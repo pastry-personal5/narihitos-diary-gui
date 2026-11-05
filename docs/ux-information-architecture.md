@@ -20,6 +20,7 @@ flowchart TB
   A --> PS[Profile selector]
   B -. between panes .- SP[Pane separator]
   I --> S[Settings]
+  N --> MW[Metadata warning]
   E --> D[Date tab]
   E --> N[Snippet tab]
   E --> F[Draft tab]

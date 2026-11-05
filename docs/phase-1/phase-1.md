@@ -75,6 +75,7 @@ Plan: [overview](milestone-08-settings-reload-overview.md), [work plan](mileston
 
 Status: Planned
 Goal: Implement bounded Ayumi/Narihito body views, metadata parsing, canonical path identities and fresh observations with independent per-file capability outcomes.
+Plan: [overview](milestone-09-source-reading-overview.md), [work plan](milestone-09-source-reading-architecture.md).
 
 ### P1-M10: Civil-date imports and timestamp resolution
 

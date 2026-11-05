@@ -14,6 +14,8 @@ The public `source_id` is an opaque encoded/hash key bound to this tuple and cur
 
 Fresh reads open a regular file beneath the validated root with no symlink traversal, bound bytes before allocation, inspect metadata before/after reading and hash complete bytes. Retry an unstable read once; then report `source_changing`. Observation tokens bind source tuple, digest, native file identity, size, config generation and import context. Roots are revalidated at each mutation, including replacement/symlink swaps. File-not-downloaded, denied, missing, malformed, unsupported and conflicting are distinct outcomes; one failed file does not discard valid neighbors.
 
+A scan returns, per file, exactly one outcome class: `ok`, `unavailable` (missing, denied, not downloaded), `malformed`, `unsupported` or `conflict`; plus scan-level `path_collision` groups and an `incomplete` flag. An `unsupported` file keeps its body viewable. An `ok` view carries one dating state: resolved instant, `timestamp_conflict` with both interpretations, or undated. Outcomes and tokens carry relative keys and codes only, never absolute paths, body text or front-matter values.
+
 ## Parsing and timestamps
 
 Separate Ayumi and Narihito adapters dispatch from `sources[].type`. Accept UTF-8 Markdown up to 8 MiB total, front matter up to 64 KiB/64 keys/8 KiB scalar, and editor body up to 1 MiB. Reject duplicate keys, YAML aliases/tags, excessive nesting, malformed encoding and stray CR. Accept a BOM and consistent CRLF for reading; preserve those conventions for supported source saves. Bound scanning to 10,000 candidates per import and report incomplete/limit reached instead of silently presenting a partial list as complete. Larger trees require a later bounded scan continuation.

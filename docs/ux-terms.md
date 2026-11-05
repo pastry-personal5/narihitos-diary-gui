@@ -36,6 +36,7 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Connection status   | `connectionStatus`   | Local server connection indicator in the Main Toolbar Strip                                                                  |
 | Save status         | `saveStatus`         | Dirty/saving/saved/failed/conflict indicator based on the acknowledged revision                                              |
 | Profile selector    | `profileSelector`    | Control for choosing a configured agent profile for Generate and AI Chat                                                     |
+| Metadata warning    | `metadataWarning`    | Per-snippet notice of parse, availability or timestamp problems, with the explicit header/filename authority choice          |
 | Snippet checkbox    | `snippetCheckbox`    | Generation-inclusion toggle in the Snippet tab; independent of snippet focus                                                 |
 | Pane separator      | `paneSeparator`      | Resizable, keyboard-operable boundary between Explorer, Tabbed Editor, AI Chat and Global Messages (the last resizes height) |
 | Completion message  | `completionMessage`  | One polite in-app message per AI completion, with View results; posted to Global Messages                                    |
