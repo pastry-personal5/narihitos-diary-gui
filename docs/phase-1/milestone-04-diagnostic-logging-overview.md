@@ -31,26 +31,50 @@ The owner asked on 2026-11-05 for an agent-debugging trace to redacted resource 
 
 Check an item only with a linked result identifying the tested revision, command or manual procedure, observed outcome and limitations. [Acceptance matrix](milestone-04-diagnostic-logging-architecture.md#acceptance-matrix) rows use the same L IDs; G IDs are the unchanged repository gate.
 
-- [ ] **L01 — Contracts:** Amend [logging](../architecture/logging.md) and [API](../architecture/api-and-processes.md) for trace IDs, resource descriptors, the trace command and diagnostic-only read-back; record the owner request in the changelog.
-- [ ] **L02 — Diagnostic model:** `Record` can be built only from allowlisted codes and typed fields; a free-form string cannot be attached; a rendered line over 2 KiB is dropped, not truncated.
-- [ ] **L03 — Store:** Role directories are 0700 and files 0600; symlinks and nonregular files are rejected on open, rotation and pruning using opened objects; a second writer fails to lock.
-- [ ] **L04 — Rotation:** Daily rollover at local midnight including DST transitions, 16 MiB size rotation, suffix allocation without truncation after restart, and a backward clock change.
-- [ ] **L05 — Caps and pruning:** At most eight files/128 MiB per role directory; at the cap, records drop instead of deleting younger files; files are pruned at exactly 72 hours (kept just under, deleted just over) at start, at rotation and hourly while idle; the active file and unrelated files or symlinks are never touched.
-- [ ] **L06 — Asynchronous worker:** Queue of 256 records of 2 KiB; overflow drops; stalled disk or stderr never blocks a producer; at most one stderr notice per minute; bounded shutdown drain. A synthetic job admission and status read complete unchanged while diagnostics are stalled; real saves are re-proved in P1-M6/M7.
-- [ ] **L07 — Server integration:** The server logs start, bind, discovery, shutdown, session, auth-rejection and fake-job events at `info` or above; no record contains the token, config contents or a request body.
-- [ ] **L08 — Client logging:** `log_client_event` rejects unknown codes, extra keys, details over 512 bytes and more than 20 events per second; the 256-line buffer and stderr fallback work before discovery; the WebView never receives a log path. Command manifest, invoke handler and capability inventories agree.
-- [ ] **L09 — Trace correlation:** The bridge sends a valid `X-Diary-Trace-Id`; the server accepts only 32 lowercase hex characters, otherwise generates one, and echoes it; the same ID appears in client and server records of one request.
-- [ ] **L10 — Redacted resource detail:** Descriptors expose only kind, validated opaque ID, revision, byte and line counts, per-instance keyed fingerprint, state tag and path class; seeded diary text, token and path strings never appear in any log line, buffer or stderr output.
-- [ ] **L11 — Trace reader:** `diary-server trace` selects by trace, operation, job, resource or `recent:<n>` (last n warn/error records, the starting point when no trace ID is known), merges server and client logs by time, revalidates every line against the schema, tolerates a truncated last line, bounds output to 200 records (maximum 500) and 256 KiB, never reads the discovery file, and neutralizes injected instruction text planted in a log line.
+- [x] **L01 — Contracts:** Amend [logging](../architecture/logging.md) and [API](../architecture/api-and-processes.md) for trace IDs, resource descriptors, the trace command and diagnostic-only read-back; record the owner request in the changelog.
+- [x] **L02 — Diagnostic model:** `Record` can be built only from allowlisted codes and typed fields; a free-form string cannot be attached; a rendered line over 2 KiB is dropped, not truncated.
+- [x] **L03 — Store:** Role directories are 0700 and files 0600; symlinks and nonregular files are rejected on open, rotation and pruning using opened objects; a second writer fails to lock.
+- [x] **L04 — Rotation:** Daily rollover at local midnight including DST transitions, 16 MiB size rotation, suffix allocation without truncation after restart, and a backward clock change.
+- [x] **L05 — Caps and pruning:** At most eight files/128 MiB per role directory; at the cap, records drop instead of deleting younger files; files are pruned at exactly 72 hours (kept just under, deleted just over) at start, at rotation and hourly while idle; the active file and unrelated files or symlinks are never touched.
+- [x] **L06 — Asynchronous worker:** Queue of 256 records of 2 KiB; overflow drops; stalled disk or stderr never blocks a producer; at most one stderr notice per minute; bounded shutdown drain. A synthetic job admission and status read complete unchanged while diagnostics are stalled; real saves are re-proved in P1-M6/M7.
+- [x] **L07 — Server integration:** The server logs start, bind, discovery, shutdown, session, auth-rejection and fake-job events at `info` or above; no record contains the token, config contents or a request body.
+- [x] **L08 — Client logging:** `log_client_event` rejects unknown codes, extra keys, details over 512 bytes and more than 20 events per second; the 256-line buffer and stderr fallback work before discovery; the WebView never receives a log path. Command manifest, invoke handler and capability inventories agree.
+- [x] **L09 — Trace correlation:** The bridge sends a valid `X-Diary-Trace-Id`; the server accepts only 32 lowercase hex characters, otherwise generates one, and echoes it; the same ID appears in client and server records of one request.
+- [x] **L10 — Redacted resource detail:** Descriptors expose only kind, validated opaque ID, revision, byte and line counts, per-instance keyed fingerprint, state tag and path class; seeded diary text, token and path strings never appear in any log line, buffer or stderr output.
+- [x] **L11 — Trace reader:** `diary-server trace` selects by trace, operation, job, resource or `recent:<n>` (last n warn/error records, the starting point when no trace ID is known), merges server and client logs by time, revalidates every line against the schema, tolerates a truncated last line, bounds output to 200 records (maximum 500) and 256 KiB, never reads the discovery file, and neutralizes injected instruction text planted in a log line.
 - [ ] **L12 — Native smoke:** Packaged server and client leave 0700/0600 logs, a seeded-secret scan finds nothing, and the trace command reconstructs one smoke request across both roles.
-- [ ] **L13 — Handoff:** Update contribution guide (agent debugging procedure), AGENTS.md commands, docs index, phase plan, roadmap, handoff row E12 and changelog; archive nothing until the milestone is Done.
-- [ ] **G01:** Pass `cargo fmt --manifest-path src-tauri/Cargo.toml --check`.
-- [ ] **G02:** Pass `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`.
-- [ ] **G03:** Pass `cargo test --manifest-path src-tauri/Cargo.toml`.
-- [ ] **G04:** Pass `npx prettier --check .`.
-- [ ] **G05:** Pass `npx eslint . --max-warnings 0`.
-- [ ] **G06:** Pass `npx vitest run`.
+- [x] **L13 — Handoff:** Update contribution guide (agent debugging procedure), AGENTS.md commands, docs index, phase plan, roadmap, handoff row E12 and changelog; archive nothing until the milestone is Done.
+- [x] **G01:** Pass `cargo fmt --manifest-path src-tauri/Cargo.toml --check`.
+- [x] **G02:** Pass `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`.
+- [x] **G03:** Pass `cargo test --manifest-path src-tauri/Cargo.toml`.
+- [x] **G04:** Pass `npx prettier --check .`.
+- [x] **G05:** Pass `npx eslint . --max-warnings 0`.
+- [x] **G06:** Pass `npx vitest run`.
 
 ## Evidence record
 
-No evidence yet; implementation has not started.
+Revision `43f1e0c` on branch `p1-m4-diagnostic-logging`, Apple Silicon macOS, 2026-11-05. Ordinary (non-fixture) build unless stated. Runs went through the test-runner; counts below are verbatim per-binary results.
+
+L01 | `docs/architecture/logging.md`, `api-and-processes.md`, changelog | prettier and relative-link check clean | amendments for trace IDs, resource detail, `comp`, selectors, trace command | Limit: owner approval is recorded in the changelog entry of the same day.
+
+L02 | `diary-application` diagnostics tests (4) and `diary-logging` codec tests (7): ID/tag/code parsers, round trip, key order, strict parse, 2 KiB drop | pass | no free-form string can be attached to a `Record` by construction | Limit: the over-2 KiB path is tested on the helper `fit` because a typed record cannot exceed the cap.
+
+L03–L05 | `diary-logging` private_fs (5) and store (10) tests: 0700/0600, second open `Locked`, hostile symlink/fifo, midnight and DST rollover, size suffixes after restart, backward clock, file and total caps, exact 72 h boundary, prune on open and rotation, active/unrelated/other-role/symlink names untouched | pass | Limit: modification times are set explicitly in tests; there is no test of real wall-clock DST on this machine.
+
+L06 | worker tests (7) and `diary-server/tests/stalled_diagnostics.rs`: 10,000 emits in under 1 s with a blocked writer, 300 emits drop 43 or 44, one stderr notice per minute, hourly idle prune, bounded shutdown, and HTTP status/session/rejection requests under a blocked writer | pass | Limit: proves job-admission-era HTTP only; real save isolation is re-proved in P1-M6/M7.
+
+L07 | diary-api diagnostics tests (5) and the server smoke: lifecycle, session, busy, cancel and auth-rejection events with no token or body | pass | Limit: `job.admitted` is not emitted (admission exists only in the fixture build); fixture job IDs are not opaque IDs, so the `job` field is omitted for them.
+
+L08 | `src-tauri/src/diagnostics/tests.rs` (4) and Vitest adapter/architecture tests: allowlist, extra keys, 512-byte detail, 20 events/s, 256-line buffer keeping the earliest, ordered flush, locked-log fallback to stderr, command inventory | pass | Limit: "no log path in any response" is structural (the command returns `Result<(), &'static str>`).
+
+L09 | diary-api trace tests and `bridge/tests.rs::every_request_carries_a_fresh_lowercase_hex_trace_id` | pass.
+
+L10 | codec fingerprint test, diary-api seeded body/token test, server smoke grep of every token and a sentinel across the log | pass | Limit: stderr output of the smoke server is not scanned.
+
+L11 | trace tests (9) and `python3 scripts/smoke/server.py` against the real binary: all selectors, epoch ordering across a DST offset change, truncated and oversize lines, injected instruction text, output bounds, no discovery read | pass | Limit: the CLI argument parser has no unit test; it is exercised only by the smoke script.
+
+L12 | Server half run: building `diary-server` and running `python3 scripts/smoke/server.py` printed PASS (0700/0600 logs, secret scan, `trace:` and `recent:` output). **Not complete:** the packaged-client half (`make smoke`, which needs a GUI session) has not been run, so client log modes and the competitor trace correlation are unverified. The new script lines for it are untested.
+
+L13 | contribution guide (debugging procedure), AGENTS.md command, docs index, phase plan, changelog | prettier clean | Limit: the handoff E12 row keeps its text; P1-M12/P1-M13 own shortcut and native key evidence.
+
+G01–G06 | revision `06eae45` (docs-only changes since) | fmt, clippy, prettier, eslint exit 0; the Rust suite passed 123 tests (api 18, application 12, client 1+23, domain 1, infrastructure 24, logging 43, stalled_diagnostics 1); Vitest 29 passed | session output, not retained in the repo.
