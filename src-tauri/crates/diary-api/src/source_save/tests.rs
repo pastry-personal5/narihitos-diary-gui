@@ -100,10 +100,7 @@ async fn rejects_unknown_fields_and_bad_input() {
             StatusCode::BAD_REQUEST
         );
     }
-    assert_eq!(
-        call(s, put("a%20b", ok_body(), true)).await.0.is_success(),
-        false
-    );
+    assert!(!call(s, put("a%20b", ok_body(), true)).await.0.is_success());
     assert!(fake.0.lock().unwrap().is_empty());
 }
 

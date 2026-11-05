@@ -1,6 +1,6 @@
 # P1-M14: Producer-compatible source saves work plan
 
-Status: Planned
+Status: Done
 
 This plan adds an explicit body save for Narihito mobile snippets that matches the producer's own edit rules and stays disabled until a producer round trip passes. Scope and checklist are in the [overview](milestone-14-producer-compatible-source-saves-overview.md); the contracts are [explicit source saves](../architecture/sources-and-dates.md#explicit-source-saves) and the [durable save protocol](../architecture/domain-and-persistence.md#autosave-protocol).
 
