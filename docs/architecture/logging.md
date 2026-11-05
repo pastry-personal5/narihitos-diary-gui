@@ -13,7 +13,7 @@ Each process writes its own files under the workspace's runtime directory, next 
 <runtime_root>/<workspace-key>/logs/client/client-YYYY-MM-DD.log
 ```
 
-The server derives the path from `paths.runtime_root`. The client has no config; it derives the same directory only after validating the `--connect` discovery file and its parent. Before that path is known, or if it is unusable, the client keeps a bounded in-memory buffer (256 lines) and writes to stderr only; it never searches for another location. Directories are owner-only (0700) and files 0600, like the rest of the [runtime directory](configuration-and-exports.md#runtime-directory). Reject symlinks/nonregular files during open, rotation and pruning, checking the opened objects rather than an earlier pathname observation. An OS lock gives one writer per role directory; another client process falls back to its bounded buffer/stderr instead of competing for the same log. Logs are not workspace, source or export data and are never exported, synced or read back as application state.
+The server derives the path from `paths.runtime_root`. The client has no config; it derives the same directory only after validating the `--connect` discovery file and its parent. Before that path is known, or if it is unusable, the client keeps a bounded in-memory buffer (256 lines) and writes to stderr only; it never searches for another location. Directories are owner-only (0700) and files 0600, like the rest of the [runtime directory](configuration-and-exports.md#runtime-directory). Reject symlinks/nonregular files during open, rotation and pruning, checking the opened objects rather than an earlier pathname observation. An OS lock gives one writer per role directory; another client process falls back to its bounded buffer/stderr instead of competing for the same log. Logs are not workspace, source or export data and are never exported, synced or read back as application state. The one exception is the read-only [trace command](#trace-and-resource-detail), which revalidates every line and never feeds state.
 
 The Rust bridge logs its own events. The WebView reports diagnostics through one typed `log_client_event` command (see [operations](api-and-processes.md#operations-and-tauri-commands)); the bridge accepts only an allowlisted event code, a level and a bounded redacted detail (at most 512 bytes), at most 20 events per second, and writes them to the client log. The WebView never receives a log path or file access.
 
@@ -28,12 +28,49 @@ The Rust bridge logs its own events. The WebView reports diagnostics through one
 
 ## Content rules
 
-Default level is `info`; `warn` and `error` are always eligible subject to the bounds above. Each line carries timestamp with offset, level, role, instance or session ID where known, event code and short message. Operation, job and resource IDs may appear. Messages come from allowlisted codes and typed fields; a free-form WebView string cannot prove itself redacted. `log_client_event` accepts only the event schema's bounded noncontent fields, rejecting extra keys and raw exception/body strings.
+Default level is `info`; `warn` and `error` are always eligible subject to the bounds above. Each line carries timestamp with offset, level, role, instance and, where known, session ID, and the event code; the code is the short message (there is no free-form text). Operation, job and resource IDs may appear. Messages come from allowlisted codes and typed fields; a free-form WebView string cannot prove itself redacted. `log_client_event` accepts only the event schema's bounded noncontent fields (code, level, optional `trace_id` and an optional detail of a component tag, count and error tag), rejecting extra keys and raw exception/body strings.
 
 Never log: the API token or any credential (including Notion), the config contents, diary or snippet body text, prompts, agent or chat output, candidate text, raw HTTP bodies, private home paths beyond what the error contract already allows in `details`, or raw exception text that may embed those. Apply the same redaction as [error bodies](api-and-processes.md#errors-and-bounds): codes and IDs, not content. A line that cannot be built without private content is dropped.
 
+## Trace and resource detail
+
+For debugging by a person or an AI coding agent, records can be followed across processes to redacted resource detail. One JSON object per line, fixed key order, absent keys omitted:
+
+```json
+{
+  "ts": "2026-11-05T09:12:03.123+09:00",
+  "lvl": "warn",
+  "role": "server",
+  "inst": "<instance id>",
+  "sess": "<session id>",
+  "code": "save.rejected",
+  "trace": "<32 hex>",
+  "op": "<id>",
+  "job": "<id>",
+  "res": {
+    "kind": "authentic_entry",
+    "id": "2026-11-05",
+    "rev": 7,
+    "bytes": 1042,
+    "lines": 21,
+    "fp": "ab12cd34ef56ab78",
+    "state": "stale",
+    "path": "entries_root"
+  },
+  "err": "stale_revision",
+  "n": 3
+}
+```
+
+- `trace` is a 32-character lowercase hex ID per client request, carried in the `X-Diary-Trace-Id` header; the server replaces a missing or invalid value.
+- `res` describes a resource with a kind, an ID that is only a UUID, a `YYYY-MM-DD` date or 16–64 lowercase hex, optional revision, byte and line counts, a state tag and a path class (`entries_root`, `runtime_root`, `source_root`, `outside_root`, `symlink`, `unknown`). It never holds a path string or content.
+- `fp` is the first 8 bytes of SHA-256(per-process random key, kind, 0x00, bytes). The key lives only in memory: fingerprints compare content across events of one process instance, cannot be reversed by a dictionary, and mean nothing after restart.
+- `state` and `err` are enum tags; no field accepts free text.
+
+`diary-server trace --config PATH --select <selector> [--limit N]` prints a bounded timeline merged from the server and client logs. Selectors: `trace:<hex>`, `op:<id>`, `job:<id>`, `res:<kind>:<id>`, `recent:<n>` (the last n ≤ 50 warn/error records, to find a trace ID). It is read-only, never reads the discovery file or takes the workspace lock, parses every line strictly, drops lines that fail validation (including a truncated last line), re-renders output from parsed values rather than copying bytes, sorts by epoch time, and prints at most 200 records (limit up to 500) and 256 KiB, followed by a summary line with distinct resources, invalid-line count and truncation.
+
 ## Required evidence
 
-Synthetic fixtures with an injected clock must show: daily rollover at local midnight including DST changes, size/total-cap behavior and restart suffix allocation, pruning at exactly 72 hours (kept just under, deleted just over), pruning on start and at rotation in a long-running process, active file never deleted, unrelated files/symlinks untouched, 0700/0600 modes, competing client log writers, bounded client buffer/async queue, event rate/size limits and schema rejection, and a scan proving seeded token and body strings never appear. A stalled writer/stderr and full queue must leave a save and a job unaffected.
+Synthetic fixtures with an injected clock must show: daily rollover at local midnight including DST changes, size/total-cap behavior and restart suffix allocation, pruning at exactly 72 hours (kept just under, deleted just over), pruning on start and at rotation in a long-running process, active file never deleted, unrelated files/symlinks untouched, 0700/0600 modes, competing client log writers, bounded client buffer/async queue, event rate/size limits and schema rejection, and a scan proving seeded token and body strings never appear. For the trace: all selectors, a truncated line, injected instruction text in a code, ID or extra key never reaching output, DST offset ordering, output bounds and no discovery-file read. A stalled writer/stderr and full queue must leave a save and a job unaffected.
 
 `tracing` with a custom age-based pruner is the preferred candidate; `tracing-appender` rotates but prunes by file count, not age, so it does not satisfy this contract alone. Any logging dependency still needs approval and a license check before adoption.
