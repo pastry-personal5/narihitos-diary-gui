@@ -1,0 +1,12 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+*.log
+.env
+.DS_Store
+
+tmp/
+tmp/initial-owner-ideas.md
+
+config/global_config.yaml

@@ -1,0 +1,6 @@
+[submodule "contrib/narihitos-diary"]
+	path = contrib/narihitos-diary
+	url = git@github.com:pastry-personal5/narihitos-diary.git
+[submodule "contrib/narihitos-diary-mobile"]
+	path = contrib/narihitos-diary-mobile
+	url = git@github.com:pastry-personal5/narihitos-diary-mobile.git
