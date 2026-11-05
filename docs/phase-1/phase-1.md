@@ -49,6 +49,8 @@ Notes: Includes the owner-requested agent-debugging trace to redacted resource d
 
 Status: Planned
 Goal: Establish locked workspace initialization, versioned SQLite authority, durable operation/step identities, resource reservations and startup recovery classification.
+Plan: [overview](milestone-05-workspace-durable-operations-overview.md), [work plan](milestone-05-workspace-durable-operations-architecture.md).
+Notes: Needs owner approval of `rusqlite` before code.
 
 ### P1-M6: Authentic persistence and recovery
 
