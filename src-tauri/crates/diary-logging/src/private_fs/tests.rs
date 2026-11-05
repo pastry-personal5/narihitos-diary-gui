@@ -26,3 +26,57 @@ fn opened_metadata_policy_rejects_foreign_owners_kinds_and_special_modes() {
         );
     }
 }
+
+fn dir() -> (tempfile::TempDir, std::path::PathBuf, PrivateDir) {
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().canonicalize().unwrap();
+    std::fs::set_permissions(&base, std::os::unix::fs::PermissionsExt::from_mode(0o700)).unwrap();
+    let dir = PrivateDir::open(&base).unwrap();
+    (temp, base, dir)
+}
+
+#[test]
+fn list_returns_names_and_hostile_entries_fail_metadata() {
+    let (_t, base, dir) = dir();
+    std::fs::write(base.join("reg"), "abc").unwrap();
+    std::os::unix::fs::symlink(base.join("reg"), base.join("link")).unwrap();
+    let fifo = std::ffi::CString::new(base.join("fifo").to_str().unwrap()).unwrap();
+    // SAFETY: valid NUL-terminated path.
+    assert_eq!(unsafe { libc::mkfifo(fifo.as_ptr(), 0o600) }, 0);
+    assert_eq!(dir.list().unwrap(), ["fifo", "link", "reg"]);
+    let meta = dir.metadata("reg").unwrap();
+    assert_eq!(meta.len, 3);
+    assert!(meta.modified_epoch_secs > 1_700_000_000);
+    assert!(dir.metadata("link").is_err());
+    assert!(dir.metadata("fifo").is_err());
+    assert!(dir.metadata("missing").is_err());
+}
+
+#[test]
+fn lock_is_exclusive_across_handles() {
+    let (_t, _base, dir) = dir();
+    let first = dir.lock("w.lock").unwrap();
+    assert_eq!(dir.lock("w.lock").err(), Some(FsError::Busy));
+    drop(first);
+    assert!(dir.lock("w.lock").is_ok());
+}
+
+#[test]
+fn append_creates_0600_file_appends_and_rejects_symlink() {
+    use std::io::Write;
+    use std::os::unix::fs::PermissionsExt;
+    let (_t, base, dir) = dir();
+    dir.append("a.log").unwrap().write_all(b"one\n").unwrap();
+    dir.append("a.log").unwrap().write_all(b"two\n").unwrap();
+    assert_eq!(std::fs::read(base.join("a.log")).unwrap(), b"one\ntwo\n");
+    assert_eq!(
+        std::fs::metadata(base.join("a.log"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o7777,
+        0o600
+    );
+    std::os::unix::fs::symlink(base.join("a.log"), base.join("b.log")).unwrap();
+    assert!(dir.append("b.log").is_err());
+}

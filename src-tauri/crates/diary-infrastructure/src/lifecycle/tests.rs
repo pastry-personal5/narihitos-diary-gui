@@ -201,3 +201,19 @@ fn cleanup_preserves_foreign_malformed_and_symlinked_records() {
         }
     }
 }
+
+#[test]
+fn workspace_key_matches_lock_key() {
+    let (_temp, workspace, _) = fixture();
+    let lock = WorkspaceLock::acquire(&workspace).unwrap();
+    assert_eq!(workspace_key(&workspace), lock.workspace_key);
+}
+
+#[test]
+fn entropy_fills_distinct_buffers() {
+    let (mut a, mut b) = ([0u8; 16], [0u8; 16]);
+    entropy(&mut a).unwrap();
+    entropy(&mut b).unwrap();
+    assert_ne!(a, b);
+    assert_ne!(a, [0u8; 16]);
+}

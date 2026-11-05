@@ -12,7 +12,7 @@ impl From<FsError> for ConfigError {
         match e {
             FsError::Path => Self::Path,
             FsError::Permissions => Self::Permissions,
-            FsError::Io => Self::Io,
+            FsError::Io | FsError::Busy => Self::Io,
         }
     }
 }

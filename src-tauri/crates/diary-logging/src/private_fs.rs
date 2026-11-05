@@ -14,6 +14,8 @@ pub enum FsError {
     Path,
     Permissions,
     Io,
+    /// Another holder has the advisory lock.
+    Busy,
 }
 
 pub fn check_private_metadata(
@@ -44,6 +46,13 @@ fn private_attributes(
         return Err(FsError::Permissions);
     }
     Ok(())
+}
+
+/// Size and modification time of an opened regular file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileMeta {
+    pub len: u64,
+    pub modified_epoch_secs: i64,
 }
 
 pub struct PrivateDir {
@@ -160,6 +169,103 @@ impl PrivateDir {
             Err(io::Error::last_os_error())
         }
     }
+    /// Entry names (no "." or ".."), sorted. Names only: callers must open each entry
+    /// through this directory so a swapped or hostile entry is judged on the opened object.
+    pub fn list(&self) -> Result<Vec<String>, FsError> {
+        // SAFETY: dup of a live descriptor; fdopendir takes ownership of the duplicate.
+        let fd = unsafe { libc::dup(self.file.as_raw_fd()) };
+        if fd < 0 {
+            return Err(FsError::Io);
+        }
+        // SAFETY: fd is a fresh directory descriptor.
+        let dir = unsafe { libc::fdopendir(fd) };
+        if dir.is_null() {
+            // SAFETY: fdopendir failed, so fd is still ours.
+            unsafe { libc::close(fd) };
+            return Err(FsError::Io);
+        }
+        // The duplicate shares its offset with the original; start from the beginning.
+        // SAFETY: dir is a live DIR*.
+        unsafe { libc::rewinddir(dir) };
+        let mut names = Vec::new();
+        loop {
+            // SAFETY: dir is live; the returned entry is valid until the next readdir.
+            let entry = unsafe { libc::readdir(dir) };
+            if entry.is_null() {
+                break;
+            }
+            // SAFETY: d_name is NUL-terminated within the entry.
+            let raw = unsafe { std::ffi::CStr::from_ptr((*entry).d_name.as_ptr()) };
+            if let Ok(n) = raw.to_str()
+                && n != "."
+                && n != ".."
+            {
+                names.push(n.to_owned());
+            }
+        }
+        // SAFETY: closes dir and the duplicate descriptor exactly once.
+        unsafe { libc::closedir(dir) };
+        names.sort();
+        Ok(names)
+    }
+
+    fn open_regular(&self, value: &str, flags: libc::c_int) -> Result<File, FsError> {
+        let value = name(value).map_err(|_| FsError::Path)?;
+        // SAFETY: valid parent fd and component; O_NONBLOCK keeps a fifo from blocking open.
+        let file = owned(unsafe {
+            libc::openat(
+                self.file.as_raw_fd(),
+                value.as_ptr(),
+                flags | libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK,
+                0o600,
+            )
+        })
+        .map_err(|_| FsError::Permissions)?;
+        if !file.metadata().map_err(|_| FsError::Io)?.is_file() {
+            return Err(FsError::Permissions);
+        }
+        Ok(file)
+    }
+
+    /// Size and mtime of a regular file, judged on the opened object (symlinks, fifos and
+    /// other kinds are errors).
+    pub fn metadata(&self, value: &str) -> Result<FileMeta, FsError> {
+        use std::os::unix::fs::MetadataExt;
+        let meta = self
+            .open_regular(value, libc::O_RDONLY)?
+            .metadata()
+            .map_err(|_| FsError::Io)?;
+        Ok(FileMeta {
+            len: meta.len(),
+            modified_epoch_secs: meta.mtime(),
+        })
+    }
+
+    /// Opens or creates a private (0600, owner-only) regular file for appending.
+    pub fn append(&self, value: &str) -> Result<File, FsError> {
+        let file = self.open_regular(value, libc::O_WRONLY | libc::O_APPEND | libc::O_CREAT)?;
+        check_private_metadata(&file.metadata().map_err(|_| FsError::Io)?, false)?;
+        Ok(file)
+    }
+
+    /// Opens or creates a private file and takes a non-blocking exclusive advisory lock that
+    /// lasts as long as the returned handle. `FsError::Busy` means another holder has it.
+    pub fn lock(&self, value: &str) -> Result<File, FsError> {
+        let file = self.open_regular(value, libc::O_RDWR | libc::O_CREAT)?;
+        check_private_metadata(&file.metadata().map_err(|_| FsError::Io)?, false)?;
+        // SAFETY: live descriptor.
+        if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+            return Err(
+                if io::Error::last_os_error().kind() == io::ErrorKind::WouldBlock {
+                    FsError::Busy
+                } else {
+                    FsError::Io
+                },
+            );
+        }
+        Ok(file)
+    }
+
     pub fn sync(&self) -> io::Result<()> {
         self.file.sync_all()
     }

@@ -21,6 +21,21 @@ pub enum LifecycleError {
     Entropy,
 }
 
+/// Fills `buf` (at most 256 bytes) from the OS entropy source.
+pub fn entropy(buf: &mut [u8]) -> Result<(), LifecycleError> {
+    // SAFETY: writable buffer of specified length; getentropy limits requests to 256 bytes.
+    if buf.len() > 256 || unsafe { libc::getentropy(buf.as_mut_ptr().cast(), buf.len()) } != 0 {
+        return Err(LifecycleError::Entropy);
+    }
+    Ok(())
+}
+
+/// Stable workspace identifier: SHA-256 of the canonical entries-root path.
+pub fn workspace_key(canonical: &Path) -> String {
+    use std::os::unix::ffi::OsStrExt;
+    hex(&Sha256::digest(canonical.as_os_str().as_bytes()))
+}
+
 pub struct WorkspaceLock {
     _file: File,
     pub workspace_key: String,
@@ -41,8 +56,7 @@ impl WorkspaceLock {
             Err(std::fs::TryLockError::WouldBlock) => return Err(LifecycleError::WorkspaceBusy),
             Err(_) => return Err(LifecycleError::Io),
         }
-        use std::os::unix::ffi::OsStrExt;
-        let workspace_key = hex(&Sha256::digest(canonical.as_os_str().as_bytes()));
+        let workspace_key = workspace_key(&canonical);
         Ok(Self {
             _file: file,
             workspace_key,
@@ -79,10 +93,7 @@ pub struct Discovery {
 impl Discovery {
     pub fn fresh(workspace_key: &str, port: u16) -> Result<Self, LifecycleError> {
         let mut bytes = [0u8; 48];
-        // SAFETY: writable buffer of specified length, below getentropy's 256-byte limit.
-        if unsafe { libc::getentropy(bytes.as_mut_ptr().cast(), bytes.len()) } != 0 {
-            return Err(LifecycleError::Entropy);
-        }
+        entropy(&mut bytes)?;
         bytes[6] = (bytes[6] & 0x0f) | 0x40;
         bytes[8] = (bytes[8] & 0x3f) | 0x80;
         let instance_id = format!(
