@@ -98,7 +98,7 @@ with tempfile.TemporaryDirectory(prefix='diary-producer-smoke-') as temporary:
         path.write_bytes(data)
         files[name] = (ident, path)
         expected_before[name] = decode(path)
-    big_id, big = document(body='é' * (524288))  # exactly 1 MiB of UTF-8
+    big_id, big = document(body='é' * 524287 + 'x')  # 1 MiB - 1: the GUI reader counts the separator newline
     (source / rel(big_id)).write_bytes(big)
     files['1 MiB body'] = (big_id, source / rel(big_id))
     expected_before['1 MiB body'] = decode(files['1 MiB body'][1])
@@ -152,6 +152,9 @@ with tempfile.TemporaryDirectory(prefix='diary-producer-smoke-') as temporary:
             code, page = call(record, session, f'/sources?import_id={import_id}' + cursor)
             assert code == 200, (code, page)
             for item in page['items']:
+                if item['source'] is None:
+                    print('non-source row:', {k: item[k] for k in item if k != 'source'})
+                    continue
                 found[item['source']['relative_key']] = item['source']
             if page['next_cursor'] is None:
                 return import_id, found
@@ -174,13 +177,14 @@ with tempfile.TemporaryDirectory(prefix='diary-producer-smoke-') as temporary:
         import_id, listing = import_and_list(record, session, 'one')
         checked = {}
         for name, (ident, path) in files.items():
+            assert rel(ident) in listing, ('not listed', name)
             item = listing[rel(ident)]
             view = read(record, session, import_id, item['id'])
             assert view['capabilities']['save'] is True, (name, view['capabilities'])
             before = expected_before[name]
-            new_body = NEW_BODIES.get(name, 'replaced ' + name + '\n') if name != '1 MiB body' else 'é' * 524288 + ''
+            new_body = NEW_BODIES.get(name, 'replaced ' + name + '\n')
             if name == '1 MiB body':
-                new_body = 'ü' * 524288
+                new_body = 'ü' * 524287 + 'y'
             # The GUI view drops the producer's separator line; the saved body is exactly the text.
             assert view['body'] == before['body'], name
             code, out = save(record, session, item['id'], sha(path), new_body)
@@ -192,7 +196,7 @@ with tempfile.TemporaryDirectory(prefix='diary-producer-smoke-') as temporary:
                 assert after[key] == before[key], (name, key, before[key], after[key])
             checked[name] = (item, out['digest'])
             # A second GUI save chains on the returned digest without a re-import.
-            code, again = save(record, session, item['id'], out['digest'], new_body + 'more' if new_body else 'more')
+            code, again = save(record, session, item['id'], out['digest'], new_body[:-1] + 'z' if name == '1 MiB body' else new_body + 'more')
             assert code == 200, (name, code, again)
             checked[name] = (item, again['digest'])
             assert decode(path)['updated_at'] > after['updated_at'], name

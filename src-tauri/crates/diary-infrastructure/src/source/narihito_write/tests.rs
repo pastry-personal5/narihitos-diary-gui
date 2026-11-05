@@ -218,7 +218,11 @@ fn rejects_body_with_cr_or_over_1mib() {
         splice(&old, REL, &"x".repeat((1 << 20) + 1), 1),
         Err(Unwritable::Body)
     );
-    assert!(splice(&old, REL, &"x".repeat(1 << 20), 2_000_000_000).is_ok());
+    assert_eq!(
+        splice(&old, REL, &"x".repeat(1 << 20), 2_000_000_000),
+        Err(Unwritable::Body)
+    );
+    assert!(splice(&old, REL, &"x".repeat((1 << 20) - 1), 2_000_000_000).is_ok());
 }
 
 #[test]

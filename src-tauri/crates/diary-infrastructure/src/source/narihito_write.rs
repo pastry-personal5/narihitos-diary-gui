@@ -330,9 +330,11 @@ pub(crate) fn check(bytes: &[u8], rel: &str) -> Result<Checked, Unwritable> {
     })
 }
 
-/// A body is writable when it has no CR and fits the producer's 1 MiB cap.
+/// A body is writable when it has no CR and, with the separator newline the reader counts,
+/// still fits the 1 MiB read cap (so the GUI can always re-read what it wrote; one byte under
+/// the producer's own cap).
 pub(crate) fn body_ok(body: &str) -> Result<(), Unwritable> {
-    if body.len() > MAX_BODY || body.contains('\r') {
+    if body.len() >= MAX_BODY || body.contains('\r') {
         Err(Unwritable::Body)
     } else {
         Ok(())
