@@ -17,6 +17,7 @@ export interface SettingsFake extends SettingsPart {
   updates: UserSettingsUpdate[];
   reloadAnswer: ReloadResult;
 }
+import { DEFAULT_BINDINGS } from "../src/application/actions/actions";
 const tag = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 /** An in-memory stand-in for the settings commands; share one between Apps to model restart. */
 export function settingsFake(
@@ -32,6 +33,8 @@ export function settingsFake(
       warnings: [],
       writing_locale: null,
       keybindings: {},
+      effective_keybindings: { ...DEFAULT_BINDINGS },
+      keybinding_issues: [],
       ...user,
     },
     server: {
@@ -72,6 +75,21 @@ export function settingsFake(
         const found = (u.value as string[]).find((t) => tag.test(t));
         if (!found) throw new SettingsError("language_unresolved");
         if (fake.user.writing_locale === null) fake.user.writing_locale = found;
+      } else if (u.section === "keybindings") {
+        const v = u.value as {
+          set?: Record<string, string[] | null>;
+          reset_all?: boolean;
+        };
+        const stored = (v.reset_all ? {} : fake.user.keybindings) as Record<
+          string,
+          string[]
+        >;
+        for (const [id, keys] of Object.entries(v.set ?? {})) {
+          if (keys === null) delete stored[id];
+          else stored[id] = keys;
+        }
+        fake.user.keybindings = stored;
+        fake.user.effective_keybindings = { ...DEFAULT_BINDINGS, ...stored };
       } else if (u.section === "writing") {
         if (typeof u.value !== "string" || !tag.test(u.value))
           throw new SettingsError("invalid_input");

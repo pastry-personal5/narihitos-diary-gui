@@ -98,6 +98,9 @@ export interface UserSettings {
   warnings: { section: string; code: string }[];
   writing_locale: string | null;
   keybindings: unknown;
+  /** Defaults merged with valid, conflict-free overrides, one list per action. */
+  effective_keybindings: Record<string, string[]>;
+  keybinding_issues: { id: string; code: string }[];
 }
 export interface UserSettingsUpdate {
   /** `writing_init` takes the system's preferred tags and only fills an empty choice. */

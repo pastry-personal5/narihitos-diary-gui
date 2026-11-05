@@ -1,3 +1,4 @@
+import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { useState } from "react";
 import {
   RELOAD_MESSAGE,
@@ -25,9 +26,9 @@ export function SettingsView({
   onClose: () => void;
 }) {
   const { user, server, error } = model;
-  const [section, setSection] = useState<"Status" | "Writing Language">(
-    "Status",
-  );
+  const [section, setSection] = useState<
+    "Status" | "Writing Language" | "Keyboard Shortcuts"
+  >("Status");
   const [draft, setDraft] = useState("");
   const [confirmRecover, setConfirmRecover] = useState(false);
   const locale = user?.writing_locale ?? null;
@@ -35,15 +36,17 @@ export function SettingsView({
   return (
     <section aria-label="Settings" className="settings">
       <nav aria-label="Settings sections">
-        {(["Status", "Writing Language"] as const).map((name) => (
-          <button
-            key={name}
-            aria-pressed={section === name}
-            onClick={() => setSection(name)}
-          >
-            {name}
-          </button>
-        ))}
+        {(["Status", "Writing Language", "Keyboard Shortcuts"] as const).map(
+          (name) => (
+            <button
+              key={name}
+              aria-pressed={section === name}
+              onClick={() => setSection(name)}
+            >
+              {name}
+            </button>
+          ),
+        )}
         <button onClick={onClose}>Close Settings</button>
       </nav>
       <div className="settings-body">
@@ -56,7 +59,10 @@ export function SettingsView({
           </p>
         ))}
         {user?.recoverable && (
-          <p>
+          <p
+            role={confirmRecover ? "dialog" : undefined}
+            aria-label={confirmRecover ? "Recover settings" : undefined}
+          >
             {confirmRecover ? (
               <>
                 The original file is kept as a private backup first.{" "}
@@ -134,6 +140,8 @@ export function SettingsView({
               </>
             )}
           </div>
+        ) : section === "Keyboard Shortcuts" ? (
+          <KeyboardShortcuts user={user} save={model.setKeybindings} />
         ) : (
           <div aria-label="Writing Language">
             <h2>Writing Language</h2>

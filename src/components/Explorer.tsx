@@ -264,7 +264,7 @@ export function Explorer({ model }: { model: NavigationModel }) {
         </>
       )}
       {view === "Snippet tab" && (
-        <>
+        <div data-snippet-tree>
           <button
             disabled={
               !date ||
@@ -340,7 +340,7 @@ export function Explorer({ model }: { model: NavigationModel }) {
               )}
             </>
           )}
-        </>
+        </div>
       )}
       {view === "Draft tab" && (
         <>

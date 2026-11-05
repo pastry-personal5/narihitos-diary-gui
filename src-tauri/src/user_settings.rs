@@ -11,6 +11,7 @@ use std::{
     sync::Mutex,
 };
 
+mod keybindings;
 mod locale;
 pub use locale::canonical_tag;
 
@@ -32,13 +33,18 @@ pub struct Snapshot {
     pub recoverable: bool,
     pub warnings: Vec<Warning>,
     pub writing_locale: Option<String>,
+    /// Stored overrides, verbatim (unknown and invalid entries included).
     pub keybindings: Value,
+    /// Defaults merged with valid, conflict-free overrides, one list per registry action.
+    pub effective_keybindings: Value,
+    pub keybinding_issues: Vec<keybindings::Issue>,
 }
 pub enum Change {
     /// A user-chosen language tag (validated and canonicalised here).
     Writing(String),
     /// First run: store the first valid tag of the system's preferred list, only if none is saved.
     InitWriting(Vec<String>),
+    /// `{"set": {id: [shortcut..] | null}}` or `{"reset_all": true}`; see `keybindings::apply`.
     Keybindings(Value),
     /// Back the original up privately, then replace an invalid or newer-schema file with defaults.
     Recover,
@@ -134,15 +140,8 @@ fn valid_writing(v: &Value) -> Option<String> {
     let object = v.as_object().filter(|o| o.len() == 1)?;
     canonical_tag(object.get("locale")?.as_str()?)
 }
-fn valid_keybindings(v: &Value) -> bool {
-    v.as_object().is_some_and(|o| {
-        o.len() <= 512
-            && o.values().all(|keys| {
-                keys.as_array().is_some_and(|a| {
-                    a.len() <= 8 && a.iter().all(|k| k.as_str().is_some_and(|k| k.len() <= 64))
-                })
-            })
-    })
+fn valid_keybindings(v: &Value) -> Option<&Map<String, Value>> {
+    v.as_object().filter(|o| o.len() <= 512)
 }
 fn revision(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
@@ -159,7 +158,10 @@ fn snapshot_of(r: &Observed) -> Snapshot {
         warnings: Vec::new(),
         writing_locale: None,
         keybindings: json!({}),
+        effective_keybindings: Value::Null,
+        keybinding_issues: Vec::new(),
     };
+    let mut overrides = Map::new();
     match &r.disk {
         Disk::Missing => {}
         Disk::Invalid => {
@@ -183,14 +185,18 @@ fn snapshot_of(r: &Observed) -> Snapshot {
                 }
             }
             if let Some(v) = map.get("keybindings") {
-                if valid_keybindings(v) {
+                if let Some(o) = valid_keybindings(v) {
                     s.keybindings = v.clone();
+                    overrides = o.clone();
                 } else {
                     s.warnings.push(warn("keybindings", "section_invalid"));
                 }
             }
         }
     }
+    let (effective, issues) = keybindings::effective(&overrides);
+    s.effective_keybindings = Value::Object(effective);
+    s.keybinding_issues = issues;
     s
 }
 
@@ -313,10 +319,20 @@ impl Store {
                 map.insert("writing".into(), json!({ "locale": tag }));
             }
             Change::Keybindings(value) => {
-                if !valid_keybindings(&value) {
+                let mut corrupt = false;
+                let stored = match map.get("keybindings") {
+                    None => Map::new(),
+                    // Only Reset all may replace a corrupt (non-object) section.
+                    Some(v) => valid_keybindings(v).cloned().unwrap_or_else(|| {
+                        corrupt = true;
+                        Map::new()
+                    }),
+                };
+                if corrupt && value.get("reset_all").is_none() {
                     return Err(Error::Invalid);
                 }
-                map.insert("keybindings".into(), value);
+                let next = keybindings::apply(&stored, &value).ok_or(Error::Invalid)?;
+                map.insert("keybindings".into(), Value::Object(next));
             }
         }
         let mut object = Map::new();

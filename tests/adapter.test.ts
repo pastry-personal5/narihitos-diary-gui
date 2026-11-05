@@ -285,6 +285,8 @@ describe("settings commands", () => {
     warnings: [],
     writing_locale: "ja-JP",
     keybindings: {},
+    effective_keybindings: { "editor.save": ["Command+S"] },
+    keybinding_issues: [],
     path: "/Users/me/secret",
   };
   it("sends camelCase arguments and rebuilds the user settings DTO", async () => {

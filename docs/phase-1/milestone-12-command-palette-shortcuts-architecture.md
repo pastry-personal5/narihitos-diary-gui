@@ -1,6 +1,6 @@
 # P1-M12: Command palette and keyboard shortcuts work plan
 
-Status: Planned
+Status: Done
 
 This plan implements the [keyboard shortcuts contract](../architecture/keyboard-shortcuts.md) in the existing Rust user-settings store and React shell. It adds no dependency; scope and checklist are in the [overview](milestone-12-command-palette-shortcuts-overview.md).
 

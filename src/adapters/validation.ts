@@ -238,6 +238,19 @@ export function userSettingsDto(value: unknown): UserSettings {
     writing_locale:
       dto.writing_locale == null ? null : text(dto.writing_locale, 35),
     keybindings: dto.keybindings ?? {},
+    effective_keybindings: Object.fromEntries(
+      Object.entries(record(dto.effective_keybindings)).map(([id, keys]) => [
+        text(id, 64),
+        list(keys, 8).map((k) => text(k, 64)),
+      ]),
+    ),
+    // Issue ids echo hand-edited file keys (any length, even empty): clip, never reject.
+    keybinding_issues: list(dto.keybinding_issues, 1024).map((item) => {
+      const issue = record(item);
+      if (typeof issue.id !== "string")
+        throw new Error("Invalid server response");
+      return { id: issue.id.slice(0, 128), code: text(issue.code, 32) };
+    }),
   };
 }
 /** The bridge answers `{code}` or a bare code string; anything else becomes `unavailable`. */

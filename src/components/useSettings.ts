@@ -44,7 +44,10 @@ export function useSettings(bridge: Bridge, connected: boolean) {
     setUser(next);
   }, []);
   const update = useCallback(
-    async (section: "writing" | "writing_init", value: unknown) => {
+    async (
+      section: "writing" | "writing_init" | "keybindings",
+      value: unknown,
+    ) => {
       if (revision.current === undefined) return false;
       try {
         const next = await bridge.updateUserSettings({
@@ -132,6 +135,7 @@ export function useSettings(bridge: Bridge, connected: boolean) {
     serverError,
     reloading,
     setWriting: (tag: string) => update("writing", tag),
+    setKeybindings: (value: unknown) => update("keybindings", value),
     recover: async () => {
       if (revision.current === undefined) return;
       try {

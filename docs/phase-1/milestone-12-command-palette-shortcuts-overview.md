@@ -1,6 +1,6 @@
 # P1-M12: Command palette and keyboard shortcuts overview
 
-Status: Planned
+Status: Done
 
 Route every GUI action through one registry, and add the command palette and editable, persistent, scope-aware keyboard shortcuts with conflict and IME protection. No new product behavior, dependency or build tool is proposed. The [work plan](milestone-12-command-palette-shortcuts-architecture.md) defines files, interfaces, sequencing and tests.
 
@@ -20,16 +20,16 @@ Not included: handlers for `source.trash`, `generate.start`, `ai.*` and `export.
 
 Check only with recorded evidence. Planning does not complete these items.
 
-- [ ] K01 — One registry file lists all 12 actions with id, label, info, scope and defaults; Rust and TypeScript both read it, and a parity test fails if either side's copy of ids, scopes, defaults or the reserved list diverges.
-- [ ] K02 — Shortcut strings canonicalize identically in Rust and TypeScript from shared fixtures (modifier order Control, Option, Shift, Command; `Shift+Command+P` equals `Command+Shift+P`); the factory defaults validate cleanly under the shipped validator.
-- [ ] K03 — Effective bindings merge defaults with overrides (new actions and defaults reach users with overrides); unknown ids, invalid strings and conflicts are inactive and reported, never fatal; a newly added default never steals an existing override.
-- [ ] K04 — `update_user_settings` for `keybindings` validates against registry and reserved keys in Rust, keeps unknown/invalid entries on disk through ordinary one-action edits, and replaces them only through Reset all; the snapshot returns effective bindings and per-entry issues. No new Tauri command or capability.
-- [ ] K05 — The dispatcher resolves a keydown by canonical shortcut and scope, never during IME composition (`isComposing` or `keyCode 229`), never for reserved text/clipboard/system keys, and `snippetTree` shortcuts fire only with focus in the Snippet tab so editor deletion is unaffected.
-- [ ] K06 — The command palette opens from `palette.open` and the toolbar, filters by label, shows current shortcuts and disabled reasons, runs the enabled action, and restores focus to its invoker; Enter during composition does not run an action.
-- [ ] K07 — Create Empty, Save/flush, Refresh, Settings and the palette are reachable from the toolbar or palette when unbound, and toolbar buttons call the registry handlers. `editor.save` on a source never reports success while source writers are disabled.
-- [ ] K08 — Registered-but-unavailable actions are listed with a reason; a bound shortcut for one is consumed and posts the reason to Global Messages. `source.trash` opens nothing.
-- [ ] K09 — The Settings table shows Action, Original, Current ("Modified"), Info; capture, Escape, add/remove chip, Edit, Reset, confirmed Reset all, conflict naming with explicit Reassign, reserved-key messages, text names for VoiceOver. Dispatch pauses during capture and while the source-guard, recovery or Reset-all dialogs are open.
-- [ ] K10 — Affected docs, README, handoff, phase plan, roadmap and changelog reflect actual behavior and the evidence limit (no native key proof).
+- [x] K01 — One registry file lists all 12 actions with id, label, info, scope and defaults; Rust and TypeScript both read it, and a parity test fails if either side's copy of ids, scopes, defaults or the reserved list diverges.
+- [x] K02 — Shortcut strings canonicalize identically in Rust and TypeScript from shared fixtures (modifier order Control, Option, Shift, Command; `Shift+Command+P` equals `Command+Shift+P`); the factory defaults validate cleanly under the shipped validator.
+- [x] K03 — Effective bindings merge defaults with overrides (new actions and defaults reach users with overrides); unknown ids, invalid strings and conflicts are inactive and reported, never fatal; a newly added default never steals an existing override.
+- [x] K04 — `update_user_settings` for `keybindings` validates against registry and reserved keys in Rust, keeps unknown/invalid entries on disk through ordinary one-action edits, and replaces them only through Reset all; the snapshot returns effective bindings and per-entry issues. No new Tauri command or capability.
+- [x] K05 — The dispatcher resolves a keydown by canonical shortcut and scope, never during IME composition (`isComposing` or `keyCode 229`), never for reserved text/clipboard/system keys, and `snippetTree` shortcuts fire only with focus in the Snippet tab so editor deletion is unaffected.
+- [x] K06 — The command palette opens from `palette.open` and the toolbar, filters by label, shows current shortcuts and disabled reasons, runs the enabled action, and restores focus to its invoker; Enter during composition does not run an action.
+- [x] K07 — Create Empty, Save/flush, Refresh, Settings and the palette are reachable from the toolbar or palette when unbound, and toolbar buttons call the registry handlers. `editor.save` on a source never reports success while source writers are disabled.
+- [x] K08 — Registered-but-unavailable actions are listed with a reason; a bound shortcut for one is consumed and posts the reason to Global Messages. `source.trash` opens nothing.
+- [x] K09 — The Settings table shows Action, Original, Current ("Modified"), Info; capture, Escape, add/remove chip, Edit, Reset, confirmed Reset all, conflict naming with explicit Reassign, reserved-key messages, text names for VoiceOver. Dispatch pauses during capture and while the source-guard, recovery or Reset-all dialogs are open.
+- [x] K10 — Affected docs, README, handoff, phase plan, roadmap and changelog reflect actual behavior and the evidence limit (no native key proof).
 
 ## Plan-review checklist
 
@@ -39,16 +39,18 @@ Check only with recorded evidence. Planning does not complete these items.
 
 ## Implementation gate
 
-- [ ] G01 — `cargo fmt --manifest-path src-tauri/Cargo.toml --check`
-- [ ] G02 — `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
-- [ ] G03 — `cargo test --manifest-path src-tauri/Cargo.toml`
-- [ ] G04 — `npx prettier --check .`
-- [ ] G05 — `npx eslint . --max-warnings 0`
-- [ ] G06 — `npx vitest run`
-- [ ] G07 — `npx tsc --noEmit` (additional project check)
+- [x] G01 — `cargo fmt --manifest-path src-tauri/Cargo.toml --check`
+- [x] G02 — `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
+- [x] G03 — `cargo test --manifest-path src-tauri/Cargo.toml`
+- [x] G04 — `npx prettier --check .`
+- [x] G05 — `npx eslint . --max-warnings 0`
+- [x] G06 — `npx vitest run`
+- [x] G07 — `npx tsc --noEmit` (additional project check)
 
 Run affected tests while iterating and `scripts/gate.sh` once at the end. If a command cannot run, leave its item unchecked and record the blocker.
 
 ## Evidence record
 
 Planned 2026-11-06. Plan review completed 2026-11-06; eight findings (F1–F8) and their corrections are in the [work plan](milestone-12-command-palette-shortcuts-architecture.md#plan-review-findings-and-corrections). Planning validation passed: `npx prettier --check docs`, a local-link check over both plans, the README and the roadmap (no broken targets), and `git diff --check`. No application code or dependencies changed; the gate was not run, so K01–K10 and G01–G07 stay unchecked until implementation.
+
+Implemented 2026-11-06. `scripts/gate.sh` passed (G01–G07). Evidence: Rust `user_settings` tests (registry parity, fixtures, per-entry survival, reset_all, merge/conflicts, stale revision), `tests/shortcuts.test.ts` (canonical fixtures, dispatcher IME/reserved/scope/suspension/disabled reasons) and `tests/settings-ui.test.tsx` (palette, Settings table). Known limits: no native WKWebView key/IME proof (P1-M13/P1-M28); `code`-based matching follows physical keys on non-US layouts; the Rust editor accepts a conflicting `set` and deactivates it on merge rather than rejecting it.

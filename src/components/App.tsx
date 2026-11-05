@@ -15,6 +15,13 @@ import { GlobalMessages } from "./GlobalMessages";
 import { PaneSeparator } from "./PaneSeparator";
 import { NavigationModel } from "../application/navigation/model";
 import { useSettings } from "./useSettings";
+import { CommandPalette } from "./CommandPalette";
+import {
+  ACTIONS,
+  DEFAULT_BINDINGS,
+  type Handlers,
+} from "../application/actions/actions";
+import { createDispatcher } from "../application/actions/dispatcher";
 export function App({ bridge }: { bridge: Bridge }) {
   const mounted = useRef(true);
   const settingsButton = useRef<HTMLButtonElement>(null);
@@ -31,6 +38,7 @@ export function App({ bridge }: { bridge: Bridge }) {
   const [chatWidth, setChatWidth] = useState(240);
   const [messageHeight, setMessageHeight] = useState(160);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const settings = useSettings(bridge, connected);
   const model = useMemo(() => new NavigationModel(bridge), [bridge]);
   const editorHost = useCallback(
@@ -194,6 +202,60 @@ export function App({ bridge }: { bridge: Bridge }) {
               ? "Wait for pending changes to save."
               : (selectedView.createError ??
                 "Save an empty file for this date.");
+  const bindings = settings.user?.effective_keybindings ?? DEFAULT_BINDINGS;
+  const later = (what: string) => `${what} is not available yet.`;
+  const handlers: Handlers = {
+    "palette.open": { reason: null, run: () => setPaletteOpen(true) },
+    "editor.save": {
+      reason:
+        active?.kind === "source"
+          ? "Source saving is not available yet."
+          : activeView
+            ? null
+            : "No file is open.",
+      run: () => model.resources.dispatch({ kind: "flush" }),
+    },
+    "authentic.create_empty": {
+      reason: canCreate ? null : createReason,
+      run: () => model.resources.createEmpty(),
+    },
+    "source.refresh": {
+      reason:
+        active?.kind !== "source"
+          ? "Open a source snippet first."
+          : active.loading || model.resources.transitioning
+            ? "Wait for the source to finish loading."
+            : null,
+      run: () => model.refreshActiveSource(),
+    },
+    "settings.open": { reason: null, run: () => setSettingsOpen(true) },
+    "source.trash": { reason: later("Move to Trash"), run: () => {} },
+    "generate.start": { reason: later("Generation"), run: () => {} },
+    "ai.activity.open": { reason: later("AI activity"), run: () => {} },
+    "ai.run.cancel": { reason: later("AI cancellation"), run: () => {} },
+    "ai.results.open": { reason: later("AI results"), run: () => {} },
+    "ai.results.discard": { reason: later("AI results"), run: () => {} },
+    "export.start": { reason: later("Export"), run: () => {} },
+  };
+  const live = useRef({ bindings, handlers });
+  useEffect(() => {
+    live.current = { bindings, handlers };
+  });
+  useEffect(() => {
+    const onKey = createDispatcher({
+      bindings: () => live.current.bindings,
+      handlers: () => live.current.handlers,
+      suspended: () =>
+        document.querySelector('[role="dialog"], [data-capture]') !== null,
+      inSnippetTree: () =>
+        !!document.activeElement?.closest("[data-snippet-tree]"),
+      notice: (text) => model.messages.add(text, "warning"),
+    });
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [model]);
+  const hint = (id: string, base: string) =>
+    bindings[id]?.length ? `${base} (${bindings[id].join(", ")})` : base;
   return (
     <main aria-label="Standard Layout" className="standard-layout">
       <header aria-label="Main Toolbar Strip" className="toolbar">
@@ -204,10 +266,16 @@ export function App({ bridge }: { bridge: Bridge }) {
         <div className="toolbar-actions">
           <button
             disabled={!canCreate}
-            title={createReason}
-            onClick={() => void model.resources.createEmpty()}
+            title={hint("authentic.create_empty", createReason)}
+            onClick={() => void handlers["authentic.create_empty"].run()}
           >
             Create Empty
+          </button>
+          <button
+            title={hint("palette.open", "Open command palette")}
+            onClick={() => void handlers["palette.open"].run()}
+          >
+            Command palette
           </button>
           <span role="status" aria-label="Save status">
             {activeView
@@ -262,6 +330,23 @@ export function App({ bridge }: { bridge: Bridge }) {
           </button>
         </div>
       )}
+      {paletteOpen && (
+        <CommandPalette
+          entries={ACTIONS.map((a) => ({
+            id: a.id,
+            label: a.label,
+            shortcuts: bindings[a.id] ?? [],
+            reason: handlers[a.id].reason,
+          }))}
+          onClose={() => setPaletteOpen(false)}
+          onRun={(id) => {
+            setPaletteOpen(false);
+            const h = handlers[id];
+            if (h.reason) model.messages.add(h.reason, "warning");
+            else void h.run();
+          }}
+        />
+      )}
       {settingsOpen && (
         <SettingsView
           model={{
@@ -315,6 +400,7 @@ export function App({ bridge }: { bridge: Bridge }) {
             ref={settingsButton}
             aria-pressed={settingsOpen}
             onClick={() => setSettingsOpen((open) => !open)}
+            title={hint("settings.open", "Settings")}
           >
             Settings
           </button>
@@ -351,7 +437,7 @@ export function App({ bridge }: { bridge: Bridge }) {
           {active?.kind === "source" && (
             <button
               disabled={active.loading || model.resources.transitioning}
-              onClick={() => void model.refreshActiveSource()}
+              onClick={() => void handlers["source.refresh"].run()}
             >
               Refresh source
             </button>

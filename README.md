@@ -10,6 +10,8 @@ The planned AI agents are Codex, Claude Code, Qwen Code, and Apple's on-device F
 
 Writing language is selected in Settings, initially uses the Mac's preferred language, and is remembered across sessions. Planned generation requires selected snippets and continues for its original date when you navigate away. **Create Empty** saves a blank draft for the selected date, including without snippets.
 
+Press Shift+Command+P (or use the toolbar) for the command palette; Command+S saves the active Authentic file. Shortcuts are editable in Settings → Keyboard Shortcuts, and every action stays reachable from the palette. Source saving, Trash, generation and export are listed but unavailable for now.
+
 The [planned background AI experience](docs/architecture/ai-job-experience.md) keeps editing available with visible progress, cancellation and in-app completion feedback.
 
 ## License

@@ -1,0 +1,151 @@
+{
+  "actions": [
+    {
+      "id": "palette.open",
+      "label": "Open command palette",
+      "info": "Opens the command palette to run any action by name.",
+      "scope": "app",
+      "defaults": ["Shift+Command+P"]
+    },
+    {
+      "id": "editor.save",
+      "label": "Save",
+      "info": "Explicitly saves the active source or flushes the active Authentic editor.",
+      "scope": "app",
+      "defaults": ["Command+S"]
+    },
+    {
+      "id": "authentic.create_empty",
+      "label": "Create Empty",
+      "info": "Creates and saves an empty Authentic file for the selected date if none exists.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
+      "id": "source.trash",
+      "label": "Move source to Trash",
+      "info": "Opens the delete preview for the selected source snippet and its related files.",
+      "scope": "snippetTree",
+      "defaults": [
+        "Shift+Backspace",
+        "Shift+ForwardDelete",
+        "Command+Backspace",
+        "Command+ForwardDelete"
+      ]
+    },
+    {
+      "id": "source.refresh",
+      "label": "Refresh source",
+      "info": "Refreshes imported snippets.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
+      "id": "generate.start",
+      "label": "Generate candidates",
+      "info": "Starts AI generation of Authentic candidates.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
+      "id": "ai.activity.open",
+      "label": "Open AI activity",
+      "info": "Opens AI activity details in the Main Toolbar Strip.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
+      "id": "ai.run.cancel",
+      "label": "Cancel AI job",
+      "info": "Cancels the active AI job and keeps completed candidates.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
+      "id": "ai.results.open",
+      "label": "View AI results",
+      "info": "Views the selected job's results after the normal date and save guards.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
+      "id": "ai.results.discard",
+      "label": "Discard AI results",
+      "info": "Explicitly discards completed transient results after review guards.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
+      "id": "export.start",
+      "label": "Export",
+      "info": "Starts export of the saved revision.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
+      "id": "settings.open",
+      "label": "Open Settings",
+      "info": "Opens Settings.",
+      "scope": "app",
+      "defaults": []
+    }
+  ],
+  "reserved": {
+    "all": [
+      "Command+C",
+      "Command+X",
+      "Command+V",
+      "Command+Z",
+      "Command+A",
+      "Shift+Command+Z",
+      "Command+Q",
+      "Command+H",
+      "Command+M",
+      "Command+W",
+      "Command+Tab"
+    ],
+    "app": [
+      "Command+Backspace",
+      "Command+ForwardDelete",
+      "Option+Backspace",
+      "Option+ForwardDelete"
+    ]
+  },
+  "fixtures": {
+    "canonical": [
+      ["shift+command+p", "Shift+Command+P"],
+      ["Command+Shift+P", "Shift+Command+P"],
+      ["option+control+s", "Control+Option+S"],
+      ["command+f5", "Command+F5"],
+      ["Command+forwarddelete", "Command+ForwardDelete"]
+    ],
+    "invalid": [
+      "",
+      "Command+Command+P",
+      "Command+P+S",
+      "Command",
+      "Shift+Command+",
+      "Hyper+P",
+      "Command+Pp"
+    ],
+    "validate": [
+      ["app", "Shift+Command+P", "ok"],
+      ["app", "Command+S", "ok"],
+      ["app", "Shift+P", "reserved"],
+      ["app", "Command+C", "reserved"],
+      ["app", "Option+A", "reserved"],
+      ["app", "Control+E", "reserved"],
+      ["app", "Command+ArrowUp", "reserved"],
+      ["app", "Command+Backspace", "reserved"],
+      ["app", "Option+ForwardDelete", "reserved"],
+      ["app", "Command+Q", "reserved"],
+      ["app", "Shift+Backspace", "reserved"],
+      ["snippetTree", "Command+Backspace", "ok"],
+      ["snippetTree", "Shift+ForwardDelete", "ok"],
+      ["snippetTree", "Shift+P", "reserved"],
+      ["snippetTree", "Command+C", "reserved"],
+      ["app", "Command+Shift+Z", "reserved"],
+      ["app", "Control+Command+K", "ok"]
+    ]
+  }
+}

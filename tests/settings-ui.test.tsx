@@ -195,3 +195,149 @@ describe("Settings", () => {
     expect(document.body.textContent).not.toMatch(/token|\/Users/u);
   });
 });
+
+describe("Command palette and Keyboard Shortcuts", () => {
+  const press = (init: KeyboardEventInit) =>
+    fireEvent.keyDown(window, { bubbles: true, ...init });
+  const palette = () =>
+    screen.findByRole("dialog", { name: "Command palette" });
+
+  it("opens from the toolbar and the default shortcut, filters, runs and restores focus", async () => {
+    languages(["en-US"]);
+    const fake = settingsFake({ writing_locale: "en-US", revision: "r0" });
+    render(<App bridge={bridge(fake)} />);
+    const button = screen.getByRole("button", { name: "Command palette" });
+    button.focus();
+    fireEvent.click(button);
+    await palette();
+    expect(screen.getByText("Shift+Command+P")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Filter actions"), {
+      target: { value: "open set" },
+    });
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    fireEvent.keyDown(screen.getByLabelText("Filter actions"), {
+      key: "Enter",
+      isComposing: true,
+    });
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "Status" })).toBeNull();
+    fireEvent.keyDown(screen.getByLabelText("Filter actions"), {
+      key: "Enter",
+    });
+    await screen.findByRole("heading", { name: "Status" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    cleanup();
+    render(<App bridge={bridge(fake)} />);
+    press({ code: "KeyP", metaKey: true, shiftKey: true });
+    await palette();
+    const input = screen.getByLabelText("Filter actions");
+    fireEvent.keyDown(input, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("lists unavailable actions with a reason and posts it when run", async () => {
+    languages(["en-US"]);
+    render(<App bridge={bridge(settingsFake({ revision: "r0" }))} />);
+    press({ code: "KeyP", metaKey: true, shiftKey: true });
+    await palette();
+    fireEvent.change(screen.getByLabelText("Filter actions"), {
+      target: { value: "Export" },
+    });
+    expect(screen.getByRole("option").textContent).toMatch(
+      /not available yet/u,
+    );
+    fireEvent.keyDown(screen.getByLabelText("Filter actions"), {
+      key: "Enter",
+    });
+    await screen.findByText(/Export is not available yet\./u);
+  });
+
+  it("Command+S with no file posts the reason instead of saving", async () => {
+    languages(["en-US"]);
+    render(<App bridge={bridge(settingsFake({ revision: "r0" }))} />);
+    press({ code: "KeyS", metaKey: true });
+    await screen.findByText(/No file is open\./u);
+  });
+
+  it("shows the table, captures by code, reassigns on conflict and resets", async () => {
+    languages(["en-US"]);
+    const fake = settingsFake({ writing_locale: "en-US", revision: "r0" });
+    render(<App bridge={bridge(fake)} />);
+    await openSettings("Keyboard Shortcuts");
+    expect(screen.getAllByRole("row")).toHaveLength(13);
+    const edit = screen.getByRole("button", { name: "Edit Open Settings" });
+    await waitFor(() => expect(edit.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(edit);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add shortcut to Open Settings" }),
+    );
+    const box = () => screen.getByRole("textbox", { name: "Press a shortcut" });
+    fireEvent.keyDown(box(), { code: "KeyC", key: "ç", metaKey: true });
+    await screen.findByText(/reserved/u);
+    fireEvent.keyDown(box(), { code: "KeyS", key: "ß", metaKey: true });
+    await screen.findByText("Command+S is used by Save.");
+    expect(
+      fake.updates.filter((u) => u.section === "keybindings"),
+    ).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Reassign" }));
+    await waitFor(() =>
+      expect(fake.updates.at(-1)?.value).toEqual({
+        set: { "settings.open": ["Command+S"], "editor.save": [] },
+      }),
+    );
+    await screen.findAllByText("Modified");
+    fireEvent.click(screen.getByRole("button", { name: "Reset Save" }));
+    await waitFor(() =>
+      expect(fake.updates.at(-1)?.value).toEqual({
+        set: { "editor.save": null },
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reset all" }));
+    expect(fake.updates.at(-1)?.value).toEqual({
+      set: { "editor.save": null },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reset all" }));
+    await waitFor(() =>
+      expect(fake.updates.at(-1)?.value).toEqual({ reset_all: true }),
+    );
+  });
+
+  it("Escape cancels capture; read-only disables editing; shortcuts are spoken text", async () => {
+    languages(["en-US"]);
+    const fake = settingsFake({ writing_locale: "en-US", revision: "r0" });
+    render(<App bridge={bridge(fake)} />);
+    await openSettings("Keyboard Shortcuts");
+    expect(
+      screen.getAllByLabelText("Shift plus Command plus P").length,
+    ).toBeGreaterThan(0);
+    const edit = screen.getByRole("button", { name: "Edit Open Settings" });
+    await waitFor(() => expect(edit.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(edit);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add shortcut to Open Settings" }),
+    );
+    fireEvent.keyDown(
+      screen.getByRole("textbox", { name: "Press a shortcut" }),
+      {
+        key: "Escape",
+      },
+    );
+    expect(
+      screen.queryByRole("textbox", { name: "Press a shortcut" }),
+    ).toBeNull();
+    cleanup();
+    render(
+      <App
+        bridge={bridge(settingsFake({ read_only: true, revision: "r0" }))}
+      />,
+    );
+    await openSettings("Keyboard Shortcuts");
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Edit Open Settings" })
+          .hasAttribute("disabled"),
+      ).toBe(true),
+    );
+  });
+});

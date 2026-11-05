@@ -102,7 +102,7 @@ fn a_bad_section_degrades_alone_and_survives_other_updates() {
     let f = fx();
     put(
         &f,
-        r#"{"schema_version":1,"keybindings":{"palette.open":"nope"},"writing":{"locale":"ko-KR"}}"#,
+        r#"{"schema_version":1,"keybindings":"nope","writing":{"locale":"ko-KR"}}"#,
     );
     let s = f.store.snapshot();
     assert_eq!(codes(&s), [("keybindings", "section_invalid")]);
@@ -112,7 +112,7 @@ fn a_bad_section_degrades_alone_and_survives_other_updates() {
         .update(&s.revision, Change::Writing("en-US".into()))
         .unwrap();
     // The invalid keybindings payload is preserved byte for byte in meaning.
-    assert_eq!(on_disk(&f)["keybindings"], json!({"palette.open":"nope"}));
+    assert_eq!(on_disk(&f)["keybindings"], json!("nope"));
     assert_eq!(on_disk(&f)["writing"], json!({"locale":"en-US"}));
 }
 
@@ -132,11 +132,15 @@ fn writes_create_a_private_directory_and_file_and_merge_sections() {
         .store
         .update(
             &s.revision,
-            Change::Keybindings(json!({"palette.open":["Shift+Command+P"]})),
+            Change::Keybindings(json!({"set":{"palette.open":["shift+command+k"]}})),
         )
         .unwrap();
     assert_eq!(s.writing_locale.as_deref(), Some("ja-JP"));
-    assert_eq!(s.keybindings, json!({"palette.open":["Shift+Command+P"]}));
+    assert_eq!(s.keybindings, json!({"palette.open":["Shift+Command+K"]}));
+    assert_eq!(
+        s.effective_keybindings["palette.open"],
+        json!(["Shift+Command+K"])
+    );
     assert_eq!(on_disk(&f)["schema_version"], 1);
     assert!(!f.dir.join(TEMP).exists());
 }
@@ -368,4 +372,148 @@ fn snapshots_hold_no_path_and_the_store_lives_outside_workspace_roots() {
     assert!(!text.contains(f.root.to_str().unwrap()));
     // The store only ever uses the one directory it was given (the Tauri app config dir).
     assert_eq!(f.store.dir, f.dir);
+}
+
+fn edit(f: &Fx, value: Value) -> Result<Snapshot, Error> {
+    f.store
+        .update(&f.store.snapshot().revision, Change::Keybindings(value))
+}
+
+#[test]
+fn unknown_and_invalid_survive_single_edit_and_reset_all_discards() {
+    let f = fx();
+    put(
+        &f,
+        r#"{"schema_version":1,"keybindings":{"ghost.action":["Command+G"],"editor.save":["nope"]}}"#,
+    );
+    let s = f.store.snapshot();
+    let issues: Vec<_> = s
+        .keybinding_issues
+        .iter()
+        .map(|i| (i.id.as_str(), i.code))
+        .collect();
+    assert_eq!(
+        issues,
+        [
+            ("editor.save", "invalid_shortcut"),
+            ("ghost.action", "unknown_action")
+        ]
+    );
+    assert!(edit(&f, json!({"set":{"settings.open":["Command+Comma"]}})).is_err());
+    let s = edit(&f, json!({"set":{"settings.open":["Command+J"]}})).unwrap();
+    assert_eq!(
+        on_disk(&f)["keybindings"],
+        json!({"ghost.action":["Command+G"],"editor.save":["nope"],"settings.open":["Command+J"]})
+    );
+    assert_eq!(
+        s.effective_keybindings["settings.open"],
+        json!(["Command+J"])
+    );
+    let s = edit(&f, json!({"reset_all":true})).unwrap();
+    assert_eq!(on_disk(&f)["keybindings"], json!({}));
+    assert!(s.keybinding_issues.is_empty());
+}
+
+#[test]
+fn invalid_edits_and_corrupt_section() {
+    let f = fx();
+    for bad in [
+        json!({"set":{"nope":["Command+J"]}}),
+        json!({"set":{"editor.save":["Command+C"]}}),
+        json!({"set":{"editor.save":["Shift+P"]}}),
+        json!({"set":{"editor.save":"Command+J"}}),
+        json!({"set":{}}),
+        json!({"reset_all":false}),
+        json!({"set":{"editor.save":[]},"reset_all":true}),
+    ] {
+        assert_eq!(edit(&f, bad.clone()).err(), Some(Error::Invalid), "{bad}");
+    }
+    assert!(!f.dir.join(FILE).exists());
+    put(&f, r#"{"schema_version":1,"keybindings":["x"]}"#);
+    let s = f.store.snapshot();
+    assert_eq!(codes(&s), [("keybindings", "section_invalid")]);
+    assert_eq!(s.effective_keybindings["editor.save"], json!(["Command+S"]));
+    assert_eq!(
+        edit(&f, json!({"set":{"editor.save":["Command+J"]}})).err(),
+        Some(Error::Invalid)
+    );
+    edit(&f, json!({"reset_all":true})).unwrap();
+    assert!(f.store.snapshot().warnings.is_empty());
+}
+
+#[test]
+fn empty_list_unbinds_and_null_restores_the_default() {
+    let f = fx();
+    let s = edit(&f, json!({"set":{"editor.save":[]}})).unwrap();
+    assert_eq!(s.effective_keybindings["editor.save"], json!([]));
+    let s = edit(&f, json!({"set":{"editor.save":null}})).unwrap();
+    assert_eq!(s.effective_keybindings["editor.save"], json!(["Command+S"]));
+    assert_eq!(on_disk(&f)["keybindings"], json!({}));
+}
+
+#[test]
+fn override_beats_a_default_and_new_defaults_do_not_steal() {
+    let f = fx();
+    put(
+        &f,
+        r#"{"schema_version":1,"keybindings":{"settings.open":["Command+S"]}}"#,
+    );
+    let s = f.store.snapshot();
+    assert_eq!(
+        s.effective_keybindings["settings.open"],
+        json!(["Command+S"])
+    );
+    assert_eq!(s.effective_keybindings["editor.save"], json!([]));
+    assert_eq!(
+        s.keybinding_issues,
+        [keybindings::Issue {
+            id: "editor.save".into(),
+            code: "conflict"
+        }]
+    );
+    put(
+        &f,
+        r#"{"schema_version":1,"keybindings":{"settings.open":["Command+J"],"source.refresh":["Command+J"]}}"#,
+    );
+    let s = f.store.snapshot();
+    assert_eq!(s.effective_keybindings["settings.open"], json!([]));
+    assert_eq!(s.effective_keybindings["source.refresh"], json!([]));
+    assert_eq!(s.keybinding_issues.len(), 2);
+}
+
+#[test]
+fn app_and_snippet_tree_overlap_but_snippet_tree_alone_does_not() {
+    let f = fx();
+    let s = edit(
+        &f,
+        json!({"set":{"settings.open":["Command+ForwardDelete"]}}),
+    )
+    .err();
+    assert_eq!(s, Some(Error::Invalid), "reserved in app scope");
+    let s = edit(
+        &f,
+        json!({"set":{"source.trash":["Command+J"],"settings.open":["Command+J"]}}),
+    )
+    .unwrap();
+    assert_eq!(s.effective_keybindings["source.trash"], json!([]));
+    assert_eq!(s.effective_keybindings["settings.open"], json!([]));
+    let s = edit(
+        &f,
+        json!({"set":{"source.trash":["Shift+Backspace"],"settings.open":null}}),
+    )
+    .unwrap();
+    assert!(s.keybinding_issues.is_empty());
+}
+
+#[test]
+fn stale_revision_conflicts() {
+    let f = fx();
+    let s = f.store.snapshot();
+    edit(&f, json!({"reset_all":true})).unwrap();
+    assert_eq!(
+        f.store
+            .update(&s.revision, Change::Keybindings(json!({"reset_all":true})))
+            .err(),
+        Some(Error::Conflict)
+    );
 }
