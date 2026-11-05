@@ -30,7 +30,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 main.is_visible().unwrap_or(false),
                 main.is_focused().unwrap_or(false)
             );
-            let _=main.eval_with_callback("JSON.stringify({focused:document.hasFocus(),activeIsEditor:document.activeElement?.classList.contains('cm-content'),length:document.querySelector('.cm-content')?.textContent.length,keys:window.__smokeKeys||0,trusted:window.__smokeTrusted||0,matched:document.querySelector('.cm-content')?.textContent.includes('synthetic keyboard sentinel')})",|result|eprintln!("SMOKE editor_probe {result}"));
+            let _=main.eval_with_callback("JSON.stringify({focused:document.hasFocus(),activeIsEditor:document.activeElement?.classList.contains('cm-content'),editable:document.querySelector('.cm-content')?.getAttribute('contenteditable'),step:window.__smokeStep||'none',status:document.querySelector('.connection [role=status]')?.textContent,error:window.__smokeError||null,notice:[...document.querySelectorAll('.notice')].map(n=>n.textContent).join(' / '),length:document.querySelector('.cm-content')?.textContent.length,keys:window.__smokeKeys||0,trusted:window.__smokeTrusted||0,matched:document.querySelector('.cm-content')?.textContent.includes('synthetic keyboard sentinel')})",|result|eprintln!("SMOKE editor_probe {result}"));
         }
         let _ = main.close();
     });
@@ -44,8 +44,11 @@ pub fn main_loaded(webview: &tauri::Webview) -> Result<(), Box<dyn std::error::E
       try {
         const invoke=window.__TAURI_INTERNALS__.invoke;
         await invoke('get_app_metadata');
-        await invoke('connect_server');
-        await invoke('open_session');
+        // Connect through the UI, as a user does: the Authentic editor stays read-only until the UI is connected.
+        for(let attempt=0;attempt<100&&![...document.querySelectorAll('button')].some(b=>b.textContent==='Connect');attempt++)await new Promise(resolve=>setTimeout(resolve,50));
+        [...document.querySelectorAll('button')].find(b=>b.textContent==='Connect').click();
+        for(let attempt=0;attempt<300&&document.querySelector('.connection [role=status]')?.textContent!=='Connected';attempt++)await new Promise(resolve=>setTimeout(resolve,50));
+        if(document.querySelector('.connection [role=status]')?.textContent!=='Connected')throw Error('ui connect failed: '+document.querySelector('.connection [role=status]')?.textContent);
         if(window.location.origin!=='tauri://localhost')throw Error('unexpected packaged origin');
         await new Promise((resolve,reject)=>{
           const timer=setTimeout(()=>reject(Error('missing CSP violation')),1500);
@@ -53,7 +56,7 @@ pub fn main_loaded(webview: &tauri::Webview) -> Result<(), Box<dyn std::error::E
           document.addEventListener('securitypolicyviolation',listener);
           fetch('http://127.0.0.1:1/api/v1/status',{mode:'no-cors'}).catch(()=>{});
         });
-        const settings=await invoke('get_settings');
+        window.__smokeStep='settings';const settings=await invoke('get_settings');
         if(!settings.folder_checks.some(check=>check.alias==='smoke-readable'&&check.outcome==='readable'))throw Error('server readable folder check');
         if(!settings.folder_checks.some(check=>check.alias==='smoke-denied'&&check.outcome==='denied'))throw Error('server denied folder check');
         const jobs=await invoke('list_jobs',{cursor:null});
@@ -70,7 +73,7 @@ pub fn main_loaded(webview: &tauri::Webview) -> Result<(), Box<dyn std::error::E
             if(packet.event.kind==='disconnected')failed(Error('stream disconnected'));
           }).catch(failed);
         },false);
-        await invoke('subscribe_events',{request:{action:'start',channel:'__CHANNEL__:'+id}});
+        window.__smokeStep='sub';await invoke('subscribe_events',{request:{action:'start',channel:'__CHANNEL__:'+id}});window.__smokeStep='subbed';
         let editor;
         for(let attempt=0;attempt<30;attempt++){
           editor=document.querySelector('.cm-content');if(editor)break;
@@ -79,12 +82,16 @@ pub fn main_loaded(webview: &tauri::Webview) -> Result<(), Box<dyn std::error::E
         if(!editor)throw Error('missing native editor');
         window.__smokeKeys=0;window.__smokeTrusted=0;
         document.addEventListener('keydown',event=>{window.__smokeKeys++;if(event.isTrusted)window.__smokeTrusted++;});
+        // The editor is read-only until the Authentic session opens; focus only works once it is editable.
+        for(let attempt=0;attempt<100&&editor.getAttribute('contenteditable')!=='true';attempt++)await new Promise(resolve=>setTimeout(resolve,50));
         editor.focus();
         if(document.activeElement!==editor)throw Error('native focus failed');
         await invoke('get_job',{id:'scaffold-fake-job'});
         let typed=false;
         for(let attempt=0;attempt<180;attempt++){
           if(editor.textContent.includes('synthetic keyboard sentinel')){typed=true;break;}
+          // Loading the date resets the editor state, which can drop focus; keep it focused until the keys land.
+          if(document.activeElement!==editor)editor.focus();
           await new Promise(resolve=>setTimeout(resolve,50));
         }
         if(!typed)throw Error('native keyboard input missing');
@@ -97,7 +104,7 @@ pub fn main_loaded(webview: &tauri::Webview) -> Result<(), Box<dyn std::error::E
         await invoke('open_session');
         const reconnected=await invoke('get_job',{id:'scaffold-fake-job'});
         if(reconnected.state!=='running')throw Error('fresh reconnect failed');
-      } catch (_) { console.error('Native smoke main failed'); }
+      } catch (e) { window.__smokeError=String(e&&e.message||e); console.error('Native smoke main failed'); }
     })();"#,
     )?;
     Ok(())
