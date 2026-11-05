@@ -72,7 +72,7 @@ function setup(over: { suspended?: boolean; tree?: boolean } = {}) {
   const notice = vi.fn();
   const handlers = {
     "palette.open": { reason: null, run },
-    "editor.save": { reason: "Source saving is not available yet.", run },
+    "editor.save": { reason: "Source Save is off.", run },
     "source.trash": { reason: null, run },
   };
   const dispatch = createDispatcher({
@@ -133,8 +133,6 @@ describe("dispatcher", () => {
     const e = t.key({ code: "KeyS", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
     expect(t.run).not.toHaveBeenCalled();
-    expect(t.notice).toHaveBeenCalledWith(
-      "Source saving is not available yet.",
-    );
+    expect(t.notice).toHaveBeenCalledWith("Source Save is off.");
   });
 });

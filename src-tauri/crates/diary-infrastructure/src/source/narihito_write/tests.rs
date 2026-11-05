@@ -88,7 +88,10 @@ fn rejects_each_producer_violation() {
         ),
         (
             "duration",
-            edit("recording_duration_ms: 1000", "recording_duration_ms: 301001"),
+            edit(
+                "recording_duration_ms: 1000",
+                "recording_duration_ms: 301001",
+            ),
         ),
         (
             "settings revision",

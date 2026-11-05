@@ -352,7 +352,9 @@ fn narihito_reason_follows_gate_then_flag_and_view_drops_separator() {
     let v = view(&tree);
     assert_eq!(v.body, "hello\n");
     assert_eq!(v.write, Err(WriteReason::WriterUnverified));
-    let text = String::from_utf8(golden("2024-02-29T01:02:03Z", "hello\n")).unwrap().replace("favorite: false", "favorite: maybe");
+    let text = String::from_utf8(golden("2024-02-29T01:02:03Z", "hello\n"))
+        .unwrap()
+        .replace("favorite: false", "favorite: maybe");
     tree.write(REL, text.as_bytes());
     assert_eq!(view(&tree).write, Err(WriteReason::UnsupportedFormat));
 }

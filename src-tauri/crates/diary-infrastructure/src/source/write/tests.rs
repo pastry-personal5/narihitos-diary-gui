@@ -96,7 +96,11 @@ fn saves_and_chains_the_returned_digest() {
     assert!(text.contains("updated_at: \"2033-05-18T03:33:20Z\""));
     let second = e.save(2, &first.digest, "two\n").unwrap();
     assert_eq!(second.digest, e.digest());
-    assert!(e.names().iter().all(|n| !n.ends_with(".tmp")), "{:?}", e.names());
+    assert!(
+        e.names().iter().all(|n| !n.ends_with(".tmp")),
+        "{:?}",
+        e.names()
+    );
     assert_eq!(e.state(2), OperationState::Succeeded);
 }
 
@@ -139,19 +143,30 @@ fn invalid_body_and_unsupported_file_and_disabled_writer() {
     let base = e.digest();
     assert_eq!(e.save(1, &base, "a\rb"), Err(SaveError::InvalidBody));
     assert!(e.writer.db.get(&op(1)).unwrap().is_none());
-    let broken = String::from_utf8(e.bytes()).unwrap().replace("favorite: false", "favorite: maybe");
+    let broken = String::from_utf8(e.bytes())
+        .unwrap()
+        .replace("favorite: false", "favorite: maybe");
     fs::write(e.file(), &broken).unwrap();
-    assert_eq!(e.save(2, &e.digest(), "x"), Err(SaveError::UnsupportedFormat));
+    assert_eq!(
+        e.save(2, &e.digest(), "x"),
+        Err(SaveError::UnsupportedFormat)
+    );
     fs::write(e.file(), golden("2024-02-29T01:02:03Z", "hello\n")).unwrap();
     e.writer.enabled = false;
-    assert_eq!(e.save(3, &e.digest(), "x"), Err(SaveError::UnsupportedFormat));
+    assert_eq!(
+        e.save(3, &e.digest(), "x"),
+        Err(SaveError::UnsupportedFormat)
+    );
 }
 
 #[test]
 fn hard_link_and_unbound_id_are_refused() {
     let e = env();
     fs::hard_link(e.file(), e.src.path().join("link.md")).unwrap();
-    assert_eq!(e.save(1, &e.digest(), "x"), Err(SaveError::UnsupportedFormat));
+    assert_eq!(
+        e.save(1, &e.digest(), "x"),
+        Err(SaveError::UnsupportedFormat)
+    );
     let mut req = e.req(2, &e.digest(), "x");
     req.source_id = "0123456789abcdef0123456789abcdef".into();
     assert_eq!(e.writer.save_body(req), Err(SaveError::SourceStale));
@@ -169,7 +184,11 @@ fn repointed_root_is_source_stale() {
 fn crash_before_intent_publishes_nothing() {
     let e = env();
     let before = e.bytes();
-    e.writer.inject(Fault { step: Step::Intent, when: When::Before, kind: FaultKind::Crash });
+    e.writer.inject(Fault {
+        step: Step::Intent,
+        when: When::Before,
+        kind: FaultKind::Crash,
+    });
     assert!(e.save(1, &e.digest(), "x\n").is_err());
     assert_eq!(e.bytes(), before);
     assert!(e.writer.db.get(&op(1)).unwrap().is_none());
@@ -179,7 +198,11 @@ fn crash_before_intent_publishes_nothing() {
 fn crash_after_publish_is_finished_by_reconcile_and_retry_returns_it() {
     let e = env();
     let base = e.digest();
-    e.writer.inject(Fault { step: Step::Publish, when: When::After, kind: FaultKind::Crash });
+    e.writer.inject(Fault {
+        step: Step::Publish,
+        when: When::After,
+        kind: FaultKind::Crash,
+    });
     assert!(e.save(1, &base, "x\n").is_err());
     assert_eq!(e.state(1), OperationState::Running);
     let written = e.digest();
@@ -193,13 +216,19 @@ fn crash_after_publish_is_finished_by_reconcile_and_retry_returns_it() {
 fn source_intent_resumes_after_restart_from_the_stage() {
     let e = env();
     let base = e.digest();
-    e.writer.inject(Fault { step: Step::Publish, when: When::Before, kind: FaultKind::Crash });
+    e.writer.inject(Fault {
+        step: Step::Publish,
+        when: When::Before,
+        kind: FaultKind::Crash,
+    });
     assert!(e.save(1, &base, "x\n").is_err());
     assert_eq!(e.digest(), base);
     // A new process: classification marks it resumable and recovery republishes from the stage.
     let classified = e.ws.classify().unwrap();
-    assert!(classified.iter().any(|c| c.kind == KIND_SOURCE_SAVE
-        && c.class == diary_application::operations::Class::Resume));
+    assert!(
+        classified.iter().any(|c| c.kind == KIND_SOURCE_SAVE
+            && c.class == diary_application::operations::Class::Resume)
+    );
     e.writer.recover(&[op(1)]).unwrap();
     assert_eq!(e.state(1), OperationState::Succeeded);
     assert!(String::from_utf8(e.bytes()).unwrap().ends_with("\n\nx\n"));
@@ -209,7 +238,11 @@ fn source_intent_resumes_after_restart_from_the_stage() {
 fn external_change_after_stage_keeps_both_and_never_restores() {
     let e = env();
     let base = e.digest();
-    e.writer.inject(Fault { step: Step::Publish, when: When::Before, kind: FaultKind::Crash });
+    e.writer.inject(Fault {
+        step: Step::Publish,
+        when: When::Before,
+        kind: FaultKind::Crash,
+    });
     assert!(e.save(1, &base, "mine\n").is_err());
     fs::write(e.file(), golden("2024-02-29T01:02:03Z", "phone\n")).unwrap();
     let theirs = e.bytes();
@@ -225,7 +258,11 @@ fn external_change_after_stage_keeps_both_and_never_restores() {
 fn failure_after_publication_is_uncertain_and_retry_finishes() {
     let e = env();
     let base = e.digest();
-    e.writer.inject(Fault { step: Step::Verify, when: When::Before, kind: FaultKind::Io });
+    e.writer.inject(Fault {
+        step: Step::Verify,
+        when: When::Before,
+        kind: FaultKind::Io,
+    });
     // The failure came after publication, so the reply is "uncertain", never a plain error.
     assert_eq!(e.save(1, &base, "x\n"), Err(SaveError::Uncertain));
     assert_eq!(e.state(1), OperationState::Uncertain);
@@ -236,7 +273,11 @@ fn failure_after_publication_is_uncertain_and_retry_finishes() {
 #[test]
 fn orphan_temp_removed_on_next_save() {
     let e = env();
-    let stray = e.file().parent().unwrap().join(format!(".diary-save-{}.tmp", op(9).as_str()));
+    let stray = e
+        .file()
+        .parent()
+        .unwrap()
+        .join(format!(".diary-save-{}.tmp", op(9).as_str()));
     fs::write(&stray, b"left behind").unwrap();
     e.save(1, &e.digest(), "x\n").unwrap();
     assert!(!stray.exists());
@@ -248,14 +289,21 @@ fn mode_preserved() {
     let e = env();
     fs::set_permissions(e.file(), fs::Permissions::from_mode(0o640)).unwrap();
     e.save(1, &e.digest(), "x\n").unwrap();
-    assert_eq!(fs::metadata(e.file()).unwrap().permissions().mode() & 0o7777, 0o640);
+    assert_eq!(
+        fs::metadata(e.file()).unwrap().permissions().mode() & 0o7777,
+        0o640
+    );
 }
 
 #[test]
 fn reserved_while_unfinished() {
     let e = env();
     let base = e.digest();
-    e.writer.inject(Fault { step: Step::Publish, when: When::Before, kind: FaultKind::Crash });
+    e.writer.inject(Fault {
+        step: Step::Publish,
+        when: When::Before,
+        kind: FaultKind::Crash,
+    });
     assert!(e.save(1, &base, "x\n").is_err());
     assert_eq!(e.save(2, &base, "y\n"), Err(SaveError::Reserved));
 }

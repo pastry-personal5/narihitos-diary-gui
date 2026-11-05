@@ -294,7 +294,10 @@ fn readable_source_roots_are_available_for_both_adapters_without_opt_in() {
     c.resolve_paths(&root.join("config.yaml")).unwrap();
     let summary = c.observe_startup(std::ffi::OsStr::new("missing-bin"), &root);
     assert!(summary.sources[0].reason.is_none(), "readable ayumi root");
-    assert!(summary.sources[1].reason.is_none(), "readable narihito root");
+    assert!(
+        summary.sources[1].reason.is_none(),
+        "readable narihito root"
+    );
     assert!(matches!(
         summary.sources[2].reason,
         Some(Reason::SourceRootMissing)

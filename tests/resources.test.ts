@@ -404,7 +404,7 @@ describe("retained editor resources", () => {
         read: true,
         save: false,
         trash: false,
-        reason: "source_writer_unavailable",
+        reason: "writer_unverified",
       },
     } as Source;
     bridge.readSource.mockResolvedValue({
@@ -433,7 +433,7 @@ describe("retained editor resources", () => {
       read: true,
       save: false,
       trash: false,
-      reason: "source_writer_unavailable",
+      reason: "writer_unverified",
     } as const;
     const source = {
       id: "source",
@@ -478,7 +478,7 @@ describe("retained editor resources", () => {
       read: true,
       save: false,
       trash: false,
-      reason: "source_writer_unavailable",
+      reason: "writer_unverified",
     } as const;
     const original = {
       id: "source",

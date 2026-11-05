@@ -139,7 +139,14 @@ fn leap(y: i64) -> bool {
 /// Seconds since the epoch of a strict `YYYY-MM-DDTHH:MM:SSZ`, or `None`.
 fn instant_secs(s: &str) -> Option<u64> {
     let b = s.as_bytes();
-    let separators = [(4, b'-'), (7, b'-'), (10, b'T'), (13, b':'), (16, b':'), (19, b'Z')];
+    let separators = [
+        (4, b'-'),
+        (7, b'-'),
+        (10, b'T'),
+        (13, b':'),
+        (16, b':'),
+        (19, b'Z'),
+    ];
     if b.len() != 20 || separators.iter().any(|&(i, c)| b[i] != c) {
         return None;
     }
@@ -150,7 +157,20 @@ fn instant_secs(s: &str) -> Option<u64> {
     };
     let (y, mo, d) = (n(0..4)?, n(5..7)?, n(8..10)?);
     let (h, mi, se) = (n(11..13)?, n(14..16)?, n(17..19)?);
-    let month_days = [31, if leap(y) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let month_days = [
+        31,
+        if leap(y) { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
     if !(1970..=9999).contains(&y)
         || !(1..=12).contains(&mo)
         || d < 1
@@ -263,7 +283,11 @@ pub(crate) fn check(bytes: &[u8], rel: &str) -> Result<Checked, Unwritable> {
     }
     if let Some(v) = get("audio_sha256") {
         let Scalar::Str(s) = v else { return Err(F) };
-        if s.len() != 64 || !s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        if s.len() != 64
+            || !s
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
             return Err(F);
         }
     }

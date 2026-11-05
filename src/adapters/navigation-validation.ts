@@ -9,6 +9,8 @@ import type {
   SourceInstant,
   LocalTime,
   SourceCapabilities,
+  SourceSaved,
+  SourceSaveReason,
   SourceItem,
   SourceFailure,
   SourceGroup,

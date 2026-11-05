@@ -3,6 +3,7 @@ import {
   importAckDto,
   importPageDto,
   sourceBodyDto,
+  sourceSaved,
   importJobDto,
   resolutionDto,
 } from "./navigation-validation";
@@ -88,6 +89,12 @@ export const tauriBridge: Bridge = {
     ),
   readSource: (sourceId, snapshotId) =>
     authentic("read_source", { sourceId, snapshotId }, sourceBodyDto),
+  saveSource: (sourceId, operationId, baseDigest, body) =>
+    authentic(
+      "save_source",
+      { sourceId, operationId, baseDigest, body },
+      sourceSaved,
+    ),
   getJob: (jobId) => authentic("get_job", { id: jobId }, importJobDto),
   cancelJob: (jobId) => authentic("cancel_job", { id: jobId }, importJobDto),
   metadata: async () => metadataDto(await invoke<unknown>("get_app_metadata")),

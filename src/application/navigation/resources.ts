@@ -25,13 +25,28 @@ export interface EditorResource {
   stale: boolean;
   epoch: number;
   pending?: Promise<void>;
+  /** Whole-file digest the next source save is based on: the one read or last saved. */
+  baseDigest?: string;
+  /** Kept while the sent text is unchanged so a retry reuses the operation ID. */
+  saveOp?: { id: string; text: string };
+  saving?: Promise<boolean>;
+  saveError?: string | null;
 }
+export const REASON_TEXT: Record<string, string> = {
+  producer_unverified: "no verified writer exists for this producer yet",
+  writer_unverified: "the writer has not passed its producer round trip",
+  unsupported_format: "this file is not in the producer's exact format",
+  checked_on_open: "open the snippet to check it",
+  reimport_required: "import this date again",
+};
 export type SourceChoice = "save" | "discard" | "cancel";
 export interface ResourceEvents {
   notice(text: string): void;
   sourceGuard(resource: EditorResource): Promise<SourceChoice>;
   savedDatesChanged(): void;
 }
+export const saveOff = (reason: string) =>
+  `Source Save is off: ${REASON_TEXT[reason] ?? "unavailable"}.`;
 const code = (e: unknown) =>
   e instanceof AuthenticError ? e.code : "unavailable";
 /** Resource identity, async load epochs, all-session close and one serialized transition guard. */
@@ -119,10 +134,7 @@ export class ResourceCoordinator {
           },
           save: () => {
             if (resource.session) resource.session.dispatch({ kind: "flush" });
-            else
-              this.events.notice(
-                "Source Save is unavailable until producer writers are verified.",
-              );
+            else void this.saveSource(key);
           },
           limit: () =>
             this.events.notice(
@@ -247,7 +259,9 @@ export class ResourceCoordinator {
       if (epoch !== this.connectionEpoch || this.disposed) return;
       r.buffer.setEditable(false);
       if (r.kind === "source") {
+        // The digest check makes a save safe on a stale-flagged tab, so Save comes back.
         r.stale = true;
+        r.buffer.setEditable(writable && !!r.source?.capabilities.save);
         continue;
       }
       if (r.session) {
@@ -287,18 +301,67 @@ export class ResourceCoordinator {
       this.emit();
     }
   }
+  /** Explicit source save: sends the buffer text against the digest last read or saved. */
+  async saveSource(key?: string): Promise<boolean> {
+    const r = key ? this.resources.get(key) : this.active;
+    if (!r || r.kind !== "source" || !r.source) return false;
+    if (r.saving) return r.saving;
+    if (!r.source.capabilities.save) {
+      this.events.notice(saveOff(r.source.capabilities.reason));
+      return false;
+    }
+    if (!this.online || !this.writable || r.baseDigest === undefined) {
+      this.events.notice("Connect to the server before saving this source.");
+      return false;
+    }
+    if (r.buffer.composing) {
+      this.events.notice("Finish text composition before saving.");
+      return false;
+    }
+    if (!r.dirty && !r.saveError) return true;
+    const text = r.buffer.getText(),
+      id = r.saveOp?.text === text ? r.saveOp.id : crypto.randomUUID(),
+      sourceId = r.source.source.id;
+    r.saveOp = { id, text };
+    r.saving = (async () => {
+      try {
+        const saved = await this.bridge.saveSource(
+          sourceId,
+          id,
+          r.baseDigest!,
+          text,
+        );
+        r.baseDigest = saved.digest;
+        r.saveError = null;
+        r.saveOp = undefined;
+        if (r.buffer.getText() === text) r.dirty = false;
+        this.events.notice(`${r.label}: Saved.`);
+        return true;
+      } catch (e) {
+        r.saveError = code(e);
+        this.events.notice(
+          r.saveError === "external_change"
+            ? `${r.label}: Changed on disk. Your text is kept; Discard to reload after a new import.`
+            : `${r.label}: Save failed (${r.saveError}). Your text is kept.`,
+        );
+        return false;
+      } finally {
+        r.saving = undefined;
+        this.emit();
+      }
+    })();
+    this.emit();
+    return r.saving;
+  }
   private async settle(r: EditorResource): Promise<boolean> {
     await r.pending;
+    await r.saving;
     if (r.buffer.composing) return false;
     if (r.session) return (await r.session.settle()) === "proceed";
     if (!r.dirty) return true;
     const choice = await this.events.sourceGuard(r);
-    if (choice === "save") {
-      this.events.notice(
-        "Source Save is unavailable; local text has been retained.",
-      );
-      return false;
-    }
+    // A failed save keeps the text and blocks the transition.
+    if (choice === "save") return this.saveSource(r.key);
     return choice === "discard";
   }
   async changeDate(date: string): Promise<boolean> {
@@ -361,8 +424,8 @@ export class ResourceCoordinator {
     if (!r) return false;
     if (r.source) {
       if (
-        r.source.snapshot_id !== source.import_id ||
-        r.source.source.digest !== source.digest
+        r.source.snapshot_id !== source.import_id &&
+        source.digest !== r.baseDigest
       )
         r.stale = true;
       this.activate(r);
@@ -412,6 +475,7 @@ export class ResourceCoordinator {
           throw error;
         }
         r.source = metadata;
+        r.baseDigest = body.source.digest;
         r.stale = false;
         r.error = null;
       } catch (e) {
@@ -496,6 +560,9 @@ export class ResourceCoordinator {
           throw error;
         }
         r.source = metadata;
+        r.baseDigest = body.source.digest;
+        r.saveOp = undefined;
+        r.saveError = null;
         r.dirty = false;
         r.stale = false;
         r.error = null;

@@ -40,7 +40,7 @@ function source(
       read: true,
       save: false,
       trash: false,
-      reason: "source_writer_unavailable",
+      reason: "writer_unverified",
     },
     navigation: {
       group_id: "group",
@@ -169,7 +169,7 @@ describe("navigation response boundary", () => {
         read: true,
         save: true,
         trash: false,
-        reason: "source_writer_unavailable",
+        reason: "writer_unverified",
       },
     };
     expect(() =>

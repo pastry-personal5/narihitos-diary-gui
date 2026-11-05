@@ -2,9 +2,9 @@
 mod authentic;
 mod calendar;
 mod imports;
-mod source_save;
 #[cfg(feature = "scaffold-smoke")]
 mod smoke;
+mod source_save;
 use axum::{
     Extension, Json, Router,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, Request, State},

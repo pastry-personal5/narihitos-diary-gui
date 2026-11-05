@@ -51,6 +51,9 @@ export function navigationFake(): NavigationBridge {
     readSource: async () => {
       throw new Error("unused");
     },
+    saveSource: async () => {
+      throw new Error("unused");
+    },
     getJob: async () => ({ id: "import", sequence: 1, state: "succeeded" }),
     cancelJob: async () => ({ id: "import", sequence: 2, state: "cancelled" }),
   };

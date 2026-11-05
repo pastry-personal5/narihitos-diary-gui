@@ -12,8 +12,9 @@ use super::{
 };
 use crate::{
     authentic::{Step, When, sha_hex},
-    authentic_fs as fs, coordination,
+    authentic_fs as fs,
     config::{Source, SourceKind},
+    coordination,
     ledger::{finish_tx, hash_input},
     sqlite::Db,
 };
@@ -246,7 +247,9 @@ impl Writer {
         );
         let _guard = self.lock.lock().map_err(|_| SaveError::Storage)?;
         if let Some(record) = self.db.get(&req.operation_id).map_err(ledger)? {
-            if record.kind != KIND_SOURCE_SAVE || record.hash_version != 1 || record.input_hash != hash
+            if record.kind != KIND_SOURCE_SAVE
+                || record.hash_version != 1
+                || record.input_hash != hash
             {
                 return Err(SaveError::Mismatch.into());
             }
@@ -301,7 +304,11 @@ impl Writer {
             Err(Fail::Crash) => return Err(Fail::Crash),
             Err(Fail::Err(e)) => return Err(self.abandon(&op, &prepared, &stage, e, published)),
         }
-        let record = self.db.get(&op).map_err(ledger)?.ok_or(SaveError::Storage)?;
+        let record = self
+            .db
+            .get(&op)
+            .map_err(ledger)?
+            .ok_or(SaveError::Storage)?;
         self.settle(record)
     }
 
@@ -314,8 +321,11 @@ impl Writer {
         stage: &Path,
     ) -> Result<(), Fail> {
         let io = |_: io::Error| Fail::Err(SaveError::Storage);
-        fs::ensure_dirs(&PathBuf::from(&self.identity.root).join(".diary"), &["pending"])
-            .map_err(io)?;
+        fs::ensure_dirs(
+            &PathBuf::from(&self.identity.root).join(".diary"),
+            &["pending"],
+        )
+        .map_err(io)?;
         fs::remove(stage).map_err(io)?;
         self.hit(Step::StageWrite, When::Before)?;
         fs::create_new(stage, bytes).map_err(io)?;
@@ -325,7 +335,8 @@ impl Writer {
         fs::sync_path(&self.pending()).map_err(io)?;
         self.hit(Step::StageSync, When::After)?;
         self.hit(Step::Intent, When::Before)?;
-        let key = ResourceKey::parse(&format!("source:{}", p.source_id)).ok_or(SaveError::Storage)?;
+        let key =
+            ResourceKey::parse(&format!("source:{}", p.source_id)).ok_or(SaveError::Storage)?;
         let first = NewStep {
             step_id: step_id(op, "prepared"),
             input_hash: step_hash(op, "prepared"),
@@ -540,18 +551,17 @@ impl Writer {
                     unchanged: false,
                 })
             }
-            OperationState::Failed | OperationState::Cancelled => Err(match record
-                .result
-                .as_deref()
-            {
-                Some("conflict") => SaveError::ExternalChange,
-                Some("unsupported_format") => SaveError::UnsupportedFormat,
-                Some("source_stale") => SaveError::SourceStale,
-                Some("source_changing") => SaveError::SourceChanging,
-                Some("cloud_unavailable") => SaveError::CloudUnavailable,
-                _ => SaveError::Storage,
+            OperationState::Failed | OperationState::Cancelled => {
+                Err(match record.result.as_deref() {
+                    Some("conflict") => SaveError::ExternalChange,
+                    Some("unsupported_format") => SaveError::UnsupportedFormat,
+                    Some("source_stale") => SaveError::SourceStale,
+                    Some("source_changing") => SaveError::SourceChanging,
+                    Some("cloud_unavailable") => SaveError::CloudUnavailable,
+                    _ => SaveError::Storage,
+                }
+                .into())
             }
-            .into()),
             _ => Err(SaveError::Uncertain.into()),
         }
     }

@@ -158,6 +158,12 @@ export interface NavigationBridge {
     authority: TimeAuthority,
   ): Promise<{ resolved: true }>;
   readSource(sourceId: string, snapshotId: string): Promise<SourceBody>;
+  saveSource(
+    sourceId: string,
+    operationId: string,
+    baseDigest: string,
+    body: string,
+  ): Promise<SourceSaved>;
   getJob(jobId: string): Promise<ImportJob>;
   cancelJob(jobId: string): Promise<ImportJob>;
 }

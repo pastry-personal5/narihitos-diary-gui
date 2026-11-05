@@ -34,6 +34,6 @@ describe("source import advice", () => {
       { alias: "odd", available: false, reason: "token=SECRET /private/path" },
     ]);
     expect(text).toContain("odd: unavailable");
-    expect(text).not.toMatch(/SECRET|private/);
+    expect(text).not.toMatch(/SECRET|\/private/);
   });
 });

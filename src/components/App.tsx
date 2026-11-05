@@ -14,6 +14,7 @@ import { Explorer } from "./Explorer";
 import { GlobalMessages } from "./GlobalMessages";
 import { PaneSeparator } from "./PaneSeparator";
 import { NavigationModel } from "../application/navigation/model";
+import { saveOff } from "../application/navigation/resources";
 import { useSettings } from "./useSettings";
 import { sourceImportAdvice } from "../application/sourceAdvice";
 import { CommandPalette } from "./CommandPalette";
@@ -232,11 +233,16 @@ export function App({ bridge }: { bridge: Bridge }) {
     "editor.save": {
       reason:
         active?.kind === "source"
-          ? "Source saving is not available yet."
+          ? active.source?.capabilities.save
+            ? null
+            : saveOff(active.source?.capabilities.reason ?? "")
           : activeView
             ? null
             : "No file is open.",
-      run: () => model.resources.dispatch({ kind: "flush" }),
+      run: () => {
+        if (active?.kind === "source") void model.resources.saveSource();
+        else model.resources.dispatch({ kind: "flush" });
+      },
     },
     "authentic.create_empty": {
       reason: canCreate ? null : createReason,
@@ -303,11 +309,33 @@ export function App({ bridge }: { bridge: Bridge }) {
             >
               <SymbolLabel name="command" label="Command palette" />
             </button>
+            {active?.kind === "source" && (
+              <button
+                disabled={!!handlers["editor.save"].reason || !!active.saving}
+                title={hint(
+                  "editor.save",
+                  handlers["editor.save"].reason ?? "Save source",
+                )}
+                onClick={() => void handlers["editor.save"].run()}
+              >
+                Save
+              </button>
+            )}
             <span role="status" aria-label="Save status">
               {activeView
                 ? SAVE_LABEL[activeView.queue.state]
                 : active?.kind === "source"
-                  ? "Source is read-only"
+                  ? !active.source?.capabilities.save
+                    ? "Source is read-only"
+                    : active.saving
+                      ? "Saving…"
+                      : active.saveError === "external_change"
+                        ? "Changed on disk"
+                        : active.saveError
+                          ? "Save failed"
+                          : active.dirty
+                            ? "Unsaved changes"
+                            : "Saved"
                   : "No file open"}
             </span>
             <button
@@ -347,7 +375,13 @@ export function App({ bridge }: { bridge: Bridge }) {
         )}
         {model.sourceGuard && (
           <div role="dialog" aria-label="Unsaved source">
-            <p>Discard local changes to {model.sourceGuard.resource.label}?</p>
+            <p>
+              Save or discard local changes to{" "}
+              {model.sourceGuard.resource.label}?
+            </p>
+            <button onClick={() => model.sourceGuard?.finish("save")}>
+              Save
+            </button>
             <button onClick={() => model.sourceGuard?.finish("discard")}>
               Discard changes
             </button>
@@ -493,7 +527,9 @@ export function App({ bridge }: { bridge: Bridge }) {
               dispatch={(action) => model.resources.dispatch(action)}
               readOnlyReason={
                 active?.kind === "source"
-                  ? "Source Save is unavailable until producer support is verified."
+                  ? active.source?.capabilities.save
+                    ? null
+                    : saveOff(active.source?.capabilities.reason ?? "")
                   : !connected
                     ? "Connect to the server to open this date."
                     : !storage

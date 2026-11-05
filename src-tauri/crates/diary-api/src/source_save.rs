@@ -28,7 +28,11 @@ fn code(e: SaveError) -> (StatusCode, &'static str, bool) {
     use SaveError::*;
     match e {
         ExternalChange => (StatusCode::CONFLICT, "external_change", false),
-        UnsupportedFormat => (StatusCode::UNPROCESSABLE_ENTITY, "unsupported_format", false),
+        UnsupportedFormat => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "unsupported_format",
+            false,
+        ),
         InvalidBody => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_body", false),
         CloudUnavailable => (StatusCode::SERVICE_UNAVAILABLE, "cloud_unavailable", true),
         SourceChanging => (StatusCode::CONFLICT, "source_changing", true),
@@ -44,7 +48,9 @@ fn code(e: SaveError) -> (StatusCode, &'static str, bool) {
 fn opaque(text: &str) -> bool {
     !text.is_empty()
         && text.len() <= 128
-        && text.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        && text
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 pub(super) async fn save(
@@ -79,9 +85,15 @@ pub(super) async fn save(
         }
     };
     let digest_ok = input.base_digest.len() == 64
-        && input.base_digest.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
-    let (Some(operation_id), true, true) = (OperationId::parse(&input.operation_id), opaque(&id), digest_ok)
-    else {
+        && input
+            .base_digest
+            .bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
+    let (Some(operation_id), true, true) = (
+        OperationId::parse(&input.operation_id),
+        opaque(&id),
+        digest_ok,
+    ) else {
         return failure(StatusCode::BAD_REQUEST, "invalid_input");
     };
     let Some(writer) = s.source_writer.clone() else {
