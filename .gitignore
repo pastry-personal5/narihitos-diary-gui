@@ -10,3 +10,4 @@ tmp/
 tmp/initial-owner-ideas.md
 
 config/global_config.yaml
+config/.global_config.yaml.swp
