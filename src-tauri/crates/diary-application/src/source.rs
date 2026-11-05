@@ -21,6 +21,13 @@ pub enum UnsupportedReason {
     Schema,
     Kind,
 }
+/// Why a readable source cannot be saved; the wire reason allowlist.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WriteReason {
+    ProducerUnverified,
+    WriterUnverified,
+    UnsupportedFormat,
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConflictKind {
     IdMismatch,
@@ -73,6 +80,8 @@ pub struct SourceView {
     pub fields: Vec<(String, Value)>,
     pub newline: Newline,
     pub bom: bool,
+    /// Whether a body save is allowed for these exact bytes.
+    pub write: Result<(), WriteReason>,
 }
 impl fmt::Debug for SourceView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -110,4 +119,43 @@ pub struct ScanReport {
 pub enum ViewError {
     Outcome(SourceOutcome),
     Stale,
+}
+
+/// One guarded body save. `base_digest` is the lowercase SHA-256 of the whole file the client
+/// last read or saved.
+#[derive(Debug, Clone)]
+pub struct SourceSaveRequest {
+    pub operation_id: crate::operations::OperationId,
+    pub source_id: String,
+    pub base_digest: String,
+    pub body: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceSaved {
+    pub operation_id: crate::operations::OperationId,
+    /// The digest to use as the next `base_digest`.
+    pub digest: String,
+    pub size: u64,
+    /// True only when the body already matched: nothing was written.
+    pub unchanged: bool,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SaveError {
+    /// The file differs from the digest the client holds.
+    ExternalChange,
+    /// Not a file the producer-strict gate accepts (also a hard link or non-regular file).
+    UnsupportedFormat,
+    InvalidBody,
+    CloudUnavailable,
+    SourceChanging,
+    /// The id is unbound, or its root is removed or repointed.
+    SourceStale,
+    Reserved,
+    Mismatch,
+    Uncertain,
+    NotFound,
+    Storage,
+}
+pub trait SourceWriter: Send + Sync {
+    fn save_body(&self, request: SourceSaveRequest) -> Result<SourceSaved, SaveError>;
 }

@@ -166,6 +166,13 @@ pub struct Capabilities {
     pub reason: String,
 }
 #[derive(Debug, Serialize, Deserialize)]
+pub struct SourceSaved {
+    pub operation_id: String,
+    pub digest: String,
+    pub size: u64,
+    pub unchanged: bool,
+}
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SourceBody {
     pub source: Source,
     pub snapshot_id: String,
@@ -201,6 +208,28 @@ impl Bridge {
             Method::GET,
             &format!("/sources/{source_id}?snapshot_id={snapshot_id}"),
             None,
+        )
+        .await
+    }
+
+    pub async fn save_source(
+        &self,
+        source_id: String,
+        operation_id: String,
+        base_digest: String,
+        body: String,
+    ) -> Result<SourceSaved, AuthenticError> {
+        if !valid_id(&source_id)
+            || !valid_id(&operation_id)
+            || !digest_shape(&base_digest)
+            || body.len() > 1024 * 1024
+        {
+            return Err(invalid());
+        }
+        self.authentic(
+            Method::PUT,
+            &format!("/sources/{source_id}/body"),
+            Some(json!({"operation_id":operation_id,"base_digest":base_digest.to_ascii_lowercase(),"body":body})),
         )
         .await
     }
@@ -267,6 +296,16 @@ mod tests {
                 .code,
             "invalid_input"
         );
+        for (source, digest) in [("../x", "a".repeat(64)), ("ok", "short".into())] {
+            assert_eq!(
+                bridge
+                    .save_source(source.into(), "op".into(), digest, String::new())
+                    .await
+                    .unwrap_err()
+                    .code,
+                "invalid_input"
+            );
+        }
         assert_eq!(
             bridge
                 .list_sources("/private/file".into(), None)

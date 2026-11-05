@@ -30,3 +30,5 @@ tempfile = "=3.27.0"
 [features]
 # Test-only crash and I/O fault injection read from DIARY_FAULT; never enabled in release builds.
 fault-injection = []
+# Lets the producer round-trip harness exercise the source writer before it is enabled.
+producer-harness = []

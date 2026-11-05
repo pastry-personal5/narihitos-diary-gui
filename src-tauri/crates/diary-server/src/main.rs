@@ -200,6 +200,9 @@ async fn run() -> Result<(), &'static str> {
     if let Some(store) = workspace.open_imports(config.sources.clone()) {
         diary_api::ServerState::set_imports(&mut state, store);
     }
+    if let Some(Ok(writer)) = workspace.open_source_writer(config.sources.clone()) {
+        diary_api::ServerState::set_source_writer(&mut state, writer);
+    }
     let watched_store = authentic.clone();
     if let Some(store) = authentic {
         diary_api::ServerState::set_authentic(&mut state, store);

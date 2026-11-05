@@ -2,6 +2,7 @@
 mod authentic;
 mod calendar;
 mod imports;
+mod source_save;
 #[cfg(feature = "scaffold-smoke")]
 mod smoke;
 use axum::{
@@ -13,7 +14,7 @@ use axum::{
         IntoResponse, Response,
         sse::{Event as SseEvent, KeepAlive, Sse},
     },
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
 };
 use diary_application::diagnostics::{
     Diagnostics, ErrorTag, EventCode, Level, NullDiagnostics, OpaqueId, Record, TraceId,
@@ -47,6 +48,7 @@ pub struct ServerState {
     storage_ready: bool,
     authentic: Option<Arc<dyn diary_application::authentic::AuthenticStore>>,
     imports: Option<Arc<dyn diary_application::imports::ImportStore>>,
+    source_writer: Option<Arc<dyn diary_application::source::SourceWriter>>,
     source_slots: Arc<tokio::sync::Semaphore>,
     import_errors: Mutex<(String, std::collections::BTreeMap<String, &'static str>)>,
     sse_slots: Arc<tokio::sync::Semaphore>,
@@ -80,6 +82,7 @@ impl ServerState {
             storage_ready: false,
             authentic: None,
             imports: None,
+            source_writer: None,
             source_slots: Arc::new(tokio::sync::Semaphore::new(2)),
             import_errors: Mutex::new((String::new(), std::collections::BTreeMap::new())),
             authentic_epoch: std::sync::atomic::AtomicU64::new(0),
@@ -129,6 +132,14 @@ impl ServerState {
         Arc::get_mut(state)
             .expect("startup precedes shared use")
             .imports = Some(store);
+    }
+    pub fn set_source_writer(
+        state: &mut Arc<Self>,
+        writer: Arc<dyn diary_application::source::SourceWriter>,
+    ) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .source_writer = Some(writer);
     }
     pub fn set_startup(state: &mut Arc<Self>, summary: diary_application::StartupSummary) {
         *Arc::get_mut(state)
@@ -200,6 +211,7 @@ pub fn router(state: Arc<ServerState>) -> Router {
         .route("/api/v1/calendar", get(calendar::get_calendar))
         .route("/api/v1/sources/{id}", get(imports::read))
         .route("/api/v1/sources", get(imports::list))
+        .route("/api/v1/sources/{id}/body", put(source_save::save))
         .route(
             "/api/v1/sources/{id}/time-resolution",
             post(imports::resolve).layer(DefaultBodyLimit::max(4096)),

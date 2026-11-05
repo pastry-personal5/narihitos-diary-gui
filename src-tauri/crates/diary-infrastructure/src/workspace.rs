@@ -3,6 +3,7 @@
 use crate::{
     authentic::{KIND_CREATE, KIND_SAVE, ReadOnlyStore, RecoverReport, Store},
     lifecycle::{WorkspaceLock, random_uuid},
+    source::write::{KIND_SOURCE_SAVE, Writer},
     sqlite::{DB_FILE, Db, DbError},
 };
 use diary_application::{
@@ -79,6 +80,34 @@ impl Workspace {
             _ => None,
         }
     }
+    #[cfg(test)]
+    pub(crate) fn db(&self) -> Arc<Db> {
+        self.db.clone().expect("ready workspace")
+    }
+    /// The source writer, after finishing interrupted source saves. `None` unless `Ready`.
+    pub fn open_source_writer(
+        &self,
+        sources: Vec<crate::config::Source>,
+    ) -> Option<Result<Arc<Writer>, LedgerError>> {
+        let (Some(db), Readiness::Ready) = (&self.db, self.readiness) else {
+            return None;
+        };
+        let writer = Arc::new(Writer::new(db.clone(), self.identity.clone(), sources));
+        Some(self.classify().and_then(|classified| {
+            let resume: Vec<_> = classified
+                .into_iter()
+                .filter(|c| {
+                    c.class == diary_application::operations::Class::Resume
+                        && c.kind == KIND_SOURCE_SAVE
+                })
+                .map(|c| c.id)
+                .collect();
+            writer
+                .recover(&resume)
+                .map(|_| writer.clone())
+                .map_err(|_| LedgerError::Storage)
+        }))
+    }
     /// The lock proves exclusivity; recovery and inspection modes expose no ledger.
     pub fn open(lock: &WorkspaceLock) -> Result<Self, WorkspaceError> {
         open_with(lock, None)
@@ -105,7 +134,10 @@ impl Workspace {
         Some(self.classify().and_then(|classified| {
             let resume: Vec<_> = classified
                 .into_iter()
-                .filter(|c| c.class == diary_application::operations::Class::Resume)
+                .filter(|c| {
+                    c.class == diary_application::operations::Class::Resume
+                        && c.kind != KIND_SOURCE_SAVE
+                })
                 .map(|c| c.id)
                 .collect();
             store
@@ -131,7 +163,7 @@ impl Workspace {
         Ok(classify(
             &self.ledger()?.unfinished()?,
             &self.identity,
-            &[KIND_SAVE, KIND_CREATE],
+            &[KIND_SAVE, KIND_CREATE, KIND_SOURCE_SAVE],
         ))
     }
 }

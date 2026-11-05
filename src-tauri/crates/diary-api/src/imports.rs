@@ -438,7 +438,7 @@ pub(super) async fn read(
         let view = st.read(&q.snapshot_id, &id, generation, &|| cancelled(&s, &session)).map_err(|e| match e { ViewError::Stale => "source_stale", ViewError::Outcome(o) => failure_code(&o) })?;
         if generation != s.config_generation.load(Ordering::SeqCst) || cancelled(&s, &session) { return Err("source_stale"); }
         if view.body.len() > diary_domain::authentic::MAX_BODY_BYTES { return Err("too_large"); }
-        let value = json!({"source":enhanced_source(&view.listing,&snapshot,false),"snapshot_id":q.snapshot_id,"body":view.body,"capabilities":{"read":true,"save":false,"trash":false,"reason":"source_writer_unavailable"}});
+        let value = json!({"source":enhanced_source(&view.listing,&snapshot,false),"snapshot_id":q.snapshot_id,"body":view.body,"capabilities":write_capabilities(view.write)});
         let bytes = serde_json::to_vec(&value).map_err(|_|"internal")?;
         if bytes.len() > 10 * 1024 * 1024 { return Err("too_large"); }
         Ok(bytes)
@@ -448,6 +448,16 @@ pub(super) async fn read(
     }
 }
 
+fn write_capabilities(write: Result<(), diary_application::source::WriteReason>) -> Value {
+    use diary_application::source::WriteReason::*;
+    let reason = match write {
+        Ok(()) => return json!({"read":true,"save":true,"trash":false,"reason":"ready"}),
+        Err(ProducerUnverified) => "producer_unverified",
+        Err(WriterUnverified) => "writer_unverified",
+        Err(UnsupportedFormat) => "unsupported_format",
+    };
+    json!({"read":true,"save":false,"trash":false,"reason":reason})
+}
 fn local(t: &diary_application::imports::LocalTime) -> Value {
     json!({"date":t.date.to_string(),"datetime":t.datetime,"offset_seconds":t.offset_seconds})
 }
@@ -475,6 +485,6 @@ fn enhanced_source(s: &SourceListing, r: &ImportListing, eligible: bool) -> Valu
     let display = r.navigation.as_ref().and_then(|n| n.sources.get(&s.id));
     v["navigation"] = display.map(|d|json!({"group_id":d.group_id,"header":d.header.as_ref().map(local),"filename":d.filename.as_ref().map(local),"included":d.included.as_ref().map(local),"authority":d.authority.map(|a|match a {Authority::Header=>"header",Authority::Filename=>"filename"})})).unwrap_or(Value::Null);
     v["eligible"] = json!(eligible && display.is_some());
-    v["capabilities"] = json!({"read":display.is_some(),"save":false,"trash":false,"reason":if display.is_some(){"source_writer_unavailable"}else{"reimport_required"}});
+    v["capabilities"] = json!({"read":display.is_some(),"save":false,"trash":false,"reason":if display.is_some(){"checked_on_open"}else{"reimport_required"}});
     v
 }

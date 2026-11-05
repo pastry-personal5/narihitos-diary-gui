@@ -1,5 +1,5 @@
 use super::adapter::SourceAdapter;
-use diary_application::source::UnsupportedReason;
+use diary_application::source::{UnsupportedReason, WriteReason};
 use diary_domain::source::{
     front_matter::Parsed,
     stamp::{self, Instant, StampError},
@@ -14,5 +14,8 @@ impl SourceAdapter for Ayumi {
     }
     fn unsupported(&self, _parsed: &Parsed) -> Option<UnsupportedReason> {
         None
+    }
+    fn write_policy(&self, _bytes: &[u8], _rel: &str) -> Result<(), WriteReason> {
+        Err(WriteReason::ProducerUnverified)
     }
 }

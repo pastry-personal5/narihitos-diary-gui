@@ -579,6 +579,7 @@ impl ImportStore for ReadFake {
             fields: vec![],
             newline: diary_domain::source::front_matter::Newline::Lf,
             bom: false,
+            write: Err(diary_application::source::WriteReason::WriterUnverified),
         })
     }
 }
@@ -606,6 +607,7 @@ async fn selected_read_redacts_metadata_and_refuses_reload_during_work() {
     let dto = value(response).await;
     assert_eq!(dto["body"], "visible body");
     assert_eq!(dto["capabilities"]["save"], false);
+    assert_eq!(dto["capabilities"]["reason"], "writer_unverified");
     for private in [
         "PRIVATE_SECRET",
         "root_namespace",

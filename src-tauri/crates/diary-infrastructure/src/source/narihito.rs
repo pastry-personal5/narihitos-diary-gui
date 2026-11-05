@@ -1,5 +1,6 @@
 use super::adapter::{SourceAdapter, scalar};
-use diary_application::source::UnsupportedReason;
+use super::{narihito_write::check, write::WRITE_BODY_VERIFIED};
+use diary_application::source::{UnsupportedReason, WriteReason};
 use diary_domain::source::{
     front_matter::Parsed,
     stamp::{self, Instant, StampError},
@@ -23,6 +24,21 @@ impl SourceAdapter for Narihito {
             Some(UnsupportedReason::Kind)
         } else {
             None
+        }
+    }
+    fn write_policy(&self, bytes: &[u8], rel: &str) -> Result<(), WriteReason> {
+        check(bytes, rel).map_err(|_| WriteReason::UnsupportedFormat)?;
+        if WRITE_BODY_VERIFIED {
+            Ok(())
+        } else {
+            Err(WriteReason::WriterUnverified)
+        }
+    }
+    fn view_body(&self, body: String) -> String {
+        // The blank line after the closing delimiter is the producer's separator, not text.
+        match body.strip_prefix('\n') {
+            Some(text) => text.to_owned(),
+            None => body,
         }
     }
 }

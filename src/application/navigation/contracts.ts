@@ -50,9 +50,23 @@ export interface SourceDisplay {
 }
 export interface SourceCapabilities {
   read: boolean;
-  save: false;
+  save: boolean;
   trash: false;
-  reason: "source_writer_unavailable" | "reimport_required";
+  /** `ready` exactly when `save` is true. */
+  reason: SourceSaveReason;
+}
+export type SourceSaveReason =
+  | "ready"
+  | "producer_unverified"
+  | "writer_unverified"
+  | "unsupported_format"
+  | "checked_on_open"
+  | "reimport_required";
+export interface SourceSaved {
+  operation_id: string;
+  digest: string;
+  size: number;
+  unchanged: boolean;
 }
 export interface Source {
   id: string;

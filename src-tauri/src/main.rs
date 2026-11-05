@@ -214,6 +214,20 @@ async fn read_source(
     state.read_source(source_id, snapshot_id).await
 }
 #[tauri::command]
+async fn save_source(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    source_id: String,
+    operation_id: String,
+    base_digest: String,
+    body: String,
+) -> Result<bridge::SourceSaved, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state
+        .save_source(source_id, operation_id, base_digest, body)
+        .await
+}
+#[tauri::command]
 async fn import_date(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -463,6 +477,7 @@ fn main() {
             get_symbol,
             get_calendar,
             read_source,
+            save_source,
             import_date,
             list_sources,
             resolve_source_time,

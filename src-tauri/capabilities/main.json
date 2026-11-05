@@ -22,6 +22,7 @@
     "allow-get-symbol",
     "allow-get-calendar",
     "allow-read-source",
+    "allow-save-source",
     "allow-import-date",
     "allow-list-sources",
     "allow-resolve-source-time",

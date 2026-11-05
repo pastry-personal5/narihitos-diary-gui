@@ -97,6 +97,7 @@ describe("explicit command permission boundary", () => {
     "get_symbol",
     "get_calendar",
     "read_source",
+    "save_source",
     "import_date",
     "list_sources",
     "resolve_source_time",

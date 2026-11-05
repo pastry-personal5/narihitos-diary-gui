@@ -15,8 +15,14 @@ pub(super) trait SourceAdapter {
     fn filename(&self, stem: &str, dir: (i32, u8, u8)) -> Result<stamp::Instant, StampError>;
     fn identity<'a>(&self, stem: &'a str) -> Option<&'a str>;
     fn unsupported(&self, parsed: &Parsed) -> Option<UnsupportedReason>;
+    /// Whether these exact bytes may be saved.
+    fn write_policy(&self, bytes: &[u8], rel: &str) -> Result<(), WriteReason>;
+    /// The editor text for a parsed body.
+    fn view_body(&self, body: String) -> String {
+        body
+    }
 }
-fn adapter(kind: &SourceKind) -> &dyn SourceAdapter {
+pub(super) fn adapter(kind: &SourceKind) -> &dyn SourceAdapter {
     match kind {
         SourceKind::Ayumi => &super::ayumi::Ayumi,
         SourceKind::Narihito => &super::narihito::Narihito,
@@ -149,9 +155,11 @@ pub fn read_view(
     let p = parse(&obs.bytes).map_err(|e| ViewError::Outcome(SourceOutcome::Malformed(e)))?;
     let (_, mut listing) = interpret(root, kind, rel, &obs, generation, &p);
     listing.token.import_id.clone_from(&expected.import_id);
+    let adapter = adapter(kind);
     Ok(SourceView {
         listing,
-        body: p.body,
+        write: adapter.write_policy(&obs.bytes, &rel.spelling),
+        body: adapter.view_body(p.body),
         raw_front_matter: p.raw_front_matter,
         fields: p.fields,
         newline: p.newline,

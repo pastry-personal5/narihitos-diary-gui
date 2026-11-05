@@ -11,7 +11,7 @@ pub use authentic::{
 pub use calendar::{Calendar, CalendarAction};
 use diary_application::diagnostics::{Component, ErrorTag, EventCode, Level, Record, TraceId};
 use diary_logging::private_fs::PrivateDir;
-pub use imports::{ImportAck, ImportPage, ResolutionAck, SourceBody, TimeAuthority};
+pub use imports::{ImportAck, ImportPage, ResolutionAck, SourceBody, SourceSaved, TimeAuthority};
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

@@ -183,16 +183,41 @@ function local(v: unknown): LocalTime | null {
     offset_seconds: num(d.offset_seconds, -86400, 86400),
   };
 }
+const SAVE_REASONS: string[] = [
+  "ready",
+  "producer_unverified",
+  "writer_unverified",
+  "unsupported_format",
+  "checked_on_open",
+  "reimport_required",
+];
+export function sourceSaved(v: unknown): SourceSaved {
+  const d = obj(v),
+    digest = str(d.digest);
+  if (!/^[0-9a-f]{64}$/u.test(digest)) return bad();
+  return {
+    operation_id: id(d.operation_id),
+    digest,
+    size: num(d.size, 0, 9 * 1024 * 1024),
+    unchanged: bool(d.unchanged),
+  };
+}
 function caps(v: unknown): SourceCapabilities {
   const d = obj(v);
+  const save = bool(d.save);
   if (
-    d.save !== false ||
     d.trash !== false ||
-    (d.reason !== "source_writer_unavailable" &&
-      d.reason !== "reimport_required")
+    typeof d.reason !== "string" ||
+    !SAVE_REASONS.includes(d.reason as SourceSaveReason) ||
+    save !== (d.reason === "ready")
   )
     return bad();
-  return { read: bool(d.read), save: false, trash: false, reason: d.reason };
+  return {
+    read: bool(d.read),
+    save,
+    trash: false,
+    reason: d.reason as SourceSaveReason,
+  };
 }
 function nullableReason(v: unknown): string | null {
   if (v === null) return null;

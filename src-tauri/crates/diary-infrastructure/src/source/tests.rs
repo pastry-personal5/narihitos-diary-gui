@@ -329,3 +329,30 @@ fn moving_a_root_changes_namespace_even_with_same_inode() {
     assert_eq!((tree.root.dev, tree.root.ino), (new.dev, new.ino));
     assert_ne!(old, root::source_id(&new, &rel));
 }
+#[test]
+fn ayumi_never_writable_and_body_unchanged() {
+    let tree = Tree::new();
+    tree.write(AYUMI, &ayumi());
+    let rel = normalize(AYUMI, tree.root.insensitive).unwrap();
+    let (_, l) = adapter::observe(&tree.root, &SourceKind::Ayumi, &rel, 0).unwrap();
+    let view = adapter::read_view(&tree.root, &SourceKind::Ayumi, &rel, 0, &l.token).unwrap();
+    assert_eq!(view.write, Err(WriteReason::ProducerUnverified));
+    assert!(view.body.starts_with("\nBODY_SECRET"));
+}
+#[test]
+fn narihito_reason_follows_gate_then_flag_and_view_drops_separator() {
+    use super::narihito_write::tests_support::{REL, golden};
+    let tree = Tree::new();
+    tree.write(REL, &golden("2024-02-29T01:02:03Z", "hello\n"));
+    let rel = normalize(REL, tree.root.insensitive).unwrap();
+    let view = |tree: &Tree| {
+        let (_, l) = adapter::observe(&tree.root, &SourceKind::Narihito, &rel, 0).unwrap();
+        adapter::read_view(&tree.root, &SourceKind::Narihito, &rel, 0, &l.token).unwrap()
+    };
+    let v = view(&tree);
+    assert_eq!(v.body, "hello\n");
+    assert_eq!(v.write, Err(WriteReason::WriterUnverified));
+    let text = String::from_utf8(golden("2024-02-29T01:02:03Z", "hello\n")).unwrap().replace("favorite: false", "favorite: maybe");
+    tree.write(REL, text.as_bytes());
+    assert_eq!(view(&tree).write, Err(WriteReason::UnsupportedFormat));
+}
