@@ -278,3 +278,28 @@ fn a_flooding_code_cannot_silence_other_events() {
     w.shutdown(Duration::from_secs(5));
     assert_eq!(dropped_counts(&sink.text()).iter().sum::<u32>(), 440);
 }
+
+#[test]
+fn idle_shutdown_returns_promptly_even_with_a_long_tick() {
+    let config = WorkerConfig {
+        tick: Duration::from_secs(5),
+        per_code_per_minute: u32::MAX,
+        ..WorkerConfig::default()
+    };
+    let w = LogWorker::start_with(
+        None,
+        Role::Server,
+        None,
+        clock(),
+        Box::new(Sink::default()),
+        config,
+    );
+    std::thread::sleep(Duration::from_millis(50));
+    let start = Instant::now();
+    w.shutdown(Duration::from_secs(5));
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "{:?}",
+        start.elapsed()
+    );
+}

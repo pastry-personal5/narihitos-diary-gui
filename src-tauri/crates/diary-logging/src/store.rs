@@ -212,6 +212,18 @@ impl LogStore {
             if parse_name(self.role, &name).is_none() || Some(&name) == active.as_ref() {
                 continue;
             }
+            match self.dir.is_regular(&name) {
+                Ok(true) => {}
+                // A symlink or fifo can never be a log and would hold a cap slot forever;
+                // unlinking removes the entry itself, never a target.
+                Ok(false) => {
+                    if self.dir.remove(&name).is_ok() {
+                        deleted += 1;
+                    }
+                    continue;
+                }
+                Err(_) => continue,
+            }
             let Ok(meta) = self.dir.metadata(&name) else {
                 continue;
             };

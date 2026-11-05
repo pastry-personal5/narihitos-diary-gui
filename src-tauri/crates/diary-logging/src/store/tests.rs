@@ -223,7 +223,7 @@ fn prune_runs_on_rotation_in_a_long_running_process() {
 }
 
 #[test]
-fn prune_never_deletes_active_unrelated_other_role_or_symlinked_names() {
+fn prune_keeps_active_unrelated_and_other_role_names_but_removes_planted_special_entries() {
     let ws = Ws::new();
     let clock = at("2026-11-05T09:00:00.000+09:00");
     let mut s = ws.store(&clock, Limits::default());
@@ -238,9 +238,20 @@ fn prune_never_deletes_active_unrelated_other_role_or_symlinked_names() {
         ws.logs().join("server-2026-01-01.log"),
     )
     .unwrap();
+    let fifo =
+        std::ffi::CString::new(ws.logs().join("server-2026-01-04.log").to_str().unwrap()).unwrap();
+    // SAFETY: valid NUL-terminated path.
+    assert_eq!(unsafe { libc::mkfifo(fifo.as_ptr(), 0o600) }, 0);
     let before = ws.names();
-    assert_eq!(s.prune(), Ok(0));
-    assert_eq!(ws.names(), before);
+    // A canonical-name symlink or fifo can never be a log; it must not hold a cap slot forever.
+    assert_eq!(s.prune(), Ok(2));
+    let mut expected = before;
+    expected.retain(|n| n != "server-2026-01-01.log" && n != "server-2026-01-04.log");
+    assert_eq!(ws.names(), expected);
+    assert!(
+        ws.logs().join("notes.txt").exists(),
+        "the symlink target is untouched"
+    );
 }
 
 #[test]

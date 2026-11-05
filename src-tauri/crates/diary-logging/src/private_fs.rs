@@ -196,14 +196,38 @@ impl PrivateDir {
         Ok(bytes)
     }
 
+    /// Duplicates the directory descriptor so it cannot leak into a spawned child process.
+    fn dup_cloexec(&self) -> Result<libc::c_int, FsError> {
+        // SAFETY: fcntl on a live descriptor; the duplicate is returned to the caller.
+        let fd = unsafe { libc::fcntl(self.file.as_raw_fd(), libc::F_DUPFD_CLOEXEC, 0) };
+        if fd < 0 { Err(FsError::Io) } else { Ok(fd) }
+    }
+
+    /// Whether `value` is a regular file, without following a symlink.
+    pub fn is_regular(&self, value: &str) -> Result<bool, FsError> {
+        let value = name(value).map_err(|_| FsError::Path)?;
+        let mut st = std::mem::MaybeUninit::<libc::stat>::uninit();
+        // SAFETY: live directory, terminated name and a valid out-pointer.
+        let rc = unsafe {
+            libc::fstatat(
+                self.file.as_raw_fd(),
+                value.as_ptr(),
+                st.as_mut_ptr(),
+                libc::AT_SYMLINK_NOFOLLOW,
+            )
+        };
+        if rc != 0 {
+            return Err(FsError::Io);
+        }
+        // SAFETY: fstatat succeeded, so the struct is initialized.
+        let st = unsafe { st.assume_init() };
+        Ok(st.st_mode & libc::S_IFMT == libc::S_IFREG)
+    }
+
     /// Entry names (no "." or ".."), sorted. Names only: callers must open each entry
     /// through this directory so a swapped or hostile entry is judged on the opened object.
     pub fn list(&self) -> Result<Vec<String>, FsError> {
-        // SAFETY: dup of a live descriptor; fdopendir takes ownership of the duplicate.
-        let fd = unsafe { libc::dup(self.file.as_raw_fd()) };
-        if fd < 0 {
-            return Err(FsError::Io);
-        }
+        let fd = self.dup_cloexec()?;
         // SAFETY: fd is a fresh directory descriptor.
         let dir = unsafe { libc::fdopendir(fd) };
         if dir.is_null() {

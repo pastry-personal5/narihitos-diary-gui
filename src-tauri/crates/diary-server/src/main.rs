@@ -12,7 +12,7 @@ use diary_logging::{
     trace::{self, Selector},
     worker::LogWorker,
 };
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{io::Write, path::PathBuf, sync::Arc, time::Duration};
 
 /// A log directory problem must never stop the server: without a store the worker writes
 /// diagnostics to stderr only.
@@ -45,7 +45,9 @@ async fn main() {
 /// `diary-server trace --config PATH --select SELECTOR [--limit N]`: a read-only, redacted,
 /// bounded timeline of the server and client logs for debugging. It never opens the discovery
 /// file or the workspace lock.
-fn trace_mode(mut args: impl Iterator<Item = std::ffi::OsString>) -> Result<(), &'static str> {
+fn parse_trace_args(
+    mut args: impl Iterator<Item = std::ffi::OsString>,
+) -> Result<(PathBuf, Selector, usize), &'static str> {
     let (mut config, mut select, mut limit) = (None, None, trace::DEFAULT_LIMIT);
     while let Some(flag) = args.next() {
         let value = args.next().and_then(|v| v.into_string().ok());
@@ -56,19 +58,36 @@ fn trace_mode(mut args: impl Iterator<Item = std::ffi::OsString>) -> Result<(), 
             _ => return Err("invalid arguments"),
         }
     }
-    let config = config.ok_or("expected --config PATH")?;
-    let selector = select.ok_or("invalid or missing --select")?;
+    Ok((
+        config.ok_or("expected --config PATH")?,
+        select.ok_or("invalid or missing --select")?,
+        limit,
+    ))
+}
+fn trace_mode(args: impl Iterator<Item = std::ffi::OsString>) -> Result<(), &'static str> {
+    let (config, selector, limit) = parse_trace_args(args)?;
     let config = config::load(&config).map_err(|_| "configuration rejected")?;
     let key = diary_infrastructure::lifecycle::workspace_key(&config.paths.entries_root);
     let report = PrivateDir::open(&config.paths.runtime_root)
         .and_then(|d| d.open_child(&key))
         .map(|d| trace::collect(&d, &selector, limit))
         .unwrap_or_default();
+    // A closed pipe (`| head`) ends the output quietly instead of panicking.
+    let mut out = std::io::stdout().lock();
     for line in &report.lines {
-        print!("{line}");
+        if out.write_all(line.as_bytes()).is_err() {
+            return Ok(());
+        }
     }
-    println!("{}", report.summary_line());
+    let _ = writeln!(out, "{}", report.summary_line());
     Ok(())
+}
+/// Flushes queued diagnostics on every exit path, including early error returns.
+struct Drain(Arc<LogWorker>);
+impl Drop for Drain {
+    fn drop(&mut self) {
+        self.0.shutdown(Duration::from_secs(2));
+    }
 }
 async fn run() -> Result<(), &'static str> {
     let mut args = std::env::args_os().skip(1);
@@ -114,6 +133,7 @@ async fn run() -> Result<(), &'static str> {
         &lock.workspace_key,
         &record.instance_id,
     );
+    let _drain = Drain(diagnostics.clone());
     diagnostics.emit(Record::new(EventCode::ServerStarted, Level::Info));
     diagnostics.emit(Record::new(EventCode::ListenerBound, Level::Info).count(u32::from(port)));
     let mut state = diary_api::ServerState::new(
@@ -164,8 +184,53 @@ async fn run() -> Result<(), &'static str> {
         },
     }
     sweeper.abort();
-    diagnostics.shutdown(Duration::from_secs(2));
     drop(published);
     drop(lock);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn args(v: &[&str]) -> impl Iterator<Item = std::ffi::OsString> {
+        v.iter()
+            .map(std::ffi::OsString::from)
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+    #[test]
+    fn trace_args_accept_config_select_and_limit() {
+        let (config, selector, limit) = parse_trace_args(args(&[
+            "--config", "/x.yaml", "--select", "recent:5", "--limit", "7",
+        ]))
+        .unwrap();
+        assert_eq!(config, PathBuf::from("/x.yaml"));
+        assert_eq!(selector, Selector::Recent(5));
+        assert_eq!(limit, 7);
+        let (_, _, default) =
+            parse_trace_args(args(&["--config", "/x.yaml", "--select", "recent:1"])).unwrap();
+        assert_eq!(default, trace::DEFAULT_LIMIT);
+    }
+    #[test]
+    fn trace_args_reject_missing_unknown_and_malformed_input() {
+        for bad in [
+            &["--select", "recent:5"][..],
+            &["--config", "/x.yaml"],
+            &["--config", "/x.yaml", "--select", "bogus"],
+            &[
+                "--config", "/x.yaml", "--select", "recent:5", "--limit", "many",
+            ],
+            &[
+                "--config",
+                "/x.yaml",
+                "--select",
+                "recent:5",
+                "--verbose",
+                "1",
+            ],
+            &["--config", "/x.yaml", "--select"],
+        ] {
+            assert!(parse_trace_args(args(bad)).is_err(), "{bad:?}");
+        }
+    }
 }

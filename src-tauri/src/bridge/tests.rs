@@ -167,3 +167,21 @@ async fn every_request_carries_a_fresh_lowercase_hex_trace_id() {
     );
     assert_eq!(request.as_bytes()[at + 32], b'\r');
 }
+
+#[test]
+fn only_unexpected_statuses_are_logged_and_tagged_by_kind() {
+    use reqwest::StatusCode as S;
+    assert_eq!(status_tag(S::CONFLICT), None);
+    assert_eq!(status_tag(S::TOO_MANY_REQUESTS), Some(ErrorTag::Limit));
+    assert_eq!(
+        status_tag(S::SERVICE_UNAVAILABLE),
+        Some(ErrorTag::Unavailable)
+    );
+    assert_eq!(
+        status_tag(S::INTERNAL_SERVER_ERROR),
+        Some(ErrorTag::Internal)
+    );
+    assert_eq!(status_tag(S::FORBIDDEN), Some(ErrorTag::Denied));
+    assert_eq!(status_tag(S::UNAUTHORIZED), Some(ErrorTag::Denied));
+    assert_eq!(status_tag(S::BAD_REQUEST), Some(ErrorTag::Invalid));
+}

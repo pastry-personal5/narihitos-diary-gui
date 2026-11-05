@@ -227,6 +227,8 @@ impl LogWorker {
             Ordering::Relaxed,
         );
         self.stopping.store(true, Ordering::Relaxed);
+        // Wake an idle worker now instead of after its tick; an empty line is never written.
+        let _ = self.tx.try_send(String::new());
         let done = self.done.lock().ok().and_then(|mut d| d.take());
         if let Some(done) = done {
             let _ = done.recv_timeout(drain + Duration::from_millis(50));
@@ -244,6 +246,7 @@ fn run(
     let mut next_prune = core.clock.now().epoch_secs + config.prune_every_secs;
     loop {
         match rx.recv_timeout(config.tick) {
+            Ok(line) if line.is_empty() => {}
             Ok(line) => core.write(&line),
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => break,
@@ -260,6 +263,7 @@ fn run(
             let deadline = Instant::now() + Duration::from_millis(drain_ms.load(Ordering::Relaxed));
             while Instant::now() < deadline {
                 match rx.try_recv() {
+                    Ok(line) if line.is_empty() => {}
                     Ok(line) => core.write(&line),
                     Err(_) => break,
                 }

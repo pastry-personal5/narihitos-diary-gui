@@ -173,6 +173,7 @@ fn rejected(
     let tag = match code {
         "server_stopping" | "request_timeout" => ErrorTag::Unavailable,
         "request_limit" => ErrorTag::Limit,
+        "unauthorized" | "invalid_origin" | "invalid_destination" => ErrorTag::Denied,
         _ => ErrorTag::Invalid,
     };
     let mut record = Record::new(EventCode::AuthRejected, Level::Warn).error(tag);
@@ -514,13 +515,16 @@ async fn cancel_job(
         Err(e) => return app_error(e),
     };
     let mut c = s.coordinator.lock().expect("coordinator poisoned");
+    let was_terminal = c
+        .get(id, s.now(), &job)
+        .is_ok_and(|j| j.state.is_terminal());
     match c.cancel(id, s.now(), &job) {
         Ok(job) => {
             // Compute the exact encoded envelope size before retaining notification.
             let dto = JobDto::from(job.clone());
             let bytes = serde_json::to_vec(&json!({"instance_id":s.instance_id,"session_id":id,"event_id":u64::MAX,"job_id":job.id,"job_sequence":job.sequence,"kind":"job_changed","payload":dto})).expect("fixed DTO").len();
             let _ = c.publish(id, s.now(), &job.id, bytes);
-            if job.state.is_terminal() {
+            if job.state.is_terminal() && !was_terminal {
                 let mut record =
                     in_session(traced(EventCode::JobFinished, Level::Info, &trace), id);
                 // Fixture job IDs are not opaque IDs; real (UUID) job IDs are recorded.

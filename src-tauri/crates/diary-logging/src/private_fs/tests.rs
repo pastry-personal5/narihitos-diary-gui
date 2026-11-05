@@ -99,3 +99,28 @@ fn open_child_does_not_create_and_read_bounded_caps_bytes() {
     std::os::unix::fs::symlink(base.join("big"), base.join("link")).unwrap();
     assert!(dir.read_bounded("link", 10).is_err());
 }
+
+#[test]
+fn list_duplicates_the_directory_descriptor_with_close_on_exec() {
+    let (_t, _base, dir) = dir();
+    let fd = dir.dup_cloexec().unwrap();
+    // SAFETY: fd is a live descriptor owned by this test.
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };
+    // SAFETY: closes the descriptor exactly once.
+    unsafe { libc::close(fd) };
+    assert!(flags >= 0 && flags & libc::FD_CLOEXEC != 0);
+}
+
+#[test]
+fn is_regular_distinguishes_files_from_symlinks_fifos_and_missing_names() {
+    let (_t, base, dir) = dir();
+    std::fs::write(base.join("reg"), "x").unwrap();
+    std::os::unix::fs::symlink(base.join("reg"), base.join("link")).unwrap();
+    let fifo = std::ffi::CString::new(base.join("fifo").to_str().unwrap()).unwrap();
+    // SAFETY: valid NUL-terminated path.
+    assert_eq!(unsafe { libc::mkfifo(fifo.as_ptr(), 0o600) }, 0);
+    assert_eq!(dir.is_regular("reg"), Ok(true));
+    assert_eq!(dir.is_regular("link"), Ok(false));
+    assert_eq!(dir.is_regular("fifo"), Ok(false));
+    assert!(dir.is_regular("missing").is_err());
+}

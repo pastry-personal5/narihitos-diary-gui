@@ -543,7 +543,7 @@ mod diagnostics {
         assert_eq!(all.len(), 1, "{all:?}");
         assert_eq!(all[0].code, EventCode::AuthRejected);
         assert_eq!(all[0].level, Level::Warn);
-        assert_eq!(all[0].error, Some(ErrorTag::Invalid));
+        assert_eq!(all[0].error, Some(ErrorTag::Denied));
         assert!(all[0].trace.is_some());
         let dump = format!("{all:?}");
         for secret in ["SECRET-BODY", "wrong-token", &"a".repeat(64)] {
@@ -576,6 +576,33 @@ mod diagnostics {
         );
         let closed = rec.find(EventCode::SessionClosed).unwrap();
         assert_eq!(closed.session, OpaqueId::parse(&id));
+    }
+
+    #[tokio::test]
+    async fn repeated_cancel_emits_job_finished_only_once() {
+        let mut s = state();
+        let inner = Arc::get_mut(&mut s).unwrap();
+        inner.clock = Arc::new(|| 0);
+        let c = inner.coordinator.get_mut().unwrap();
+        c.open(SESSION, 0).unwrap();
+        c.admit(SESSION, 0, "request", &"a".repeat(64), JOB, 100)
+            .unwrap();
+        let (s, rec) = recorded(s);
+        let app = router(s);
+        for _ in 0..3 {
+            let response = app
+                .clone()
+                .oneshot(owned_request("POST", &format!("/api/v1/jobs/{JOB}/cancel")))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+        let finished = rec
+            .all()
+            .into_iter()
+            .filter(|r| r.code == EventCode::JobFinished)
+            .count();
+        assert_eq!(finished, 1);
     }
 
     #[tokio::test]

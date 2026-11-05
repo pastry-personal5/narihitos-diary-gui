@@ -96,6 +96,18 @@ pub struct Bridge {
     subscription: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
     log: Arc<ClientLog>,
 }
+/// Unexpected statuses only: a 409 is an expected conflict (busy, stale) that the caller handles.
+fn status_tag(status: reqwest::StatusCode) -> Option<ErrorTag> {
+    use reqwest::StatusCode as S;
+    match status {
+        S::CONFLICT => None,
+        S::UNAUTHORIZED | S::FORBIDDEN => Some(ErrorTag::Denied),
+        S::TOO_MANY_REQUESTS => Some(ErrorTag::Limit),
+        S::SERVICE_UNAVAILABLE => Some(ErrorTag::Unavailable),
+        s if s.is_server_error() => Some(ErrorTag::Internal),
+        _ => Some(ErrorTag::Invalid),
+    }
+}
 /// One fresh ID per outgoing request; the server echoes it in its own records.
 fn new_trace() -> String {
     uuid::Uuid::new_v4().simple().to_string()
@@ -165,7 +177,9 @@ impl Bridge {
             "server_unavailable"
         })?;
         if !response.status().is_success() {
-            self.note(&trace, ErrorTag::Invalid);
+            if let Some(tag) = status_tag(response.status()) {
+                self.note(&trace, tag);
+            }
             if response.status() == reqwest::StatusCode::CONFLICT {
                 let mut bytes = Vec::new();
                 while let Some(chunk) = response

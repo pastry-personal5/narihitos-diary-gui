@@ -194,3 +194,20 @@ fn accepted_event_is_logged_with_trace_and_component_and_rejection_is_logged_too
             .any(|r| r.record.code == EventCode::ClientEventRejected)
     );
 }
+
+#[test]
+fn concurrent_attach_calls_open_the_log_once_and_stay_on_file() {
+    let ws = Ws::new();
+    let (log, _sink, _ms) = test_log();
+    let dir = std::sync::Arc::new(ws.dir());
+    let handles: Vec<_> = (0..4)
+        .map(|_| {
+            let (log, dir) = (log.clone(), dir.clone());
+            std::thread::spawn(move || log.attach(&dir))
+        })
+        .collect();
+    for h in handles {
+        h.join().unwrap();
+    }
+    assert_eq!(log.mode(), Mode::File);
+}

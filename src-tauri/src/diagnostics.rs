@@ -114,6 +114,7 @@ pub struct ClientLog {
     stderr_worker: Arc<LogWorker>,
     state: Mutex<State>,
     limiter: Mutex<Limiter>,
+    attach_gate: Mutex<()>,
 }
 
 impl ClientLog {
@@ -142,6 +143,7 @@ impl ClientLog {
                 lines: Vec::new(),
                 dropped: 0,
             }),
+            attach_gate: Mutex::new(()),
             limiter: Mutex::new(Limiter {
                 window_start: 0,
                 count: 0,
@@ -178,6 +180,30 @@ impl ClientLog {
     /// client process, or any open failure, leaves the client on stderr; it never competes
     /// for the file and never searches for another location.
     pub fn attach(&self, workspace_dir: &PrivateDir) {
+        // One attacher at a time. `log()` only ever takes the short-lived state lock, so opening
+        // the store (mkdir, flock, pruning) never blocks it.
+        let _attaching = self.attach_gate.lock().unwrap_or_else(|e| e.into_inner());
+        let buffering = matches!(
+            *self.state.lock().unwrap_or_else(|e| e.into_inner()),
+            State::Buffering { .. }
+        );
+        if !buffering {
+            return;
+        }
+        let opened = LogStore::open(workspace_dir, Role::Client, self.clock.clone()).map(|store| {
+            LogWorker::start_with(
+                Some(store),
+                Role::Client,
+                None,
+                self.clock.clone(),
+                (self.make_stderr)(),
+                // Room for a full 256-line buffer flush plus the drop report.
+                WorkerConfig {
+                    queue: BUFFER_LINES * 2,
+                    ..WorkerConfig::default()
+                },
+            )
+        });
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let (lines, dropped) = match std::mem::replace(&mut *state, State::Stderr) {
             State::Buffering { lines, dropped } => (lines, dropped),
@@ -186,21 +212,7 @@ impl ClientLog {
                 return;
             }
         };
-        let Ok(store) = LogStore::open(workspace_dir, Role::Client, self.clock.clone()) else {
-            return;
-        };
-        let worker = LogWorker::start_with(
-            Some(store),
-            Role::Client,
-            None,
-            self.clock.clone(),
-            (self.make_stderr)(),
-            // Room for a full 256-line buffer flush plus the drop report.
-            WorkerConfig {
-                queue: BUFFER_LINES * 2,
-                ..WorkerConfig::default()
-            },
-        );
+        let Ok(worker) = opened else { return };
         for line in lines {
             worker.emit_line(line);
         }

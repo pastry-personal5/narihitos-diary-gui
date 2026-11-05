@@ -103,8 +103,9 @@ impl LocalStamp {
             || !(1..=31).contains(&d)
             || h > 23
             || mi > 59
-            || sec > 60
+            || sec > 59
             || om > 59
+            || oh > 23
         {
             return None;
         }
