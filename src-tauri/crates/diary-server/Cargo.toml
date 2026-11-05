@@ -16,5 +16,4 @@ axum = "=0.8.9"
 [features]
 # Smoke-test crash injection through DIARY_FAULT; never part of a release build.
 fault-injection = ["diary-infrastructure/fault-injection"]
-producer-harness = ["diary-infrastructure/producer-harness"]
 scaffold-smoke = ["diary-api/scaffold-smoke"]

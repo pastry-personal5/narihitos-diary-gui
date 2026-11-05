@@ -340,7 +340,7 @@ fn ayumi_never_writable_and_body_unchanged() {
     assert!(view.body.starts_with("\nBODY_SECRET"));
 }
 #[test]
-fn narihito_reason_follows_gate_then_flag_and_view_drops_separator() {
+fn narihito_save_true_when_enabled_and_view_drops_separator() {
     use super::narihito_write::tests_support::{REL, golden};
     let tree = Tree::new();
     tree.write(REL, &golden("2024-02-29T01:02:03Z", "hello\n"));
@@ -351,7 +351,7 @@ fn narihito_reason_follows_gate_then_flag_and_view_drops_separator() {
     };
     let v = view(&tree);
     assert_eq!(v.body, "hello\n");
-    assert_eq!(v.write, Err(WriteReason::WriterUnverified));
+    assert_eq!(v.write, Ok(()));
     let text = String::from_utf8(golden("2024-02-29T01:02:03Z", "hello\n"))
         .unwrap()
         .replace("favorite: false", "favorite: maybe");

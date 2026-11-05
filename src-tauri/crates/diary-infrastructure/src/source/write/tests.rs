@@ -307,3 +307,70 @@ fn reserved_while_unfinished() {
     assert!(e.save(1, &base, "x\n").is_err());
     assert_eq!(e.save(2, &base, "y\n"), Err(SaveError::Reserved));
 }
+
+#[test]
+fn crash_at_every_boundary_never_leaves_a_partial_file_and_retry_finishes() {
+    let steps = [
+        Step::StageWrite,
+        Step::StageSync,
+        Step::Intent,
+        Step::Publish,
+        Step::FileSync,
+        Step::DirSync,
+        Step::Verify,
+        Step::Receipt,
+        Step::Ack,
+    ];
+    for step in steps {
+        for when in [When::Before, When::After] {
+            let e = env();
+            let (old, base) = (e.bytes(), e.digest());
+            e.writer.inject(Fault {
+                step,
+                when,
+                kind: FaultKind::Crash,
+            });
+            let _ = e.save(1, &base, "x\n");
+            let now = e.bytes();
+            assert!(
+                now == old || String::from_utf8(now).unwrap().ends_with("\n\nx\n"),
+                "{step:?} {when:?}: file is neither old nor new"
+            );
+            e.writer.recover(&[op(1)]).unwrap();
+            let done = e
+                .save(1, &base, "x\n")
+                .unwrap_or_else(|x| panic!("{step:?} {when:?}: {x:?}"));
+            assert_eq!(done.digest, e.digest(), "{step:?} {when:?}");
+            assert!(String::from_utf8(e.bytes()).unwrap().ends_with("\n\nx\n"));
+            assert_eq!(e.state(1), OperationState::Succeeded, "{step:?} {when:?}");
+        }
+    }
+}
+
+#[test]
+fn read_errors_map_to_codes() {
+    use diary_application::source::Unavailable as U;
+    for (e, code) in [
+        (U::NotDownloaded, SaveError::CloudUnavailable),
+        (U::SourceChanging, SaveError::SourceChanging),
+        (U::Missing, SaveError::SourceStale),
+        (U::NotRegular, SaveError::UnsupportedFormat),
+        (U::Io, SaveError::Storage),
+    ] {
+        assert_eq!(read_err(e), code);
+    }
+}
+
+#[test]
+fn save_after_restart_and_reload_uses_durable_identity() {
+    let e = env();
+    let fresh = {
+        let mut w = Writer::new(e.ws.db(), e.ws.identity.clone(), e.writer.sources.clone());
+        w.now = Box::new(|| 2_000_000_000);
+        w
+    };
+    let out = fresh
+        .save_body(e.req(1, &e.digest(), "after restart\n"))
+        .unwrap();
+    assert_eq!(out.digest, e.digest());
+}

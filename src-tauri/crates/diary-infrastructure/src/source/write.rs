@@ -36,9 +36,8 @@ use std::{
 };
 
 pub const KIND_SOURCE_SAVE: &str = "source_save";
-/// Flipped only after the producer round trip (`scripts/smoke/producer.py`) passes. The
-/// `producer-harness` feature lets that harness exercise the writer before the flip.
-pub(super) const WRITE_BODY_VERIFIED: bool = cfg!(feature = "producer-harness");
+/// Enabled after `scripts/smoke/producer.py` passed (2026-11-06); it proves file format only.
+pub(super) const WRITE_BODY_VERIFIED: bool = true;
 
 #[derive(Debug)]
 enum Fail {

@@ -1,6 +1,6 @@
 """P1-M14 producer round trip: GUI-saved files must decode as supported by the pinned mobile codec.
 
-Builds the real diary-server with the `producer-harness` feature (writer enabled) and a Swift program
+Builds the real diary-server and a Swift program
 from the pinned codec files (swiftc, no dependency). Proves file format only: not the phone app's
 catalog or recovery, not iCloud. Skips (exit 0 with SKIP) when the submodule or swiftc is missing;
 a skip is not evidence. Run outside scripts/gate.sh.
@@ -73,7 +73,7 @@ with tempfile.TemporaryDirectory(prefix='diary-producer-smoke-') as temporary:
     harness = base / 'producer'
     subprocess.run(['swiftc', '-swift-version', '5', '-o', str(harness), str(root / 'scripts/smoke/producer/main.swift'), *map(str, codec)], check=True, capture_output=True)
     target = root / 'src-tauri/target/producer-harness'
-    subprocess.run(['cargo', 'build', '--quiet', '--manifest-path', str(root / 'src-tauri/Cargo.toml'), '-p', 'diary-server', '--features', 'producer-harness', '--target-dir', str(target)], check=True)
+    subprocess.run(['cargo', 'build', '--quiet', '--manifest-path', str(root / 'src-tauri/Cargo.toml'), '-p', 'diary-server', '--target-dir', str(target)], check=True)
     binary = target / 'debug/diary-server'
 
     def decode(path):
