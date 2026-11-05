@@ -64,3 +64,9 @@ This index lists the design and process docs, one line each. Read only the doc y
 - [Third-party notices](../third-party-notices.md): exact resolved dependency inventory, preserved license assets and outstanding notice review.
 
 - [P1-M3 acceptance audit](archive/milestones/p1-m3/milestone-03-acceptance-audit.md): requirement-by-requirement evidence and final audit.
+
+- [P1-M10 import hardening](archive/milestones/p1-m10/milestone-10-import-hardening-overview.md): completed follow-up checklist and durable snapshot/scan/paging regression evidence.
+
+- [P1-M11 Explorer and editor navigation overview](archive/milestones/p1-m11/milestone-11-explorer-navigation-overview.md): completed scope, N01–N12 completion checklist and implementation gate.
+
+- [P1-M11 Explorer and editor navigation work plan](archive/milestones/p1-m11/milestone-11-explorer-navigation-architecture.md): review findings, server calendar/source DTOs, immutable import UI, resource guards, bounded caches and packaged smoke procedure.

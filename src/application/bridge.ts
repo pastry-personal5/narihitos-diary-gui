@@ -1,3 +1,4 @@
+import type { NavigationBridge } from "./navigation/contracts";
 import type { StreamEvent } from "./events";
 /** Only redacted DTOs belong here. Discovery paths and credentials stay in Rust. */
 export interface AppMetadata {
@@ -111,7 +112,7 @@ export class SettingsError extends Error {
     super(code);
   }
 }
-export interface Bridge {
+export interface Bridge extends NavigationBridge {
   metadata(): Promise<AppMetadata>;
   serverSettings(): Promise<ServerSettings>;
   reloadSettings(): Promise<ReloadResult>;

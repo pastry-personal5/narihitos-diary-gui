@@ -4,7 +4,7 @@ Narihito's Diary, the GUI: a personal asset management app on your Mac.
 
 The app runs a separately launched Rust server and Tauri client, with saved Authentic editing, Create Empty, autosave and Settings. AI and exports remain unavailable. Setup and independent launch commands are in the [contribution guide](docs/contribution-guide.md#setup-and-development). Feature delivery follows the [roadmap](docs/roadmap.md).
 
-Read-only Ayumi/Narihito date imports and timestamp-resolution choices are available through the server and typed bridge commands. The Explorer and source UI are planned for P1-M11. See the [P1-M10 acceptance record](docs/archive/milestones/p1-m10/milestone-10-civil-date-imports-overview.md).
+Read-only Ayumi/Narihito date imports and timestamp-resolution choices are available through the server and typed bridge commands. Imports search source trees within shared scan limits and warn about misplaced timestamped files, including files outside the expected date directories. Listing pages stay fixed across file changes and server restarts; import again to refresh sources or apply timestamp choices. The Explorer and source UI are planned for P1-M11. See the [P1-M10 acceptance record](docs/archive/milestones/p1-m10/milestone-10-civil-date-imports-overview.md) and [snapshot hardening evidence](docs/archive/milestones/p1-m10/milestone-10-import-hardening-overview.md).
 
 The planned AI agents are Codex, Claude Code, Qwen Code, and Apple's on-device Foundation Models. Agent integration is not implemented yet. Prompt templates live in [assets/prompts/](assets/prompts/README.md).
 

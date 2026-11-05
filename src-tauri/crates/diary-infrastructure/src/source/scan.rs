@@ -279,19 +279,21 @@ impl Walker<'_> {
                 self.failure(rel, Unavailable::NotDownloaded);
                 continue;
             }
-            let (result, producer) = outcome(self.root, self.kind, &path, self.generation);
+            let (result, producer, observed) =
+                outcome(self.root, self.kind, &path, self.generation);
+            if let Some(listing) = &observed
+                && !self
+                    .identities
+                    .insert(&listing.id, self.root, &listing.token.key)
+            {
+                self.report.failures.push((
+                    rel,
+                    SourceOutcome::Conflict(ConflictKind::IdentityCollision),
+                ));
+                continue;
+            }
             match result {
                 SourceOutcome::Ok(listing) => {
-                    if !self
-                        .identities
-                        .insert(&listing.id, self.root, &listing.token.key)
-                    {
-                        self.report.failures.push((
-                            rel,
-                            SourceOutcome::Conflict(ConflictKind::IdentityCollision),
-                        ));
-                        continue;
-                    }
                     if let Some(p) = producer {
                         self.producers
                             .entry(p)
@@ -300,7 +302,17 @@ impl Walker<'_> {
                     }
                     self.report.listings.push(*listing);
                 }
-                failure => self.report.failures.push((rel, failure)),
+                failure => {
+                    if matches!(
+                        failure,
+                        SourceOutcome::Unsupported { viewable: true, .. }
+                            | SourceOutcome::Conflict(ConflictKind::IdMismatch)
+                    ) && let Some(listing) = observed
+                    {
+                        self.report.readable.push(listing);
+                    }
+                    self.report.failures.push((rel, failure));
+                }
             }
         }
     }

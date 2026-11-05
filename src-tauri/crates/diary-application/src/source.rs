@@ -98,6 +98,8 @@ pub enum SourceOutcome {
 #[derive(Debug, Default)]
 pub struct ScanReport {
     pub listings: Vec<SourceListing>,
+    /// Safely observed unsupported/identity-conflicting rows; never eligible.
+    pub readable: Vec<SourceListing>,
     pub failures: Vec<(String, SourceOutcome)>,
     pub collisions: Vec<Vec<String>>,
     pub incomplete: bool,

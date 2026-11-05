@@ -19,6 +19,8 @@
     "allow-subscribe-events",
     "allow-get-app-metadata",
     "allow-log-client-event",
+    "allow-get-calendar",
+    "allow-read-source",
     "allow-import-date",
     "allow-list-sources",
     "allow-resolve-source-time",

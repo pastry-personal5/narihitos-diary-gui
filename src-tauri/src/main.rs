@@ -193,6 +193,26 @@ async fn list_jobs(
     state.jobs(cursor).await
 }
 #[tauri::command]
+async fn get_calendar(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    anchor: Option<String>,
+    action: bridge::CalendarAction,
+) -> Result<bridge::Calendar, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.get_calendar(anchor, action).await
+}
+#[tauri::command]
+async fn read_source(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    source_id: String,
+    snapshot_id: String,
+) -> Result<bridge::SourceBody, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.read_source(source_id, snapshot_id).await
+}
+#[tauri::command]
 async fn import_date(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -418,6 +438,8 @@ fn main() {
             subscribe_events,
             get_app_metadata,
             log_client_event,
+            get_calendar,
+            read_source,
             import_date,
             list_sources,
             resolve_source_time,

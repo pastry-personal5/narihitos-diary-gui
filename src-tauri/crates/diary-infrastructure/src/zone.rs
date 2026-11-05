@@ -22,6 +22,17 @@ pub enum ZoneError {
 pub struct SystemZone(TimeZone);
 
 impl SystemZone {
+    pub fn display(
+        &self,
+        unix_ms: i64,
+    ) -> Result<diary_application::imports::LocalTime, WindowError> {
+        let timestamp = Timestamp::from_millisecond(unix_ms).map_err(|_| WindowError::Range)?;
+        Ok(diary_application::imports::LocalTime {
+            date: diary(self.0.to_datetime(timestamp).date())?,
+            datetime: self.0.to_datetime(timestamp).to_string(),
+            offset_seconds: self.0.to_offset(timestamp).seconds(),
+        })
+    }
     pub fn capture() -> Result<(ImportZone, Self), ZoneError> {
         Self::capture_from(Path::new("/etc/localtime"), Path::new(SYSTEM_DATABASE))
     }

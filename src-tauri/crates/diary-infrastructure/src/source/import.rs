@@ -5,11 +5,11 @@ use super::{
 };
 use crate::{
     config::Source,
-    zone::{SYSTEM_DATABASE, SystemZone, ZoneError},
+    zone::{SystemZone, ZoneError},
 };
 use diary_application::{
     imports::*,
-    source::{ScanReport, SourceListing, SourceOutcome, Unavailable},
+    source::{ScanReport, SourceListing, SourceOutcome, SourceView, Unavailable, ViewError},
 };
 use diary_domain::{
     authentic::DiaryDate,
@@ -19,18 +19,16 @@ use diary_domain::{
     },
 };
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
 type Capture = dyn Fn() -> Result<(ImportZone, SystemZone), ZoneError> + Send + Sync;
-type Load = dyn Fn(&str) -> Result<(ImportZone, SystemZone), ZoneError> + Send + Sync;
 pub struct Store {
     sources: Vec<Source>,
     repository: Arc<dyn ImportRepository>,
     capture: Arc<Capture>,
-    load: Arc<Load>,
 }
 impl Store {
     pub fn new(sources: Vec<Source>, repository: Arc<dyn ImportRepository>) -> Self {
@@ -38,24 +36,17 @@ impl Store {
             sources,
             repository,
             capture: Arc::new(SystemZone::capture),
-            load: Arc::new(|name| {
-                SystemZone::from_database(std::path::Path::new(SYSTEM_DATABASE), name)
-            }),
         }
     }
     fn scan(
         &self,
         context: ImportContext,
-        zone: &dyn Zone,
+        zone: &SystemZone,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<ImportListing, ImportError> {
         let window = import_window(context.date, zone).map_err(window_error)?;
-        let dirs: BTreeSet<_> = window
-            .utc_dates
-            .iter()
-            .map(|d| format!("{:04}/{:02}/{:02}", d.year(), d.month(), d.day()))
-            .collect();
         let mut scan = ScanReport::default();
+        let mut navigation = Navigation::default();
         let mut remaining_bytes: usize = 16 * 1024 * 1024;
         let mut candidates: usize = 0;
         let mut entries = 0;
@@ -63,6 +54,16 @@ impl Store {
         let mut bindings = Vec::new();
         for (source, root) in self.sources.iter().zip(resolve_roots(&self.sources)) {
             check(cancelled)?;
+            let group_id = crate::lifecycle::random_uuid().map_err(|_| ImportError::Storage)?;
+            navigation.groups.push(SourceGroup {
+                id: group_id.clone(),
+                alias: source.alias.clone(),
+                kind: match source.kind {
+                    crate::config::SourceKind::Ayumi => "ayumi",
+                    crate::config::SourceKind::Narihito => "narihito",
+                }
+                .into(),
+            });
             let root = match root {
                 Ok(root) => root,
                 Err(e) => {
@@ -75,6 +76,7 @@ impl Store {
                     };
                     scan.failures
                         .push((String::new(), SourceOutcome::Unavailable(code)));
+                    navigation.failure_groups.push(group_id);
                     scan.incomplete = true;
                     continue;
                 }
@@ -85,7 +87,7 @@ impl Store {
                 context.config_generation,
                 100_000 - entries,
                 10_000 - candidates,
-                Some(&dirs),
+                None,
                 cancelled,
             );
             entries += report.entries_seen;
@@ -100,6 +102,7 @@ impl Store {
                     break;
                 }
                 remaining_bytes -= bytes;
+                navigation.collision_groups.push(group_id.clone());
                 scan.collisions.push(group);
             }
             for (path, outcome) in report.failures {
@@ -108,9 +111,16 @@ impl Store {
                     break;
                 }
                 remaining_bytes -= path.len() + 128;
+                navigation.failure_groups.push(group_id.clone());
                 scan.failures.push((path, outcome));
             }
-            for mut listing in report.listings {
+            let supported_count = report.listings.len();
+            for (i, mut listing) in report
+                .listings
+                .into_iter()
+                .chain(report.readable)
+                .enumerate()
+            {
                 let bytes = listing.rel.len() + listing.token.key.len() + 512;
                 if bytes > remaining_bytes {
                     scan.incomplete = true;
@@ -124,7 +134,29 @@ impl Store {
                     listing.token.root_namespace,
                     listing.token.key.clone(),
                 ));
-                scan.listings.push(listing);
+                let header = choose(&listing.dating, Authority::Header)
+                    .map(|t| zone.display(t.unix_ms))
+                    .transpose()
+                    .map_err(window_error)?;
+                let filename = choose(&listing.dating, Authority::Filename)
+                    .map(|t| zone.display(t.unix_ms))
+                    .transpose()
+                    .map_err(window_error)?;
+                navigation.sources.insert(
+                    listing.id.clone(),
+                    SourceDisplay {
+                        group_id: group_id.clone(),
+                        header,
+                        filename,
+                        included: None,
+                        authority: None,
+                    },
+                );
+                if i < supported_count {
+                    scan.listings.push(listing);
+                } else {
+                    scan.readable.push(listing);
+                }
             }
             if candidates >= 10_000 || entries >= 100_000 || remaining_bytes < 512 {
                 scan.incomplete = true;
@@ -139,21 +171,31 @@ impl Store {
             warnings: Vec::new(),
             misplaced: Vec::new(),
             scan,
+            navigation: Some(navigation),
         };
         for source in result.scan.listings.clone() {
             if misplaced(&source) {
                 result.misplaced.push(source.id.clone());
             }
+            let resolution = self
+                .repository
+                .resolution(&source.id, &source.token.sha256)?
+                .filter(|r| choose(&source.dating, r.authority) == Some(r.instant));
             let instant = match source.dating {
                 Dating::Agreed(t) => Some(t),
-                _ => self
-                    .repository
-                    .resolution(&source.id, &source.token.sha256)?
-                    .filter(|r| choose(&source.dating, r.authority) == Some(r.instant))
-                    .map(|r| r.instant),
+                _ => resolution.as_ref().map(|r| r.instant),
             };
             if let Some(instant) = instant {
                 if include(&window, zone, instant.unix_ms).map_err(window_error)? {
+                    let display = result
+                        .navigation
+                        .as_mut()
+                        .expect("new snapshot")
+                        .sources
+                        .get_mut(&source.id)
+                        .expect("scan source");
+                    display.included = Some(zone.display(instant.unix_ms).map_err(window_error)?);
+                    display.authority = resolution.map(|r| r.authority);
                     result.included.push(IncludedSource { source, instant });
                 }
             } else {
@@ -217,7 +259,112 @@ fn misplaced(source: &SourceListing) -> bool {
         }
     )
 }
+// A read descriptor is publishable only when its corresponding failure row survived
+// the scan budget. Equal relative names under distinct roots must not be conflated.
+fn published_readable<'a>(
+    snapshot: &'a ImportListing,
+    source: &'a SourceListing,
+) -> Option<&'a SourceListing> {
+    let nav = snapshot.navigation.as_ref()?;
+    let group = &nav.sources.get(&source.id)?.group_id;
+    snapshot
+        .scan
+        .failures
+        .iter()
+        .zip(&nav.failure_groups)
+        .any(|((key, outcome), owner)| {
+            key == &source.rel
+                && owner == group
+                && matches!(
+                    outcome,
+                    SourceOutcome::Unsupported { viewable: true, .. }
+                        | SourceOutcome::Conflict(
+                            diary_application::source::ConflictKind::IdMismatch
+                        )
+                )
+        })
+        .then_some(source)
+}
 impl ImportStore for Store {
+    fn today(&self) -> Result<DiaryDate, ImportError> {
+        let (_, zone) = (self.capture)().map_err(zone_error)?;
+        zone.local_date(now()).map_err(window_error)
+    }
+    fn read(
+        &self,
+        import_id: &str,
+        source_id: &str,
+        generation: u64,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<SourceView, ViewError> {
+        if cancelled() {
+            return Err(ViewError::Stale);
+        }
+        let snapshot = self
+            .repository
+            .snapshot(import_id)
+            .map_err(|_| ViewError::Stale)?;
+        if snapshot.navigation.is_none() || snapshot.context.config_generation != generation {
+            return Err(ViewError::Stale);
+        }
+        let source = snapshot
+            .included
+            .iter()
+            .map(|entry| &entry.source)
+            .chain(&snapshot.warnings)
+            .chain(
+                snapshot
+                    .scan
+                    .readable
+                    .iter()
+                    .filter_map(|s| published_readable(&snapshot, s)),
+            )
+            .find(|s| s.id == source_id)
+            .ok_or(ViewError::Stale)?;
+        for (configured, root) in self.sources.iter().zip(resolve_roots(&self.sources)) {
+            if cancelled() {
+                return Err(ViewError::Stale);
+            }
+            let root = match root {
+                Ok(root) => root,
+                Err(e) => {
+                    let nav = snapshot.navigation.as_ref().expect("checked");
+                    let group = &nav.sources.get(source_id).ok_or(ViewError::Stale)?.group_id;
+                    if nav
+                        .groups
+                        .iter()
+                        .any(|g| &g.id == group && g.alias == configured.alias)
+                    {
+                        return Err(ViewError::Outcome(SourceOutcome::Unavailable(match e {
+                            RootError::Missing => Unavailable::Missing,
+                            RootError::Denied => Unavailable::Denied,
+                            RootError::NotDownloaded => Unavailable::NotDownloaded,
+                            _ => Unavailable::InvalidPath,
+                        })));
+                    }
+                    continue;
+                }
+            };
+            let path = diary_domain::source::path::normalize(&source.rel, root.insensitive)
+                .map_err(|_| ViewError::Stale)?;
+            if super::root::source_id(&root, &path) != source.id {
+                continue;
+            }
+            let result = super::adapter::read_view(
+                &root,
+                &configured.kind,
+                &path,
+                generation,
+                &source.token,
+            )?;
+            if cancelled() {
+                return Err(ViewError::Stale);
+            }
+            return Ok(result);
+        }
+        Err(ViewError::Stale)
+    }
+
     fn import_date(
         &self,
         id: &str,
@@ -248,7 +395,10 @@ impl ImportStore for Store {
             }
         };
         let at = now();
-        self.repository.complete(id, at)?;
+        if let Err(e) = self.repository.complete(&result, at) {
+            let _ = self.repository.discard(id);
+            return Err(e);
+        }
         result.context.completed_at = Some(at);
         Ok(result)
     }
@@ -257,13 +407,10 @@ impl ImportStore for Store {
         import_id: &str,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<ImportListing, ImportError> {
-        let context = self.repository.context(import_id)?;
-        let (captured, rules) = (self.load)(&context.zone.name).map_err(zone_error)?;
-        // Never silently reinterpret old provenance using a newly installed tzdb.
-        if captured != context.zone {
-            return Err(ImportError::TimezoneDatabase);
-        }
-        self.scan(context, &rules, cancelled)
+        check(cancelled)?;
+        let result = self.repository.snapshot(import_id)?;
+        check(cancelled)?;
+        Ok(result)
     }
     fn resolve(
         &self,
@@ -274,20 +421,43 @@ impl ImportStore for Store {
         generation: u64,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<(), ImportError> {
-        // Refuse a stale generation before the expensive rescan and rehash.
+        // Refuse stale configuration before reading the snapshot or source.
         if self.repository.context(import_id)?.config_generation != generation {
             return Err(ImportError::Stale);
         }
         let result = self.list(import_id, cancelled)?;
         let source = result
-            .scan
-            .listings
+            .included
             .iter()
+            .map(|entry| &entry.source)
+            .chain(&result.warnings)
             .find(|s| s.id == source_id)
             .ok_or(ImportError::NotFound)?;
         if &source.token.sha256 != digest {
             return Err(ImportError::Stale);
         }
+        // Only this snapshot identity is re-observed. Never rescan or substitute a
+        // different source when the original path/root is missing or replaced.
+        let mut fresh = None;
+        for (configured, root) in self.sources.iter().zip(resolve_roots(&self.sources)) {
+            check(cancelled)?;
+            let Ok(root) = root else { continue };
+            let path = diary_domain::source::path::normalize(&source.rel, root.insensitive)
+                .map_err(|_| ImportError::Stale)?;
+            if super::root::source_id(&root, &path) != source.id {
+                continue;
+            }
+            let (outcome, mut observed) =
+                super::adapter::observe(&root, &configured.kind, &path, generation)
+                    .map_err(|_| ImportError::Stale)?;
+            observed.token.import_id.clone_from(&source.token.import_id);
+            if !matches!(outcome, SourceOutcome::Ok(_)) || observed.token != source.token {
+                return Err(ImportError::Stale);
+            }
+            fresh = Some(observed);
+            break;
+        }
+        let source = fresh.as_ref().ok_or(ImportError::Stale)?;
         if misplaced(source) && authority == Authority::Filename {
             return Err(ImportError::FilenameDirectoryMismatch);
         }

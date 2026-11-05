@@ -85,8 +85,10 @@ Plan: [overview](../archive/milestones/p1-m10/milestone-10-civil-date-imports-ov
 
 ### P1-M11: Explorer and editor navigation
 
-Status: Planned
+Status: Done
 Goal: Complete the resizable Standard Layout, civil-date calendar, grouped source selection, saved-date navigation and resource-owned tabs with guarded refresh and dirty-source handling.
+Plan: [overview](../archive/milestones/p1-m11/milestone-11-explorer-navigation-overview.md), [work plan](../archive/milestones/p1-m11/milestone-11-explorer-navigation-architecture.md).
+Notes: Closed with the owner-waived packaged navigation smoke (2026-11-06); no new dependency or producer mutation capability.
 
 ### P1-M12: Command palette and keyboard shortcuts
 

@@ -13,6 +13,7 @@ struct Fake {
 }
 fn listing(id: &str) -> ImportListing {
     ImportListing {
+        navigation: None,
         context: ImportContext {
             id: id.into(),
             date: DiaryDate::parse("2024-02-29").unwrap(),
@@ -30,6 +31,9 @@ fn listing(id: &str) -> ImportListing {
     }
 }
 impl ImportStore for Fake {
+    fn today(&self) -> Result<DiaryDate, ImportError> {
+        Ok(DiaryDate::parse("2024-02-29").unwrap())
+    }
     fn import_date(
         &self,
         id: &str,
@@ -359,4 +363,273 @@ async fn capacity_failure_remains_visible_on_retry_and_job_lookup() {
     .await;
     assert_eq!(job["error_code"], "limit");
     assert_eq!(fake.calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn cancellation_polling_is_throttled_and_latched() {
+    let polls = std::cell::Cell::new(0);
+    let stop = std::cell::Cell::new(false);
+    let check = throttled(|| {
+        polls.set(polls.get() + 1);
+        stop.get()
+    });
+    assert!(!check());
+    assert_eq!(polls.get(), 1);
+    stop.set(true);
+    for _ in 0..63 {
+        assert!(!check());
+    }
+    assert_eq!(polls.get(), 1);
+    assert!(check());
+    assert_eq!(polls.get(), 2);
+    stop.set(false);
+    for _ in 0..200 {
+        assert!(check());
+    }
+    assert_eq!(polls.get(), 2);
+    assert!(throttled(|| true)());
+}
+
+#[test]
+fn page_crosses_category_boundaries_and_handles_end_cursors() {
+    let make = || {
+        let mut r = listing("paging");
+        r.scan.failures = (0..105)
+            .map(|i| {
+                (
+                    format!("{i}.md"),
+                    diary_application::source::SourceOutcome::Unavailable(
+                        diary_application::source::Unavailable::Missing,
+                    ),
+                )
+            })
+            .collect();
+        r.scan.collisions = vec![vec!["a.md".into(), "A.md".into()]];
+        r
+    };
+    let first = page(make(), 0).unwrap();
+    assert_eq!(first["items"].as_array().unwrap().len(), 100);
+    assert_eq!(first["next_cursor"], 100);
+    let last = page(make(), 100).unwrap();
+    assert_eq!(last["items"].as_array().unwrap().len(), 6);
+    assert_eq!(last["items"][0]["relative_key"], "100.md");
+    assert_eq!(last["items"][5]["kind"], "path_collision");
+    assert!(last["next_cursor"].is_null());
+    assert!(
+        page(make(), 106).unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(page(make(), 107), Err(ImportError::NotFound));
+}
+
+#[tokio::test]
+async fn server_calendar_requires_owner_and_clamps_civil_navigation() {
+    let (s, _) = setup();
+    let app = router(s.clone());
+    assert_eq!(
+        app.clone()
+            .oneshot(req("GET", "/api/v1/calendar", None, false))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    s.coordinator
+        .lock()
+        .unwrap()
+        .open("07249746-e280-4d51-a86a-cbcb198ee101", s.now())
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(req(
+            "GET",
+            "/api/v1/calendar?anchor=2024-01-31&action=next_month",
+            None,
+            true,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let dto = value(response).await;
+    assert_eq!(dto["anchor"], "2024-02-29");
+    assert_eq!(dto["today"], "2024-02-29");
+    assert_eq!(dto["days"].as_array().unwrap().len(), 29);
+    let response = app
+        .clone()
+        .oneshot(req(
+            "GET",
+            "/api/v1/calendar?anchor=0001-01-01&action=previous_day",
+            None,
+            true,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(value(response).await["error"]["code"], "invalid_diary_date");
+    for uri in [
+        "/api/v1/calendar?anchor=2024-02-30",
+        "/api/v1/calendar?timezone=private",
+        "/api/v1/calendar?action=month&action=today",
+        "/api/v1/sources/id?snapshot_id=x&path=private",
+    ] {
+        assert_eq!(
+            app.clone()
+                .oneshot(req("GET", uri, None, true))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+    }
+}
+
+struct ReadFake {
+    wait: AtomicBool,
+    started: AtomicBool,
+}
+fn readable_listing(id: &str) -> ImportListing {
+    use diary_application::{imports::*, source::*};
+    use diary_domain::source::stamp::Precision;
+    let mut r = listing(id);
+    let source = SourceListing {
+        id: "source-id".into(),
+        rel: "2024/02/29/test.md".into(),
+        size: 100,
+        dating: Dating::Agreed(Instant {
+            unix_ms: 1,
+            precision: Precision::Milli,
+        }),
+        warnings: vec![],
+        token: ObservationToken {
+            root_namespace: [9; 32],
+            key: "2024/02/29/test.md".into(),
+            sha256: [1; 32],
+            dev: 99,
+            ino: 98,
+            size: 100,
+            mtime_ns: 1,
+            ctime_ns: 1,
+            config_generation: 1,
+            import_id: Some(id.into()),
+        },
+    };
+    r.scan.listings.push(source);
+    r.navigation = Some(Navigation {
+        groups: vec![SourceGroup {
+            id: "group".into(),
+            alias: "Diary".into(),
+            kind: "ayumi".into(),
+        }],
+        sources: std::collections::BTreeMap::from([(
+            "source-id".into(),
+            SourceDisplay {
+                group_id: "group".into(),
+                header: None,
+                filename: None,
+                included: None,
+                authority: None,
+            },
+        )]),
+        ..Default::default()
+    });
+    r
+}
+impl ImportStore for ReadFake {
+    fn import_date(
+        &self,
+        _: &str,
+        _: DiaryDate,
+        _: u64,
+        _: &dyn Fn() -> bool,
+    ) -> Result<ImportListing, ImportError> {
+        unreachable!()
+    }
+    fn list(&self, id: &str, _: &dyn Fn() -> bool) -> Result<ImportListing, ImportError> {
+        Ok(readable_listing(id))
+    }
+    fn resolve(
+        &self,
+        _: &str,
+        _: &str,
+        _: &[u8; 32],
+        _: Authority,
+        _: u64,
+        _: &dyn Fn() -> bool,
+    ) -> Result<(), ImportError> {
+        unreachable!()
+    }
+    fn read(
+        &self,
+        import_id: &str,
+        _: &str,
+        _: u64,
+        _: &dyn Fn() -> bool,
+    ) -> Result<diary_application::source::SourceView, diary_application::source::ViewError> {
+        use diary_application::source::*;
+        self.started.store(true, Ordering::SeqCst);
+        let end = std::time::Instant::now() + Duration::from_secs(3);
+        while self.wait.load(Ordering::SeqCst) && std::time::Instant::now() < end {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        Ok(SourceView {
+            listing: readable_listing(import_id).scan.listings.remove(0),
+            body: "visible body".into(),
+            raw_front_matter: "PRIVATE_SECRET".into(),
+            fields: vec![],
+            newline: diary_domain::source::front_matter::Newline::Lf,
+            bom: false,
+        })
+    }
+}
+#[tokio::test]
+async fn selected_read_redacts_metadata_and_refuses_reload_during_work() {
+    let mut s = state();
+    let fake = Arc::new(ReadFake {
+        wait: AtomicBool::new(false),
+        started: AtomicBool::new(false),
+    });
+    ServerState::set_imports(&mut s, fake.clone());
+    s.coordinator
+        .lock()
+        .unwrap()
+        .open("07249746-e280-4d51-a86a-cbcb198ee101", s.now())
+        .unwrap();
+    let app = router(s.clone());
+    let uri = "/api/v1/sources/source-id?snapshot_id=import";
+    let response = app
+        .clone()
+        .oneshot(req("GET", uri, None, true))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let dto = value(response).await;
+    assert_eq!(dto["body"], "visible body");
+    assert_eq!(dto["capabilities"]["save"], false);
+    for private in [
+        "PRIVATE_SECRET",
+        "root_namespace",
+        "mtime_ns",
+        "raw_front_matter",
+        "\"ino\"",
+        "\"dev\"",
+    ] {
+        assert!(!dto.to_string().contains(private));
+    }
+    fake.started.store(false, Ordering::SeqCst);
+    fake.wait.store(true, Ordering::SeqCst);
+    let task = tokio::spawn(app.oneshot(req("GET", uri, None, true)));
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while !fake.started.load(Ordering::SeqCst) {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    s.config_generation.store(2, Ordering::SeqCst);
+    fake.wait.store(false, Ordering::SeqCst);
+    assert_eq!(
+        value(task.await.unwrap().unwrap()).await["error"]["code"],
+        "source_stale"
+    );
 }

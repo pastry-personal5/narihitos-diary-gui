@@ -1,6 +1,8 @@
+import { navigationFake } from "./navigation-fake";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -8,7 +10,6 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { App } from "../src/components/App";
-import { EditorView } from "@codemirror/view";
 import { mountScratchEditor } from "../src/editor/scratch-editor";
 import type { Bridge } from "../src/application/bridge";
 import { settingsFake } from "./settings-fake";
@@ -24,6 +25,7 @@ const status = {
 afterEach(cleanup);
 function bridge(): Bridge {
   return {
+    ...navigationFake(),
     metadata: async () => ({ version: "1.0.0" }),
     ...settingsFake(),
     connect: async () => status,
@@ -84,13 +86,14 @@ describe("scaffold shell", () => {
   });
   it("destroys CodeMirror on unmount and permits a clean remount", async () => {
     const view = render(<App bridge={bridge()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
     await waitFor(() =>
       expect(document.querySelectorAll(".cm-editor").length).toBe(1),
     );
     view.unmount();
     expect(document.querySelectorAll(".cm-editor").length).toBe(0);
     render(<App bridge={bridge()} />);
-    expect(document.querySelectorAll(".cm-editor").length).toBe(1);
+    expect(document.querySelectorAll(".cm-editor").length).toBe(0);
   });
   it("dedicated editor disposes its DOM without writing files", () => {
     const parent = document.createElement("div");
@@ -105,16 +108,46 @@ describe("scaffold shell", () => {
   });
   it("is read-only and reports no open file while disconnected", async () => {
     render(<App bridge={bridge()} />);
-    const dom = await waitFor(() => {
-      const el = document.querySelector<HTMLElement>(".cm-editor");
-      expect(el).toBeTruthy();
-      return el!;
-    });
-    expect(
-      EditorView.findFromDOM(dom)!.contentDOM.getAttribute("contenteditable"),
-    ).toBe("false");
+    expect(document.querySelector(".cm-editor")).toBeNull();
     expect(screen.getByText("No file open")).toBeTruthy();
     expect(screen.queryByText("Saved")).toBeNull();
+  });
+  it("ignores a settings reply that arrives after the subscription disconnects", async () => {
+    const adapter = bridge();
+    let observer!: (
+      event: import("../src/application/events").StreamEvent,
+    ) => void;
+    let resolve!: (
+      value: Awaited<ReturnType<Bridge["serverSettings"]>>,
+    ) => void;
+    adapter.serverSettings = vi.fn(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    const stop = vi.fn(async () => {});
+    adapter.watch = async (listener) => {
+      observer = listener;
+      return stop;
+    };
+    render(<App bridge={adapter} />);
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await waitFor(() => expect(observer).toBeDefined());
+    await act(async () => observer({ kind: "disconnected" }));
+    await act(async () =>
+      resolve({
+        config_generation: 1,
+        last_reload: null,
+        storage_ready: true,
+        sources: [],
+        profiles: [],
+      }),
+    );
+    expect(screen.getByText(/Connection interrupted/)).toBeTruthy();
+    expect(adapter.serverSettings).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(".cm-editor")).toBeNull();
+    expect(stop).toHaveBeenCalled();
   });
   it("does not log rejected connection details to the console", async () => {
     const spies = (["log", "info", "warn", "error"] as const).map((m) =>

@@ -1,5 +1,5 @@
 //! Date import provenance and explicit, complete-byte-bound timestamp authority.
-use crate::source::{ScanReport, SourceListing};
+use crate::source::{ScanReport, SourceListing, SourceView, ViewError};
 use diary_domain::{
     authentic::DiaryDate,
     source::{
@@ -61,6 +61,38 @@ pub struct ImportListing {
     /// Includes misplaced sources even when an explicit header choice includes them.
     pub misplaced: Vec<String>,
     pub scan: ScanReport,
+    /// Absent in legacy snapshots: enhanced navigation requires re-import.
+    pub navigation: Option<Navigation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceGroup {
+    pub id: String,
+    pub alias: String,
+    pub kind: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalTime {
+    pub date: DiaryDate,
+    pub offset_seconds: i32,
+    /// Captured civil representation; never recomputed when reading a snapshot.
+    pub datetime: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceDisplay {
+    pub group_id: String,
+    pub header: Option<LocalTime>,
+    pub filename: Option<LocalTime>,
+    pub included: Option<LocalTime>,
+    pub authority: Option<Authority>,
+}
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Navigation {
+    pub groups: Vec<SourceGroup>,
+    pub sources: std::collections::BTreeMap<String, SourceDisplay>,
+    /// Parallel to scan failure/collision rows, including rows without identities.
+    pub failure_groups: Vec<String>,
+    pub collision_groups: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,7 +120,10 @@ pub trait ImportRepository: Send + Sync {
     fn begin(&self, context: &ImportContext) -> Result<(), ImportError>;
     /// Removes a context that never completed (cancelled or failed scan).
     fn discard(&self, id: &str) -> Result<(), ImportError>;
-    fn complete(&self, id: &str, at: i64) -> Result<(), ImportError>;
+    /// Atomically publishes the immutable body-less snapshot and completion marker.
+    fn complete(&self, listing: &ImportListing, at: i64) -> Result<(), ImportError>;
+    /// Completed legacy contexts without a snapshot require a new import.
+    fn snapshot(&self, id: &str) -> Result<ImportListing, ImportError>;
     /// Incomplete contexts are never returned.
     fn context(&self, id: &str) -> Result<ImportContext, ImportError>;
     fn resolution(
@@ -105,6 +140,18 @@ pub trait ImportRepository: Send + Sync {
 }
 
 pub trait ImportStore: Send + Sync {
+    fn today(&self) -> Result<DiaryDate, ImportError> {
+        Err(ImportError::UnnamedZone)
+    }
+    fn read(
+        &self,
+        _import_id: &str,
+        _source_id: &str,
+        _generation: u64,
+        _cancelled: &dyn Fn() -> bool,
+    ) -> Result<SourceView, ViewError> {
+        Err(ViewError::Stale)
+    }
     /// The caller supplies a server-issued ID and a lease/cancellation predicate.
     fn import_date(
         &self,

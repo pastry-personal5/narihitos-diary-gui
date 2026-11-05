@@ -177,5 +177,24 @@ fn m10_upgrades_the_released_schema_without_changing_existing_rows() {
         })
         .unwrap();
     assert_eq!(id, "existing-workspace");
-    assert_eq!(pragma(&db, "user_version"), 3);
+    assert_eq!(pragma(&db, "user_version"), MIGRATIONS.len() as i64);
+}
+
+#[test]
+fn snapshots_migrate_legacy_contexts_without_reconstructing_sources() {
+    use diary_application::imports::{ImportError, ImportRepository};
+    let (_t, dir, path) = private_dir();
+    dir.create(DB_FILE).unwrap();
+    let mut conn = Connection::open(path.join(DB_FILE)).unwrap();
+    migrate(&mut conn, &MIGRATIONS[..3]).unwrap();
+    conn.execute(
+        "INSERT INTO import_contexts VALUES ('legacy', '2024-02-29', 'UTC', '2026e', 7, 99)",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+    let db = Db::open_existing(&dir, &path.join(DB_FILE), false).unwrap();
+    assert_eq!(db.context("legacy").unwrap().completed_at, Some(99));
+    assert!(matches!(db.snapshot("legacy"), Err(ImportError::Stale)));
+    assert_eq!(pragma(&db, "user_version"), MIGRATIONS.len() as i64);
 }

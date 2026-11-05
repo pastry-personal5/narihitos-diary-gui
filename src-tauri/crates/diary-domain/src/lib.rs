@@ -1,6 +1,7 @@
 //! Framework-independent protocol compatibility values and the Authentic file format.
 
 pub mod authentic;
+pub mod calendar;
 pub mod source;
 
 /// Compatibility is explicit: every required capability must be advertised.

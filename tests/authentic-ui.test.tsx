@@ -1,3 +1,4 @@
+import { navigationFake } from "./navigation-fake";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -45,6 +46,7 @@ class FakeServer {
   });
   bridge(): Bridge {
     return {
+      ...navigationFake(),
       metadata: async () => ({ version: "1.0.0" }),
       ...settingsFake(),
       connect: async () => status,
@@ -131,6 +133,24 @@ const createEmpty = () => screen.getByRole("button", { name: "Create Empty" });
 const date = () => (screen.getByLabelText("Date") as HTMLInputElement).value;
 
 describe("Authentic editing", () => {
+  it("moves calendar focus by civil day without selecting until activation", async () => {
+    const server = new FakeServer();
+    await open(server);
+    const original = date();
+    const selected = screen.getByRole("gridcell", { name: original });
+    selected.focus();
+    fireEvent.keyDown(selected, { key: "ArrowRight" });
+    await waitFor(() =>
+      expect(document.activeElement?.getAttribute("aria-label")).not.toBe(
+        original,
+      ),
+    );
+    expect(date()).toBe(original);
+    expect(
+      document.querySelectorAll('[role="gridcell"][tabindex="0"]'),
+    ).toHaveLength(1);
+  });
+
   it("Create Empty saves an empty file, then typing autosaves with one debounced save", async () => {
     const server = new FakeServer();
     await open(server);

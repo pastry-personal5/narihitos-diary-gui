@@ -31,7 +31,7 @@ pub(super) fn valid_query(query: &str) -> bool {
             }
     }) && keys.contains("import_id")
 }
-fn authorize(s: &ServerState, headers: &HeaderMap) -> Result<String, Response> {
+pub(super) fn authorize(s: &ServerState, headers: &HeaderMap) -> Result<String, Response> {
     let id = session(headers).map_err(app_error)?;
     s.coordinator
         .lock()
@@ -40,12 +40,12 @@ fn authorize(s: &ServerState, headers: &HeaderMap) -> Result<String, Response> {
         .map_err(app_error)?;
     Ok(id.to_owned())
 }
-fn store(s: &ServerState) -> Result<Arc<dyn ImportStore>, Response> {
+pub(super) fn store(s: &ServerState) -> Result<Arc<dyn ImportStore>, Response> {
     s.imports
         .clone()
         .ok_or_else(|| failure(StatusCode::SERVICE_UNAVAILABLE, "storage_unavailable"))
 }
-fn cancelled(s: &ServerState, session: &str) -> bool {
+pub(super) fn cancelled(s: &ServerState, session: &str) -> bool {
     s.stopping.load(Ordering::Acquire)
         || s.coordinator
             .lock()
@@ -81,7 +81,7 @@ fn code(e: ImportError) -> &'static str {
         ImportError::Limit => "limit",
     }
 }
-fn error(e: ImportError) -> Response {
+pub(super) fn error(e: ImportError) -> Response {
     failure(
         match e {
             ImportError::NotFound => StatusCode::NOT_FOUND,
@@ -248,7 +248,7 @@ fn source(s: &SourceListing) -> Value {
     // to request a resolution. Native identity and root namespace are never exposed.
     json!({"id":s.id,"relative_key":s.token.key,"digest":digest,"import_id":s.token.import_id,"dating":dating,"duplicate_producer_id":!s.warnings.is_empty()})
 }
-fn failure_code(outcome: &diary_application::source::SourceOutcome) -> &'static str {
+pub(super) fn failure_code(outcome: &diary_application::source::SourceOutcome) -> &'static str {
     use diary_application::source::{SourceOutcome, Unavailable};
     match outcome {
         SourceOutcome::Unavailable(e) => match e {
@@ -273,14 +273,30 @@ fn page(r: ImportListing, cursor: usize) -> Result<Value, ImportError> {
         return Err(ImportError::NotFound);
     }
     let misplaced: std::collections::BTreeSet<_> = r.misplaced.iter().collect();
-    let items: Vec<_> = r.included.iter().map(|s| json!({"kind":"included","source":source(&s.source),"instant":instant(s.instant),"misplaced":misplaced.contains(&s.source.id)}))
-        .chain(r.warnings.iter().map(|s| json!({"kind":"warning","source":source(s),"misplaced":misplaced.contains(&s.id)})))
-        .chain(r.scan.failures.iter().map(|(key,outcome)| json!({"kind":"failure","relative_key":key,"code":failure_code(outcome)})))
-        .chain(r.scan.collisions.iter().map(|keys| json!({"kind":"path_collision","relative_keys":keys})))
-        .skip(cursor).take(100).collect();
+    // Select references first: skipped records must never allocate JSON or digests.
+    enum Item<'a> {
+        Included(&'a diary_application::imports::IncludedSource),
+        Warning(&'a SourceListing),
+        Failure(usize, &'a str, &'a diary_application::source::SourceOutcome),
+        Collision(usize, &'a Vec<String>),
+    }
+    let items: Vec<_> = r.included.iter().map(Item::Included)
+        .chain(r.warnings.iter().map(Item::Warning))
+        .chain(r.scan.failures.iter().enumerate().map(|(i, (key, outcome))| Item::Failure(i, key, outcome)))
+        .chain(r.scan.collisions.iter().enumerate().map(|(i,keys)| Item::Collision(i,keys)))
+        .skip(cursor).take(100).map(|item| match item {
+            Item::Included(s) => json!({"kind":"included","source":enhanced_source(&s.source,&r,true),"instant":instant(s.instant),"misplaced":misplaced.contains(&s.source.id)}),
+            Item::Warning(s) => json!({"kind":"warning","source":enhanced_source(s,&r,false),"misplaced":misplaced.contains(&s.id)}),
+            Item::Failure(i, key, outcome) => {
+                let group = r.navigation.as_ref().and_then(|n|n.failure_groups.get(i));
+                let readable = r.scan.readable.iter().find(|s| s.rel == key && r.navigation.as_ref().and_then(|n|n.sources.get(&s.id)).is_some_and(|d| Some(&d.group_id)==group));
+                json!({"kind":"failure","relative_key":key,"code":failure_code(outcome),"group_id":group,"source":readable.map(|s|enhanced_source(s,&r,false))})
+            },
+            Item::Collision(i, keys) => json!({"kind":"path_collision","relative_keys":keys,"group_id":r.navigation.as_ref().and_then(|n|n.collision_groups.get(i))}),
+        }).collect();
     let next = cursor + items.len();
     Ok(
-        json!({"import_id":r.context.id,"date":r.context.date.to_string(),"zone":r.context.zone.name,"timezone_database":r.context.zone.database_version,"config_generation":r.context.config_generation,"completed_at":r.context.completed_at,"items":items,"next_cursor":if next < total { Some(next) } else { None },"incomplete":r.scan.incomplete}),
+        json!({"groups":r.navigation.as_ref().map(|n|n.groups.iter().map(|g|json!({"id":g.id,"alias":g.alias,"type":g.kind})).collect::<Vec<_>>()),"reimport_required":r.navigation.is_none(),"import_id":r.context.id,"date":r.context.date.to_string(),"zone":r.context.zone.name,"timezone_database":r.context.zone.database_version,"config_generation":r.context.config_generation,"completed_at":r.context.completed_at,"items":items,"next_cursor":if next < total { Some(next) } else { None },"incomplete":r.scan.incomplete}),
     )
 }
 pub(super) async fn list(
@@ -382,3 +398,83 @@ pub(super) async fn resolve(
 
 #[cfg(test)]
 mod tests;
+
+pub(super) fn valid_read_query(query: &str) -> bool {
+    query.strip_prefix("snapshot_id=").is_some_and(opaque)
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ReadQuery {
+    snapshot_id: String,
+}
+pub(super) async fn read(
+    State(s): State<Arc<ServerState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Query(q): Query<ReadQuery>,
+) -> Response {
+    use diary_application::source::ViewError;
+    let session = match authorize(&s, &headers) {
+        Ok(id) => id,
+        Err(r) => return r,
+    };
+    if !opaque(&id) || !opaque(&q.snapshot_id) {
+        return failure(StatusCode::BAD_REQUEST, "invalid_input");
+    }
+    let st = match store(&s) {
+        Ok(st) => st,
+        Err(r) => return r,
+    };
+    let permit = match s.source_slots.clone().try_acquire_owned() {
+        Ok(p) => p,
+        Err(_) => return error(ImportError::Limit),
+    };
+    let generation = s.config_generation.load(Ordering::SeqCst);
+    match tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        // Legacy contexts need a new import; never invent a descriptor from a path.
+        let snapshot = st.list(&q.snapshot_id, &|| cancelled(&s, &session)).map_err(|_| "source_stale")?;
+        if snapshot.navigation.is_none() { return Err("reimport_required"); }
+        let view = st.read(&q.snapshot_id, &id, generation, &|| cancelled(&s, &session)).map_err(|e| match e { ViewError::Stale => "source_stale", ViewError::Outcome(o) => failure_code(&o) })?;
+        if generation != s.config_generation.load(Ordering::SeqCst) || cancelled(&s, &session) { return Err("source_stale"); }
+        if view.body.len() > diary_domain::authentic::MAX_BODY_BYTES { return Err("too_large"); }
+        let value = json!({"source":enhanced_source(&view.listing,&snapshot,false),"snapshot_id":q.snapshot_id,"body":view.body,"capabilities":{"read":true,"save":false,"trash":false,"reason":"source_writer_unavailable"}});
+        let bytes = serde_json::to_vec(&value).map_err(|_|"internal")?;
+        if bytes.len() > 10 * 1024 * 1024 { return Err("too_large"); }
+        Ok(bytes)
+    }).await {
+        Ok(Ok(bytes)) => ([(axum::http::header::CONTENT_TYPE,"application/json")],bytes).into_response(),
+        Ok(Err(code))=>failure(StatusCode::CONFLICT,code),Err(_)=>failure(StatusCode::INTERNAL_SERVER_ERROR,"internal"),
+    }
+}
+
+fn local(t: &diary_application::imports::LocalTime) -> Value {
+    json!({"date":t.date.to_string(),"datetime":t.datetime,"offset_seconds":t.offset_seconds})
+}
+fn stamp_error(e: diary_domain::source::stamp::StampError) -> &'static str {
+    use diary_domain::source::stamp::StampError::*;
+    match e {
+        Format => "format",
+        Offset => "offset",
+        Calendar => "calendar",
+        DirMismatch => "directory_mismatch",
+    }
+}
+fn enhanced_source(s: &SourceListing, r: &ImportListing, eligible: bool) -> Value {
+    let mut v = source(s);
+    let (header_error, filename_error) = match s.dating {
+        Dating::HeaderOnly { filename, .. } => (None, Some(stamp_error(filename))),
+        Dating::FilenameOnly { header, .. } => (Some(stamp_error(header)), None),
+        Dating::Undated { header, filename } => {
+            (Some(stamp_error(header)), Some(stamp_error(filename)))
+        }
+        _ => (None, None),
+    };
+    v["header_invalid"] = json!(header_error);
+    v["filename_invalid"] = json!(filename_error);
+    let display = r.navigation.as_ref().and_then(|n| n.sources.get(&s.id));
+    v["navigation"] = display.map(|d|json!({"group_id":d.group_id,"header":d.header.as_ref().map(local),"filename":d.filename.as_ref().map(local),"included":d.included.as_ref().map(local),"authority":d.authority.map(|a|match a {Authority::Header=>"header",Authority::Filename=>"filename"})})).unwrap_or(Value::Null);
+    v["eligible"] = json!(eligible && display.is_some());
+    v["capabilities"] = json!({"read":display.is_some(),"save":false,"trash":false,"reason":if display.is_some(){"source_writer_unavailable"}else{"reimport_required"}});
+    v
+}

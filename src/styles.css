@@ -215,3 +215,109 @@ footer {
   padding: 20px;
   overflow: auto;
 }
+
+.editor-column {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.editor-column .editor-pane {
+  flex: 1;
+}
+.editor-column [aria-label="Global Messages"] {
+  height: 160px;
+  overflow: auto;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+}
+.editor-column [aria-label="Global Messages"] h2 {
+  margin: 0;
+}
+.editor-column [role="log"] p {
+  font-size: 12px;
+  margin: 4px 0;
+}
+.calendar-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+.calendar-grid button {
+  padding: 4px 1px;
+}
+.calendar-grid [aria-selected="true"] {
+  background: var(--accent);
+  color: white;
+}
+.snippet-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.snippet-row button {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.explorer ul {
+  padding-left: 18px;
+}
+
+.workspace {
+  min-width: 780px;
+  overflow: auto;
+}
+.pane-separator {
+  background: var(--line);
+  touch-action: none;
+}
+.pane-separator.vertical {
+  cursor: col-resize;
+}
+.pane-separator.horizontal {
+  height: 6px;
+  flex: none;
+  cursor: row-resize;
+}
+.pane-separator:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.editor-column [aria-label="Global Messages"] {
+  flex: none;
+  max-height: 45%;
+}
+
+.editor-column [aria-label="Global Messages"] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.messages-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.messages-log {
+  min-height: 0;
+  overflow: auto;
+  flex: 1;
+}
+.message-error {
+  color: #8b2222;
+}
+.message-warning {
+  color: #765500;
+}
+.message-info {
+  color: #285a46;
+}

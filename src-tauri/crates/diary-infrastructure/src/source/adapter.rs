@@ -117,17 +117,18 @@ pub(crate) fn outcome(
     kind: &SourceKind,
     rel: &SourcePath,
     generation: u64,
-) -> (SourceOutcome, Option<String>) {
+) -> (SourceOutcome, Option<String>, Option<SourceListing>) {
     let obs = match read_fresh(root, rel) {
         Ok(o) => o,
-        Err(e) => return (SourceOutcome::Unavailable(e), None),
+        Err(e) => return (SourceOutcome::Unavailable(e), None, None),
     };
     let p = match parse(&obs.bytes) {
         Ok(p) => p,
-        Err(e) => return (SourceOutcome::Malformed(e), None),
+        Err(e) => return (SourceOutcome::Malformed(e), None, None),
     };
     let producer = scalar(&p, "id").map(str::to_owned);
-    (interpret(root, kind, rel, &obs, generation, &p).0, producer)
+    let (outcome, listing) = interpret(root, kind, rel, &obs, generation, &p);
+    (outcome, producer, Some(listing))
 }
 /// Re-read an observed path. Unsupported/conflicting but well-formed files remain
 /// viewable. Any observation change (including a config reload) requires refresh.

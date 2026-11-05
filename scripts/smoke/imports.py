@@ -101,19 +101,23 @@ with tempfile.TemporaryDirectory(prefix='diary-import-smoke-') as temporary:
         code, ack = call(record, session, f'/sources/{source_id}/time-resolution', 'POST', {'import_id': import_id, 'digest': observation['digest'], 'authority': 'filename'})
         assert code == 200 and ack['resolved'], (code, ack)
         code, page = call(record, session, '/sources?import_id=' + import_id)
-        assert code == 200 and [i['kind'] for i in page['items']] == ['included'], (code, page)
+        assert code == 200 and [i['kind'] for i in page['items']] == ['warning'], (code, page)
         assert file.read_bytes() == original
         stop(server)
         server, record = start()
         session = session_for(record)
         code, page = call(record, session, '/sources?import_id=' + import_id)
-        assert code == 200 and page['items'][0]['kind'] == 'included', (code, page)
+        assert code == 200 and page['items'][0]['kind'] == 'warning', (code, page)
         second = import_date(record, session, 'second')
         code, page = call(record, session, '/sources?import_id=' + second)
-        assert code == 200 and page['items'][0]['source']['id'] == source_id
+        assert code == 200 and page['items'][0]['source']['id'] == source_id and page['items'][0]['kind'] == 'included'
+        frozen = page
         file.write_bytes(original + b' ')
         code, page = call(record, session, '/sources?import_id=' + second)
-        assert code == 200 and [i['kind'] for i in page['items']] == ['warning'], (code, page)
+        assert code == 200 and page == frozen, (code, page)
+        third = import_date(record, session, 'third')
+        code, refreshed = call(record, session, '/sources?import_id=' + third)
+        assert code == 200 and [i['kind'] for i in refreshed['items']] == ['warning'], (code, refreshed)
         code, error = call(record, session, f'/sources/{source_id}/time-resolution', 'POST', {'import_id': second, 'digest': observation['digest'], 'authority': 'header'})
         assert code == 409 and error['error']['code'] == 'source_stale', (code, error)
         assert authentic_file.read_bytes() == authentic_bytes
@@ -121,8 +125,10 @@ with tempfile.TemporaryDirectory(prefix='diary-import-smoke-') as temporary:
         stop(server)
         db = sqlite3.connect(workspace / '.diary/state.sqlite3')
         contexts = db.execute('SELECT import_id, zone, database_version, completed_at FROM import_contexts').fetchall()
-        assert len(contexts) == 2 and all(row[1] and row[2] and row[3] for row in contexts)
+        assert len(contexts) == 3 and all(row[1] and row[2] and row[3] for row in contexts)
         assert db.execute('SELECT count(*) FROM time_resolutions').fetchone()[0] == 1
+        payloads = db.execute('SELECT payload FROM import_snapshots').fetchall()
+        assert len(payloads) == 3 and all(SECRET.encode() not in row[0] and str(source).encode() not in row[0] for row in payloads)
         db.close()
         logs = ''.join(p.read_text() for p in runtime.glob('*/logs/server/*.log'))
         assert logs and SECRET not in logs and str(source) not in logs and str(workspace) not in logs

@@ -14,6 +14,8 @@ const COMMANDS: &[&str] = &[
     "subscribe_events",
     "get_app_metadata",
     "log_client_event",
+    "get_calendar",
+    "read_source",
     "import_date",
     "list_sources",
     "resolve_source_time",

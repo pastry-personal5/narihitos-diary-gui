@@ -1,3 +1,4 @@
+import { navigationFake } from "./navigation-fake";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -26,6 +27,7 @@ afterEach(() => {
 });
 function bridge(fake: SettingsFake): Bridge {
   return {
+    ...navigationFake(),
     metadata: async () => ({ version: "1.0.0" }),
     connect: async () => status,
     status: async () => status,

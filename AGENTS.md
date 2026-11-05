@@ -39,6 +39,10 @@ See [README.md](README.md) for the overview and [docs/product-behavior.md](docs/
 
 - **P1-M10 approvals (owner, 2026-11-05):** Approved pinned `jiff` (direct dependency in `diary-infrastructure`, with license-notice review), server routes plus bridge commands without UI, and the system timezone database `+VERSION` as the recorded version. See the [work plan](docs/archive/milestones/p1-m10/milestone-10-civil-date-imports-architecture.md#owner-decisions).
 
+- **Import snapshots (owner approval, 2026-11-05):** Persist immutable, body-less scan snapshots per completed `import_id`, atomically with completion. Pagination survives source changes and restart. Resolve only the selected source with a fresh observation; a new import refreshes listings and applies choices. Legacy contexts without snapshots require re-import. See the [source/date contract](docs/architecture/sources-and-dates.md#implementation-status).
+
+- **P1-M11 smoke waiver (owner, 2026-11-06):** The owner skipped the packaged synthetic navigation smoke and closed P1-M11 on automated tests plus the full gate. This waives only that smoke clause; later milestones still need their own evidence. See the [completion record](docs/archive/milestones/p1-m11/milestone-11-explorer-navigation-overview.md#completion-record).
+
 ## Undecided — ask before inventing
 
 The [P1-M2 owner interview](docs/phase-1/milestone-02-owner-decisions.md) resolves the earlier product choices. The maintained [architecture](docs/architecture.md) resolves delegated internal design work; do not ask again about already approved choices. Ask before changing those choices or inventing new product behavior outside the delegation.

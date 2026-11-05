@@ -79,6 +79,11 @@ pub struct Source {
     pub import_id: String,
     pub dating: SourceDating,
     pub duplicate_producer_id: bool,
+    pub header_invalid: Option<String>,
+    pub filename_invalid: Option<String>,
+    pub navigation: Option<SourceDisplay>,
+    pub eligible: bool,
+    pub capabilities: Capabilities,
 }
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -110,13 +115,18 @@ pub enum SourceItem {
     Failure {
         relative_key: String,
         code: SourceFailure,
+        group_id: Option<String>,
+        source: Option<Source>,
     },
     PathCollision {
         relative_keys: Vec<String>,
+        group_id: Option<String>,
     },
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ImportPage {
+    pub groups: Option<Vec<SourceGroup>>,
+    pub reimport_required: bool,
     pub import_id: String,
     pub date: String,
     pub zone: String,
@@ -126,6 +136,41 @@ pub struct ImportPage {
     pub items: Vec<SourceItem>,
     pub next_cursor: Option<usize>,
     pub incomplete: bool,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SourceGroup {
+    pub id: String,
+    pub alias: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LocalTime {
+    pub date: String,
+    pub datetime: String,
+    pub offset_seconds: i32,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SourceDisplay {
+    pub group_id: String,
+    pub header: Option<LocalTime>,
+    pub filename: Option<LocalTime>,
+    pub included: Option<LocalTime>,
+    pub authority: Option<TimeAuthority>,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Capabilities {
+    pub read: bool,
+    pub save: bool,
+    pub trash: bool,
+    pub reason: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SourceBody {
+    pub source: Source,
+    pub snapshot_id: String,
+    pub body: String,
+    pub capabilities: Capabilities,
 }
 fn invalid() -> AuthenticError {
     AuthenticError::new("invalid_input")
@@ -144,6 +189,22 @@ fn digest_shape(s: &str) -> bool {
     s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 impl Bridge {
+    pub async fn read_source(
+        &self,
+        source_id: String,
+        snapshot_id: String,
+    ) -> Result<SourceBody, AuthenticError> {
+        if !valid_id(&source_id) || !valid_id(&snapshot_id) {
+            return Err(invalid());
+        }
+        self.authentic(
+            Method::GET,
+            &format!("/sources/{source_id}?snapshot_id={snapshot_id}"),
+            None,
+        )
+        .await
+    }
+
     pub async fn import_date(
         &self,
         date: String,

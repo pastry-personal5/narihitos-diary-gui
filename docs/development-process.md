@@ -24,6 +24,8 @@ A phase is done when every milestone is `Done` or `Dropped` and its exit criteri
 
 Owner-approved exception: P1-M1 Research and P1-M2 Architecture produce documentation only and are exempt from the code gate in item 2; see the [Phase 1 changelog](phase-1/changelog.md). Their checklists, evidence, affected-doc updates, and local-link/whitespace review still apply. P1-M3 requires the full gate. This exception does not authorize code or dependency changes in the docs-only milestones.
 
+Owner waiver (2026-11-06): P1-M11 closed without its packaged navigation smoke, which the owner skipped. It applies to P1-M11 only; see the [completion record](archive/milestones/p1-m11/milestone-11-explorer-navigation-overview.md#completion-record).
+
 ## Plan files
 
 Create a phase directory when planning that phase.

@@ -1,3 +1,11 @@
+import {
+  calendarDto,
+  importAckDto,
+  importPageDto,
+  sourceBodyDto,
+  importJobDto,
+  resolutionDto,
+} from "./navigation-validation";
 import { streamEvent } from "../application/events";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type { Bridge, ClientEvent } from "../application/bridge";
@@ -61,6 +69,26 @@ export async function logClientEvent(event: ClientEvent): Promise<void> {
   await invoke("log_client_event", { event: payload }).catch(() => {});
 }
 export const tauriBridge: Bridge = {
+  getCalendar: (anchor, action = "month") =>
+    authentic("get_calendar", { anchor: anchor ?? null, action }, calendarDto),
+  importDate: (date, requestId) =>
+    authentic("import_date", { date, requestId }, importAckDto),
+  listSources: (importId, cursor) =>
+    authentic(
+      "list_sources",
+      { importId, cursor: cursor ?? null },
+      importPageDto,
+    ),
+  resolveSourceTime: (importId, sourceId, digest, authority) =>
+    authentic(
+      "resolve_source_time",
+      { importId, sourceId, digest, authority },
+      resolutionDto,
+    ),
+  readSource: (sourceId, snapshotId) =>
+    authentic("read_source", { sourceId, snapshotId }, sourceBodyDto),
+  getJob: (jobId) => authentic("get_job", { id: jobId }, importJobDto),
+  cancelJob: (jobId) => authentic("cancel_job", { id: jobId }, importJobDto),
   metadata: async () => metadataDto(await invoke<unknown>("get_app_metadata")),
   serverSettings: () => settings("get_settings", undefined, serverSettingsDto),
   reloadSettings: () => settings("reload_settings", undefined, reloadResultDto),

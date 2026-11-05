@@ -10,6 +10,8 @@ export type SaveState =
 
 export interface QueueState {
   state: SaveState;
+  /** Disconnect/reconciliation suspends all new writes. */
+  paused: boolean;
   /** Increases with every user edit; programmatic body replacement never counts. */
   generation: number;
   /** Highest generation covered by an acknowledgement. */
@@ -34,6 +36,8 @@ export interface QueueState {
 }
 
 export type Action =
+  | { kind: "pause" }
+  | { kind: "resume" }
   | { kind: "edit" }
   | { kind: "tick" }
   | { kind: "composition_start" }
@@ -76,6 +80,7 @@ export type Effect =
 
 export const initialQueue = (acknowledged: Revision | null): QueueState => ({
   state: "clean",
+  paused: false,
   generation: 0,
   saved: 0,
   acknowledged,
@@ -100,6 +105,7 @@ const out = (state: QueueState, ...effects: Effect[]): Result => ({
 });
 
 function send(s: QueueState, newId: () => string): Result {
+  if (s.paused) return out({ ...s, state: "dirty", flushPending: true });
   const operationId = newId();
   return out(
     {
@@ -127,6 +133,11 @@ function send(s: QueueState, newId: () => string): Result {
 function settle(s: QueueState, newId: () => string): Result {
   // After an acknowledgement: reload if an invalidation was held back, then send newer text.
   const effects: Effect[] = s.recheck ? [{ kind: "reload" }] : [];
+  if (s.recheck)
+    return out(
+      { ...s, recheck: false, state: dirty(s) ? "dirty" : "clean" },
+      ...effects,
+    );
   const base = { ...s, recheck: false };
   if (!dirty(base)) return out({ ...base, state: "clean" }, ...effects);
   if (base.flushPending && !base.composing) {
@@ -153,6 +164,26 @@ function conflict(s: QueueState): Result {
 export function step(s: QueueState, a: Action, newId: () => string): Result {
   const blocked = s.state === "save_failed" || s.state === "external_conflict";
   switch (a.kind) {
+    case "pause":
+      return out({ ...s, paused: true });
+    case "resume": {
+      const next = { ...s, paused: false };
+      if (s.inFlight)
+        return out(
+          {
+            ...next,
+            state: "saving",
+            inFlight: { ...s.inFlight, recovering: true, attempts: 0 },
+          },
+          {
+            kind: "get_operation",
+            operationId: s.inFlight.operationId,
+            delayMs: 0,
+          },
+        );
+      if (blocked) return out(next);
+      return settle({ ...next, flushPending: dirty(next) }, newId);
+    }
     case "edit": {
       const next = {
         ...s,
@@ -164,12 +195,15 @@ export function step(s: QueueState, a: Action, newId: () => string): Result {
         : out(next, { kind: "schedule_tick", delayMs: DEBOUNCE_MS });
     }
     case "tick":
-      if (blocked || s.composing || s.inFlight || !dirty(s)) return out(s);
+      if (s.paused || blocked || s.composing || s.inFlight || !dirty(s))
+        return out(s);
       return send(s, newId);
     case "composition_start":
       return out({ ...s, composing: true });
     case "composition_end": {
       const next = { ...s, composing: false };
+      if (s.recheck && !s.inFlight)
+        return out({ ...next, recheck: false }, { kind: "reload" });
       if (blocked || s.inFlight || !dirty(next)) return out(next);
       return next.flushPending
         ? send(next, newId)
@@ -250,8 +284,10 @@ export function step(s: QueueState, a: Action, newId: () => string): Result {
       }
       if (a.succeeded) {
         const m = /^(\d+):([0-9a-f]{64})$/i.exec(a.result ?? "");
-        if (!m) return fail({ ...s, inFlight: null }, "invalid_response");
+        if (!m) return fail(s, "invalid_response");
         const sequence = Number(m[1]);
+        if (!Number.isSafeInteger(sequence) || sequence < 1)
+          return fail(s, "invalid_response");
         return step(
           s,
           {
@@ -270,6 +306,7 @@ export function step(s: QueueState, a: Action, newId: () => string): Result {
     case "invalidated":
       return out(s, { kind: "reload" });
     case "loaded": {
+      if (s.composing) return out({ ...s, recheck: true });
       if (s.discarding) {
         return out(
           {
@@ -277,13 +314,16 @@ export function step(s: QueueState, a: Action, newId: () => string): Result {
             generation: s.generation,
             saved: s.generation,
             composing: s.composing,
+            paused: s.paused,
           },
           { kind: "replace_body", body: a.body },
         );
       }
       if (s.inFlight) return out({ ...s, recheck: true });
       if (same(a.revision, s.acknowledged) && s.state !== "external_conflict")
-        return out(s);
+        return s.flushPending && dirty(s) && !s.paused && !s.composing
+          ? send(s, newId)
+          : out(s);
       if (s.state === "external_conflict")
         return out({ ...s, external: a.revision });
       if (dirty(s) || blocked)
@@ -321,6 +361,8 @@ export function step(s: QueueState, a: Action, newId: () => string): Result {
         newId,
       );
     case "discard":
+      // An admitted operation with an unknown outcome must be reconciled first.
+      if (s.inFlight) return out(s);
       return out(
         { ...s, inFlight: null, discarding: true, flushPending: false },
         { kind: "reload" },
@@ -331,7 +373,11 @@ export function step(s: QueueState, a: Action, newId: () => string): Result {
 export type Transition = "proceed" | "wait" | "blocked";
 /** Whether a date change or close may go ahead. */
 export function guard(s: QueueState): Transition {
-  if (s.state === "save_failed" || s.state === "external_conflict")
+  if (
+    s.state === "save_failed" ||
+    s.state === "external_conflict" ||
+    (s.paused && (dirty(s) || s.inFlight))
+  )
     return "blocked";
   return s.state === "clean" && !s.inFlight && !s.composing
     ? "proceed"

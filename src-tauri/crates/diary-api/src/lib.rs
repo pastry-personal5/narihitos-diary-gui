@@ -1,5 +1,6 @@
 //! Explicit authenticated scaffold transport; no content mutation or fake admission route.
 mod authentic;
+mod calendar;
 mod imports;
 #[cfg(feature = "scaffold-smoke")]
 mod smoke;
@@ -196,6 +197,8 @@ pub fn router(state: Arc<ServerState>) -> Router {
             "/api/v1/imports",
             post(imports::create).layer(DefaultBodyLimit::max(4096)),
         )
+        .route("/api/v1/calendar", get(calendar::get_calendar))
+        .route("/api/v1/sources/{id}", get(imports::read))
         .route("/api/v1/sources", get(imports::list))
         .route(
             "/api/v1/sources/{id}/time-resolution",
@@ -317,7 +320,16 @@ async fn authenticate(
         || request.uri().scheme().is_some()
         || request.uri().authority().is_some()
         || request.uri().query().is_some_and(|query| {
-            if request.uri().path() == "/api/v1/sources" {
+            if request.uri().path() == "/api/v1/calendar" {
+                !calendar::valid_query(query)
+            } else if request
+                .uri()
+                .path()
+                .strip_prefix("/api/v1/sources/")
+                .is_some_and(|id| !id.contains('/'))
+            {
+                !imports::valid_read_query(query)
+            } else if request.uri().path() == "/api/v1/sources" {
                 !imports::valid_query(query)
             } else {
                 !matches!(request.uri().path(), "/api/v1/jobs" | "/api/v1/authentic")

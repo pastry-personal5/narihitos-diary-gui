@@ -1,7 +1,7 @@
 //! Durable provenance and timestamp choices, separate from transient source bodies.
 use crate::sqlite::{Db, DbError};
 use diary_application::imports::{
-    Authority, ImportContext, ImportError, ImportRepository, Resolution,
+    Authority, ImportContext, ImportError, ImportListing, ImportRepository, Resolution,
 };
 use diary_domain::{
     authentic::DiaryDate,
@@ -11,6 +11,8 @@ use diary_domain::{
     },
 };
 use rusqlite::OptionalExtension;
+
+mod snapshot;
 
 fn storage(_: DbError) -> ImportError {
     ImportError::Storage
@@ -67,11 +69,21 @@ impl ImportRepository for Db {
         })
         .map_err(storage)
     }
-    fn complete(&self, id: &str, at: i64) -> Result<(), ImportError> {
-        self.with(|db| {
-            let n = db.execute("UPDATE import_contexts SET completed_at = ?2 WHERE import_id = ?1 AND completed_at IS NULL", (id, at)).map_err(|_| DbError::Storage)?;
+    fn complete(&self, listing: &ImportListing, at: i64) -> Result<(), ImportError> {
+        let payload = snapshot::encode(listing)?;
+        self.transact(|tx| {
+            tx.execute("INSERT INTO import_snapshots VALUES (?1, ?2)", (&listing.context.id, payload)).map_err(|_| DbError::Storage)?;
+            let n = tx.execute("UPDATE import_contexts SET completed_at = ?2 WHERE import_id = ?1 AND completed_at IS NULL", (&listing.context.id, at)).map_err(|_| DbError::Storage)?;
             if n == 1 { Ok(()) } else { Err(DbError::Storage) }
         }).map_err(storage)
+    }
+    fn snapshot(&self, id: &str) -> Result<ImportListing, ImportError> {
+        let context = self.context(id)?;
+        let payload: Vec<u8> = self.with(|db| {
+            db.query_row("SELECT payload FROM import_snapshots WHERE import_id = ?1 AND length(payload) <= 16777216", [id], |r| r.get(0))
+                .optional().map_err(|_| DbError::Storage)
+        }).map_err(storage)?.ok_or(ImportError::Stale)?;
+        snapshot::decode(context, &payload)
     }
     fn context(&self, id: &str) -> Result<ImportContext, ImportError> {
         self.with(|db| {
@@ -108,6 +120,16 @@ mod tests {
     use super::*;
     use diary_logging::private_fs::PrivateDir;
     use std::os::unix::fs::PermissionsExt;
+    fn listing(context: &ImportContext) -> ImportListing {
+        ImportListing {
+            navigation: None,
+            context: context.clone(),
+            included: vec![],
+            warnings: vec![],
+            misplaced: vec![],
+            scan: Default::default(),
+        }
+    }
     #[test]
     fn bounds_foreign_keys_and_identity_collisions_are_enforced() {
         let temp = tempfile::tempdir().unwrap();
@@ -128,6 +150,33 @@ mod tests {
             db.bind_source("too-long", &[0; 32], &"x".repeat(4097))
                 .is_err()
         );
+        let batch = vec![
+            ("batch-a".into(), [2; 32], "a.md".into()),
+            ("batch-b".into(), [2; 32], "b.md".into()),
+        ];
+        db.bind_sources(&batch).unwrap();
+        db.bind_sources(&batch).unwrap();
+        for bad in [
+            ("source".into(), [3; 32], "collision.md".into()),
+            ("different-id".into(), [0; 32], "2024/02/29/a.md".into()),
+            ("long".into(), [2; 32], "x".repeat(4097)),
+        ] {
+            assert!(
+                db.bind_sources(&[("rolled-back".into(), [4; 32], "rollback.md".into()), bad])
+                    .is_err()
+            );
+            assert_eq!(
+                db.with(|c| c
+                    .query_row(
+                        "SELECT count(*) FROM source_identities WHERE source_id='rolled-back'",
+                        [],
+                        |r| r.get::<_, i64>(0)
+                    )
+                    .map_err(|_| DbError::Storage))
+                    .unwrap(),
+                0
+            );
+        }
         for sql in [
             "INSERT INTO time_resolutions VALUES ('missing', zeroblob(32), 'header', 0, 'second', 0)",
             "INSERT INTO time_resolutions VALUES ('source', zeroblob(31), 'header', 0, 'second', 0)",
@@ -153,7 +202,73 @@ mod tests {
         context.zone.database_version = "2026e".into();
         db.begin(&context).unwrap();
         assert_eq!(db.context("import"), Err(ImportError::NotFound));
-        db.complete("import", 99).unwrap();
+        db.discard("import").unwrap();
+        db.discard("import").unwrap();
+        assert_eq!(
+            db.complete(&listing(&context), 99),
+            Err(ImportError::Storage)
+        );
+        db.begin(&context).unwrap();
+        db.complete(&listing(&context), 99).unwrap();
+        db.discard("import").unwrap();
+        let persisted = db.snapshot("import").unwrap();
+        assert_eq!(persisted.context.completed_at, Some(99));
+        assert_eq!(
+            db.complete(&listing(&context), 100),
+            Err(ImportError::Storage)
+        );
+        for sql in [
+            "UPDATE import_snapshots SET payload=x'00' WHERE import_id='import'",
+            "DELETE FROM import_snapshots WHERE import_id='import'",
+        ] {
+            assert!(
+                db.with(|c| c.execute(sql, []).map(|_| ()).map_err(|_| DbError::Storage))
+                    .is_err()
+            );
+        }
+        let mut failed = context.clone();
+        failed.id = "oversized".into();
+        db.begin(&failed).unwrap();
+        let mut oversized = listing(&failed);
+        oversized.scan.failures.push((
+            "x".repeat(16 * 1024 * 1024),
+            diary_application::source::SourceOutcome::Unavailable(
+                diary_application::source::Unavailable::Missing,
+            ),
+        ));
+        assert_eq!(db.complete(&oversized, 100), Err(ImportError::Limit));
+        assert_eq!(db.context("oversized"), Err(ImportError::NotFound));
+        db.discard("oversized").unwrap();
+        // Simulate an existing released context: publication must roll back the
+        // snapshot insert when its completion precondition fails.
+        let mut legacy = context.clone();
+        legacy.id = "legacy".into();
+        db.begin(&legacy).unwrap();
+        db.with(|c| {
+            c.execute(
+                "UPDATE import_contexts SET completed_at=1 WHERE import_id='legacy'",
+                [],
+            )
+            .map(|_| ())
+            .map_err(|_| DbError::Storage)
+        })
+        .unwrap();
+        assert!(matches!(db.snapshot("legacy"), Err(ImportError::Stale)));
+        assert_eq!(
+            db.complete(&listing(&legacy), 100),
+            Err(ImportError::Storage)
+        );
+        assert_eq!(
+            db.with(|c| c
+                .query_row(
+                    "SELECT count(*) FROM import_snapshots WHERE import_id='legacy'",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .map_err(|_| DbError::Storage))
+                .unwrap(),
+            0
+        );
         context.completed_at = Some(99);
         assert_eq!(db.context("import").unwrap(), context);
     }

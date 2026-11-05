@@ -217,6 +217,62 @@ describe("save queue", () => {
     ]);
   });
 
+  it("retains the original operation when a success receipt is malformed", () => {
+    counter = 0;
+    const r = run(
+      initialQueue(null),
+      ...edits(1),
+      { kind: "tick" },
+      {
+        kind: "failed",
+        operationId: "op-1",
+        code: "outcome_uncertain",
+        retryable: true,
+      },
+      {
+        kind: "operation",
+        operationId: "op-1",
+        found: true,
+        terminal: true,
+        succeeded: true,
+        result: "bad",
+      },
+    );
+    expect(r.state.state).toBe("save_failed");
+    expect(r.state.inFlight?.operationId).toBe("op-1");
+    expect(run(r.state, { kind: "retry" }).effects).toEqual([
+      { kind: "get_operation", operationId: "op-1", delayMs: 0 },
+    ]);
+  });
+  it("never discards an admitted save whose outcome remains uncertain", () => {
+    counter = 0;
+    let r = run(
+      initialQueue(rev(1)),
+      ...edits(1),
+      { kind: "tick" },
+      {
+        kind: "failed",
+        operationId: "op-1",
+        code: "outcome_uncertain",
+        retryable: true,
+      },
+    );
+    for (let i = 0; i < 5; i++)
+      r = run(r.state, {
+        kind: "operation",
+        operationId: "op-1",
+        found: true,
+        terminal: false,
+        succeeded: false,
+        result: null,
+      });
+    const before = r.state;
+    r = run(before, { kind: "discard" });
+    expect(r.state).toEqual(before);
+    expect(r.effects).toEqual([]);
+    expect(r.state.inFlight?.operationId).toBe("op-1");
+  });
+
   it("a definite failure keeps the buffer and retry sends a fresh operation", () => {
     counter = 0;
     let r = run(

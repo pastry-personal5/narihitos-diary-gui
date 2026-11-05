@@ -71,6 +71,12 @@ export function AuthenticPane({
             <>
               <span>Discard unsaved text and reload the saved file?</span>
               <button
+                disabled={!!queue.inFlight}
+                title={
+                  queue.inFlight
+                    ? "Resolve the pending save before discarding."
+                    : undefined
+                }
                 onClick={() => {
                   setConfirming(false);
                   dispatch({ kind: "discard" });
@@ -81,7 +87,17 @@ export function AuthenticPane({
               <button onClick={() => setConfirming(false)}>Cancel</button>
             </>
           ) : (
-            <button onClick={() => setConfirming(true)}>Discard changes</button>
+            <button
+              disabled={!!queue.inFlight}
+              title={
+                queue.inFlight
+                  ? "Resolve the pending save before discarding."
+                  : undefined
+              }
+              onClick={() => setConfirming(true)}
+            >
+              Discard changes
+            </button>
           )}
         </div>
       ) : null}
