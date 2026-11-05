@@ -22,10 +22,64 @@ export interface ClientEvent {
     count?: number;
   };
 }
+export interface Revision {
+  sequence: number;
+  sha256: string;
+}
+export interface AuthenticFile {
+  date: string;
+  exists: boolean;
+  revision: Revision | null;
+  body: string;
+}
+export interface SaveAck {
+  operation_id: string;
+  revision: Revision;
+  buffer_generation: number;
+}
+export interface AuthenticPage {
+  items: { date: string; revision: Revision | null; problem: string | null }[];
+  next_cursor: string | null;
+}
+export interface RefreshReport {
+  files: number;
+  problems: number;
+}
+export interface OperationState {
+  operation_id: string;
+  state: string;
+  terminal: boolean;
+  succeeded: boolean;
+  result: string | null;
+}
+export interface SaveRequest {
+  date: string;
+  operationId: string;
+  expectedRevision: Revision | null;
+  body: string;
+  bufferGeneration: number;
+}
+/** Allowlisted failure of an Authentic command; never carries server text or paths. */
+export class AuthenticError extends Error {
+  constructor(
+    readonly code: string,
+    readonly retryable: boolean,
+  ) {
+    super(code);
+  }
+}
 export interface Bridge {
   metadata(): Promise<AppMetadata>;
   connect(): Promise<Status>;
   status(): Promise<Status>;
+  listAuthentic(cursor?: string): Promise<AuthenticPage>;
+  loadAuthentic(date: string): Promise<AuthenticFile>;
+  saveAuthentic(request: SaveRequest): Promise<SaveAck>;
+  createEmptyAuthentic(date: string, operationId: string): Promise<SaveAck>;
+  refreshAuthentic(): Promise<RefreshReport>;
+  getOperation(operationId: string): Promise<OperationState>;
+  /** The handler resolves true when the window may close (pending saves are settled). */
+  onCloseRequested?(handler: () => Promise<boolean>): Promise<() => void>;
   watch(observer: (event: StreamEvent) => void): Promise<() => Promise<void>>;
 }
 export type Connection =

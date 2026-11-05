@@ -25,6 +25,11 @@ pub enum BridgeEvent {
         instance_id: String,
         session_id: String,
     },
+    /// Watcher hint: carries nothing; the client rescans through `load_authentic`.
+    AuthenticChanged {
+        instance_id: String,
+        session_id: String,
+    },
     Disconnected,
 }
 #[derive(Deserialize)]
@@ -84,6 +89,12 @@ impl Cursor {
         }
         if kind == Some("resync_required") {
             return Ok(Some(BridgeEvent::ResyncRequired {
+                instance_id: instance.into(),
+                session_id: session.into(),
+            }));
+        }
+        if kind == Some("authentic_changed") {
+            return Ok(Some(BridgeEvent::AuthenticChanged {
                 instance_id: instance.into(),
                 session_id: session.into(),
             }));
@@ -214,6 +225,11 @@ mod tests {
             c.decode("event: resync_required\ndata: {}\n\n", "i", "s")
                 .unwrap(),
             Some(BridgeEvent::ResyncRequired { .. })
+        ));
+        assert!(matches!(
+            c.decode("event: authentic_changed\ndata: {}\n\n", "i", "s")
+                .unwrap(),
+            Some(BridgeEvent::AuthenticChanged { .. })
         ));
     }
 }

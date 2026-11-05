@@ -28,7 +28,7 @@ fn create_is_private_wal_full_and_versioned() {
     assert_eq!(mode & 0o7777, 0o600);
     assert_eq!(pragma(&db, "synchronous"), 2);
     assert_eq!(pragma(&db, "foreign_keys"), 1);
-    assert_eq!(pragma(&db, "user_version"), 1);
+    assert_eq!(pragma(&db, "user_version"), MIGRATIONS.len() as i64);
     // WAL and SHM, once present, inherit the private mode.
     db.with(|c| {
         c.execute("INSERT INTO workspace_meta VALUES (1, 'w')", [])
@@ -53,7 +53,7 @@ fn reopen_is_a_no_op_and_second_create_is_refused() {
     let (_t, dir, path) = private_dir();
     drop(Db::create(&dir, &path.join(DB_FILE)).unwrap());
     let db = Db::open_existing(&dir, &path.join(DB_FILE), false).unwrap();
-    assert_eq!(pragma(&db, "user_version"), 1);
+    assert_eq!(pragma(&db, "user_version"), MIGRATIONS.len() as i64);
     assert!(
         Db::create(&dir, &path.join(DB_FILE)).is_err(),
         "never replaces an existing file"
@@ -88,7 +88,10 @@ fn symlinked_database_is_refused() {
 fn altered_migration_checksum_is_damage() {
     let (_t, dir, path) = private_dir();
     let db = Db::create(&dir, &path.join(DB_FILE)).unwrap();
-    let altered = [(1, "CREATE TABLE schema_migrations (version INTEGER);")];
+    let altered = [
+        (1, "CREATE TABLE schema_migrations (version INTEGER);"),
+        MIGRATIONS[1],
+    ];
     assert_eq!(db.with(|c| migrate(c, &altered)), Err(DbError::Damaged));
 }
 
@@ -114,13 +117,14 @@ fn failed_migration_rolls_back_whole() {
     let db = Db::create(&dir, &path.join(DB_FILE)).unwrap();
     let next = [
         MIGRATIONS[0],
+        MIGRATIONS[1],
         (
-            2,
+            3,
             "CREATE TABLE half_done (x INTEGER) STRICT; CREATE TABLE half_done (y INTEGER);",
         ),
     ];
     assert_eq!(db.with(|c| migrate(c, &next)), Err(DbError::Storage));
-    assert_eq!(pragma(&db, "user_version"), 1);
+    assert_eq!(pragma(&db, "user_version"), MIGRATIONS.len() as i64);
     let leaked: i64 = db
         .with(|c| {
             c.query_row(
@@ -133,9 +137,13 @@ fn failed_migration_rolls_back_whole() {
         .unwrap();
     assert_eq!(leaked, 0);
     // A later correct migration still applies.
-    let good = [MIGRATIONS[0], (2, "CREATE TABLE later (x INTEGER) STRICT;")];
+    let good = [
+        MIGRATIONS[0],
+        MIGRATIONS[1],
+        (3, "CREATE TABLE later (x INTEGER) STRICT;"),
+    ];
     db.with(|c| migrate(c, &good)).unwrap();
-    assert_eq!(pragma(&db, "user_version"), 2);
+    assert_eq!(pragma(&db, "user_version"), 3);
 }
 
 #[test]

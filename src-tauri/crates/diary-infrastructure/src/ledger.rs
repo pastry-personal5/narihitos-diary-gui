@@ -3,7 +3,7 @@
 use crate::sqlite::{Db, DbError};
 use diary_application::operations::{
     Admission, Identity, LedgerError, MAX_OUTCOME_BYTES, MAX_RESOURCES, NewOperation, NewStep,
-    OperationId, OperationLedger, OperationState, Record, ResourceKey, StepOutcome,
+    OperationId, OperationLedger, OperationState, Record, ResourceKey, StepId, StepOutcome,
 };
 use rusqlite::{Connection, OptionalExtension, Row, Transaction, params};
 use sha2::{Digest, Sha256};
@@ -103,7 +103,39 @@ fn apply_step(tx: &Transaction, id: &OperationId, step: &NewStep) -> Result<(), 
 }
 
 /// A transaction body reports either a domain error or a database failure.
-type Tx<T> = Result<Result<T, LedgerError>, DbError>;
+pub(crate) type Tx<T> = Result<Result<T, LedgerError>, DbError>;
+
+/// Terminal transition and reservation release inside the caller's transaction, so a caller can
+/// commit its own receipt in the same transaction.
+pub(crate) fn finish_tx(
+    tx: &Transaction,
+    id: &OperationId,
+    state: OperationState,
+    result: &str,
+) -> Tx<()> {
+    let Some(op) = fetch(tx, id)? else {
+        return Ok(Err(LedgerError::NotFound));
+    };
+    if op.state.is_terminal() {
+        let same = op.state == state && op.result.as_deref() == Some(result);
+        return Ok(if same {
+            Ok(())
+        } else {
+            Err(LedgerError::Terminal)
+        });
+    }
+    tx.execute(
+        "UPDATE operations SET state = ?2, result = ?3 WHERE operation_id = ?1",
+        params![id.as_str(), state.as_str(), result],
+    )
+    .map_err(storage)?;
+    tx.execute(
+        "DELETE FROM operation_resources WHERE operation_id = ?1",
+        [id.as_str()],
+    )
+    .map_err(storage)?;
+    Ok(Ok(()))
+}
 
 impl OperationLedger for Db {
     fn admit(&self, op: NewOperation) -> Result<Admission, LedgerError> {
@@ -223,30 +255,19 @@ impl OperationLedger for Db {
         if !state.is_terminal() || result.len() > MAX_RESULT_BYTES {
             return Err(LedgerError::Invalid);
         }
-        self.transact(|tx| -> Tx<()> {
-            let Some(op) = fetch(tx, id)? else {
-                return Ok(Err(LedgerError::NotFound));
-            };
-            if op.state.is_terminal() {
-                let same = op.state == state && op.result.as_deref() == Some(result);
-                return Ok(if same {
-                    Ok(())
-                } else {
-                    Err(LedgerError::Terminal)
-                });
-            }
-            tx.execute(
-                "UPDATE operations SET state = ?2, result = ?3 WHERE operation_id = ?1",
-                params![id.as_str(), state.as_str(), result],
+        self.transact(|tx| finish_tx(tx, id, state, result))?
+    }
+
+    fn step_outcome(&self, id: &OperationId, step: &StepId) -> Result<Option<String>, LedgerError> {
+        Ok(self.with(|c| {
+            c.query_row(
+                "SELECT outcome FROM operation_steps WHERE operation_id = ?1 AND step_id = ?2",
+                [id.as_str(), step.as_str()],
+                |r| r.get(0),
             )
-            .map_err(storage)?;
-            tx.execute(
-                "DELETE FROM operation_resources WHERE operation_id = ?1",
-                [id.as_str()],
-            )
-            .map_err(storage)?;
-            Ok(Ok(()))
-        })?
+            .optional()
+            .map_err(storage)
+        })?)
     }
 
     fn unfinished(&self) -> Result<Vec<Record>, LedgerError> {

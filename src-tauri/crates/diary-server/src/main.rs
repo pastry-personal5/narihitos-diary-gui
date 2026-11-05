@@ -163,6 +163,30 @@ async fn run() -> Result<(), &'static str> {
                 .count(u32::try_from(blocked).unwrap_or(u32::MAX)),
         );
     }
+    let authentic: Option<Arc<dyn diary_application::authentic::AuthenticStore>> =
+        match workspace.open_authentic() {
+            Some(Ok((store, report))) => {
+                let n = |v: usize| u32::try_from(v).unwrap_or(u32::MAX);
+                if report.reconciled + report.orphans_removed > 0 {
+                    diagnostics.emit(
+                        Record::new(EventCode::AuthenticRecovered, Level::Info)
+                            .count(n(report.reconciled + report.orphans_removed)),
+                    );
+                }
+                diagnostics.emit(
+                    Record::new(EventCode::AuthenticRebuilt, Level::Info)
+                        .count(n(report.catalog.files)),
+                );
+                Some(store)
+            }
+            Some(Err(_)) => {
+                diagnostics.emit(Record::new(EventCode::AuthenticBlocked, Level::Error));
+                None
+            }
+            None => workspace
+                .read_only_authentic()
+                .map(|s| s as Arc<dyn diary_application::authentic::AuthenticStore>),
+        };
     diagnostics.emit(Record::new(EventCode::ListenerBound, Level::Info).count(u32::from(port)));
     let mut state = diary_api::ServerState::new(
         record.token.clone(),
@@ -173,6 +197,10 @@ async fn run() -> Result<(), &'static str> {
     );
     diary_api::ServerState::set_diagnostics(&mut state, diagnostics.clone());
     diary_api::ServerState::set_storage_ready(&mut state, workspace.readiness == Readiness::Ready);
+    let watched_store = authentic.clone();
+    if let Some(store) = authentic {
+        diary_api::ServerState::set_authentic(&mut state, store);
+    }
     let launch_path = std::env::var_os("PATH").unwrap_or_default();
     let launch_cwd = std::env::current_dir().map_err(|_| "launch directory unavailable")?;
     diary_api::ServerState::set_startup(
@@ -181,6 +209,25 @@ async fn run() -> Result<(), &'static str> {
     );
     #[cfg(feature = "scaffold-smoke")]
     diary_api::ServerState::set_smoke_folders(&mut state, native_smoke::folders(&config));
+    // shortcut: a tree that does not exist yet is not watched until the next start.
+    let tree = config.paths.entries_root.join("assets/diary/authentic");
+    let _watch = (workspace.readiness == Readiness::Ready && tree.is_dir())
+        .then(|| diary_infrastructure::watch::watch(&tree, diary_infrastructure::watch::DEBOUNCE))
+        .and_then(Result::ok)
+        .map(|w| {
+            let state = state.clone();
+            std::thread::spawn(move || {
+                // Moving the whole watcher in (not just `signals`) keeps it alive for the process.
+                let w = w;
+                while w.signals.recv().is_ok() {
+                    // The date list reads the catalog, so bring it in line with the disk first.
+                    if let Some(store) = &watched_store {
+                        let _ = store.refresh();
+                    }
+                    state.authentic_changed();
+                }
+            });
+        });
     let app = diary_api::router(state.clone());
     let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
         .map_err(|_| "signal registration failed")?;

@@ -192,6 +192,8 @@ pub trait OperationLedger {
     ) -> Result<(), LedgerError>;
     /// Every non-terminal operation (these hold reservations).
     fn unfinished(&self) -> Result<Vec<Record>, LedgerError>;
+    /// The recorded outcome of one step, for recovery that needs what an operation prepared.
+    fn step_outcome(&self, id: &OperationId, step: &StepId) -> Result<Option<String>, LedgerError>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

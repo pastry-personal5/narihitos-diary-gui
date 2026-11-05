@@ -213,3 +213,66 @@ describe("client diagnostics adapter", () => {
     void logClientEvent({ code: "server.started", level: "warn" });
   });
 });
+describe("authentic commands", () => {
+  const sha = "a".repeat(64);
+  it("sends camelCase arguments, rebuilds the DTO and drops extra fields", async () => {
+    mocks.invoke.mockResolvedValueOnce({
+      operation_id: "op",
+      revision: { sequence: 2, sha256: sha },
+      buffer_generation: 4,
+      private: "x",
+    });
+    const ack = await tauriBridge.saveAuthentic({
+      date: "2026-11-05",
+      operationId: "op",
+      expectedRevision: { sequence: 1, sha256: sha },
+      body: "hi",
+      bufferGeneration: 4,
+    });
+    expect(ack).toEqual({
+      operation_id: "op",
+      revision: { sequence: 2, sha256: sha },
+      buffer_generation: 4,
+    });
+    expect(mocks.invoke).toHaveBeenCalledWith("save_authentic", {
+      date: "2026-11-05",
+      operationId: "op",
+      expectedRevision: { sequence: 1, sha256: sha },
+      body: "hi",
+      bufferGeneration: 4,
+    });
+  });
+  it("turns rejections into allowlisted errors and never forwards raw text", async () => {
+    mocks.invoke.mockRejectedValueOnce({
+      code: "revision_conflict",
+      retryable: false,
+    });
+    await expect(tauriBridge.loadAuthentic("2026-11-05")).rejects.toMatchObject(
+      { code: "revision_conflict", retryable: false },
+    );
+    mocks.invoke.mockRejectedValueOnce("/Users/me/secret path");
+    const error = await tauriBridge.loadAuthentic("2026-11-05").catch((e) => e);
+    expect(error.code).toBe("unavailable");
+    expect(String(error.message)).not.toContain("secret");
+  });
+  it("rejects a malformed server response", async () => {
+    mocks.invoke.mockResolvedValueOnce({
+      date: "2026-11-05",
+      exists: true,
+      revision: null,
+      body: "",
+    });
+    await expect(tauriBridge.loadAuthentic("2026-11-05")).rejects.toMatchObject(
+      { code: "invalid_response" },
+    );
+  });
+  it("accepts the watcher hint event", () => {
+    expect(
+      streamEvent({
+        kind: "authentic_changed",
+        instance_id: "i",
+        session_id: "s",
+      }),
+    ).toEqual({ kind: "authentic_changed", instance_id: "i", session_id: "s" });
+  });
+});

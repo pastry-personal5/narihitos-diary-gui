@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8–P1-M28 remain Planned.
 
 ### P1-M1: Research
 
@@ -54,13 +54,16 @@ Notes: `rusqlite` approved 2026-11-05.
 
 ### P1-M6: Authentic persistence and recovery
 
-Status: Planned
+Status: Done
 Goal: Implement canonical Authentic Markdown, guarded durable saves and empty-file creation, saved-date catalogs, external-change detection and interrupted-save recovery.
+Plan: [overview](milestone-06-authentic-persistence-overview.md), [work plan](milestone-06-authentic-persistence-architecture.md).
+Notes: `notify`, `objc2` and `objc2-foundation` approved 2026-11-05; Authentic Tauri commands move to P1-M7.
 
 ### P1-M7: Authentic editing and autosave
 
-Status: Planned
+Status: Done
 Goal: Connect one shared Draft/Entry buffer to ordered IME-aware autosave, Create Empty, acknowledged save feedback and guarded date/close transitions.
+Plan: [overview](milestone-07-authentic-editing-overview.md), [work plan](milestone-07-authentic-editing-architecture.md).
 
 ### P1-M8: Settings and configuration reload
 

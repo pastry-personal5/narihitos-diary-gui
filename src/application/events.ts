@@ -26,6 +26,7 @@ export type StreamEvent =
       };
     }
   | { kind: "resync_required"; instance_id: string; session_id: string }
+  | { kind: "authentic_changed"; instance_id: string; session_id: string }
   | { kind: "disconnected" };
 export function streamEvent(value: unknown): StreamEvent {
   if (typeof value !== "object" || value === null)
@@ -77,7 +78,7 @@ export function streamEvent(value: unknown): StreamEvent {
       complete: e.complete,
     };
   }
-  if (e.kind === "resync_required")
+  if (e.kind === "resync_required" || e.kind === "authentic_changed")
     return {
       kind: e.kind,
       instance_id: e.instance_id,

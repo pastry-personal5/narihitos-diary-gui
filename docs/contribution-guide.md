@@ -35,6 +35,8 @@ src-tauri/target/debug/diary-server --config /absolute/private/config.yaml
 
 For the isolated ordinary server smoke, run `python3 scripts/smoke/server.py` after building the server. The [native evidence](archive/milestones/p1-m3/milestone-03-native-evidence.md) records fixture build commands, outcomes and remaining native checks. `scaffold-smoke` is opt-in and changes no command permission; do not use it with real config/source roots. After rebuilding ordinary artifacts, `node scripts/check-fixture-exclusion.mjs` checks fixture-marker exclusion. App packaging requires the frontend build/type check via its configured before-build command.
 
+For the Authentic persistence smoke, run `python3 scripts/smoke/authentic.py`; it builds a separate `fault-injection` binary under `src-tauri/target/fault` (the `DIARY_FAULT` environment variable is read only in that build), creates, saves, restarts and reloads files, and `SIGKILL`s a save between publication and receipt to check recovery.
+
 `python3 scripts/collect-notices.py` refreshes exact resolved dependency notice assets using the local Cargo/npm installation. The [third-party notice record](../third-party-notices.md) identifies current review gaps. Keep upstream legal text byte-for-byte and retain source provenance; do not infer license clearance from package metadata alone.
 
 ## Debugging with the redacted trace

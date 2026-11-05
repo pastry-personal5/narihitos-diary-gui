@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { Bridge, Connection } from "../application/bridge";
-import { ScratchEditor } from "./ScratchEditor";
+import { AuthenticPane } from "./AuthenticPane";
+import { SAVE_LABEL, today, useAuthentic } from "./useAuthentic";
 const tabs = ["Date tab", "Snippet tab", "Draft tab", "Entry tab"] as const;
 const unavailable = "This feature is unavailable in the scaffold.";
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 export function App({ bridge }: { bridge: Bridge }) {
   const mounted = useRef(true);
   const dispose = useRef<(() => Promise<void>) | undefined>(undefined);
@@ -12,6 +14,16 @@ export function App({ bridge }: { bridge: Bridge }) {
     message: "Server disconnected",
   });
   const [tab, setTab] = useState<(typeof tabs)[number]>("Date tab");
+  const connected = connection.kind === "connected";
+  const auth = useAuthentic(
+    bridge,
+    connected,
+    connected && connection.status.storage_ready,
+  );
+  const onEvent = useRef(auth.onEvent);
+  useEffect(() => {
+    onEvent.current = auth.onEvent;
+  }, [auth.onEvent]);
   useEffect(() => {
     let disposed = false;
     mounted.current = true;
@@ -36,6 +48,7 @@ export function App({ bridge }: { bridge: Bridge }) {
       const status = await bridge.connect();
       if (!mounted.current) return;
       const stop = await bridge.watch((event) => {
+        onEvent.current(event);
         if (mounted.current && event.kind === "disconnected")
           setConnection({
             kind: "disconnected",
@@ -74,6 +87,27 @@ export function App({ bridge }: { bridge: Bridge }) {
         });
     }
   }
+  const storage = connected && connection.status.storage_ready;
+  const queueState = auth.view?.queue.state;
+  const canCreate =
+    storage &&
+    !!auth.view &&
+    !auth.view.exists &&
+    !auth.view.creating &&
+    queueState === "clean";
+  const createReason = !connected
+    ? "Connect to the server first."
+    : !storage
+      ? "Storage is unavailable."
+      : !auth.view
+        ? "Loading this date."
+        : auth.view.exists
+          ? "A file already exists for this date."
+          : auth.view.creating
+            ? "Creating the file."
+            : queueState !== "clean"
+              ? "Wait for pending changes to save."
+              : (auth.view.createError ?? "Save an empty file for this date.");
   return (
     <main aria-label="Standard Layout" className="standard-layout">
       <header aria-label="Main Toolbar Strip" className="toolbar">
@@ -82,9 +116,16 @@ export function App({ bridge }: { bridge: Bridge }) {
           <span>{version ? `Version v${version}` : "Version unavailable"}</span>
         </div>
         <div className="toolbar-actions">
-          <button disabled title={unavailable}>
+          <button
+            disabled={!canCreate}
+            title={createReason}
+            onClick={auth.createEmpty}
+          >
             Create Empty
           </button>
+          <span role="status" aria-label="Save status">
+            {auth.view ? SAVE_LABEL[auth.view.queue.state] : "No file open"}
+          </span>
           <button
             disabled
             title="Select eligible snippets after import becomes available."
@@ -95,7 +136,9 @@ export function App({ bridge }: { bridge: Bridge }) {
         <div className="connection">
           <span role="status">
             {connection.kind === "connected"
-              ? "Connected · Storage unavailable"
+              ? connection.status.storage_ready
+                ? "Connected"
+                : "Connected · Storage unavailable"
               : connection.kind === "connecting"
                 ? "Connecting…"
                 : connection.message}
@@ -131,17 +174,57 @@ export function App({ bridge }: { bridge: Bridge }) {
             ))}
           </div>
           <h3>{tab}</h3>
-          <p>
-            {tab === "Date tab"
-              ? "Date selection becomes available with imports."
-              : tab === "Snippet tab"
-                ? "No sources imported. Import is unavailable in the scaffold."
-                : tab === "Draft tab"
-                  ? "Authentic persistence and candidates are unavailable."
-                  : "Saved Entry dates become available with persistence."}
-          </p>
+          {tab === "Date tab" ? (
+            <>
+              <label>
+                Date
+                <input
+                  type="date"
+                  value={auth.date}
+                  onChange={(e) => {
+                    if (datePattern.test(e.target.value))
+                      void auth.changeDate(e.target.value);
+                  }}
+                />
+              </label>
+              <button onClick={() => void auth.changeDate(today())}>
+                Today
+              </button>
+            </>
+          ) : tab === "Snippet tab" ? (
+            <p>No sources imported. Import is unavailable in the scaffold.</p>
+          ) : auth.dates.length === 0 ? (
+            <p>No saved dates yet.</p>
+          ) : (
+            <ul aria-label="Saved dates">
+              {auth.dates.map((d) => (
+                <li key={d}>
+                  <button
+                    aria-pressed={d === auth.date}
+                    onClick={() => void auth.changeDate(d)}
+                  >
+                    {d}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </aside>
-        <ScratchEditor />
+        <AuthenticPane
+          hostRef={auth.hostRef}
+          date={auth.date}
+          view={auth.view}
+          error={auth.error}
+          notice={auth.notice}
+          dispatch={auth.dispatch}
+          readOnlyReason={
+            !connected
+              ? "Connect to the server to open this date."
+              : !storage
+                ? "Storage is unavailable: files are read-only."
+                : null
+          }
+        />
         <aside aria-label="AI Chat" className="chat">
           <h2>AI Chat</h2>
           <p>No agent is active.</p>
@@ -153,7 +236,8 @@ export function App({ bridge }: { bridge: Bridge }) {
         </aside>
       </div>
       <footer>
-        Scaffolding · File storage, imports, AI and exports are unavailable.
+        Authentic files save automatically · Imports, AI and exports are
+        unavailable.
       </footer>
     </main>
   );

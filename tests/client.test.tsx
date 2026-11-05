@@ -27,6 +27,23 @@ function bridge(): Bridge {
     connect: async () => status,
     status: async () => status,
     watch: async () => async () => {},
+    listAuthentic: async () => ({ items: [], next_cursor: null }),
+    loadAuthentic: async (date) => ({
+      date,
+      exists: false,
+      revision: null,
+      body: "",
+    }),
+    saveAuthentic: async () => {
+      throw new Error("unused");
+    },
+    createEmptyAuthentic: async () => {
+      throw new Error("unused");
+    },
+    refreshAuthentic: async () => ({ files: 0, problems: 0 }),
+    getOperation: async () => {
+      throw new Error("unused");
+    },
   };
 }
 describe("scaffold shell", () => {
@@ -47,11 +64,8 @@ describe("scaffold shell", () => {
         .getByRole("button", { name: "Create Empty" })
         .hasAttribute("disabled"),
     ).toBe(true);
-    expect(screen.getByText(/Never saved/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Entry tab" }));
-    expect(
-      screen.getByText("Saved Entry dates become available with persistence."),
-    ).toBeTruthy();
+    expect(screen.getByText("No saved dates yet.")).toBeTruthy();
   });
   it("reports disconnected and reconnects without changing scratch state", async () => {
     const adapter = bridge();
@@ -87,18 +101,18 @@ describe("scaffold shell", () => {
     expect(parent.childElementCount).toBe(0);
     parent.remove();
   });
-  it("keeps edits in memory and never reports them saved", async () => {
+  it("is read-only and reports no open file while disconnected", async () => {
     render(<App bridge={bridge()} />);
     const dom = await waitFor(() => {
       const el = document.querySelector<HTMLElement>(".cm-editor");
       expect(el).toBeTruthy();
       return el!;
     });
-    const view = EditorView.findFromDOM(dom)!;
-    view.dispatch({ changes: { from: 0, insert: "edit" } });
-    expect(view.state.doc.toString()).toBe("edit");
-    expect(screen.getByText(/Never saved/)).toBeTruthy();
-    expect(screen.queryByText(/^Saved/)).toBeNull();
+    expect(
+      EditorView.findFromDOM(dom)!.contentDOM.getAttribute("contenteditable"),
+    ).toBe("false");
+    expect(screen.getByText("No file open")).toBeTruthy();
+    expect(screen.queryByText("Saved")).toBeNull();
   });
   it("does not log rejected connection details to the console", async () => {
     const spies = (["log", "info", "warn", "error"] as const).map((m) =>

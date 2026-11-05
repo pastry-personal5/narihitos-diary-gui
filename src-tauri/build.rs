@@ -11,6 +11,14 @@ const COMMANDS: &[&str] = &[
     "subscribe_events",
     "get_app_metadata",
     "log_client_event",
+    "list_authentic",
+    "load_authentic",
+    "save_authentic",
+    "create_empty_authentic",
+    "refresh_authentic",
+    "get_operation",
+    "watch_close",
+    "finish_close",
 ];
 fn main() {
     tauri_build::try_build(

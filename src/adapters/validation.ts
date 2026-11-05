@@ -1,4 +1,14 @@
-import type { AppMetadata, Status } from "../application/bridge";
+import {
+  AuthenticError,
+  type AppMetadata,
+  type AuthenticFile,
+  type AuthenticPage,
+  type OperationState,
+  type RefreshReport,
+  type Revision,
+  type SaveAck,
+  type Status,
+} from "../application/bridge";
 function record(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     throw new Error("Invalid server response");
@@ -49,4 +59,99 @@ export function statusDto(value: unknown): Status {
     storage_ready: dto.storage_ready,
     capabilities: [...capabilities],
   };
+}
+const dateText = /^\d{4}-\d{2}-\d{2}$/;
+const hex64 = /^[0-9a-f]{64}$/i;
+function count(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 0)
+    throw new Error("Invalid server response");
+  return value as number;
+}
+function date(value: unknown): string {
+  if (typeof value !== "string" || !dateText.test(value))
+    throw new Error("Invalid server response");
+  return value;
+}
+function revision(value: unknown): Revision {
+  const dto = record(value);
+  if (
+    !Number.isSafeInteger(dto.sequence) ||
+    (dto.sequence as number) < 1 ||
+    typeof dto.sha256 !== "string" ||
+    !hex64.test(dto.sha256)
+  )
+    throw new Error("Invalid server response");
+  return { sequence: dto.sequence as number, sha256: dto.sha256 };
+}
+const maybeRevision = (value: unknown) =>
+  value === null ? null : revision(value);
+export function authenticFileDto(value: unknown): AuthenticFile {
+  const dto = record(value);
+  if (
+    typeof dto.exists !== "boolean" ||
+    typeof dto.body !== "string" ||
+    dto.body.length > 1024 * 1024 * 3
+  )
+    throw new Error("Invalid server response");
+  const rev = maybeRevision(dto.revision);
+  if (dto.exists !== (rev !== null)) throw new Error("Invalid server response");
+  return {
+    date: date(dto.date),
+    exists: dto.exists,
+    revision: rev,
+    body: dto.body,
+  };
+}
+export function saveAckDto(value: unknown): SaveAck {
+  const dto = record(value);
+  return {
+    operation_id: text(dto.operation_id, 64),
+    revision: revision(dto.revision),
+    buffer_generation: count(dto.buffer_generation),
+  };
+}
+export function authenticPageDto(value: unknown): AuthenticPage {
+  const dto = record(value);
+  if (!Array.isArray(dto.items) || dto.items.length > 200)
+    throw new Error("Invalid server response");
+  return {
+    items: dto.items.map((item: unknown) => {
+      const row = record(item);
+      return {
+        date: date(row.date),
+        revision: maybeRevision(row.revision ?? null),
+        problem: row.problem == null ? null : text(row.problem, 256),
+      };
+    }),
+    next_cursor: dto.next_cursor == null ? null : date(dto.next_cursor),
+  };
+}
+export function refreshReportDto(value: unknown): RefreshReport {
+  const dto = record(value);
+  return { files: count(dto.files), problems: count(dto.problems) };
+}
+export function operationStateDto(value: unknown): OperationState {
+  const dto = record(value);
+  if (typeof dto.terminal !== "boolean" || typeof dto.succeeded !== "boolean")
+    throw new Error("Invalid server response");
+  return {
+    operation_id: text(dto.operation_id, 64),
+    state: text(dto.state, 32),
+    terminal: dto.terminal,
+    succeeded: dto.succeeded,
+    result: dto.result == null ? null : text(dto.result, 256),
+  };
+}
+/** Anything that is not the bridge's allowlisted error becomes `unavailable`. */
+export function authenticErrorDto(value: unknown): AuthenticError {
+  if (typeof value === "object" && value !== null) {
+    const dto = value as Record<string, unknown>;
+    if (
+      typeof dto.code === "string" &&
+      /^[a-z_]{1,40}$/.test(dto.code) &&
+      typeof dto.retryable === "boolean"
+    )
+      return new AuthenticError(dto.code, dto.retryable);
+  }
+  return new AuthenticError("unavailable", false);
 }

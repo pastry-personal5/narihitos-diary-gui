@@ -14,4 +14,6 @@ tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "net", "
 axum = "=0.8.9"
 
 [features]
+# Smoke-test crash injection through DIARY_FAULT; never part of a release build.
+fault-injection = ["diary-infrastructure/fault-injection"]
 scaffold-smoke = ["diary-api/scaffold-smoke"]

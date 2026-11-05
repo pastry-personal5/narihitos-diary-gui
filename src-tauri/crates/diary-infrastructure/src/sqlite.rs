@@ -8,13 +8,17 @@ use std::{path::Path, sync::Mutex};
 
 pub const DB_FILE: &str = "state.sqlite3";
 /// Applied in order; an entry is immutable once released (its checksum is recorded).
-pub const MIGRATIONS: &[(u32, &str)] = &[(1, include_str!("sqlite/0001_init.sql"))];
+pub const MIGRATIONS: &[(u32, &str)] = &[
+    (1, include_str!("sqlite/0001_init.sql")),
+    (2, include_str!("sqlite/0002_catalog.sql")),
+];
 const REQUIRED_TABLES: &[&str] = &[
     "schema_migrations",
     "workspace_meta",
     "operations",
     "operation_resources",
     "operation_steps",
+    "catalog_authentic",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

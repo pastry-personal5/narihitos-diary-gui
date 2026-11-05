@@ -1,7 +1,11 @@
+mod authentic;
 use crate::delivery::{Delivery, Flow};
 use crate::diagnostics::ClientLog;
 use crate::discovery::{self, Discovery};
 use crate::events::{BridgeEvent, Cursor, Decoder};
+pub use authentic::{
+    AuthenticError, AuthenticFile, AuthenticList, OperationState, RefreshReport, Revision, SaveAck,
+};
 use diary_application::diagnostics::{Component, ErrorTag, EventCode, Level, Record, TraceId};
 use diary_logging::private_fs::PrivateDir;
 use reqwest::{Client, Method};

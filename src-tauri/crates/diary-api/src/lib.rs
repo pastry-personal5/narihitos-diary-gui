@@ -1,4 +1,5 @@
 //! Explicit authenticated scaffold transport; no content mutation or fake admission route.
+mod authentic;
 #[cfg(feature = "scaffold-smoke")]
 mod smoke;
 use axum::{
@@ -39,9 +40,11 @@ pub struct ServerState {
     development: bool,
     startup: diary_application::StartupSummary,
     storage_ready: bool,
+    authentic: Option<Arc<dyn diary_application::authentic::AuthenticStore>>,
     sse_slots: Arc<tokio::sync::Semaphore>,
     clock: Arc<dyn Fn() -> u64 + Send + Sync>,
     stopping: std::sync::atomic::AtomicBool,
+    authentic_epoch: std::sync::atomic::AtomicU64,
     coordinator: Mutex<Coordinator>,
     diagnostics: Arc<dyn Diagnostics>,
 }
@@ -64,6 +67,8 @@ impl ServerState {
             development,
             startup: diary_application::StartupSummary::default(),
             storage_ready: false,
+            authentic: None,
+            authentic_epoch: std::sync::atomic::AtomicU64::new(0),
             sse_slots: Arc::new(tokio::sync::Semaphore::new(4)),
             clock: Arc::new(|| {
                 // macOS CLOCK_MONOTONIC_RAW includes time spent asleep.
@@ -88,6 +93,20 @@ impl ServerState {
         Arc::get_mut(state)
             .expect("startup precedes shared use")
             .storage_ready = ready;
+    }
+    /// Invalidation hint from the file watcher; open event streams announce it once each.
+    pub fn authentic_changed(&self) {
+        self.authentic_epoch
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+    /// The Authentic store: writable when the workspace is `Ready`, read-only in recovery.
+    pub fn set_authentic(
+        state: &mut Arc<Self>,
+        store: Arc<dyn diary_application::authentic::AuthenticStore>,
+    ) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .authentic = Some(store);
     }
     pub fn set_startup(state: &mut Arc<Self>, summary: diary_application::StartupSummary) {
         Arc::get_mut(state)
@@ -140,6 +159,17 @@ pub fn router(state: Arc<ServerState>) -> Router {
         .route("/api/v1/jobs/{id}", get(get_job))
         .route("/api/v1/jobs/{id}/cancel", post(cancel_job))
         .route("/api/v1/events", get(events))
+        .route("/api/v1/authentic", get(authentic::list))
+        .route("/api/v1/authentic/refresh", post(authentic::refresh))
+        .route(
+            "/api/v1/authentic/{date}",
+            get(authentic::load).put(authentic::save),
+        )
+        .route(
+            "/api/v1/authentic/{date}/empty",
+            post(authentic::create_empty),
+        )
+        .route("/api/v1/operations/{id}", get(authentic::operation))
         .fallback(|| async { failure(StatusCode::NOT_FOUND, "not_found") })
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
         .layer(middleware::from_fn_with_state(state.clone(), authenticate))
@@ -245,7 +275,7 @@ async fn authenticate(
         || request.uri().scheme().is_some()
         || request.uri().authority().is_some()
         || request.uri().query().is_some_and(|query| {
-            request.uri().path() != "/api/v1/jobs"
+            !matches!(request.uri().path(), "/api/v1/jobs" | "/api/v1/authentic")
                 || !query.strip_prefix("cursor=").is_some_and(|cursor| {
                     !cursor.is_empty()
                         && cursor.len() <= 64
@@ -571,13 +601,25 @@ async fn events(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Respon
         Ok(permit) => permit,
         Err(_) => return failure(StatusCode::TOO_MANY_REQUESTS, "stream_limit"),
     };
+    let start = s.authentic_epoch.load(std::sync::atomic::Ordering::SeqCst);
     let stream = futures_util::stream::unfold(
-        (s, id, instance, after, false, permit),
-        |(s, id, instance, mut after, done, permit)| async move {
+        (s, id, instance, after, false, permit, start),
+        |(s, id, instance, mut after, done, permit, mut seen)| async move {
             if done {
                 return None;
             }
             loop {
+                let epoch = s.authentic_epoch.load(std::sync::atomic::Ordering::SeqCst);
+                if epoch != seen {
+                    seen = epoch;
+                    // No id, no path, no content: the receiver always rescans.
+                    return Some((
+                        Ok::<_, Infallible>(
+                            SseEvent::default().event("authentic_changed").data("{}"),
+                        ),
+                        (s, id, instance, after, false, permit, seen),
+                    ));
+                }
                 let replay = s
                     .coordinator
                     .lock()
@@ -590,7 +632,7 @@ async fn events(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Respon
                             Ok::<_, Infallible>(
                                 SseEvent::default().event("resync_required").data("{}"),
                             ),
-                            (s, id, instance, after, true, permit),
+                            (s, id, instance, after, true, permit, seen),
                         ));
                     }
                     Ok(Replay::Events(events)) => {
@@ -602,7 +644,7 @@ async fn events(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Respon
                                 .event("job_changed")
                                 .json_data(data)
                                 .expect("fixed DTO");
-                            return Some((Ok(item), (s, id, instance, after, false, permit)));
+                            return Some((Ok(item), (s, id, instance, after, false, permit, seen)));
                         }
                     }
                 }

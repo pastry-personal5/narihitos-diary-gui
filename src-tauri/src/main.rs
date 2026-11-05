@@ -7,8 +7,40 @@ mod events;
 mod native_smoke;
 use bridge::{Bridge, Job, JobList, Lease, Metadata, Settings, Status};
 use diagnostics::{ClientEvent, ClientLog, Reject};
-use std::sync::Arc;
-use tauri::{Manager, State, WebviewWindow};
+use std::sync::{Arc, Mutex};
+use tauri::{Manager, State, WebviewWindow, ipc::Channel};
+
+/// The WebView registers here so a close request first flushes pending Authentic saves. With
+/// no registered guard (or a dead channel) the window closes immediately, as before.
+#[derive(Default)]
+struct CloseGate(Mutex<Option<Channel<()>>>);
+
+async fn release_and_close(app: tauri::AppHandle, window: tauri::Window) {
+    let _result = app.state::<Bridge>().close().await;
+    app.state::<Arc<ClientLog>>()
+        .shutdown(std::time::Duration::from_millis(500));
+    #[cfg(feature = "scaffold-smoke")]
+    if _result.is_ok() {
+        eprintln!("SMOKE main_window_close_released");
+    }
+    let _ = window.destroy();
+}
+#[tauri::command]
+fn watch_close(
+    window: WebviewWindow,
+    gate: State<'_, CloseGate>,
+    on_close: Channel<()>,
+) -> Result<(), &'static str> {
+    main_window(&window)?;
+    *gate.0.lock().map_err(|_| "unavailable")? = Some(on_close);
+    Ok(())
+}
+#[tauri::command]
+async fn finish_close(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), &'static str> {
+    main_window(&window)?;
+    release_and_close(app, window.as_ref().window()).await;
+    Ok(())
+}
 fn main_window(window: &WebviewWindow) -> Result<(), &'static str> {
     if window.label() == "main" {
         Ok(())
@@ -87,6 +119,72 @@ async fn list_jobs(
 ) -> Result<JobList, &'static str> {
     main_window(&window)?;
     state.jobs(cursor).await
+}
+#[tauri::command]
+async fn list_authentic(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    cursor: Option<String>,
+) -> Result<bridge::AuthenticList, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.list_authentic(cursor).await
+}
+#[tauri::command]
+async fn load_authentic(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    date: String,
+) -> Result<bridge::AuthenticFile, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.load_authentic(date).await
+}
+#[tauri::command]
+async fn save_authentic(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    date: String,
+    operation_id: String,
+    expected_revision: Option<bridge::Revision>,
+    body: String,
+    buffer_generation: u64,
+) -> Result<bridge::SaveAck, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state
+        .save_authentic(
+            date,
+            operation_id,
+            expected_revision,
+            body,
+            buffer_generation,
+        )
+        .await
+}
+#[tauri::command]
+async fn create_empty_authentic(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    date: String,
+    operation_id: String,
+) -> Result<bridge::SaveAck, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.create_empty_authentic(date, operation_id).await
+}
+#[tauri::command]
+async fn refresh_authentic(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+) -> Result<bridge::RefreshReport, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.refresh_authentic().await
+}
+#[tauri::command]
+async fn get_operation(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    operation_id: String,
+) -> Result<bridge::OperationState, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.get_operation(operation_id).await
 }
 #[tauri::command]
 async fn get_job(
@@ -183,6 +281,7 @@ fn main() {
     tauri::Builder::default()
         .manage(bridge)
         .manage(log)
+        .manage(CloseGate::default())
         .setup(|_app| {
             #[cfg(feature = "scaffold-smoke")]
             native_smoke::setup(_app)?;
@@ -208,7 +307,15 @@ fn main() {
             cancel_job,
             subscribe_events,
             get_app_metadata,
-            log_client_event
+            log_client_event,
+            list_authentic,
+            load_authentic,
+            save_authentic,
+            create_empty_authentic,
+            refresh_authentic,
+            get_operation,
+            watch_close,
+            finish_close
         ])
         .on_window_event(|window, event| {
             if window.label() != "main" {
@@ -230,18 +337,16 @@ fn main() {
                 api.prevent_close();
                 let app = window.app_handle().clone();
                 let window = window.clone();
-                tauri::async_runtime::spawn(async move {
-                    // The scaffold has only a disposable scratch buffer. Future
-                    // durable/source editing supplies its own guarded flush here.
-                    let _result = app.state::<Bridge>().close().await;
-                    app.state::<Arc<ClientLog>>()
-                        .shutdown(std::time::Duration::from_millis(500));
-                    #[cfg(feature = "scaffold-smoke")]
-                    if _result.is_ok() {
-                        eprintln!("SMOKE main_window_close_released");
-                    }
-                    let _ = window.destroy();
-                });
+                let guarded = app
+                    .state::<CloseGate>()
+                    .0
+                    .lock()
+                    .ok()
+                    .and_then(|gate| gate.as_ref().map(|c| c.send(()).is_ok()))
+                    .unwrap_or(false);
+                if !guarded {
+                    tauri::async_runtime::spawn(release_and_close(app, window));
+                }
             }
         })
         .run(tauri::generate_context!())

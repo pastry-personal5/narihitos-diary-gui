@@ -1,7 +1,34 @@
 import { streamEvent } from "../application/events";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type { Bridge, ClientEvent } from "../application/bridge";
-import { metadataDto, statusDto } from "./validation";
+import {
+  authenticErrorDto,
+  authenticFileDto,
+  authenticPageDto,
+  operationStateDto,
+  refreshReportDto,
+  saveAckDto,
+  metadataDto,
+  statusDto,
+} from "./validation";
+
+async function authentic<T>(
+  command: string,
+  args: Record<string, unknown> | undefined,
+  dto: (value: unknown) => T,
+): Promise<T> {
+  let value: unknown;
+  try {
+    value = await invoke<unknown>(command, args);
+  } catch (error) {
+    throw authenticErrorDto(error);
+  }
+  try {
+    return dto(value);
+  } catch {
+    throw authenticErrorDto({ code: "invalid_response", retryable: false });
+  }
+}
 /** Fire-and-forget diagnostics: a rejected or rate-limited event never disturbs the UI. */
 export async function logClientEvent(event: ClientEvent): Promise<void> {
   const payload: Record<string, unknown> = {
@@ -16,6 +43,48 @@ export const tauriBridge: Bridge = {
   metadata: async () => metadataDto(await invoke<unknown>("get_app_metadata")),
   connect: async () => statusDto(await invoke<unknown>("connect_server")),
   status: async () => statusDto(await invoke<unknown>("get_status")),
+  listAuthentic: (cursor) =>
+    authentic("list_authentic", { cursor: cursor ?? null }, authenticPageDto),
+  loadAuthentic: (date) =>
+    authentic("load_authentic", { date }, authenticFileDto),
+  saveAuthentic: (r) =>
+    authentic(
+      "save_authentic",
+      {
+        date: r.date,
+        operationId: r.operationId,
+        expectedRevision: r.expectedRevision,
+        body: r.body,
+        bufferGeneration: r.bufferGeneration,
+      },
+      saveAckDto,
+    ),
+  createEmptyAuthentic: (date, operationId) =>
+    authentic("create_empty_authentic", { date, operationId }, saveAckDto),
+  refreshAuthentic: () =>
+    authentic("refresh_authentic", undefined, refreshReportDto),
+  getOperation: (operationId) =>
+    authentic("get_operation", { operationId }, operationStateDto),
+  onCloseRequested: async (handler) => {
+    const channel = new Channel<unknown>();
+    let busy = false;
+    // After dispose the Rust side still holds the channel, so a late close must still go through.
+    let current = handler;
+    channel.onmessage = () => {
+      if (busy) return;
+      busy = true;
+      void current()
+        .then((proceed) => (proceed ? invoke("finish_close") : undefined))
+        .catch(() => {})
+        .finally(() => {
+          busy = false;
+        });
+    };
+    await invoke("watch_close", { onClose: channel });
+    return () => {
+      current = async () => true;
+    };
+  },
   watch: async (observer) => {
     await invoke("open_session");
     let disposed = false;

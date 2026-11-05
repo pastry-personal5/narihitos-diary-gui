@@ -7,6 +7,7 @@ rust-version.workspace = true
 
 [dependencies]
 diary-application.workspace = true
+diary-domain.workspace = true
 diary-logging.workspace = true
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_yaml_ng = "=0.10.0"
@@ -15,6 +16,16 @@ unsafe-libyaml = "=0.2.11"
 serde_json = "=1.0.154"
 sha2 = "=0.11.1"
 rusqlite = { version = "=0.41.1", features = ["bundled"] }
+notify = { version = "=8.2.0", default-features = false, features = ["macos_fsevent"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.5"
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "block2", "NSError", "NSString", "NSURL", "NSFileCoordinator", "NSArray", "NSObject"] }
+block2 = "=0.6.2"
 
 [dev-dependencies]
 tempfile = "=3.27.0"
+
+[features]
+# Test-only crash and I/O fault injection read from DIARY_FAULT; never enabled in release builds.
+fault-injection = []

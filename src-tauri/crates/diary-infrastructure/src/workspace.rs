@@ -1,6 +1,7 @@
 //! Workspace initialization and opening under the OS lock. The marker `workspace.json` is
 //! published last; authoritative state is never created over existing state.
 use crate::{
+    authentic::{KIND_CREATE, KIND_SAVE, ReadOnlyStore, RecoverReport, Store},
     lifecycle::{WorkspaceLock, random_uuid},
     sqlite::{DB_FILE, Db, DbError},
 };
@@ -10,7 +11,7 @@ use diary_application::{
 };
 use diary_logging::private_fs::PrivateDir;
 use serde::{Deserialize, Serialize};
-use std::{io::Write, os::unix::fs::MetadataExt, time::SystemTime};
+use std::{io::Write, os::unix::fs::MetadataExt, path::PathBuf, sync::Arc, time::SystemTime};
 
 /// Bump when the meaning of a stored operation identity changes.
 pub const ADAPTER_VERSION: u32 = 1;
@@ -55,7 +56,7 @@ pub struct Workspace {
     pub reason: Option<Reason>,
     /// What new operations are admitted under. `workspace_id` is empty when unknown.
     pub identity: Identity,
-    db: Option<Db>,
+    db: Option<Arc<Db>>,
 }
 
 /// Test-only interruption points of initialization.
@@ -73,15 +74,53 @@ impl Workspace {
 
     pub fn ledger(&self) -> Result<&dyn OperationLedger, LedgerError> {
         match (&self.db, self.readiness) {
-            (Some(db), Readiness::Ready) => Ok(db),
+            (Some(db), Readiness::Ready) => Ok(&**db),
             _ => Err(LedgerError::Unavailable),
         }
     }
 
-    /// Unfinished operations against this root. No reconciler exists yet, so valid ones are
-    /// quarantined (`NoReconciler`) and keep their reservations until their milestone lands.
+    /// The Authentic store, after reconciling interrupted saves and rebuilding the catalog.
+    /// Only a `Ready` workspace has one; operations of other roots stay quarantined.
+    pub fn open_authentic(&self) -> Option<Result<(Arc<Store>, RecoverReport), LedgerError>> {
+        let (Some(db), Readiness::Ready) = (&self.db, self.readiness) else {
+            return None;
+        };
+        let store = Arc::new(Store::new(
+            db.clone(),
+            PathBuf::from(&self.identity.root),
+            self.identity.clone(),
+        ));
+        Some(self.classify().and_then(|classified| {
+            let resume: Vec<_> = classified
+                .into_iter()
+                .filter(|c| c.class == diary_application::operations::Class::Resume)
+                .map(|c| c.id)
+                .collect();
+            store
+                .recover(&resume)
+                .map(|report| (store.clone(), report))
+                .map_err(|_| LedgerError::Storage)
+        }))
+    }
+
+    /// Recovery mode keeps Authentic files readable without any ledger or mutation.
+    pub fn read_only_authentic(&self) -> Option<Arc<ReadOnlyStore>> {
+        (self.readiness == Readiness::Recovery).then(|| {
+            Arc::new(ReadOnlyStore {
+                root: PathBuf::from(&self.identity.root),
+            })
+        })
+    }
+
+    /// Unfinished operations against this root. Authentic saves and creations are resumable;
+    /// other valid kinds are quarantined (`NoReconciler`) and keep their reservations until
+    /// their milestone lands.
     pub fn classify(&self) -> Result<Vec<Classified>, LedgerError> {
-        Ok(classify(&self.ledger()?.unfinished()?, &self.identity, &[]))
+        Ok(classify(
+            &self.ledger()?.unfinished()?,
+            &self.identity,
+            &[KIND_SAVE, KIND_CREATE],
+        ))
     }
 }
 
@@ -147,7 +186,7 @@ fn open_with(lock: &WorkspaceLock, fault: Option<Fault>) -> Result<Workspace, Wo
             readiness: Readiness::Ready,
             reason: None,
             identity: identity(&id),
-            db: Some(db),
+            db: Some(Arc::new(db)),
         });
     }
 
@@ -187,7 +226,7 @@ fn open_with(lock: &WorkspaceLock, fault: Option<Fault>) -> Result<Workspace, Wo
         readiness: Readiness::Ready,
         reason: None,
         identity: identity(&marker.workspace_id),
-        db: Some(db),
+        db: Some(Arc::new(db)),
     })
 }
 
@@ -265,7 +304,7 @@ fn utc_now() -> String {
     utc(secs)
 }
 /// `YYYY-MM-DDTHH:MM:SSZ` (Hinnant's civil-from-days).
-fn utc(secs: u64) -> String {
+pub(crate) fn utc(secs: u64) -> String {
     let (days, rem) = ((secs / 86_400) as i64, secs % 86_400);
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
