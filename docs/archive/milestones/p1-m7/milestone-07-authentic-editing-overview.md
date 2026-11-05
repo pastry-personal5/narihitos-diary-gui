@@ -2,7 +2,7 @@
 
 Status: Done
 
-Connect one shared Draft/Entry CodeMirror buffer to the P1-M6 Authentic routes through typed Tauri commands, with an ordered, IME-aware autosave queue, Create Empty, acknowledged save feedback, external-change handling and guarded date/close transitions. The work plan is [milestone-07-authentic-editing-architecture.md](milestone-07-authentic-editing-architecture.md). Contracts: [editor and client state](../architecture/editing-and-agents.md#editor-and-client-state), [autosave protocol](../architecture/domain-and-persistence.md#autosave-protocol), [startup and external changes](../architecture/domain-and-persistence.md#startup-and-external-changes) and [save feedback](../ux-gui.md).
+Connect one shared Draft/Entry CodeMirror buffer to the P1-M6 Authentic routes through typed Tauri commands, with an ordered, IME-aware autosave queue, Create Empty, acknowledged save feedback, external-change handling and guarded date/close transitions. The work plan is [milestone-07-authentic-editing-architecture.md](milestone-07-authentic-editing-architecture.md). Contracts: [editor and client state](../../../architecture/editing-and-agents.md#editor-and-client-state), [autosave protocol](../../../architecture/domain-and-persistence.md#autosave-protocol), [startup and external changes](../../../architecture/domain-and-persistence.md#startup-and-external-changes) and [save feedback](../../../ux-gui.md).
 
 ## Entry conditions
 

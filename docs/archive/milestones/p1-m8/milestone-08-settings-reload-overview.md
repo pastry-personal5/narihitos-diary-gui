@@ -2,7 +2,7 @@
 
 Status: Done
 
-Add the client-owned `user_settings.json` store with guarded, section-scoped writes and recovery; persist the Writing Language; and give Settings a redacted server-config status with an explicit, validated, atomic `reload_settings`. The work plan is [milestone-08-settings-reload-architecture.md](milestone-08-settings-reload-architecture.md). Contracts: [user settings](../architecture/user-settings.md), [configuration schema and reload](../architecture/configuration-and-exports.md#configuration-schema-and-validation), [API table](../architecture/api-and-processes.md) and [Settings UX](../ux-gui.md).
+Add the client-owned `user_settings.json` store with guarded, section-scoped writes and recovery; persist the Writing Language; and give Settings a redacted server-config status with an explicit, validated, atomic `reload_settings`. The work plan is [milestone-08-settings-reload-architecture.md](milestone-08-settings-reload-architecture.md). Contracts: [user settings](../../../architecture/user-settings.md), [configuration schema and reload](../../../architecture/configuration-and-exports.md#configuration-schema-and-validation), [API table](../../../architecture/api-and-processes.md) and [Settings UX](../../../ux-gui.md).
 
 ## Entry conditions
 

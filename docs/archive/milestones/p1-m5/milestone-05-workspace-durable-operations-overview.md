@@ -2,7 +2,7 @@
 
 Status: Done
 
-Implement locked workspace initialization, the versioned SQLite authority, durable operation/step identities, resource reservations and startup recovery classification from the [persistence contract](../architecture/domain-and-persistence.md) and [operation identities](../architecture/api-and-processes.md#wire-types-and-preconditions). The work plan is [milestone-05-workspace-durable-operations-architecture.md](milestone-05-workspace-durable-operations-architecture.md).
+Implement locked workspace initialization, the versioned SQLite authority, durable operation/step identities, resource reservations and startup recovery classification from the [persistence contract](../../../architecture/domain-and-persistence.md) and [operation identities](../../../architecture/api-and-processes.md#wire-types-and-preconditions). The work plan is [milestone-05-workspace-durable-operations-architecture.md](milestone-05-workspace-durable-operations-architecture.md).
 
 ## Entry conditions
 
@@ -50,7 +50,7 @@ Check an item only with a linked result naming the tested revision, command, obs
 
 Working tree on top of `e70c17c`, branch `main`, Apple Silicon macOS, 2026-11-05. Test runs went through the test-runner.
 
-W01 | Owner message "Approve dependencies" (this session) and [changelog](changelog.md); `rusqlite =0.41.1` with `bundled`; `cargo tree` and crate metadata show MIT for `rusqlite`/`libsqlite3-sys` and MIT or MIT/Apache-2.0 for the others; bundled SQLite is public domain; `collect-notices.py` regenerated the inventory (+8 Cargo records, clean prettier) | Note: `rsqlite-vfs` 0.2.0 (wasm-only, not compiled here) ships no license file, so its notice is the upstream `LICENSE` fetched from the crate's exact commit by `fetch-notice-supplements.py`.
+W01 | Owner message "Approve dependencies" (this session) and [changelog](../../../phase-1/changelog.md); `rusqlite =0.41.1` with `bundled`; `cargo tree` and crate metadata show MIT for `rusqlite`/`libsqlite3-sys` and MIT or MIT/Apache-2.0 for the others; bundled SQLite is public domain; `collect-notices.py` regenerated the inventory (+8 Cargo records, clean prettier) | Note: `rsqlite-vfs` 0.2.0 (wasm-only, not compiled here) ships no license file, so its notice is the upstream `LICENSE` fetched from the crate's exact commit by `fetch-notice-supplements.py`.
 
 W02–W03 | `workspace/tests.rs` (15, including an orphan `-wal` without a database requiring inspection, a truncated database with a marker staying 0 bytes in recovery, and an unreadable ledger row refusing `ready`) and `lifecycle/tests.rs`: empty directory to Ready with 0600 files, marker last, both interruption points resumable with the same workspace ID, stale empty DB reused, unexpected files, extra root files, symlinked DB and symlinked `.diary` refused byte-identically, non-empty root untouched, second owner `WorkspaceBusy` | pass | Limit: interruptions are injected, not process kills; no power-loss test.
 

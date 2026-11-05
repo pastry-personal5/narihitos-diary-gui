@@ -2,7 +2,7 @@
 
 Status: Done
 
-Implementation plan for the [P1-M6 overview](milestone-06-authentic-persistence-overview.md). It follows the [persistence](../architecture/domain-and-persistence.md) and [API](../architecture/api-and-processes.md) contracts and the inward dependency rule of [architecture](../architecture.md). Each task ends with passing tests and one commit. Run affected tests while iterating and the full gate once at the end.
+Implementation plan for the [P1-M6 overview](milestone-06-authentic-persistence-overview.md). It follows the [persistence](../../../architecture/domain-and-persistence.md) and [API](../../../architecture/api-and-processes.md) contracts and the inward dependency rule of [architecture](../../../architecture.md). Each task ends with passing tests and one commit. Run affected tests while iterating and the full gate once at the end.
 
 ## Placement
 
@@ -18,7 +18,7 @@ The current `Workspace` owns the ledger; the store borrows it, so a save and its
 
 ## Owner decisions (A01)
 
-Answered 2026-11-05 and to be copied to the [changelog](changelog.md).
+Answered 2026-11-05 and to be copied to the [changelog](../../../phase-1/changelog.md).
 
 | #   | Decision                                                                                                                         |
 | --- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -47,7 +47,7 @@ This list overrides the tasks below.
 
 ### Task 0: Questions and contract amendments
 
-Record the Q1–Q4 decisions in the [changelog](changelog.md). Pin `notify`, `objc2` and `objc2-foundation` exactly, record versions, features and licences from `cargo tree`/lock inspection, regenerate the notices as in P1-M5, and amend the persistence doc where the plan departs (`diary_timezone` capture, the refresh route, mandatory coordinated access). Docs and manifests only; stop here if a licence is incompatible with Apache-2.0.
+Record the Q1–Q4 decisions in the [changelog](../../../phase-1/changelog.md). Pin `notify`, `objc2` and `objc2-foundation` exactly, record versions, features and licences from `cargo tree`/lock inspection, regenerate the notices as in P1-M5, and amend the persistence doc where the plan departs (`diary_timezone` capture, the refresh route, mandatory coordinated access). Docs and manifests only; stop here if a licence is incompatible with Apache-2.0.
 
 ### Task 1: Canonical format (domain)
 

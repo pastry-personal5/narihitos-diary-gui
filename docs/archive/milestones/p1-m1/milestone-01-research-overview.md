@@ -3,7 +3,7 @@
 Status: Done
 Goal: Produce evidence and explicit open questions for architecture decisions in P1-M2. Documentation research covers R1–R14; verification gaps and owner questions remain explicit blockers on dependent decisions.
 
-Sources: owner's initial ideas (`tmp/initial-owner-ideas.md`, untracked) and the owner notes recorded in [R5 findings](../research/agent-assisted-diary-composition.md). The working baseline below preserves the relevant intent for readers without the local ideas file. Exempt from the code gate; documentation review still applies; see [development-process.md](../development-process.md#definition-of-done).
+Sources: owner's initial ideas (`tmp/initial-owner-ideas.md`, untracked) and the owner notes recorded in [R5 findings](../../../research/agent-assisted-diary-composition.md). The working baseline below preserves the relevant intent for readers without the local ideas file. Exempt from the code gate; documentation review still applies; see [development-process.md](../../../development-process.md#definition-of-done).
 
 ## Scope
 
@@ -17,8 +17,8 @@ Out: architecture decisions (P1-M2), code, and scaffolding (P1-M3). Start with s
 - The intended flow is local date selection → import snippets for D-1/D/D+1 → select snippets → generate candidates → edit the Authentic file → optionally export. The owner clarified that Authentic draft and Authentic Entry are one autosaved file; candidates are transient. Do not introduce a separate draft-to-Entry promotion or separate persistence copies.
 - Owner clarification: source edit/save is explicit; source snippet plus related audio deletion is an explicit, confirmed action in the Explorer tree. Markdown-only import does not remove the need to validate related-audio ownership during deletion. Import captures the system timezone; saved Entry dates stay fixed.
 - R5 records an owner requirement for Codex, Claude Code, and Qwen Code profiles, selected per chat session and per generation. Its proposed configuration and one-shot adapter approach remain research recommendations until P1-M2.
-- [product-behavior.md](../product-behavior.md), [ux-gui.md](../ux-gui.md), [ux-terms.md](../ux-terms.md), and [ux-information-architecture.md](../ux-information-architecture.md) currently contain `TBD` placeholders. They cannot yet settle product or interaction questions. R12 must identify the owner confirmations needed to make them useful; this review does not fill them with invented behavior.
-- The owner confirmed Phase 1 delivers v1.0.0; see the updated [phase plan](phase-1.md). Research → Architecture → Scaffolding remain first, followed by feature/release milestones to be planned.
+- [product-behavior.md](../../../product-behavior.md), [ux-gui.md](../../../ux-gui.md), [ux-terms.md](../../../ux-terms.md), and [ux-information-architecture.md](../../../ux-information-architecture.md) currently contain `TBD` placeholders. They cannot yet settle product or interaction questions. R12 must identify the owner confirmations needed to make them useful; this review does not fill them with invented behavior.
+- The owner confirmed Phase 1 delivers v1.0.0; see the updated [phase plan](../../../phase-1/phase-1.md). Research → Architecture → Scaffolding remain first, followed by feature/release milestones to be planned.
 
 ## Review completion checklist (this plan revision)
 
@@ -79,7 +79,7 @@ Priority controls sequencing, not permission to skip an unanswered dependency. A
 - R5.4 Compare adapter interfaces for the recorded three-agent, per-use selection requirement. Separate common capabilities from provider-specific ones and identify compatibility checks; the interface itself is decided in P1-M2.
 - R5.5 Failure and cost handling: missing CLI, expired login, timeouts.
 
-Existing evidence: [R5 findings](../research/agent-assisted-diary-composition.md) covers R5.1–R5.5, with recommendations and unverified claims. No live model turn was run. Follow up on tools/MCP disablement, session persistence, auth probes that might incur cost, schema-constrained output, and cancellation of descendants. Cross-reference R13; a read-only sandbox or empty working directory alone does not establish confidentiality. Keep this item partial until the evidence gaps are verified or explicitly block the dependent decision.
+Existing evidence: [R5 findings](../../../research/agent-assisted-diary-composition.md) covers R5.1–R5.5, with recommendations and unverified claims. No live model turn was run. Follow up on tools/MCP disablement, session persistence, auth probes that might incur cost, schema-constrained output, and cancellation of descendants. Cross-reference R13; a read-only sandbox or empty working directory alone does not establish confidentiality. Keep this item partial until the evidence gaps are verified or explicitly block the dependent decision.
 
 ### R6. Export targets (B)
 
@@ -97,7 +97,7 @@ Existing evidence: [R5 findings](../research/agent-assisted-diary-composition.md
 - R7.4 Calendar component (Date tab) build vs. library; accessibility.
 - R7.5 Explorer tree with checkboxes (Snippet tab) and tab content patterns; state management choice.
 - R7.6 UI test approach with Vitest for the above.
-- R7.7 Alignment of the ideas with [ux-gui.md](../ux-gui.md), [ux-terms.md](../ux-terms.md), and [ux-information-architecture.md](../ux-information-architecture.md); list conflicts for the owner.
+- R7.7 Alignment of the ideas with [ux-gui.md](../../../ux-gui.md), [ux-terms.md](../../../ux-terms.md), and [ux-information-architecture.md](../../../ux-information-architecture.md); list conflicts for the owner.
 - R7.8 Keyboard-only navigation, focus restoration, VoiceOver, IME composition, and large snippet trees/long documents. Record measurable scenarios for P1-M3 and feature milestones rather than choosing arbitrary performance thresholds here.
 
 ### R8. Date and time (A)
@@ -158,20 +158,20 @@ Each findings document must identify covered subitem IDs, research date and insp
 
 | Items                             | Evidence                                                                                | Remaining work                                                                                                                        |
 | --------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| R1.1–R1.6, R2.1–R2.4              | [Sources/prior art](../research/source-formats-and-prior-art.md)                        | Producer coverage limits and import/revision policy remain explicit. Source-write interoperability needs verification.                |
-| R3.1–R3.8, R12.1–R12.4            | [Storage/lifecycle](../research/storage-and-asset-lifecycle.md)                         | Compare engines and choose identity/recovery contracts in P1-M2; pending-save/adoption semantics need owner decisions.                |
-| R4.1–R4.6, R14.1–R14.3            | [Tauri/macOS/validation](../research/tauri-macos-and-validation.md), partial            | Packaged access/process feasibility and distribution requirements remain unverified.                                                  |
-| R5.1–R5.5                         | [Agent findings](../research/agent-assisted-diary-composition.md), partial              | Live schema/confinement/persistence evidence still missing; dependent claims blocked.                                                 |
-| R6.1–R6.5, R9.1–R9.5, R11.1–R11.2 | [Export/config/versioning](../research/export-config-and-versioning.md)                 | Export hierarchy/config discovery/secret strategy need decisions; real service/platform behavior not exercised.                       |
-| R7.1–R7.8, R10.1–R10.3            | [Frontend/licensing](../research/frontend-and-licensing.md), partial                    | Inspected SF Symbols license does not clear bitmap bundling; canonical UX docs and packaged accessibility evidence remain incomplete. |
-| R8.1–R8.3                         | [Date/time](../research/date-and-time.md)                                               | Capture import zone and preserve Entry date confirmed; choose library and ambiguity policy in P1-M2.                                  |
-| R13.1–R13.4                       | [Trust/source mutations](../research/trust-boundaries-and-source-mutations.md), partial | Verify effective tool/config restrictions and source-pair operations before dependent decisions/features.                             |
+| R1.1–R1.6, R2.1–R2.4              | [Sources/prior art](../../../research/source-formats-and-prior-art.md)                        | Producer coverage limits and import/revision policy remain explicit. Source-write interoperability needs verification.                |
+| R3.1–R3.8, R12.1–R12.4            | [Storage/lifecycle](../../../research/storage-and-asset-lifecycle.md)                         | Compare engines and choose identity/recovery contracts in P1-M2; pending-save/adoption semantics need owner decisions.                |
+| R4.1–R4.6, R14.1–R14.3            | [Tauri/macOS/validation](../../../research/tauri-macos-and-validation.md), partial            | Packaged access/process feasibility and distribution requirements remain unverified.                                                  |
+| R5.1–R5.5                         | [Agent findings](../../../research/agent-assisted-diary-composition.md), partial              | Live schema/confinement/persistence evidence still missing; dependent claims blocked.                                                 |
+| R6.1–R6.5, R9.1–R9.5, R11.1–R11.2 | [Export/config/versioning](../../../research/export-config-and-versioning.md)                 | Export hierarchy/config discovery/secret strategy need decisions; real service/platform behavior not exercised.                       |
+| R7.1–R7.8, R10.1–R10.3            | [Frontend/licensing](../../../research/frontend-and-licensing.md), partial                    | Inspected SF Symbols license does not clear bitmap bundling; canonical UX docs and packaged accessibility evidence remain incomplete. |
+| R8.1–R8.3                         | [Date/time](../../../research/date-and-time.md)                                               | Capture import zone and preserve Entry date confirmed; choose library and ambiguity policy in P1-M2.                                  |
+| R13.1–R13.4                       | [Trust/source mutations](../../../research/trust-boundaries-and-source-mutations.md), partial | Verify effective tool/config restrictions and source-pair operations before dependent decisions/features.                             |
 
 Split rows as findings arrive. A deferral must name its subitem IDs, reason, destination milestone, and consequence for P1-M2. Do not mark a partial item complete merely because a findings document exists.
 
 ## Open questions for the owner
 
-These are pending decisions, not assumptions authorizing implementation. Carry unresolved architecture blockers to "Undecided" in [AGENTS.md](../../AGENTS.md) before the P1-M2 handoff.
+These are pending decisions, not assumptions authorizing implementation. Carry unresolved architecture blockers to "Undecided" in [AGENTS.md](../../../../AGENTS.md) before the P1-M2 handoff.
 
 - R1/R12: Explicit source edit/save and confirmed snippet-plus-related-audio deletion are approved. What happens when an imported snippet changes or reappears, and should it remain visible on later imports?
 - R1: Markdown-only import is stated in the ideas. Should embedded asset links and audio/location/weather front matter be preserved, displayed, or omitted? Future audio support need not be decided to finish v1 research.
@@ -184,29 +184,29 @@ These are pending decisions, not assumptions authorizing implementation. Carry u
 
 ## P1-M2 handoff
 
-Owner decisions: Phase 1 delivers v1.0.0; Authentic draft/Entry are one autosaved file; source edit/save is explicit and snippet-plus-related-audio deletion requires an explicit Explorer action and confirmation; import captures the system timezone and preserves saved Entry dates. See [product behavior](../product-behavior.md) and [changelog](changelog.md).
+Owner decisions: Phase 1 delivers v1.0.0; Authentic draft/Entry are one autosaved file; source edit/save is explicit and snippet-plus-related-audio deletion requires an explicit Explorer action and confirmation; import captures the system timezone and preserves saved Entry dates. See [product behavior](../../../product-behavior.md) and [changelog](../../../phase-1/changelog.md).
 
 Recommended decision order:
 
 1. Resolve asset/source identity, re-import conflicts, candidate adoption, and autosave/history semantics. Record the actual UX contracts rather than building from the placeholder docs.
-2. Settle distribution/access feasibility and CLI auth/confinement. The bounded checks in [Tauri findings](../research/tauri-macos-and-validation.md) and [trust findings](../research/trust-boundaries-and-source-mutations.md) block claims about those capabilities until executed; reading docs did not verify runtime enforcement.
+2. Settle distribution/access feasibility and CLI auth/confinement. The bounded checks in [Tauri findings](../../../research/tauri-macos-and-validation.md) and [trust findings](../../../research/trust-boundaries-and-source-mutations.md) block claims about those capabilities until executed; reading docs did not verify runtime enforcement.
 3. Select file schema/layout, timezone library, history engine, catalog/durable-state boundaries, source-mutation recovery, and typed Tauri command/channel contracts.
 4. Select installed config discovery/secret handling, Notion hierarchy/reconciliation, minimal frontend dependencies, and version metadata. Obtain dependency/tool approval before changing the build.
 5. Define P1-M3 scaffold evidence and add later feature/release milestones for v1.0.0. The inspected SF Symbols terms leave bitmap bundling uncleared, which blocks that asset route, not a text-labeled scaffold. Native/real-service tests belong in the corresponding implementation acceptance criteria; do not claim them passed from this documentation research.
 
-All fourteen groups have written findings; this is not a claim that every feasibility question is settled. No numbered subitem has silently been deferred. Remaining owner choices are in [AGENTS.md](../../AGENTS.md#undecided--ask-before-inventing); remaining experimental gaps are explicit in the findings register. P1-M1 closes as documentation research with those blockers retained; closure does not certify unexecuted feasibility checks or authorize the blocked implementation.
+All fourteen groups have written findings; this is not a claim that every feasibility question is settled. No numbered subitem has silently been deferred. Remaining owner choices are in [AGENTS.md](../../../../AGENTS.md#undecided--ask-before-inventing); remaining experimental gaps are explicit in the findings register. P1-M1 closes as documentation research with those blockers retained; closure does not certify unexecuted feasibility checks or authorize the blocked implementation.
 
 ## Milestone completion checklist
 
 - [x] Every numbered subitem under R1–R14 is covered by findings or an explicit nonblocking deferral in the findings register.
-- [x] Findings are linked from this doc and indexed in [docs/README.md](../README.md).
+- [x] Findings are linked from this doc and indexed in [docs/README.md](../../../README.md).
 - [x] Findings identify sources, versions/dates, alternatives, and verification limits; recommendations are distinguishable from decisions.
 - [x] Each item that affects P1-M2 has an "implication for architecture" and identifies its dependent decision.
 - [x] Architecture-blocking feasibility gaps are verified, or explicitly listed as blockers preventing the dependent P1-M2 decision; any proposed spike has a question, bounded scope, and destination milestone.
-- [x] Open questions are answered with owner evidence or moved to "Undecided" in [AGENTS.md](../../AGENTS.md); blocking questions remain visibly blocking even if this research milestone closes.
-- [x] Product/UX placeholder gaps and contradictions are listed with their disposition in [changelog.md](changelog.md); no unapproved behavior is treated as settled.
+- [x] Open questions are answered with owner evidence or moved to "Undecided" in [AGENTS.md](../../../../AGENTS.md); blocking questions remain visibly blocking even if this research milestone closes.
+- [x] Product/UX placeholder gaps and contradictions are listed with their disposition in [changelog.md](../../../phase-1/changelog.md); no unapproved behavior is treated as settled.
 - [x] A P1-M2 handoff lists recommendations, deferred subitems with destinations, unresolved blockers, and the order in which decisions can safely proceed.
 - [x] Documentation links and whitespace are checked; the recorded docs-only gate exemption is preserved without claiming the code gate passed.
-- [x] [phase-1.md](phase-1.md) status for P1-M1 updated.
+- [x] [phase-1.md](../../../phase-1/phase-1.md) status for P1-M1 updated.
 
 Acceptance evidence (2026-11-05): all 66 subitems are mapped in the findings register; eight findings documents are indexed, with explicit implications, alternatives, and limits. Owner clarifications are recorded in product behavior/changelog; unresolved decisions are carried in AGENTS.md. Local-link/anchor, subitem-coverage, and whitespace checks passed. Synthetic sample/date checks and CLI/toolchain inspection are documented in the findings. No code gate, live inference, service write, source mutation, or app runtime test was run; the docs-only exemption and blocked capability claims remain explicit.

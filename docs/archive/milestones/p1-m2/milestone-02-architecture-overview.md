@@ -6,7 +6,7 @@ Completed the Clean Architecture design in [the maintained overview](../../../ar
 
 ## Inputs and scope
 
-Read the [owner decisions](../../../phase-1/milestone-02-owner-decisions.md), [research handoff](../../../phase-1/milestone-01-research-overview.md#p1-m2-handoff), and relevant linked findings before designing dependent behavior. Follow the [architecture work plan](milestone-02-architecture-architecture.md).
+Read the [owner decisions](../../../phase-1/milestone-02-owner-decisions.md), [research handoff](../../../archive/milestones/p1-m1/milestone-01-research-overview.md#p1-m2-handoff), and relevant linked findings before designing dependent behavior. Follow the [architecture work plan](milestone-02-architecture-architecture.md).
 
 In scope: process/layer boundaries, domain and storage models, APIs/events, frontend ownership, source operations, agents, config, exports, recovery, trust boundaries, and implementation acceptance requirements. Write a reusable overall design with future MCP/web transport seams, while keeping v1 local and personal.
 

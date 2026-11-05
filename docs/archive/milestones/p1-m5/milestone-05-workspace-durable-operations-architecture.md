@@ -2,7 +2,7 @@
 
 Status: Done
 
-Implementation plan for the [P1-M5 overview](milestone-05-workspace-durable-operations-overview.md). It follows the [persistence](../architecture/domain-and-persistence.md) and [API](../architecture/api-and-processes.md) contracts and keeps the inward dependency rule of [architecture](../architecture.md). Each task ends with tests that pass and one commit. Run the affected tests while iterating and the full gate once at the end.
+Implementation plan for the [P1-M5 overview](milestone-05-workspace-durable-operations-overview.md). It follows the [persistence](../../../architecture/domain-and-persistence.md) and [API](../../../architecture/api-and-processes.md) contracts and keeps the inward dependency rule of [architecture](../../../architecture.md). Each task ends with tests that pass and one commit. Run the affected tests while iterating and the full gate once at the end.
 
 ## Placement
 
@@ -17,7 +17,7 @@ Implementation plan for the [P1-M5 overview](milestone-05-workspace-durable-oper
 
 ## Departures made during implementation
 
-Recorded in the [changelog](changelog.md); the tasks below describe the intent, this list overrides them.
+Recorded in the [changelog](../../../phase-1/changelog.md); the tasks below describe the intent, this list overrides them.
 
 - **One mutex-guarded connection, not a worker thread.** `Db::with`/`transact` serialize every call, which is what the contract requires; async callers use `spawn_blocking`. Upgrade to a thread only if a measured need appears.
 - **Reservations are derived from the ledger (Task 5).** No separate `Reservations` trait or in-memory map: the keys of unfinished operations live in `operation_resources`, are checked in the admitting transaction, fail fast as `Reserved`, and are released by `finish`. This is durable by construction and cannot deadlock because nothing waits.

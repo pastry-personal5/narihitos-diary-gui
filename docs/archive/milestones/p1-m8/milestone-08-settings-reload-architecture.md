@@ -2,7 +2,7 @@
 
 Status: Done
 
-Implementation plan for the [P1-M8 overview](milestone-08-settings-reload-overview.md). It follows [user settings](../architecture/user-settings.md), the [configuration contract](../architecture/configuration-and-exports.md#configuration-schema-and-validation) and the inward dependency rule of [architecture](../architecture.md). Each task ends with passing tests and one commit. Run affected tests while iterating and the full gate once at the end.
+Implementation plan for the [P1-M8 overview](milestone-08-settings-reload-overview.md). It follows [user settings](../../../architecture/user-settings.md), the [configuration contract](../../../architecture/configuration-and-exports.md#configuration-schema-and-validation) and the inward dependency rule of [architecture](../../../architecture.md). Each task ends with passing tests and one commit. Run affected tests while iterating and the full gate once at the end.
 
 ## Placement
 
@@ -18,7 +18,7 @@ Implementation plan for the [P1-M8 overview](milestone-08-settings-reload-overvi
 
 ## Owner decisions
 
-Answered 2026-11-05 and recorded in the [changelog](changelog.md).
+Answered 2026-11-05 and recorded in the [changelog](../../../phase-1/changelog.md).
 
 1. **Digest:** add the already-pinned `sha2 =0.11.1` to `diary-client` (approved; already in the notices as a `diary-infrastructure` dependency).
 2. **Preferred language:** the WebView sends `navigator.languages`; Rust validates it as untrusted data. No `objc2` change.

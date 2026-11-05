@@ -10,7 +10,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 - Research findings are written down and linked from the milestone plans.
 - The architecture is documented and any related "Undecided" items in [AGENTS.md](../../AGENTS.md) are resolved.
 - The Tauri 2 + React + CodeMirror 6 scaffold builds, runs, and passes the full gate.
-- The owner-confirmed v1 Diary workflows from [the research baseline](milestone-01-research-overview.md#working-baseline-and-decision-boundaries) are implemented and verified, with affected product/UX docs completed.
+- The owner-confirmed v1 Diary workflows from [the research baseline](../archive/milestones/p1-m1/milestone-01-research-overview.md#working-baseline-and-decision-boundaries) are implemented and verified, with affected product/UX docs completed.
 - The macOS v1.0.0 release meets the installation/distribution criteria agreed after R14 research. Feature and release milestone checklists must be added before that work begins.
 
 ## Milestones
@@ -21,7 +21,7 @@ This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level m
 
 Status: Done
 Goal: Gather the knowledge needed to make sound architecture decisions.
-Plan: [overview](milestone-01-research-overview.md), including research sequence and evidence requirements.
+Plan: [overview](../archive/milestones/p1-m1/milestone-01-research-overview.md), including research sequence and evidence requirements.
 Notes: Documentation research and its checklist are complete under the docs-only exemption. The overview carries unresolved owner choices and unexecuted feasibility checks into P1-M2 as blockers on dependent decisions, not established capabilities.
 
 ### P1-M2: Architecture
@@ -49,27 +49,27 @@ Notes: Includes the owner-requested agent-debugging trace to redacted resource d
 
 Status: Done
 Goal: Establish locked workspace initialization, versioned SQLite authority, durable operation/step identities, resource reservations and startup recovery classification.
-Plan: [overview](milestone-05-workspace-durable-operations-overview.md), [work plan](milestone-05-workspace-durable-operations-architecture.md).
+Plan: [overview](../archive/milestones/p1-m5/milestone-05-workspace-durable-operations-overview.md), [work plan](../archive/milestones/p1-m5/milestone-05-workspace-durable-operations-architecture.md).
 Notes: `rusqlite` approved 2026-11-05.
 
 ### P1-M6: Authentic persistence and recovery
 
 Status: Done
 Goal: Implement canonical Authentic Markdown, guarded durable saves and empty-file creation, saved-date catalogs, external-change detection and interrupted-save recovery.
-Plan: [overview](milestone-06-authentic-persistence-overview.md), [work plan](milestone-06-authentic-persistence-architecture.md).
+Plan: [overview](../archive/milestones/p1-m6/milestone-06-authentic-persistence-overview.md), [work plan](../archive/milestones/p1-m6/milestone-06-authentic-persistence-architecture.md).
 Notes: `notify`, `objc2` and `objc2-foundation` approved 2026-11-05; Authentic Tauri commands move to P1-M7.
 
 ### P1-M7: Authentic editing and autosave
 
 Status: Done
 Goal: Connect one shared Draft/Entry buffer to ordered IME-aware autosave, Create Empty, acknowledged save feedback and guarded date/close transitions.
-Plan: [overview](milestone-07-authentic-editing-overview.md), [work plan](milestone-07-authentic-editing-architecture.md).
+Plan: [overview](../archive/milestones/p1-m7/milestone-07-authentic-editing-overview.md), [work plan](../archive/milestones/p1-m7/milestone-07-authentic-editing-architecture.md).
 
 ### P1-M8: Settings and configuration reload
 
 Status: Done
 Goal: Add guarded client-owned preferences, persistent Writing Language and redacted Settings status with explicit validated server-config reload.
-Plan: [overview](milestone-08-settings-reload-overview.md), [work plan](milestone-08-settings-reload-architecture.md).
+Plan: [overview](../archive/milestones/p1-m8/milestone-08-settings-reload-overview.md), [work plan](../archive/milestones/p1-m8/milestone-08-settings-reload-architecture.md).
 
 ### P1-M9: Source identity and reading
 

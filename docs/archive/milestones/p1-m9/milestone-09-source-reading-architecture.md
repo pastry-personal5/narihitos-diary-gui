@@ -13,7 +13,7 @@ Implementation plan for the [P1-M9 overview](milestone-09-source-reading-overvie
 | Infrastructure | `diary-infrastructure/src/source/` (new)         | Root resolver, volume probe, bounded no-follow reader, Ayumi/Narihito adapters, scanner; reuses `SourceKind` from `config.rs` |
 | Server/API     | none                                             | Exposure is deferred (O2)                                                                                                     |
 
-Domain code stays free of YAML libraries, as for Authentic ([M6](../../../phase-1/milestone-06-authentic-persistence-architecture.md)): a closed line grammar rejects duplicate keys, aliases, tags and nesting by construction. Nothing here writes to a source. `diary-infrastructure` already depends on `sha2`, `libc` and `objc2-foundation` (with `NSString`); no other dependency is needed except O1.
+Domain code stays free of YAML libraries, as for Authentic ([M6](../../../archive/milestones/p1-m6/milestone-06-authentic-persistence-architecture.md)): a closed line grammar rejects duplicate keys, aliases, tags and nesting by construction. Nothing here writes to a source. `diary-infrastructure` already depends on `sha2`, `libc` and `objc2-foundation` (with `NSString`); no other dependency is needed except O1.
 
 ## Owner decisions needed
 

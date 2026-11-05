@@ -2,7 +2,7 @@
 
 Status: Done
 
-Implement canonical Authentic Markdown, guarded durable saves, server-side Create Empty, the saved-date catalog, external-change detection and interrupted-save recovery from the [persistence contract](../architecture/domain-and-persistence.md#autosave-protocol) on top of the P1-M5 ledger. The work plan is [milestone-06-authentic-persistence-architecture.md](milestone-06-authentic-persistence-architecture.md). The editor, autosave queue and any visible UI are P1-M7.
+Implement canonical Authentic Markdown, guarded durable saves, server-side Create Empty, the saved-date catalog, external-change detection and interrupted-save recovery from the [persistence contract](../../../architecture/domain-and-persistence.md#autosave-protocol) on top of the P1-M5 ledger. The work plan is [milestone-06-authentic-persistence-architecture.md](milestone-06-authentic-persistence-architecture.md). The editor, autosave queue and any visible UI are P1-M7.
 
 ## Entry conditions
 
@@ -52,7 +52,7 @@ Check an item only with a linked result naming the tested revision, command, obs
 
 Working tree on top of `2d0ba9f`, branch `main`, Apple Silicon macOS (APFS temp volume), 2026-11-05. Test runs went through the test-runner. Departures from the plan are in the [work plan](milestone-06-authentic-persistence-architecture.md#departures-made-during-implementation).
 
-A01 | Owner interview answers (this session) and [changelog](changelog.md); `notify =8.2.0` (CC0-1.0, FSEvents only), `objc2 =0.6.5`, `objc2-foundation =0.3.2` (MIT) and `block2 =0.6.2` (MIT, already a transitive dependency of `objc2-foundation`, now direct because the accessor block is built here); `fetch` pulled the all-platform crates so `collect-notices.py` could regenerate the inventory (+7 notice files) | `block2` as a direct dependency was not named in the interview.
+A01 | Owner interview answers (this session) and [changelog](../../../phase-1/changelog.md); `notify =8.2.0` (CC0-1.0, FSEvents only), `objc2 =0.6.5`, `objc2-foundation =0.3.2` (MIT) and `block2 =0.6.2` (MIT, already a transitive dependency of `objc2-foundation`, now direct because the accessor block is built here); `fetch` pulled the all-platform crates so `collect-notices.py` could regenerate the inventory (+7 notice files) | `block2` as a direct dependency was not named in the interview.
 
 A02–A03 | `diary-domain` `authentic/tests.rs` (9): golden round trip, unicode, scalar extensions, 13 unsupported-YAML shapes, BOM/CR/UTF-8/schema/date/kind/revision rejections, field order, 1 MiB boundary, Gregorian dates | pass | Limit: the header grammar is hand-written and deliberately closed (see departures); files written by other tools with different quoting are rejected, not repaired.
 

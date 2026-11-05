@@ -2,7 +2,7 @@
 
 Status: Done
 
-Implementation plan for the [P1-M7 overview](milestone-07-authentic-editing-overview.md). It follows the [autosave protocol](../architecture/domain-and-persistence.md#autosave-protocol), the [API contract](../architecture/api-and-processes.md) and the inward dependency rule of [architecture](../architecture.md). Each task ends with passing tests and one commit. Run affected tests while iterating and the full gate once at the end.
+Implementation plan for the [P1-M7 overview](milestone-07-authentic-editing-overview.md). It follows the [autosave protocol](../../../architecture/domain-and-persistence.md#autosave-protocol), the [API contract](../../../architecture/api-and-processes.md) and the inward dependency rule of [architecture](../../../architecture.md). Each task ends with passing tests and one commit. Run affected tests while iterating and the full gate once at the end.
 
 ## Placement
 
@@ -17,7 +17,7 @@ Implementation plan for the [P1-M7 overview](milestone-07-authentic-editing-over
 
 ## Owner decisions
 
-Answered 2026-11-05 and recorded in the [changelog](changelog.md).
+Answered 2026-11-05 and recorded in the [changelog](../../../phase-1/changelog.md).
 
 1. **Watcher event:** add payload-free `authentic_changed` and start the P1-M6 watcher now.
 2. **Own writes:** the client ignores a reload that returns the revision it already acknowledged; no server suppression.

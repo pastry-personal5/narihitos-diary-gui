@@ -2,7 +2,7 @@
 
 Status: Active (P1-M1 research item R5; findings only, no architecture decision)
 
-Research date: 2026-11-05. v1 supports three agent CLIs: Codex, Claude Code, and Qwen Code. Findings come from the installed `codex-cli` 0.166.0, `claude` 2.1.318, and `qwen` 0.26.4 (their `--help` output, the Codex JSON Schema from `codex app-server generate-json-schema`, and two small local checks of per-profile config directories), plus vendor docs. No live model turn was run. This doc answers R5.1 to R5.5 in [the P1-M1 overview](../phase-1/milestone-01-research-overview.md); P1-M2 decides.
+Research date: 2026-11-05. v1 supports three agent CLIs: Codex, Claude Code, and Qwen Code. Findings come from the installed `codex-cli` 0.166.0, `claude` 2.1.318, and `qwen` 0.26.4 (their `--help` output, the Codex JSON Schema from `codex app-server generate-json-schema`, and two small local checks of per-profile config directories), plus vendor docs. No live model turn was run. This doc answers R5.1 to R5.5 in [the P1-M1 overview](../archive/milestones/p1-m1/milestone-01-research-overview.md); P1-M2 decides.
 
 ## Verification update (2026-11-05)
 
