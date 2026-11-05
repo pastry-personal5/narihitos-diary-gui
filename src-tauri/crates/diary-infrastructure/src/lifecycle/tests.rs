@@ -29,13 +29,44 @@ fn os_lock_excludes_second_owner_and_releases_on_drop() {
 }
 
 #[test]
-fn uninitialized_workspace_is_not_modified() {
+fn empty_root_gets_a_private_lock_tree() {
     let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    let lock = WorkspaceLock::acquire(&root).unwrap();
+    let mode = |p: &str| fs::metadata(root.join(p)).unwrap().permissions().mode() & 0o7777;
+    assert_eq!(
+        (mode(".diary"), mode(".diary/workspace.lock")),
+        (0o700, 0o600)
+    );
     assert!(matches!(
-        WorkspaceLock::acquire(&temp.path().canonicalize().unwrap()),
-        Err(LifecycleError::WorkspaceUnavailable)
+        WorkspaceLock::acquire(&root),
+        Err(LifecycleError::WorkspaceBusy)
     ));
-    assert_eq!(fs::read_dir(temp.path()).unwrap().count(), 0);
+    drop(lock);
+}
+
+#[test]
+fn nonempty_root_without_diary_is_not_modified() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    fs::write(root.join("notes.md"), "mine").unwrap();
+    assert!(matches!(
+        WorkspaceLock::acquire(&root),
+        Err(LifecycleError::RootNotEmpty)
+    ));
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+}
+
+#[test]
+fn symlinked_diary_directory_is_refused() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    let elsewhere = root.join("elsewhere");
+    fs::create_dir(&elsewhere).unwrap();
+    fs::set_permissions(&elsewhere, fs::Permissions::from_mode(0o700)).unwrap();
+    std::os::unix::fs::symlink(&elsewhere, root.join(".diary")).unwrap();
+    assert!(WorkspaceLock::acquire(&root).is_err());
+    assert_eq!(fs::read_dir(&elsewhere).unwrap().count(), 0);
 }
 
 #[test]

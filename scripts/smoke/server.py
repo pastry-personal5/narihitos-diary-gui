@@ -14,11 +14,9 @@ binary = Path('src-tauri/target/debug/diary-server').resolve()
 with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
     base = Path(temporary).resolve()
     workspace, runtime = base / 'workspace', base / 'runtime'
-    for folder in [base, workspace, workspace / '.diary', runtime]:
+    for folder in [base, workspace, runtime]:
         folder.mkdir(exist_ok=True, mode=0o700)
         folder.chmod(0o700)
-    lock = workspace / '.diary/workspace.lock'
-    lock.touch(mode=0o600)
     readable, denied = base / 'readable-source', base / 'denied-source'
     for folder in [readable, denied]:
         folder.mkdir(mode=0o700)
@@ -63,10 +61,22 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
         except urllib.error.URLError:
             return 0, None
     try:
+        # P1-M5: a non-empty folder without .diary is refused untouched (before any initialization).
+        occupied = base / 'occupied'
+        occupied.mkdir(mode=0o700)
+        (occupied / 'notes.md').write_text('existing notes')
+        bad = base / 'bad.yaml'
+        bad.write_text(config.read_text().replace(str(workspace), str(occupied)))
+        bad.chmod(0o600)
+        refused = subprocess.run([str(binary), '--config', str(bad)], capture_output=True, text=True, timeout=5)
+        assert refused.returncode != 0 and 'inspect' in refused.stderr
+        assert sorted(p.name for p in occupied.iterdir()) == ['notes.md']
+        assert not workspace.joinpath('.diary').exists()
         first, discovery, record = start()
+        marker_bytes = (workspace / '.diary/workspace.json').read_bytes()
         assert call(record, '/status', authorized=False, trace=TRACE)[0] == 401
         code, status = call(record, '/status')
-        assert code == 200 and status['instance_id'] == record['instance_id'] and status['storage_ready'] is False
+        assert code == 200 and status['instance_id'] == record['instance_id'] and status['storage_ready'] is True
         code, lease = call(record, '/sessions', 'POST', {})
         assert code == 200
         session = lease['session_id']
@@ -153,8 +163,26 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
         restarted.send_signal(signal.SIGINT)
         restarted.wait(timeout=3)
         assert restarted.returncode == 0 and not discovery.exists()
-        # P1-M4 diagnostics: private logs, no seeded secret in any log or trace, redacted trace.
+        # P1-M5: private workspace tree, stable identity across restarts, no credential in it.
         mode = lambda path: path.stat().st_mode & 0o7777
+        assert mode(workspace / '.diary') == 0o700
+        for name in ['workspace.json', 'workspace.lock', 'state.sqlite3']:
+            assert mode(workspace / '.diary' / name) == 0o600, name
+        assert (workspace / '.diary/workspace.json').read_bytes() == marker_bytes
+        assert not any(token.encode() in marker_bytes for token in tokens)
+        assert not (workspace / '.diary/workspace.json.tmp').exists()
+        # P1-M5 recovery: a lost database starts read-only and is never recreated.
+        for name in ['state.sqlite3', 'state.sqlite3-wal', 'state.sqlite3-shm']:
+            (workspace / '.diary' / name).unlink(missing_ok=True)
+        lost, lost_discovery, lost_record = start()
+        code, status = call(lost_record, '/status')
+        assert code == 200 and status['storage_ready'] is False
+        assert not (workspace / '.diary/state.sqlite3').exists(), 'recovery recreated the ledger'
+        assert (workspace / '.diary/workspace.json').read_bytes() == marker_bytes
+        lost.send_signal(signal.SIGINT)
+        lost.wait(timeout=3)
+        assert lost.returncode == 0 and not lost_discovery.exists()
+        # P1-M4 diagnostics: private logs, no seeded secret in any log or trace, redacted trace.
         server_logs = list(runtime.glob('*/logs/server'))
         assert len(server_logs) == 1, 'missing server log directory'
         assert mode(server_logs[0].parent) == 0o700 and mode(server_logs[0]) == 0o700
@@ -164,7 +192,7 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
         assert tokens and not any(token in log_text for token in tokens), 'token leaked into the log'
         assert 'synthetic scaffold sentinel' not in log_text
         codes = {json.loads(l)['code'] for l in log_text.splitlines()}
-        assert {'server.started', 'server.listener_bound', 'server.discovery_published', 'server.stopping', 'session.opened', 'session.closed', 'session.client_busy', 'http.auth_rejected'} <= codes, codes
+        assert {'server.started', 'workspace.opened', 'workspace.recovery', 'server.listener_bound', 'server.discovery_published', 'server.stopping', 'session.opened', 'session.closed', 'session.client_busy', 'http.auth_rejected'} <= codes, codes
         def trace(selector):
             done = subprocess.run([str(binary), 'trace', '--config', str(config), '--select', selector], capture_output=True, text=True, timeout=5)
             assert done.returncode == 0, done.stderr

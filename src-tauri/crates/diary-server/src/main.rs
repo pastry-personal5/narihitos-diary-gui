@@ -1,9 +1,13 @@
 #[cfg(feature = "scaffold-smoke")]
 mod native_smoke;
-use diary_application::diagnostics::{Diagnostics, EventCode, Level, OpaqueId, Record, Role};
+use diary_application::{
+    diagnostics::{Diagnostics, EventCode, Level, OpaqueId, Record, Role},
+    operations::{Class, Readiness},
+};
 use diary_infrastructure::{
     config,
-    lifecycle::{Discovery, PublishedDiscovery, WorkspaceLock, bind_loopback},
+    lifecycle::{Discovery, LifecycleError, PublishedDiscovery, WorkspaceLock, bind_loopback},
+    workspace::Workspace,
 };
 use diary_logging::{
     clock::SystemClock,
@@ -114,8 +118,15 @@ async fn run() -> Result<(), &'static str> {
         return Err("invalid arguments");
     }
     let config = config::load(&path).map_err(|_| "configuration rejected")?;
-    let lock = WorkspaceLock::acquire(&config.paths.entries_root)
-        .map_err(|_| "workspace unavailable or busy")?;
+    let lock = WorkspaceLock::acquire(&config.paths.entries_root).map_err(|e| match e {
+        LifecycleError::RootNotEmpty => {
+            "workspace folder has files but no .diary: inspect it first"
+        }
+        LifecycleError::WorkspaceBusy => "workspace busy",
+        _ => "workspace unavailable",
+    })?;
+    // Declared after the lock, so the database closes before the lock is released.
+    let workspace = Workspace::open(&lock).map_err(|_| "workspace unavailable")?;
     let listener = bind_loopback(config.server.port, config.server.port_fallback_count)
         .map_err(|_| "listener unavailable")?;
     let port = listener
@@ -135,6 +146,23 @@ async fn run() -> Result<(), &'static str> {
     );
     let _drain = Drain(diagnostics.clone());
     diagnostics.emit(Record::new(EventCode::ServerStarted, Level::Info));
+    let (code, level) = match workspace.readiness {
+        Readiness::Ready => (EventCode::WorkspaceOpened, Level::Info),
+        Readiness::InspectionRequired => (EventCode::WorkspaceInspection, Level::Warn),
+        Readiness::Recovery => (EventCode::WorkspaceRecovery, Level::Error),
+    };
+    diagnostics.emit(Record::new(code, level));
+    let blocked = workspace.classify().map_or(0, |c| {
+        c.iter()
+            .filter(|c| matches!(c.class, Class::Blocked(_)))
+            .count()
+    });
+    if blocked > 0 {
+        diagnostics.emit(
+            Record::new(EventCode::OperationBlocked, Level::Warn)
+                .count(u32::try_from(blocked).unwrap_or(u32::MAX)),
+        );
+    }
     diagnostics.emit(Record::new(EventCode::ListenerBound, Level::Info).count(u32::from(port)));
     let mut state = diary_api::ServerState::new(
         record.token.clone(),
@@ -144,6 +172,7 @@ async fn run() -> Result<(), &'static str> {
         development,
     );
     diary_api::ServerState::set_diagnostics(&mut state, diagnostics.clone());
+    diary_api::ServerState::set_storage_ready(&mut state, workspace.readiness == Readiness::Ready);
     let launch_path = std::env::var_os("PATH").unwrap_or_default();
     let launch_cwd = std::env::current_dir().map_err(|_| "launch directory unavailable")?;
     diary_api::ServerState::set_startup(
@@ -185,6 +214,7 @@ async fn run() -> Result<(), &'static str> {
     }
     sweeper.abort();
     drop(published);
+    drop(workspace);
     drop(lock);
     Ok(())
 }

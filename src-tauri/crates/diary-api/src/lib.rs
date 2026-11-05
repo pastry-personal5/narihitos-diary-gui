@@ -38,6 +38,7 @@ pub struct ServerState {
     workspace_key: String,
     development: bool,
     startup: diary_application::StartupSummary,
+    storage_ready: bool,
     sse_slots: Arc<tokio::sync::Semaphore>,
     clock: Arc<dyn Fn() -> u64 + Send + Sync>,
     stopping: std::sync::atomic::AtomicBool,
@@ -62,6 +63,7 @@ impl ServerState {
             workspace_key,
             development,
             startup: diary_application::StartupSummary::default(),
+            storage_ready: false,
             sse_slots: Arc::new(tokio::sync::Semaphore::new(4)),
             clock: Arc::new(|| {
                 // macOS CLOCK_MONOTONIC_RAW includes time spent asleep.
@@ -80,6 +82,12 @@ impl ServerState {
             stopping: std::sync::atomic::AtomicBool::new(false),
             diagnostics: Arc::new(NullDiagnostics),
         })
+    }
+    /// True only when the workspace opened `Ready`; recovery and inspection modes stay false.
+    pub fn set_storage_ready(state: &mut Arc<Self>, ready: bool) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .storage_ready = ready;
     }
     pub fn set_startup(state: &mut Arc<Self>, summary: diary_application::StartupSummary) {
         Arc::get_mut(state)
@@ -301,7 +309,7 @@ async fn authenticate(
 }
 async fn status(State(s): State<Arc<ServerState>>) -> Json<Value> {
     Json(
-        json!({"instance_id":s.instance_id,"workspace_key":s.workspace_key,"server_version":env!("CARGO_PKG_VERSION"),"api_version":1,"api_minor":0,"config_schema_version":1,"storage_ready":false,"capabilities":["status","sessions","jobs","events"],"limits":{"http_bytes":10485760,"event_bytes":65536,"replay_events":2048,"replay_bytes":4194304,"transient_bytes":67108864,"business_jobs":32,"reserved_save_slots":8,"sse_connections":4}}),
+        json!({"instance_id":s.instance_id,"workspace_key":s.workspace_key,"server_version":env!("CARGO_PKG_VERSION"),"api_version":1,"api_minor":0,"config_schema_version":1,"storage_ready":s.storage_ready,"capabilities":["status","sessions","jobs","events"],"limits":{"http_bytes":10485760,"event_bytes":65536,"replay_events":2048,"replay_bytes":4194304,"transient_bytes":67108864,"business_jobs":32,"reserved_save_slots":8,"sse_connections":4}}),
     )
 }
 #[derive(Deserialize)]
@@ -423,7 +431,7 @@ async fn settings(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Resp
         .list(id, s.now(), None, 1)
     {
         Ok(_) => {
-            let value = json!({"config_schema_version":1,"storage_ready":false,"sources_available":false,"agents_available":false,"exports_available":false,"sources":availability_dto(&s.startup.sources),"profiles":availability_dto(&s.startup.profiles)});
+            let value = json!({"config_schema_version":1,"storage_ready":s.storage_ready,"sources_available":false,"agents_available":false,"exports_available":false,"sources":availability_dto(&s.startup.sources),"profiles":availability_dto(&s.startup.profiles)});
             #[cfg(feature = "scaffold-smoke")]
             let value = {
                 let mut value = value;

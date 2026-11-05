@@ -20,7 +20,7 @@ cargo run --manifest-path src-tauri/Cargo.toml -p diary-server -- --config /abso
 npm run tauri dev -- -- --connect /absolute/private/runtime/WORKSPACE_KEY/discovery.json
 ```
 
-The server prints only the discovery path. Do not print or copy discovery contents: they contain a credential. The [configuration contract](architecture/configuration-and-exports.md#configuration-schema-and-validation) defines private permissions and roots. Storage initialization is deferred to P1-M5; the scaffold requires an existing private workspace lock tree prepared by the synthetic smoke script. Do not create a partial workspace in a real diary directory. Sources, durable saves, agents and exports remain unavailable; the editor is disposable scratch text.
+The server prints only the discovery path. Do not print or copy discovery contents: they contain a credential. The [configuration contract](architecture/configuration-and-exports.md#configuration-schema-and-validation) defines private permissions and roots. On start the server initializes an empty `paths.entries_root` (private `.diary` with the lock, `state.sqlite3` and `workspace.json`) and reopens an initialized one. A folder that has files but no `.diary`, or unexpected files in `.diary`, is refused or reported `inspection_required` without modification; a lost or damaged database starts in read-only `recovery` mode (`storage_ready` false). Never point `entries_root` at a folder you have not inspected, and never delete `.diary` files to "fix" recovery. Sources, durable saves, agents and exports remain unavailable; the editor is disposable scratch text.
 
 Build/run commands:
 

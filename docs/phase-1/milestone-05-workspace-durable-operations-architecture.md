@@ -1,6 +1,6 @@
 # P1-M5: Workspace and durable operations work plan
 
-Status: Planned
+Status: Done
 
 Implementation plan for the [P1-M5 overview](milestone-05-workspace-durable-operations-overview.md). It follows the [persistence](../architecture/domain-and-persistence.md) and [API](../architecture/api-and-processes.md) contracts and keeps the inward dependency rule of [architecture](../architecture.md). Each task ends with tests that pass and one commit. Run the affected tests while iterating and the full gate once at the end.
 
@@ -14,6 +14,16 @@ Implementation plan for the [P1-M5 overview](milestone-05-workspace-durable-oper
 | API               | `diary-api`            | `readiness` field in the status DTO only; no new route                                                                                        |
 
 `WorkspaceLock::acquire` stays the single entry; today it requires a pre-made lock file. Task 1 lets it create `.diary/workspace.lock` when the tree is uninitialized.
+
+## Departures made during implementation
+
+Recorded in the [changelog](changelog.md); the tasks below describe the intent, this list overrides them.
+
+- **One mutex-guarded connection, not a worker thread.** `Db::with`/`transact` serialize every call, which is what the contract requires; async callers use `spawn_blocking`. Upgrade to a thread only if a measured need appears.
+- **Reservations are derived from the ledger (Task 5).** No separate `Reservations` trait or in-memory map: the keys of unfinished operations live in `operation_resources`, are checked in the admitting transaction, fail fast as `Reserved`, and are released by `finish`. This is durable by construction and cannot deadlock because nothing waits.
+- **Readiness reuses `storage_ready`.** The status and settings DTOs already carry the boolean to the UI; adding a field would touch the bridge and TypeScript for no consumer. Mode names are in the log codes `workspace.opened`, `workspace.inspection_required`, `workspace.recovery` and `operation.blocked`.
+- **Root rule.** A root with files but no `.diary` is refused by `WorkspaceLock::acquire` (`RootNotEmpty`) before anything is created. This is stricter than the plan and protects an existing diary folder.
+- **No fault-hook for the database.** Interrupted migrations are tested with a really failing migration; interrupted initialization uses a test-only `Fault` at the two risky points (database created, marker temp written).
 
 ## Tasks
 

@@ -25,6 +25,10 @@ tag_enum!(EventCode {
     ServerStopping => "server.stopping",
     ListenerBound => "server.listener_bound",
     DiscoveryPublished => "server.discovery_published",
+    WorkspaceOpened => "workspace.opened",
+    WorkspaceInspection => "workspace.inspection_required",
+    WorkspaceRecovery => "workspace.recovery",
+    OperationBlocked => "operation.blocked",
     SessionOpened => "session.opened",
     SessionClosed => "session.closed",
     ClientBusy => "session.client_busy",
@@ -113,7 +117,7 @@ fn valid_date(s: &str) -> bool {
     (1..=days).contains(&d)
 }
 
-fn valid_uuid(s: &str) -> bool {
+pub fn valid_uuid(s: &str) -> bool {
     let b = s.as_bytes();
     b.len() == 36
         && [8, 13, 18, 23].iter().all(|&i| b[i] == b'-')

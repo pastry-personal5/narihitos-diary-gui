@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6–P1-M28 remain Planned.
 
 ### P1-M1: Research
 
@@ -47,10 +47,10 @@ Notes: Includes the owner-requested agent-debugging trace to redacted resource d
 
 ### P1-M5: Workspace and durable operations
 
-Status: Planned
+Status: Done
 Goal: Establish locked workspace initialization, versioned SQLite authority, durable operation/step identities, resource reservations and startup recovery classification.
 Plan: [overview](milestone-05-workspace-durable-operations-overview.md), [work plan](milestone-05-workspace-durable-operations-architecture.md).
-Notes: Needs owner approval of `rusqlite` before code.
+Notes: `rusqlite` approved 2026-11-05.
 
 ### P1-M6: Authentic persistence and recovery
 

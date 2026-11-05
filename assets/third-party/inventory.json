@@ -1885,6 +1885,50 @@
   },
   {
     "ecosystem": "cargo",
+    "name": "fallible-iterator",
+    "version": "0.3.0",
+    "license": "MIT/Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/fallible-iterator/0.3.0/download",
+    "features": ["alloc", "default"],
+    "authors": ["Steven Fackler <sfackler@gmail.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt",
+        "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/0816e154b159ba255c563f7c8c7df5bbb8cc5fc96f5ab8cf9f4743b4f41fe7eb.txt",
+        "sha256": "0816e154b159ba255c563f7c8c7df5bbb8cc5fc96f5ab8cf9f4743b4f41fe7eb"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "fallible-streaming-iterator",
+    "version": "0.1.9",
+    "license": "MIT/Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/fallible-streaming-iterator/0.1.9/download",
+    "features": [],
+    "authors": ["Steven Fackler <sfackler@gmail.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt",
+        "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/8dcec5569a9be5b0e086c80faed6f1aefa670af0ec29cecc2f714303096887e0.txt",
+        "sha256": "8dcec5569a9be5b0e086c80faed6f1aefa670af0ec29cecc2f714303096887e0"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
     "name": "fastrand",
     "version": "2.5.0",
     "license": "Apache-2.0 OR MIT",
@@ -2755,7 +2799,7 @@
     "version": "0.17.1",
     "license": "MIT OR Apache-2.0",
     "source_archive": "https://crates.io/api/v1/crates/hashbrown/0.17.1/download",
-    "features": [],
+    "features": ["default-hasher"],
     "authors": [],
     "notices": [
       {
@@ -2767,6 +2811,28 @@
         "original_name": "LICENSE-MIT",
         "file": "licenses/ff8f68cb076caf8cefe7a6430d4ac086ce6af2ca8ce2c4e5a2004d4552ef52a2.txt",
         "sha256": "ff8f68cb076caf8cefe7a6430d4ac086ce6af2ca8ce2c4e5a2004d4552ef52a2"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "hashlink",
+    "version": "0.12.2",
+    "license": "MIT OR Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/hashlink/0.12.2/download",
+    "features": [],
+    "authors": [],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/c144680885b29e4719e2a51f0aab5439a1e02d980692b5aaf086cae12727f28b.txt",
+        "sha256": "c144680885b29e4719e2a51f0aab5439a1e02d980692b5aaf086cae12727f28b"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/e915669a595b11a200873df8286561881b0e04932f6412a585db6297ba0bc97c.txt",
+        "sha256": "e915669a595b11a200873df8286561881b0e04932f6412a585db6297ba0bc97c"
       }
     ],
     "selected_licenses": ["MIT"]
@@ -3885,6 +3951,31 @@
         "original_name": "LICENSE",
         "file": "licenses/8d073a6a80d1ef2d2fc2bc6c809aa221161bf1906c76d4aeef55fd2b999d9413.txt",
         "sha256": "8d073a6a80d1ef2d2fc2bc6c809aa221161bf1906c76d4aeef55fd2b999d9413"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "libsqlite3-sys",
+    "version": "0.39.1",
+    "license": "MIT",
+    "source_archive": "https://crates.io/api/v1/crates/libsqlite3-sys/0.39.1/download",
+    "features": [
+      "bundled",
+      "bundled_bindings",
+      "cc",
+      "default",
+      "min_sqlite_version_3_45_3",
+      "pkg-config",
+      "vcpkg"
+    ],
+    "authors": ["The rusqlite developers"],
+    "notices": [
+      {
+        "original_name": "LICENSE",
+        "file": "licenses/c10c1f27337546471e5f7e4e97fdd398b35b9d4e126115dcd22de8d8e65abf6f.txt",
+        "sha256": "c10c1f27337546471e5f7e4e97fdd398b35b9d4e126115dcd22de8d8e65abf6f"
       }
     ],
     "selected_licenses": ["MIT"]
@@ -6270,6 +6361,48 @@
   },
   {
     "ecosystem": "cargo",
+    "name": "rsqlite-vfs",
+    "version": "0.2.0",
+    "license": "MIT",
+    "source_archive": "https://crates.io/api/v1/crates/rsqlite-vfs/0.2.0/download",
+    "features": [],
+    "authors": [],
+    "notices": [
+      {
+        "original_name": "LICENSE",
+        "file": "licenses/e1c1975c3474cce31722836f101a40ffaf1cc784e4d2f38ce3e77b9712934e78.txt",
+        "sha256": "e1c1975c3474cce31722836f101a40ffaf1cc784e4d2f38ce3e77b9712934e78",
+        "source_url": "https://raw.githubusercontent.com/Spxg/sqlite-wasm-rs/3d8318430bacd7d6a1aafdf5b5e54fb0fee8d451/LICENSE"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "rusqlite",
+    "version": "0.41.1",
+    "license": "MIT",
+    "source_archive": "https://crates.io/api/v1/crates/rusqlite/0.41.1/download",
+    "features": [
+      "bundled",
+      "cache",
+      "default",
+      "ffi-sqlite-wasm-rs",
+      "hashlink",
+      "modern_sqlite"
+    ],
+    "authors": ["The rusqlite developers"],
+    "notices": [
+      {
+        "original_name": "LICENSE",
+        "file": "licenses/c10c1f27337546471e5f7e4e97fdd398b35b9d4e126115dcd22de8d8e65abf6f.txt",
+        "sha256": "c10c1f27337546471e5f7e4e97fdd398b35b9d4e126115dcd22de8d8e65abf6f"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
     "name": "rustc-hash",
     "version": "2.1.3",
     "license": "Apache-2.0 OR MIT",
@@ -7201,6 +7334,23 @@
         "original_name": "LICENSE",
         "file": "licenses/7ade43ec5e1a5e43000aa871d290dff4c0e9e2e16b7f6bea2ecf091e3d056d31.txt",
         "sha256": "7ade43ec5e1a5e43000aa871d290dff4c0e9e2e16b7f6bea2ecf091e3d056d31"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "sqlite-wasm-rs",
+    "version": "0.6.2",
+    "license": "MIT",
+    "source_archive": "https://crates.io/api/v1/crates/sqlite-wasm-rs/0.6.2/download",
+    "features": [],
+    "authors": ["Spxg <noz@live.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE",
+        "file": "licenses/e1c1975c3474cce31722836f101a40ffaf1cc784e4d2f38ce3e77b9712934e78.txt",
+        "sha256": "e1c1975c3474cce31722836f101a40ffaf1cc784e4d2f38ce3e77b9712934e78"
       }
     ],
     "selected_licenses": ["MIT"]
@@ -8718,6 +8868,28 @@
         "original_name": "LICENSE-MIT",
         "file": "licenses/436bc5a105d8e57dcd8778730f3754f7bf39c14d2f530e4cde4bd2d17a83ec3d.txt",
         "sha256": "436bc5a105d8e57dcd8778730f3754f7bf39c14d2f530e4cde4bd2d17a83ec3d"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "vcpkg",
+    "version": "0.2.15",
+    "license": "MIT/Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/vcpkg/0.2.15/download",
+    "features": [],
+    "authors": ["Jim McGrath <jimmc2@gmail.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/60c93a31f490375aadf64098b75f10715010379541021e00261045d7800611d3.txt",
+        "sha256": "60c93a31f490375aadf64098b75f10715010379541021e00261045d7800611d3"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/016d20f335060a70e79d9fcf8dfaa6201114d65d592211f4bdfb8ae9ca2bc1dc.txt",
+        "sha256": "016d20f335060a70e79d9fcf8dfaa6201114d65d592211f4bdfb8ae9ca2bc1dc"
       }
     ],
     "selected_licenses": ["MIT"]

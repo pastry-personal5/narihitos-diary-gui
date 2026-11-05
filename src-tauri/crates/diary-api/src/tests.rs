@@ -625,3 +625,27 @@ mod diagnostics {
         assert!(finished.trace.is_some());
     }
 }
+
+#[tokio::test]
+async fn storage_ready_follows_workspace_readiness_in_status_and_settings() {
+    for ready in [false, true] {
+        let mut s = state();
+        ServerState::set_storage_ready(&mut s, ready);
+        s.coordinator
+            .lock()
+            .unwrap()
+            .open(SESSION, s.now())
+            .unwrap();
+        for path in ["/api/v1/status", "/api/v1/settings"] {
+            let response = router(s.clone())
+                .oneshot(owned_request("GET", path))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK, "{path}");
+            let value: Value =
+                serde_json::from_slice(&to_bytes(response.into_body(), 20480).await.unwrap())
+                    .unwrap();
+            assert_eq!(value["storage_ready"], ready, "{path}");
+        }
+    }
+}

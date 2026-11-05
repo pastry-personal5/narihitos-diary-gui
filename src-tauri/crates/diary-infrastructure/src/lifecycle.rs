@@ -1,5 +1,6 @@
 //! OS lock, bounded loopback listener and private ephemeral discovery.
 use crate::config::{ConfigError, open_private};
+use diary_logging::private_fs::{FsError, PrivateDir};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -14,6 +15,8 @@ pub enum LifecycleError {
     UnsafePath,
     WorkspaceUnavailable,
     WorkspaceBusy,
+    /// No `.diary` and the directory holds other files: inspect before initializing.
+    RootNotEmpty,
     Io,
     InvalidPorts,
     PortsExhausted,
@@ -30,6 +33,22 @@ pub fn entropy(buf: &mut [u8]) -> Result<(), LifecycleError> {
     Ok(())
 }
 
+/// Random (version 4) lowercase hyphenated UUID from OS entropy.
+pub fn random_uuid() -> Result<String, LifecycleError> {
+    let mut b = [0u8; 16];
+    entropy(&mut b)?;
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    Ok(format!(
+        "{}-{}-{}-{}-{}",
+        hex(&b[..4]),
+        hex(&b[4..6]),
+        hex(&b[6..8]),
+        hex(&b[8..10]),
+        hex(&b[10..])
+    ))
+}
+
 /// Stable workspace identifier: SHA-256 of the canonical entries-root path.
 pub fn workspace_key(canonical: &Path) -> String {
     use std::os::unix::ffi::OsStrExt;
@@ -39,27 +58,49 @@ pub fn workspace_key(canonical: &Path) -> String {
 pub struct WorkspaceLock {
     _file: File,
     pub workspace_key: String,
+    pub root: PathBuf,
 }
 impl WorkspaceLock {
-    /// Requires a prepared private tree. This never initializes durable storage.
+    /// Takes the exclusive workspace lock. A root without `.diary` gets one (and the lock file)
+    /// only when it is empty, so a real diary directory is never half-initialized.
     pub fn acquire(workspace: &Path) -> Result<Self, LifecycleError> {
+        use std::os::unix::fs::DirBuilderExt;
         let canonical =
             fs::canonicalize(workspace).map_err(|_| LifecycleError::WorkspaceUnavailable)?;
         if canonical != workspace {
             return Err(LifecycleError::UnsafePath);
         }
-        // Existing lock file only: P1-M5 owns creation and initialization.
-        let (file, _) = open_private(&workspace.join(".diary/workspace.lock"))
-            .map_err(|_| LifecycleError::WorkspaceUnavailable)?;
-        match file.try_lock() {
-            Ok(()) => (),
-            Err(std::fs::TryLockError::WouldBlock) => return Err(LifecycleError::WorkspaceBusy),
-            Err(_) => return Err(LifecycleError::Io),
+        let diary = workspace.join(".diary");
+        match fs::symlink_metadata(&diary) {
+            Ok(_) => (),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                let empty = fs::read_dir(workspace)
+                    .map_err(|_| LifecycleError::WorkspaceUnavailable)?
+                    .all(|e| e.is_ok_and(|e| e.file_name() == ".DS_Store"));
+                if !empty {
+                    return Err(LifecycleError::RootNotEmpty);
+                }
+                fs::DirBuilder::new()
+                    .mode(0o700)
+                    .create(&diary)
+                    .map_err(|_| LifecycleError::Io)?;
+                File::open(workspace)
+                    .and_then(|d| d.sync_all())
+                    .map_err(|_| LifecycleError::Io)?;
+            }
+            Err(_) => return Err(LifecycleError::WorkspaceUnavailable),
         }
+        let file = PrivateDir::open(&diary)?
+            .lock("workspace.lock")
+            .map_err(|e| match e {
+                FsError::Busy => LifecycleError::WorkspaceBusy,
+                _ => LifecycleError::UnsafePath,
+            })?;
         let workspace_key = workspace_key(&canonical);
         Ok(Self {
             _file: file,
             workspace_key,
+            root: canonical,
         })
     }
 }
