@@ -57,7 +57,7 @@ fn file_name(role: Role, date: &str, suffix: u32) -> String {
 }
 
 /// Only canonical names of this role match: `role-YYYY-MM-DD.log` or `role-YYYY-MM-DD.N.log`.
-fn parse_name(role: Role, name: &str) -> Option<(String, u32)> {
+pub(crate) fn parse_name(role: Role, name: &str) -> Option<(String, u32)> {
     let rest = name
         .strip_prefix(role.as_str())?
         .strip_prefix('-')?

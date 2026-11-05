@@ -3,6 +3,7 @@ pub mod clock;
 pub mod codec;
 pub mod private_fs;
 pub mod store;
+pub mod trace;
 pub mod worker;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

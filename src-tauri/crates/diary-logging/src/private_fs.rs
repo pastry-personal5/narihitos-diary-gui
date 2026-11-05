@@ -169,6 +169,33 @@ impl PrivateDir {
             Err(io::Error::last_os_error())
         }
     }
+    /// Opens an existing private subdirectory without creating it (read-only callers).
+    pub fn open_child(&self, child: &str) -> Result<Self, FsError> {
+        let child = name(child).map_err(|_| FsError::Path)?;
+        // SAFETY: live parent and terminated single-component name; result owned immediately.
+        let file = owned(unsafe {
+            libc::openat(
+                self.file.as_raw_fd(),
+                child.as_ptr(),
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        })
+        .map_err(|_| FsError::Permissions)?;
+        check_private_metadata(&file.metadata().map_err(|_| FsError::Io)?, true)?;
+        Ok(Self { file })
+    }
+
+    /// At most `max` bytes of a regular file, judged on the opened object.
+    pub fn read_bounded(&self, value: &str, max: u64) -> Result<Vec<u8>, FsError> {
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        self.open_regular(value, libc::O_RDONLY)?
+            .take(max)
+            .read_to_end(&mut bytes)
+            .map_err(|_| FsError::Io)?;
+        Ok(bytes)
+    }
+
     /// Entry names (no "." or ".."), sorted. Names only: callers must open each entry
     /// through this directory so a swapped or hostile entry is judged on the opened object.
     pub fn list(&self) -> Result<Vec<String>, FsError> {

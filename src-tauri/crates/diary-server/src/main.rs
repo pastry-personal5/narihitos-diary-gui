@@ -6,7 +6,11 @@ use diary_infrastructure::{
     lifecycle::{Discovery, PublishedDiscovery, WorkspaceLock, bind_loopback},
 };
 use diary_logging::{
-    clock::SystemClock, private_fs::PrivateDir, store::LogStore, worker::LogWorker,
+    clock::SystemClock,
+    private_fs::PrivateDir,
+    store::LogStore,
+    trace::{self, Selector},
+    worker::LogWorker,
 };
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
@@ -38,9 +42,41 @@ async fn main() {
         std::process::exit(1);
     }
 }
+/// `diary-server trace --config PATH --select SELECTOR [--limit N]`: a read-only, redacted,
+/// bounded timeline of the server and client logs for debugging. It never opens the discovery
+/// file or the workspace lock.
+fn trace_mode(mut args: impl Iterator<Item = std::ffi::OsString>) -> Result<(), &'static str> {
+    let (mut config, mut select, mut limit) = (None, None, trace::DEFAULT_LIMIT);
+    while let Some(flag) = args.next() {
+        let value = args.next().and_then(|v| v.into_string().ok());
+        match (flag.to_str(), value) {
+            (Some("--config"), Some(v)) => config = Some(PathBuf::from(v)),
+            (Some("--select"), Some(v)) => select = Selector::parse(&v),
+            (Some("--limit"), Some(v)) => limit = v.parse().map_err(|_| "invalid --limit")?,
+            _ => return Err("invalid arguments"),
+        }
+    }
+    let config = config.ok_or("expected --config PATH")?;
+    let selector = select.ok_or("invalid or missing --select")?;
+    let config = config::load(&config).map_err(|_| "configuration rejected")?;
+    let key = diary_infrastructure::lifecycle::workspace_key(&config.paths.entries_root);
+    let report = PrivateDir::open(&config.paths.runtime_root)
+        .and_then(|d| d.open_child(&key))
+        .map(|d| trace::collect(&d, &selector, limit))
+        .unwrap_or_default();
+    for line in &report.lines {
+        print!("{line}");
+    }
+    println!("{}", report.summary_line());
+    Ok(())
+}
 async fn run() -> Result<(), &'static str> {
     let mut args = std::env::args_os().skip(1);
-    if args.next().as_deref() != Some(std::ffi::OsStr::new("--config")) {
+    let first = args.next();
+    if first.as_deref() == Some(std::ffi::OsStr::new("trace")) {
+        return trace_mode(args);
+    }
+    if first.as_deref() != Some(std::ffi::OsStr::new("--config")) {
         return Err("expected --config PATH");
     }
     let path = PathBuf::from(args.next().ok_or("expected config path")?);

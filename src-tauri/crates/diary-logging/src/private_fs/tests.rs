@@ -80,3 +80,22 @@ fn append_creates_0600_file_appends_and_rejects_symlink() {
     std::os::unix::fs::symlink(base.join("a.log"), base.join("b.log")).unwrap();
     assert!(dir.append("b.log").is_err());
 }
+
+#[test]
+fn open_child_does_not_create_and_read_bounded_caps_bytes() {
+    let (_t, base, dir) = dir();
+    assert!(dir.open_child("missing").is_err());
+    assert!(!base.join("missing").exists());
+    std::fs::create_dir(base.join("sub")).unwrap();
+    std::fs::set_permissions(
+        base.join("sub"),
+        std::os::unix::fs::PermissionsExt::from_mode(0o700),
+    )
+    .unwrap();
+    assert!(dir.open_child("sub").is_ok());
+    std::fs::write(base.join("big"), vec![b'x'; 100]).unwrap();
+    assert_eq!(dir.read_bounded("big", 10).unwrap().len(), 10);
+    assert_eq!(dir.read_bounded("big", 1000).unwrap().len(), 100);
+    std::os::unix::fs::symlink(base.join("big"), base.join("link")).unwrap();
+    assert!(dir.read_bounded("link", 10).is_err());
+}
