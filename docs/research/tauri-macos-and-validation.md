@@ -36,14 +36,14 @@ The deployed app uses the system WebView, so Node/Vitest success does not establ
 
 ## Validation mapping (R14.1–R14.2)
 
-| Risk | Appropriate evidence |
-|---|---|
-| Parser/identity/time selection | Synthetic Rust unit fixtures, including malformed inputs and full date inclusion sets |
-| Autosave/recovery/external edits | Temporary-workspace integration tests, controlled interruption at each durable boundary, stale-revision races |
-| Export retries and ordering | Fake HTTP service for pagination, limits, lost replies, remote drift; optional synthetic-account smoke test later |
-| Agent adapters | Fake executables emitting split/malformed/oversized JSON, stderr floods, early exit, timeout, and descendants; separately verify real CLI flags |
-| UI behavior | Vitest tests for transition effects, keyboard/selection independence, stale job events, save acknowledgements, and React editor cleanup |
-| Native permissions/runtime | Packaged Finder launch, real WKWebView, iCloud availability/permission denial, missing CLI, IME and VoiceOver checks |
+| Risk                             | Appropriate evidence                                                                                                                            |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parser/identity/time selection   | Synthetic Rust unit fixtures, including malformed inputs and full date inclusion sets                                                           |
+| Autosave/recovery/external edits | Temporary-workspace integration tests, controlled interruption at each durable boundary, stale-revision races                                   |
+| Export retries and ordering      | Fake HTTP service for pagination, limits, lost replies, remote drift; optional synthetic-account smoke test later                               |
+| Agent adapters                   | Fake executables emitting split/malformed/oversized JSON, stderr floods, early exit, timeout, and descendants; separately verify real CLI flags |
+| UI behavior                      | Vitest tests for transition effects, keyboard/selection independence, stale job events, save acknowledgements, and React editor cleanup         |
+| Native permissions/runtime       | Packaged Finder launch, real WKWebView, iCloud availability/permission denial, missing CLI, IME and VoiceOver checks                            |
 
 The current [Tauri WebDriver docs](https://v2.tauri.app/develop/tests/webdriver/) describe an embedded WebdriverIO service route supporting macOS, while direct `tauri-driver` still lacks a native macOS WKWebView driver. Do not repeat the outdated blanket assertion that all Tauri WebDriver automation is unavailable on macOS. Embedded automation adds development plugins and must be evaluated/approved separately, excluded from production builds. For initial P1-M3 evidence, manual packaged smoke checks plus existing Rust/Vitest tests avoid deciding a new dependency now.
 

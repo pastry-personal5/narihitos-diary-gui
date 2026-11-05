@@ -8,17 +8,17 @@ This is the target architecture for Narihito's Diary, the GUI, using Clean Archi
 
 [Product behavior](product-behavior.md) defines the owner requirements. Engineering choices here specify their internal implementation: one workspace, one client, separately launched Rust server and Tauri client, React/TypeScript, and CodeMirror 6. Only Diary assets are implemented; financial assets, history, remote clients, and MCP serving are future extensions. Reference repositories are evidence, never runtime dependencies.
 
-| Contract | Maintained document |
-|---|---|
-| Launch, discovery, authentication, commands, HTTP, SSE, jobs and errors | [API and processes](architecture/api-and-processes.md) |
-| Domain types, Markdown, SQLite, autosave, locking and recovery | [Domain and persistence](architecture/domain-and-persistence.md) |
-| Path identity, source parsing/save/Trash, timestamps and civil dates | [Sources and dates](architecture/sources-and-dates.md) |
-| Editor ownership, paragraph review, CLI/native agents, prompt assets and supervision | [Editing and agents](architecture/editing-and-agents.md) |
-| Nonblocking AI work, progress, streaming, cancellation and completion attention | [Background AI experience](architecture/ai-job-experience.md) |
-| Diagnostic logs, 3-day rotation and redaction | [Logging](architecture/logging.md) |
-| GUI actions, default shortcuts, Settings Keyboard Shortcuts table | [Keyboard shortcuts](architecture/keyboard-shortcuts.md) |
-| Persistent GUI-editable settings apart from private config | [User settings](architecture/user-settings.md) |
-| Private configuration, exports, versions, platform and dependency candidates | [Configuration and exports](architecture/configuration-and-exports.md) |
+| Contract                                                                             | Maintained document                                                    |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| Launch, discovery, authentication, commands, HTTP, SSE, jobs and errors              | [API and processes](architecture/api-and-processes.md)                 |
+| Domain types, Markdown, SQLite, autosave, locking and recovery                       | [Domain and persistence](architecture/domain-and-persistence.md)       |
+| Path identity, source parsing/save/Trash, timestamps and civil dates                 | [Sources and dates](architecture/sources-and-dates.md)                 |
+| Editor ownership, paragraph review, CLI/native agents, prompt assets and supervision | [Editing and agents](architecture/editing-and-agents.md)               |
+| Nonblocking AI work, progress, streaming, cancellation and completion attention      | [Background AI experience](architecture/ai-job-experience.md)          |
+| Diagnostic logs, 3-day rotation and redaction                                        | [Logging](architecture/logging.md)                                     |
+| GUI actions, default shortcuts, Settings Keyboard Shortcuts table                    | [Keyboard shortcuts](architecture/keyboard-shortcuts.md)               |
+| Persistent GUI-editable settings apart from private config                           | [User settings](architecture/user-settings.md)                         |
+| Private configuration, exports, versions, platform and dependency candidates         | [Configuration and exports](architecture/configuration-and-exports.md) |
 
 These documents are engineering decisions within the approved product scope. A chosen interface or algorithm does not prove macOS access, producer interoperability, CLI behavior, or service recovery. Each theme states the evidence needed before enabling its conditional capability.
 
@@ -67,18 +67,18 @@ The CLI is trusted under the owner's account policy. Filtering the app's prompt/
 
 Proposed module locations are a scaffold contract, not a repository restructure already performed:
 
-| Location | Responsibility and dependency constraints |
-|---|---|
-| `src-tauri/crates/diary-domain` | Asset/date/revision values, review alignment and selection/order policies; standard-library-oriented pure code |
-| `src-tauri/crates/diary-application` | Use cases; ports for content, catalog, operations, sources, clock/zone, agent runner, exports and event sink; depends on domain |
+| Location                                | Responsibility and dependency constraints                                                                                         |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `src-tauri/crates/diary-domain`         | Asset/date/revision values, review alignment and selection/order policies; standard-library-oriented pure code                    |
+| `src-tauri/crates/diary-application`    | Use cases; ports for content, catalog, operations, sources, clock/zone, agent runner, exports and event sink; depends on domain   |
 | `src-tauri/crates/diary-infrastructure` | Port implementations, platform/file/DB/provider/CLI/native model adapters and prompt asset loading; depends on application/domain |
-| `src-tauri/crates/diary-api` | HTTP/SSE DTO conversion, auth/session admission and error mapping; depends on application |
-| `src-tauri/crates/diary-server` | Server executable and composition root |
-| `src-tauri/src` | Tauri client composition, narrow HTTP bridge, shutdown handshake and native symbols; no server/domain implementation |
-| `src/application` | Client reducers, save/review/session state machines, command registry and typed bridge interface |
-| `src/adapters` | Tauri invocations, channel subscription and DTO validation |
-| `src/editor` | Dedicated CodeMirror state/view/extensions and transaction translation |
-| `src/components` | React layout and accessible controls from the canonical [containment model](ux-information-architecture.md) |
+| `src-tauri/crates/diary-api`            | HTTP/SSE DTO conversion, auth/session admission and error mapping; depends on application                                         |
+| `src-tauri/crates/diary-server`         | Server executable and composition root                                                                                            |
+| `src-tauri/src`                         | Tauri client composition, narrow HTTP bridge, shutdown handshake and native symbols; no server/domain implementation              |
+| `src/application`                       | Client reducers, save/review/session state machines, command registry and typed bridge interface                                  |
+| `src/adapters`                          | Tauri invocations, channel subscription and DTO validation                                                                        |
+| `src/editor`                            | Dedicated CodeMirror state/view/extensions and transaction translation                                                            |
+| `src/components`                        | React layout and accessible controls from the canonical [containment model](ux-information-architecture.md)                       |
 
 Use a Cargo workspace rooted at `src-tauri/Cargo.toml` whose default members include the client, server and all Rust crates. This preserves the existing gate command paths while covering the server. Feature code never imports a reference submodule or a transport adapter from the domain/application crates. Architectural tests should reject forbidden dependencies and verify both binaries are included in gate coverage.
 

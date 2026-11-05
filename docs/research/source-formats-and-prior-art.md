@@ -10,16 +10,16 @@ Inspected reference revisions: `contrib/narihitos-diary` at `8d4563851ee5f7f7d96
 
 A read-only Python inventory inspected every local sample Markdown file, split front matter at delimiters, counted field names/schema markers, parsed `created_at` with `datetime.fromisoformat`, and compared UTC dates/stems with directories/filenames. It emitted counts only, with no diary bodies, IDs, paths, locations, or timestamps from the samples. This inventories the supplied examples; it is not a production YAML parser or proof of all historical source variants.
 
-| Check | Ayumi | Narihito mobile |
-|---|---|---|
-| Markdown samples inspected | 2 | 20 |
-| `created_at` offset | Both `+09:00` | All `Z` |
-| Parent directory matches UTC creation date | 2/2 | 20/20 |
-| Filename starts with UTC creation timestamp to seconds | 2/2 | 20/20 |
-| ID matches expected filename identity | 2/2, stem equals ID | 20/20, stem ends with UUID |
-| Matching sibling `.assets` directory exists | 2/2 | 20/20 |
-| Duplicate IDs within sample set | 0 | 0 |
-| Schema markers | None | All version `1`, kind `ndm.diary-snippet` |
+| Check                                                  | Ayumi               | Narihito mobile                           |
+| ------------------------------------------------------ | ------------------- | ----------------------------------------- |
+| Markdown samples inspected                             | 2                   | 20                                        |
+| `created_at` offset                                    | Both `+09:00`       | All `Z`                                   |
+| Parent directory matches UTC creation date             | 2/2                 | 20/20                                     |
+| Filename starts with UTC creation timestamp to seconds | 2/2                 | 20/20                                     |
+| ID matches expected filename identity                  | 2/2, stem equals ID | 20/20, stem ends with UUID                |
+| Matching sibling `.assets` directory exists            | 2/2                 | 20/20                                     |
+| Duplicate IDs within sample set                        | 0                   | 0                                         |
+| Schema markers                                         | None                | All version `1`, kind `ndm.diary-snippet` |
 
 Audio bytes were not opened. No live iCloud operation, source mutation, build, or prior-art test suite was run. Test source is evidence of intended coverage, not a passing test claim.
 
@@ -49,10 +49,10 @@ Recommended separation: retain original Markdown bytes as provenance, extract a 
 
 Compare identity strategies:
 
-| Strategy | Advantage | Problem |
-|---|---|---|
-| Source path only | Simple catalog key | Rename looks like a new snippet |
-| Content digest only | Detects identical bytes | An edit looks like a new asset; unrelated identical notes collapse |
+| Strategy                                                      | Advantage                         | Problem                                                                        |
+| ------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------ |
+| Source path only                                              | Simple catalog key                | Rename looks like a new snippet                                                |
+| Content digest only                                           | Detects identical bytes           | An edit looks like a new asset; unrelated identical notes collapse             |
 | Stable source identifier + source-native ID, plus byte digest | Separates identity from revisions | Requires rules for source rename/reconfiguration and conflicting duplicate IDs |
 
 Recommend the third for P1-M2 evaluation. A digest records a revision, not identity. Neither the source display name nor absolute folder path is necessarily a stable namespace. Do not silently collapse an ID shared across two sources; preserve provenance and report same-namespace ID conflicts. Repeated same-ID/same-byte imports can be no-ops while preserving selection state; same-ID/changed-byte imports need an explicit conflict/refresh policy, especially if the imported copy has edits.
@@ -65,14 +65,14 @@ Proposed synthetic fixture matrix for implementation: valid examples of each sou
 
 The desktop prior art is already Rust (edition 2024), with a Swift Apple helper, rather than a codebase requiring wholesale porting to Rust. Its workspace contains `diary-core` (domain/workflow), `diary-connectors` (Ayumi, SQLite, local output, Notion, Apple bridge), `diary-control`/`diary-control-contract` (HTTP/control jobs and DTOs), `diary-macos` (native helpers), `diary-tui`, and `apps/nd` (assembly).
 
-| Reference | Reusable knowledge | GUI adaptation needed |
-|---|---|---|
-| `diary-connectors/src/local_output.rs` | `YYYY/MM/YYYY-MM-DD.md`, no-clobber writes, digest/read-back, placeholder guards, receipt-guarded replacement | Add draft/Entry metadata and history contract; keep optional export independent of local save |
-| `diary-connectors/src/notion/{projection,hierarchy,output,transport,retry}.rs` | Markdown projection, page discovery, insertion anchors, chunking, reconciliation | Verify API behavior/version; choose GUI export UX and stable receipts |
-| `diary-connectors/src/ayumi.rs` | Bounded/fresh reads and containment checks | Add mobile format and explicit source namespaces; separate import from edit/delete |
-| `diary-core/src/source_time.rs` | UTC stem interpretation and boundary cases | Replace fixed-offset/manual calendar handling with timezone-aware validation |
-| `diary-control/src/lifecycle.rs` | Config validation, secret redaction, explicit executable paths | Replace launch-directory/server assumptions; no need to transplant HTTP/TUI layers |
-| Mobile codec/layout/domain and pair-store code | Exact producer grammar, schema evolution, coordinated writes/recovery concepts | Read Markdown independently of audio; investigate write-back interoperability separately |
+| Reference                                                                      | Reusable knowledge                                                                                            | GUI adaptation needed                                                                         |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `diary-connectors/src/local_output.rs`                                         | `YYYY/MM/YYYY-MM-DD.md`, no-clobber writes, digest/read-back, placeholder guards, receipt-guarded replacement | Add draft/Entry metadata and history contract; keep optional export independent of local save |
+| `diary-connectors/src/notion/{projection,hierarchy,output,transport,retry}.rs` | Markdown projection, page discovery, insertion anchors, chunking, reconciliation                              | Verify API behavior/version; choose GUI export UX and stable receipts                         |
+| `diary-connectors/src/ayumi.rs`                                                | Bounded/fresh reads and containment checks                                                                    | Add mobile format and explicit source namespaces; separate import from edit/delete            |
+| `diary-core/src/source_time.rs`                                                | UTC stem interpretation and boundary cases                                                                    | Replace fixed-offset/manual calendar handling with timezone-aware validation                  |
+| `diary-control/src/lifecycle.rs`                                               | Config validation, secret redaction, explicit executable paths                                                | Replace launch-directory/server assumptions; no need to transplant HTTP/TUI layers            |
+| Mobile codec/layout/domain and pair-store code                                 | Exact producer grammar, schema evolution, coordinated writes/recovery concepts                                | Read Markdown independently of audio; investigate write-back interoperability separately      |
 
 ## R2.3 Bugs, limitations, and contradictory assumptions
 

@@ -1,0 +1,16 @@
+[package]
+name = "diary-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+diary-application.workspace = true
+diary-infrastructure.workspace = true
+diary-api.workspace = true
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "net", "signal", "time"] }
+axum = "=0.8.9"
+
+[features]
+scaffold-smoke = ["diary-api/scaffold-smoke"]

@@ -1,0 +1,24 @@
+[package]
+name = "diary-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+diary-application.workspace = true
+axum = "=0.8.9"
+tokio = { version = "=1.54.1", features = ["time", "sync"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+uuid = { version = "=1.29.0", features = ["v4"] }
+subtle = "=2.6.1"
+libc = "=0.2.191"
+futures-util = "=0.3.34"
+
+[dev-dependencies]
+tokio = { version = "=1.54.1", features = ["macros", "rt", "test-util"] }
+tower = { version = "0.5", features = ["util"] }
+
+[features]
+scaffold-smoke = []

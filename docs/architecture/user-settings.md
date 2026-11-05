@@ -6,13 +6,13 @@ This contract defines persistent, GUI-editable user settings. They are stored ap
 
 ## Separation from config
 
-| | Server config | User settings |
-|---|---|---|
-| File | `--config PATH`, conventionally `config/global_config.yaml` | `user_settings.json` |
-| Location | Chosen by the owner at server launch | Tauri app config directory for the app identifier (`~/Library/Application Support/<identifier>/`), never inside `entries_root`, `runtime_root`, sources, exports or the config's directory |
-| Owner | Server, loaded at launch, explicit `reload_settings` | Tauri client bridge |
-| Edited by | Owner in a text editor | The user in Settings |
-| Content | Paths, sources, profiles, credentials | User preferences: key bindings and AI writing language |
+|           | Server config                                               | User settings                                                                                                                                                                              |
+| --------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| File      | `--config PATH`, conventionally `config/global_config.yaml` | `user_settings.json`                                                                                                                                                                       |
+| Location  | Chosen by the owner at server launch                        | Tauri app config directory for the app identifier (`~/Library/Application Support/<identifier>/`), never inside `entries_root`, `runtime_root`, sources, exports or the config's directory |
+| Owner     | Server, loaded at launch, explicit `reload_settings`        | Tauri client bridge                                                                                                                                                                        |
+| Edited by | Owner in a text editor                                      | The user in Settings                                                                                                                                                                       |
+| Content   | Paths, sources, profiles, credentials                       | User preferences: key bindings and AI writing language                                                                                                                                     |
 
 User settings never hold credentials, tokens, paths, source or agent profiles, or diary content, and the server neither reads nor writes their file. The chosen writing locale is sent as validated request data for each AI run. Because settings are per-user and per-machine, they are not part of the workspace and are not exported or synced.
 

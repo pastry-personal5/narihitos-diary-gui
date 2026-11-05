@@ -1,0 +1,242 @@
+//! OS lock, bounded loopback listener and private ephemeral discovery.
+use crate::config::{ConfigError, open_private};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::{
+    fs::{self, File},
+    io::{Read, Write},
+    net::{Ipv4Addr, SocketAddrV4, TcpListener},
+    path::{Path, PathBuf},
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LifecycleError {
+    UnsafePath,
+    WorkspaceUnavailable,
+    WorkspaceBusy,
+    Io,
+    InvalidPorts,
+    PortsExhausted,
+    DiscoveryInvalid,
+    Entropy,
+}
+
+pub struct WorkspaceLock {
+    _file: File,
+    pub workspace_key: String,
+}
+impl WorkspaceLock {
+    /// Requires a prepared private tree. This never initializes durable storage.
+    pub fn acquire(workspace: &Path) -> Result<Self, LifecycleError> {
+        let canonical =
+            fs::canonicalize(workspace).map_err(|_| LifecycleError::WorkspaceUnavailable)?;
+        if canonical != workspace {
+            return Err(LifecycleError::UnsafePath);
+        }
+        // Existing lock file only: P1-M5 owns creation and initialization.
+        let (file, _) = open_private(&workspace.join(".diary/workspace.lock"))
+            .map_err(|_| LifecycleError::WorkspaceUnavailable)?;
+        match file.try_lock() {
+            Ok(()) => (),
+            Err(std::fs::TryLockError::WouldBlock) => return Err(LifecycleError::WorkspaceBusy),
+            Err(_) => return Err(LifecycleError::Io),
+        }
+        use std::os::unix::ffi::OsStrExt;
+        let workspace_key = hex(&Sha256::digest(canonical.as_os_str().as_bytes()));
+        Ok(Self {
+            _file: file,
+            workspace_key,
+        })
+    }
+}
+
+pub fn bind_loopback(port: u16, fallback_count: u8) -> Result<TcpListener, LifecycleError> {
+    if port < 1024 || fallback_count > 8 || port.checked_add(u16::from(fallback_count)).is_none() {
+        return Err(LifecycleError::InvalidPorts);
+    }
+    for offset in 0..=u16::from(fallback_count) {
+        match TcpListener::bind(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port + offset)) {
+            Ok(listener) => return Ok(listener),
+            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => (),
+            Err(_) => return Err(LifecycleError::Io),
+        }
+    }
+    Err(LifecycleError::PortsExhausted)
+}
+
+// No Debug: this contains the API credential; only redacted typed DTOs cross IPC.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Discovery {
+    pub schema_version: u32,
+    pub instance_id: String,
+    pub pid: u32,
+    pub workspace_key: String,
+    pub api_version: u32,
+    pub origin: String,
+    pub token: String,
+}
+impl Discovery {
+    pub fn fresh(workspace_key: &str, port: u16) -> Result<Self, LifecycleError> {
+        let mut bytes = [0u8; 48];
+        // SAFETY: writable buffer of specified length, below getentropy's 256-byte limit.
+        if unsafe { libc::getentropy(bytes.as_mut_ptr().cast(), bytes.len()) } != 0 {
+            return Err(LifecycleError::Entropy);
+        }
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        let instance_id = format!(
+            "{}-{}-{}-{}-{}",
+            hex(&bytes[..4]),
+            hex(&bytes[4..6]),
+            hex(&bytes[6..8]),
+            hex(&bytes[8..10]),
+            hex(&bytes[10..16])
+        );
+        let record = Self {
+            schema_version: 1,
+            instance_id,
+            pid: std::process::id(),
+            workspace_key: workspace_key.into(),
+            api_version: 1,
+            origin: format!("http://127.0.0.1:{port}"),
+            token: hex(&bytes[16..]),
+        };
+        record.validate()?;
+        Ok(record)
+    }
+    pub fn validate(&self) -> Result<(), LifecycleError> {
+        let valid_hex = |s: &str, n| {
+            s.len() == n
+                && s.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        };
+        let uuid_parts: Vec<_> = self.instance_id.split('-').collect();
+        let uuid_valid = uuid_parts.len() == 5
+            && uuid_parts
+                .iter()
+                .zip([8, 4, 4, 4, 12])
+                .all(|(part, len)| valid_hex(part, len));
+        let port = self
+            .origin
+            .strip_prefix("http://127.0.0.1:")
+            .and_then(|p| p.parse::<u16>().ok());
+        if self.schema_version != 1
+            || self.api_version != 1
+            || self.pid == 0
+            || !uuid_valid
+            || !valid_hex(&self.workspace_key, 64)
+            || !valid_hex(&self.token, 64)
+            || !port.is_some_and(|p| p >= 1024 && self.origin == format!("http://127.0.0.1:{p}"))
+        {
+            return Err(LifecycleError::DiscoveryInvalid);
+        }
+        Ok(())
+    }
+}
+
+pub fn read_discovery(path: &Path) -> Result<Discovery, LifecycleError> {
+    let (mut file, _) = open_private(path).map_err(|_| LifecycleError::UnsafePath)?;
+    let mut bytes = Vec::new();
+    Read::by_ref(&mut file)
+        .take(16 * 1024 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| LifecycleError::Io)?;
+    if bytes.len() > 16 * 1024 {
+        return Err(LifecycleError::DiscoveryInvalid);
+    }
+    let record: Discovery =
+        serde_json::from_slice(&bytes).map_err(|_| LifecycleError::DiscoveryInvalid)?;
+    record.validate()?;
+    Ok(record)
+}
+
+pub struct PublishedDiscovery {
+    pub path: PathBuf,
+    instance_id: String,
+    directory: crate::private_fs::PrivateDir,
+}
+impl PublishedDiscovery {
+    /// Call only after listener/controller readiness, holding the workspace lock.
+    /// Runtime root must already be private; never silently repair its modes.
+    pub fn publish(
+        runtime: &Path,
+        record: &Discovery,
+        lock: &WorkspaceLock,
+    ) -> Result<Self, LifecycleError> {
+        record.validate()?;
+        if record.workspace_key != lock.workspace_key {
+            return Err(LifecycleError::DiscoveryInvalid);
+        }
+        let runtime_dir = crate::private_fs::PrivateDir::open(runtime)?;
+        let directory = runtime_dir.child(&record.workspace_key)?;
+        let staging = format!(".{}.tmp", record.instance_id);
+        let mut file = directory.create(&staging)?;
+        let result = (|| {
+            let bytes = serde_json::to_vec(record).map_err(|_| LifecycleError::DiscoveryInvalid)?;
+            file.write_all(&bytes).map_err(|_| LifecycleError::Io)?;
+            file.sync_all().map_err(|_| LifecycleError::Io)?;
+            directory
+                .rename(&staging, "discovery.json", false)
+                .map_err(|_| LifecycleError::Io)?;
+            directory.sync().map_err(|_| LifecycleError::Io)?;
+            Ok(())
+        })();
+        if let Err(error) = result {
+            let _ = directory.remove(&staging);
+            return Err(error);
+        }
+        Ok(Self {
+            path: runtime.join(&record.workspace_key).join("discovery.json"),
+            instance_id: record.instance_id.clone(),
+            directory,
+        })
+    }
+}
+impl Drop for PublishedDiscovery {
+    fn drop(&mut self) {
+        // Move the exact record into an exclusive private cleanup slot before
+        // inspecting it, so a replacement at the public name is never unlinked.
+        let cleanup = format!(".{}.cleanup", self.instance_id);
+        if self
+            .directory
+            .rename("discovery.json", &cleanup, true)
+            .is_err()
+        {
+            return;
+        }
+        let own = (|| {
+            let file = self.directory.read(&cleanup).ok()?;
+            let mut bytes = Vec::new();
+            file.take(16385).read_to_end(&mut bytes).ok()?;
+            if bytes.len() > 16384 {
+                return None;
+            }
+            let record: Discovery = serde_json::from_slice(&bytes).ok()?;
+            record.validate().ok()?;
+            Some(record.instance_id == self.instance_id)
+        })()
+        .unwrap_or(false);
+        if own {
+            let _ = self.directory.remove(&cleanup);
+        } else {
+            // Never clobber a third record installed while the check ran. If
+            // restoration loses that race, preserve the moved record privately.
+            let _ = self.directory.rename(&cleanup, "discovery.json", true);
+        }
+        let _ = self.directory.sync();
+    }
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+impl From<ConfigError> for LifecycleError {
+    fn from(_: ConfigError) -> Self {
+        Self::UnsafePath
+    }
+}
+
+#[cfg(test)]
+mod tests;

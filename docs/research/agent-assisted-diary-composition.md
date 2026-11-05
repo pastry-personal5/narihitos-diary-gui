@@ -17,21 +17,21 @@ Rechecked `--version`, `codex exec --help`, `claude --help`, and `qwen --help` l
 
 ## Comparison
 
-| | Codex | Claude Code | Qwen Code |
-|---|---|---|---|
-| Profile / login dir | `CODEX_HOME` (checked: empty dir = "Not logged in") | `CLAUDE_CONFIG_DIR` (checked: empty dir = `loggedIn: false`) | `QWEN_HOME` (checked: empty dir is used as the new home; the CLI warns that existing config is not migrated) |
-| Login | `codex login` into that dir; ChatGPT plan or API key | `claude auth` into that dir; claude.ai plan or API key | No `qwen auth` (removed). Edit `settings.json` in that dir: `modelProviders`, `env` (API key), `security.auth.selectedType`; or `--auth-type` |
-| One-shot headless | `codex exec -` (stdin prompt) | `claude -p` (stdin prompt) | `qwen "<prompt>"` or stdin |
-| Streaming events | `exec --json` NDJSON | `--output-format stream-json --include-partial-messages` (needs `--verbose` in some versions) | `-o stream-json --include-partial-messages` |
-| Schema-constrained final answer | `exec --output-schema FILE`; app-server `turn/start.outputSchema` | `--json-schema` returns `structured_output` | `--json-schema` (headless only; registers a synthetic `structured_output` tool; session ends on first valid call; rejected with `--input-format stream-json`) |
-| Persistent multi-turn process | `codex app-server` JSON-RPC (experimental) | `-p --input-format stream-json --output-format stream-json` | `--input-format stream-json` (documented as under construction); `--acp`; `qwen serve` daemon (experimental) |
-| Cancel | app-server `turn/interrupt`, or kill | kill | kill |
-| No session files | `--ephemeral` | `--no-session-persistence` | `--chat-recording=false` explicitly (default unverified) |
-| Tools off | no flag; confine by sandbox, empty `cwd`, approvals never | `--tools ""` | `--max-tool-calls 0` (`structured_output` is exempt), `--exclude-tools` (tool names unverified) |
-| MCP off | `-c mcp_servers={}` (see gap below) | `--strict-mcp-config` with no `--mcp-config` | `--safe-mode`/`--bare`; `--disable-mcp-server` requires server names |
-| Ignore user/project config | `--ignore-user-config`, `--ignore-rules` | `--setting-sources ""`, `--disable-slash-commands`, `--bare` (API-key auth only), `--restricted` | `--bare`, `--safe-mode` |
-| Limits | tokens via `thread/tokenUsage/updated` | `--max-budget-usd`, `--max-turns` | `--max-wall-time` (exit code 55), `--max-session-turns` |
-| Error signal | exit status; app-server `CodexErrorInfo` (`unauthorized`, `usageLimitExceeded`, `contextWindowExceeded`, `httpConnectionFailed`, ...) | exit status and the final `result` message | exit status; in `json`/`stream-json` the failure `result` message is on stdout |
+|                                 | Codex                                                                                                                                 | Claude Code                                                                                      | Qwen Code                                                                                                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Profile / login dir             | `CODEX_HOME` (checked: empty dir = "Not logged in")                                                                                   | `CLAUDE_CONFIG_DIR` (checked: empty dir = `loggedIn: false`)                                     | `QWEN_HOME` (checked: empty dir is used as the new home; the CLI warns that existing config is not migrated)                                                  |
+| Login                           | `codex login` into that dir; ChatGPT plan or API key                                                                                  | `claude auth` into that dir; claude.ai plan or API key                                           | No `qwen auth` (removed). Edit `settings.json` in that dir: `modelProviders`, `env` (API key), `security.auth.selectedType`; or `--auth-type`                 |
+| One-shot headless               | `codex exec -` (stdin prompt)                                                                                                         | `claude -p` (stdin prompt)                                                                       | `qwen "<prompt>"` or stdin                                                                                                                                    |
+| Streaming events                | `exec --json` NDJSON                                                                                                                  | `--output-format stream-json --include-partial-messages` (needs `--verbose` in some versions)    | `-o stream-json --include-partial-messages`                                                                                                                   |
+| Schema-constrained final answer | `exec --output-schema FILE`; app-server `turn/start.outputSchema`                                                                     | `--json-schema` returns `structured_output`                                                      | `--json-schema` (headless only; registers a synthetic `structured_output` tool; session ends on first valid call; rejected with `--input-format stream-json`) |
+| Persistent multi-turn process   | `codex app-server` JSON-RPC (experimental)                                                                                            | `-p --input-format stream-json --output-format stream-json`                                      | `--input-format stream-json` (documented as under construction); `--acp`; `qwen serve` daemon (experimental)                                                  |
+| Cancel                          | app-server `turn/interrupt`, or kill                                                                                                  | kill                                                                                             | kill                                                                                                                                                          |
+| No session files                | `--ephemeral`                                                                                                                         | `--no-session-persistence`                                                                       | `--chat-recording=false` explicitly (default unverified)                                                                                                      |
+| Tools off                       | no flag; confine by sandbox, empty `cwd`, approvals never                                                                             | `--tools ""`                                                                                     | `--max-tool-calls 0` (`structured_output` is exempt), `--exclude-tools` (tool names unverified)                                                               |
+| MCP off                         | `-c mcp_servers={}` (see gap below)                                                                                                   | `--strict-mcp-config` with no `--mcp-config`                                                     | `--safe-mode`/`--bare`; `--disable-mcp-server` requires server names                                                                                          |
+| Ignore user/project config      | `--ignore-user-config`, `--ignore-rules`                                                                                              | `--setting-sources ""`, `--disable-slash-commands`, `--bare` (API-key auth only), `--restricted` | `--bare`, `--safe-mode`                                                                                                                                       |
+| Limits                          | tokens via `thread/tokenUsage/updated`                                                                                                | `--max-budget-usd`, `--max-turns`                                                                | `--max-wall-time` (exit code 55), `--max-session-turns`                                                                                                       |
+| Error signal                    | exit status; app-server `CodexErrorInfo` (`unauthorized`, `usageLimitExceeded`, `contextWindowExceeded`, `httpConnectionFailed`, ...) | exit status and the final `result` message                                                       | exit status; in `json`/`stream-json` the failure `result` message is on stdout                                                                                |
 
 Notes on the table:
 
@@ -81,6 +81,7 @@ Login is done by the owner in a terminal with the same home variable. The GUI on
   ```
 
   Parse with Serde, reject malformed output (no free-text recovery), check every `snippet_id` exists. `claim_support` is an audit aid, not proof; the user reads the draft. Inferred feelings or reflections go in `warnings`, not stated as fact.
+
 - **Optional two-pass.** For long days, a first pass extracts atomic memories (`fact`, `snippet_ids`, `importance`) and a second writes from the kept ones. This adds selection and provenance-audit complexity; no source-backed diary-specific quality comparison or measurement has been performed. Start with one pass.
 - **Persistence.** Candidates are transient. The owner clarified that Authentic draft and Authentic Entry are one autosaved file (R3.4/R12); do not create separate saved draft/Entry copies.
 - **Quality varies by agent.** Same prompt and schema do not give equal writing. Do not rank agents without a source-linked human comparison on synthetic notes; no such comparison has been done.
@@ -110,17 +111,17 @@ Residual risk to state to the owner: for Codex and Qwen an agent that still gets
 
 ## R5.5 Failure and cost handling
 
-| Failure | Detection | Behavior |
-|---|---|---|
-| CLI missing | spawn error | Disable that agent; show an install hint; editor and import still work. |
-| Version too old | `--version` check | Same, with the required version. |
-| Not logged in or key missing | status check; auth errors in the result | Tell the owner which alias to sign in with in a terminal. |
-| Usage or rate limit | Codex `usageLimitExceeded`/`rateLimitExceeded`; Claude and Qwen result errors | Show the reset time if given; offer another configured agent. |
-| Context too large | Codex `contextWindowExceeded`; result errors | Ask the user to uncheck Snippets or shorten the chat; never truncate silently. |
-| Network or server error | exit status, `httpConnectionFailed`, 429/503 | Show state; manual retry. Qwen `--fallback-model` and Claude `--fallback-model` exist but are not needed in v1. |
-| Hang | no event for T seconds; Qwen `--max-wall-time` | Kill the child. T is a config value; default chosen in P1-M2. |
-| Bad output | Serde or snippet-id check fails | Mark that candidate failed; keep others. |
-| App exit | window close | Kill all children. |
+| Failure                      | Detection                                                                     | Behavior                                                                                                        |
+| ---------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| CLI missing                  | spawn error                                                                   | Disable that agent; show an install hint; editor and import still work.                                         |
+| Version too old              | `--version` check                                                             | Same, with the required version.                                                                                |
+| Not logged in or key missing | status check; auth errors in the result                                       | Tell the owner which alias to sign in with in a terminal.                                                       |
+| Usage or rate limit          | Codex `usageLimitExceeded`/`rateLimitExceeded`; Claude and Qwen result errors | Show the reset time if given; offer another configured agent.                                                   |
+| Context too large            | Codex `contextWindowExceeded`; result errors                                  | Ask the user to uncheck Snippets or shorten the chat; never truncate silently.                                  |
+| Network or server error      | exit status, `httpConnectionFailed`, 429/503                                  | Show state; manual retry. Qwen `--fallback-model` and Claude `--fallback-model` exist but are not needed in v1. |
+| Hang                         | no event for T seconds; Qwen `--max-wall-time`                                | Kill the child. T is a config value; default chosen in P1-M2.                                                   |
+| Bad output                   | Serde or snippet-id check fails                                               | Mark that candidate failed; keep others.                                                                        |
+| App exit                     | window close                                                                  | Kill all children.                                                                                              |
 
 Because error text differs per agent, map to a small shared kind set (`missing`, `auth`, `limit`, `context`, `network`, `timeout`, `invalid_output`, `other`) in each adapter; keep raw text out of logs. Cost: show token usage where the agent reports it; use supported per-agent limits (Claude money budget, Qwen wall time, and an app-level candidate/concurrency cap); do not promise one universal cost cap. Log neither prompts nor responses.
 

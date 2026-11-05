@@ -28,13 +28,13 @@ Owner-approved exception: P1-M1 Research and P1-M2 Architecture produce document
 
 Create a phase directory when planning that phase.
 
-| File | Purpose |
-|---|---|
-| `docs/roadmap.md` | All phases with ID, title, status, and phase-doc link; the sole authority for the active phase. |
-| `docs/phase-N/phase-N.md` | Phase goal, exit criteria, and brief milestone entries. |
-| `docs/phase-N/milestone-NN-<theme>-overview.md` | Milestone goal, in/out scope, and completion checklist. |
-| `docs/phase-N/milestone-NN-<theme>-architecture.md` | Affected modules, interfaces, approach, and sequencing. |
-| `docs/phase-N/changelog.md` | Reverse-chronological decisions and plan changes not clear from commits. |
+| File                                                | Purpose                                                                                         |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `docs/roadmap.md`                                   | All phases with ID, title, status, and phase-doc link; the sole authority for the active phase. |
+| `docs/phase-N/phase-N.md`                           | Phase goal, exit criteria, and brief milestone entries.                                         |
+| `docs/phase-N/milestone-NN-<theme>-overview.md`     | Milestone goal, in/out scope, and completion checklist.                                         |
+| `docs/phase-N/milestone-NN-<theme>-architecture.md` | Affected modules, interfaces, approach, and sequencing.                                         |
+| `docs/phase-N/changelog.md`                         | Reverse-chronological decisions and plan changes not clear from commits.                        |
 
 `N` is the phase number. `NN` is the zero-padded milestone number matching its ID; `<theme>` is kebab-case. Do not use a generic `phase.md` filename.
 
@@ -47,11 +47,13 @@ Status: Active
 Goal: <one sentence>
 
 ## Exit criteria
+
 - <observable outcome>
 
 ## Milestones
 
 ### P1-M1: <title>
+
 Status: Done
 Goal: <one sentence>
 Plan: [overview](milestone-01-<theme>-overview.md), [architecture](milestone-01-<theme>-architecture.md)

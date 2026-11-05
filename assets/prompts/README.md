@@ -36,11 +36,11 @@ File format: a `---` front matter block with `provider`, `model`, and
 
 ## Existing inventory and acceptance gaps
 
-| Agent type | Existing files | Outstanding coverage |
-|---|---|---|
+| Agent type                | Existing files                                                                                                                                                                                                                                                                                                                             | Outstanding coverage                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
 | `apple-foundation-models` | [session-instructions.md](apple-foundation-models/session-instructions.md), [draft-entry.md](apple-foundation-models/draft-entry.md), [extract-memories.md](apple-foundation-models/extract-memories.md), [refine-source.md](apple-foundation-models/refine-source.md), [review-paragraph.md](apple-foundation-models/review-paragraph.md) | Validate native guided output and reconcile with the approved generation/chat contract |
-| `codex` | [draft-entry.md](codex/draft-entry.md), [extract-memories.md](codex/extract-memories.md), [refine-source.md](codex/refine-source.md), [review-paragraph.md](codex/review-paragraph.md) | Validate configured model/effort, generation schema and chat instructions |
-| `claude`, `qwen` | None yet | Add agent-specific assets before enabling their actions |
+| `codex`                   | [draft-entry.md](codex/draft-entry.md), [extract-memories.md](codex/extract-memories.md), [refine-source.md](codex/refine-source.md), [review-paragraph.md](codex/review-paragraph.md)                                                                                                                                                     | Validate configured model/effort, generation schema and chat instructions              |
+| `claude`, `qwen`          | None yet                                                                                                                                                                                                                                                                                                                                   | Add agent-specific assets before enabling their actions                                |
 
 These supplied templates are preserved inputs to future integration. Their
 `reviewed_memory` and reflection-range fields do not yet match the generation

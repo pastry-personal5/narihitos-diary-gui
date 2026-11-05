@@ -1,0 +1,19 @@
+{
+  "identifier": "main",
+  "description": "Explicit scaffold commands for the local main window only",
+  "local": true,
+  "windows": ["main"],
+  "permissions": [
+    "allow-connect-server",
+    "allow-get-status",
+    "allow-open-session",
+    "allow-heartbeat-session",
+    "allow-close-session",
+    "allow-get-settings",
+    "allow-get-job",
+    "allow-list-jobs",
+    "allow-cancel-job",
+    "allow-subscribe-events",
+    "allow-get-app-metadata"
+  ]
+}

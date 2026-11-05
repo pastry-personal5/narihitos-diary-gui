@@ -156,16 +156,16 @@ Each findings document must identify covered subitem IDs, research date and insp
 
 ### Findings register
 
-| Items | Evidence | Remaining work |
-|---|---|---|
-| R1.1–R1.6, R2.1–R2.4 | [Sources/prior art](../research/source-formats-and-prior-art.md) | Producer coverage limits and import/revision policy remain explicit. Source-write interoperability needs verification. |
-| R3.1–R3.8, R12.1–R12.4 | [Storage/lifecycle](../research/storage-and-asset-lifecycle.md) | Compare engines and choose identity/recovery contracts in P1-M2; pending-save/adoption semantics need owner decisions. |
-| R4.1–R4.6, R14.1–R14.3 | [Tauri/macOS/validation](../research/tauri-macos-and-validation.md), partial | Packaged access/process feasibility and distribution requirements remain unverified. |
-| R5.1–R5.5 | [Agent findings](../research/agent-assisted-diary-composition.md), partial | Live schema/confinement/persistence evidence still missing; dependent claims blocked. |
-| R6.1–R6.5, R9.1–R9.5, R11.1–R11.2 | [Export/config/versioning](../research/export-config-and-versioning.md) | Export hierarchy/config discovery/secret strategy need decisions; real service/platform behavior not exercised. |
-| R7.1–R7.8, R10.1–R10.3 | [Frontend/licensing](../research/frontend-and-licensing.md), partial | Inspected SF Symbols license does not clear bitmap bundling; canonical UX docs and packaged accessibility evidence remain incomplete. |
-| R8.1–R8.3 | [Date/time](../research/date-and-time.md) | Capture import zone and preserve Entry date confirmed; choose library and ambiguity policy in P1-M2. |
-| R13.1–R13.4 | [Trust/source mutations](../research/trust-boundaries-and-source-mutations.md), partial | Verify effective tool/config restrictions and source-pair operations before dependent decisions/features. |
+| Items                             | Evidence                                                                                | Remaining work                                                                                                                        |
+| --------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| R1.1–R1.6, R2.1–R2.4              | [Sources/prior art](../research/source-formats-and-prior-art.md)                        | Producer coverage limits and import/revision policy remain explicit. Source-write interoperability needs verification.                |
+| R3.1–R3.8, R12.1–R12.4            | [Storage/lifecycle](../research/storage-and-asset-lifecycle.md)                         | Compare engines and choose identity/recovery contracts in P1-M2; pending-save/adoption semantics need owner decisions.                |
+| R4.1–R4.6, R14.1–R14.3            | [Tauri/macOS/validation](../research/tauri-macos-and-validation.md), partial            | Packaged access/process feasibility and distribution requirements remain unverified.                                                  |
+| R5.1–R5.5                         | [Agent findings](../research/agent-assisted-diary-composition.md), partial              | Live schema/confinement/persistence evidence still missing; dependent claims blocked.                                                 |
+| R6.1–R6.5, R9.1–R9.5, R11.1–R11.2 | [Export/config/versioning](../research/export-config-and-versioning.md)                 | Export hierarchy/config discovery/secret strategy need decisions; real service/platform behavior not exercised.                       |
+| R7.1–R7.8, R10.1–R10.3            | [Frontend/licensing](../research/frontend-and-licensing.md), partial                    | Inspected SF Symbols license does not clear bitmap bundling; canonical UX docs and packaged accessibility evidence remain incomplete. |
+| R8.1–R8.3                         | [Date/time](../research/date-and-time.md)                                               | Capture import zone and preserve Entry date confirmed; choose library and ambiguity policy in P1-M2.                                  |
+| R13.1–R13.4                       | [Trust/source mutations](../research/trust-boundaries-and-source-mutations.md), partial | Verify effective tool/config restrictions and source-pair operations before dependent decisions/features.                             |
 
 Split rows as findings arrive. A deferral must name its subitem IDs, reason, destination milestone, and consequence for P1-M2. Do not mark a partial item complete merely because a findings document exists.
 

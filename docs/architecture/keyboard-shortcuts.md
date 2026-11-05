@@ -12,20 +12,20 @@ Scopes: `app` fires wherever focus is in the window; `snippetTree` fires only wh
 
 Factory defaults. Shortcuts use macOS names; the stored key names are `Command`, `Shift`, `Option`, `Control` plus a key such as `P`, `S`, `Backspace` or `ForwardDelete` (the Delete key that removes forward).
 
-| Action ID | Action | Scope | Default shortcuts |
-|---|---|---|---|
-| `palette.open` | Open command palette | `app` | Shift+Command+P |
-| `editor.save` | Explicitly save the active source or flush the active Authentic editor | `app` | Command+S |
-| `authentic.create_empty` | Create Empty for the selected date; immediately save an empty Authentic file if absent | `app` | none |
-| `source.trash` | Move a source diary snippet and related files to Trash | `snippetTree` | Shift+Backspace, Shift+ForwardDelete, Command+Backspace, Command+ForwardDelete |
-| `source.refresh` | Refresh imported snippets | `app` | none |
-| `generate.start` | Generate candidates | `app` | none |
-| `ai.activity.open` | Open AI activity details in the Main Toolbar Strip | `app` | none |
-| `ai.run.cancel` | Cancel the active AI job; keep completed candidates | `app` | none |
-| `ai.results.open` | View the selected job's results after normal date/save guards | `app` | none |
-| `ai.results.discard` | Explicitly discard completed transient results after review guards | `app` | none |
-| `export.start` | Start export of the saved revision | `app` | none |
-| `settings.open` | Open Settings | `app` | none |
+| Action ID                | Action                                                                                 | Scope         | Default shortcuts                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------ |
+| `palette.open`           | Open command palette                                                                   | `app`         | Shift+Command+P                                                                |
+| `editor.save`            | Explicitly save the active source or flush the active Authentic editor                 | `app`         | Command+S                                                                      |
+| `authentic.create_empty` | Create Empty for the selected date; immediately save an empty Authentic file if absent | `app`         | none                                                                           |
+| `source.trash`           | Move a source diary snippet and related files to Trash                                 | `snippetTree` | Shift+Backspace, Shift+ForwardDelete, Command+Backspace, Command+ForwardDelete |
+| `source.refresh`         | Refresh imported snippets                                                              | `app`         | none                                                                           |
+| `generate.start`         | Generate candidates                                                                    | `app`         | none                                                                           |
+| `ai.activity.open`       | Open AI activity details in the Main Toolbar Strip                                     | `app`         | none                                                                           |
+| `ai.run.cancel`          | Cancel the active AI job; keep completed candidates                                    | `app`         | none                                                                           |
+| `ai.results.open`        | View the selected job's results after normal date/save guards                          | `app`         | none                                                                           |
+| `ai.results.discard`     | Explicitly discard completed transient results after review guards                     | `app`         | none                                                                           |
+| `export.start`           | Start export of the saved revision                                                     | `app`         | none                                                                           |
+| `settings.open`          | Open Settings                                                                          | `app`         | none                                                                           |
 
 `source.trash` only opens the existing [delete preview](sources-and-dates.md#related-audio-and-trash); the confirmation step is unchanged, so no shortcut deletes without it. Actions without a default stay unbound until the user assigns one. This registry lists the GUI actions defined so far; adding an action means adding a row here and a registry entry, never a hard-coded key handler.
 
@@ -40,12 +40,12 @@ Factory defaults. Shortcuts use macOS names; the stored key names are `Command`,
 
 Settings has a sidebar with status, writing language and **Keyboard Shortcuts**. The Keyboard Shortcuts section shows a table with one row per action:
 
-| Column | Content |
-|---|---|
-| Action | Visible action label |
-| Original shortcuts | Factory defaults, read-only, or "None" |
-| Current shortcuts | Effective bindings; changed ones are marked "Modified" |
-| Info | Scope and what the action does, plus a conflict or reserved-key message for the row in edit |
+| Column             | Content                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| Action             | Visible action label                                                                        |
+| Original shortcuts | Factory defaults, read-only, or "None"                                                      |
+| Current shortcuts  | Effective bindings; changed ones are marked "Modified"                                      |
+| Info               | Scope and what the action does, plus a conflict or reserved-key message for the row in edit |
 
 The row has Edit and Reset controls; a Reset all button restores every default after confirmation. Edit enters capture mode ("Press a shortcut"); a keypress is recorded, Escape cancels, and a chip list lets the user add another shortcut or remove one. Capture respects IME composition. The table is keyboard-operable with text names for every control, and shortcuts are exposed as text to VoiceOver (for example "Shift plus Command plus P"). A search field may filter rows; it adds no other behavior.
 

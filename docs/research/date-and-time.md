@@ -20,12 +20,12 @@ Do not scan only the three UTC folders bearing the local date names. For positiv
 
 ## R8.2 Library comparison
 
-| Option | Evidence | Tradeoff for this app |
-|---|---|---|
-| Chrono 0.4.45 + Chrono-TZ 0.10.4 | [Chrono](https://docs.rs/chrono/0.4.45/chrono/) separates naive dates and timezone-aware values; [Chrono-TZ](https://docs.rs/chrono-tz/0.10.4/chrono_tz/) supplies named-zone rules | Familiar explicit types; named-zone database and updates must be managed alongside Chrono. Conversion can return unique, ambiguous, or missing local times. |
-| Jiff 0.2.39 | [Jiff docs](https://docs.rs/jiff/0.2.39/jiff/) integrate timestamps, civil values, spans, and named zones | Fits calendar arithmetic directly; defaults resolve some ambiguity automatically, so app policy must still be explicit. Check timezone-database feature behavior and binary footprint in P1-M2. |
-| TypeScript `Intl.DateTimeFormat` | [ECMA-402 date formatting](https://tc39.es/ecma402/#datetimeformat-objects) | Suitable for display with an explicit zone, not the sole owner of timezone interval calculations. |
-| JavaScript Temporal | [Temporal specification](https://tc39.es/proposal-temporal/) defines separate plain dates, instants, and zoned datetimes | Availability in the target WKWebView is not established by a Node version or a browser preview. Feature-detect and test the actual minimum supported macOS before relying on it; a polyfill would be a new dependency requiring approval. |
+| Option                           | Evidence                                                                                                                                                                            | Tradeoff for this app                                                                                                                                                                                                                     |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chrono 0.4.45 + Chrono-TZ 0.10.4 | [Chrono](https://docs.rs/chrono/0.4.45/chrono/) separates naive dates and timezone-aware values; [Chrono-TZ](https://docs.rs/chrono-tz/0.10.4/chrono_tz/) supplies named-zone rules | Familiar explicit types; named-zone database and updates must be managed alongside Chrono. Conversion can return unique, ambiguous, or missing local times.                                                                               |
+| Jiff 0.2.39                      | [Jiff docs](https://docs.rs/jiff/0.2.39/jiff/) integrate timestamps, civil values, spans, and named zones                                                                           | Fits calendar arithmetic directly; defaults resolve some ambiguity automatically, so app policy must still be explicit. Check timezone-database feature behavior and binary footprint in P1-M2.                                           |
+| TypeScript `Intl.DateTimeFormat` | [ECMA-402 date formatting](https://tc39.es/ecma402/#datetimeformat-objects)                                                                                                         | Suitable for display with an explicit zone, not the sole owner of timezone interval calculations.                                                                                                                                         |
+| JavaScript Temporal              | [Temporal specification](https://tc39.es/proposal-temporal/) defines separate plain dates, instants, and zoned datetimes                                                            | Availability in the target WKWebView is not established by a Node version or a browser preview. Feature-detect and test the actual minimum supported macOS before relying on it; a polyfill would be a new dependency requiring approval. |
 
 Recommendation: perform canonical selection/date conversion in Rust and send ISO civil dates/instants plus the operation zone through Tauri. Keep frontend calendar navigation civil-date based. P1-M2 selects the Rust library after checking license/features and missing-time behavior; no dependency is adopted here. [Chrono's `LocalResult`](https://docs.rs/chrono/0.4.45/chrono/offset/enum.LocalResult.html) explicitly represents gaps/folds. Jiff offers explicit disambiguation in addition to its defaults. Neither library removes the need for product rules.
 
@@ -33,11 +33,11 @@ Recommendation: perform canonical selection/date conversion in Rust and send ISO
 
 Ran an in-memory Python `datetime`/`zoneinfo` check using synthetic dates; start/end were constructed as civil midnights, then converted to UTC before subtracting. Expected and observed:
 
-| Zone/day | UTC start → UTC end | Elapsed hours |
-|---|---|---|
-| New York, 2026-03-08 | 05:00Z → next day 04:00Z | 23 |
-| New York, 2026-11-01 | 04:00Z → next day 05:00Z | 25 |
-| Seoul, 2026-01-01 | prior year 12-31 15:00Z → 01-01 15:00Z | 24 |
+| Zone/day             | UTC start → UTC end                    | Elapsed hours |
+| -------------------- | -------------------------------------- | ------------- |
+| New York, 2026-03-08 | 05:00Z → next day 04:00Z               | 23            |
+| New York, 2026-11-01 | 04:00Z → next day 05:00Z               | 25            |
+| Seoul, 2026-01-01    | prior year 12-31 15:00Z → 01-01 15:00Z | 24            |
 
 All three expected durations matched. This validates the reasoning against the host Python timezone data only, not an unimplemented Rust module or WKWebView. Add Rust fixtures for these cases, exact half-open boundaries, leap days, non-hour offsets, repeated local times, skipped midnight/date, malformed instants, changed system zone, and an Entry saved days after its diary date. Compare the full three-date inclusion set, not just interval length.
 

@@ -3,6 +3,7 @@ provider: apple-foundation-models
 model: default
 reasoning_effort: not-applicable
 ---
+
 You are a celebrated, award-winning novelist and a careful editor of private
 diaries. Rework the single diary paragraph so it reads like a precious, natural
 page from a real person's day: concrete, warm, and rhythmic, in the same

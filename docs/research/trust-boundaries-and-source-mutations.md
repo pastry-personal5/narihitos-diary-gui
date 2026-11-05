@@ -6,14 +6,14 @@ Research date: 2026-11-05. Covers R13.1–R13.4 and supplements R1/R5/R12 with t
 
 ## R13.1 Data flows and retention
 
-| Boundary | Allowed data/task to design | Exposure or retention to account for |
-|---|---|---|
-| WebView → Rust commands | Asset/source/profile/job IDs, explicit edit/save/delete requests | Frontend arguments are untrusted; validate type, ownership, revision, and operation scope in Rust |
-| Source folder → managed catalog/files | Bounded Markdown and provenance | Imported text/front matter may contain instructions, links, paths, malformed structures, and private metadata |
-| Editor/selected snippets → agent process → provider | Explicitly selected drafting/chat content | Provider account retention, CLI session logs, inherited hooks/tools/MCP, temp files, telemetry, diagnostic output |
-| Rust → Notion/iCloud export | A selected saved Authentic revision | Remote retention and edits; local receipt ownership and export state |
-| Rust → external source edit/delete | Explicit user action; delete confirmation | Concurrent mobile edits, associated audio ownership, partial failure, cloud conflict/download state |
-| Content → local history/index/backups | Revisions, provenance, receipts | Deleted text may remain in history; a rebuildable index is different from durable receipts/IDs |
+| Boundary                                            | Allowed data/task to design                                      | Exposure or retention to account for                                                                              |
+| --------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| WebView → Rust commands                             | Asset/source/profile/job IDs, explicit edit/save/delete requests | Frontend arguments are untrusted; validate type, ownership, revision, and operation scope in Rust                 |
+| Source folder → managed catalog/files               | Bounded Markdown and provenance                                  | Imported text/front matter may contain instructions, links, paths, malformed structures, and private metadata     |
+| Editor/selected snippets → agent process → provider | Explicitly selected drafting/chat content                        | Provider account retention, CLI session logs, inherited hooks/tools/MCP, temp files, telemetry, diagnostic output |
+| Rust → Notion/iCloud export                         | A selected saved Authentic revision                              | Remote retention and edits; local receipt ownership and export state                                              |
+| Rust → external source edit/delete                  | Explicit user action; delete confirmation                        | Concurrent mobile edits, associated audio ownership, partial failure, cloud conflict/download state               |
+| Content → local history/index/backups               | Revisions, provenance, receipts                                  | Deleted text may remain in history; a rebuildable index is different from durable receipts/IDs                    |
 
 Recommendation: Rust builds separate body-only agent packets, minimizing metadata by default; chat uses an explicit snapshot/revision of the active document, not an arbitrary filesystem path. Show the profile/provider and content scope in the action flow. Whether transcripts persist and the provider-retention policy acceptable to the owner remain product questions. Do not assume deleting a local file erases provider copies, cloud versions, or history.
 
@@ -39,13 +39,13 @@ For delete, resolve the related-file set in Rust from validated source metadata/
 
 ## R13.4 Verification proposals and decision blockers
 
-| Check | Setup and expected evidence | Destination/dependent decision |
-|---|---|---|
-| CLI effective customization surface | Fresh owner-private temp cwd, synthetic profiles/config with sentinel hook/MCP; inspect advertised/effective settings and any sentinel invocation without private data | Feasibility evidence before P1-M2 chooses a confinement/auth strategy; live schema/model behavior remains separate |
-| Tool denial and persistence | Synthetic allowed/forbidden sentinel files, prompt attempting read/write/tool use, explicit no-session flags; inspect accesses and temp/profile artifacts | One explicitly approved synthetic live run per agent if execution is necessary; blocks claims of confidential text-only operation until verified |
-| Cancellation | Fake child/grandchild emitting bounded streams, plus real CLI cancellation later; verify all descendants reaped and no late writes/events | Process-runner implementation acceptance, not proof from a direct child kill |
-| Parser/path boundary | Malformed/oversized Markdown, traversal links, symlink swaps, root overlap | Rust adapter fixtures before source writes/import ship |
-| Source pair update/delete | Synthetic Markdown/audio pairs, stale mobile rewrite, unavailable placeholder, failure after each individual mutation | Source feature milestone before enabling edit/delete; choose Trash/partial-recovery contract in P1-M2 |
+| Check                               | Setup and expected evidence                                                                                                                                            | Destination/dependent decision                                                                                                                   |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CLI effective customization surface | Fresh owner-private temp cwd, synthetic profiles/config with sentinel hook/MCP; inspect advertised/effective settings and any sentinel invocation without private data | Feasibility evidence before P1-M2 chooses a confinement/auth strategy; live schema/model behavior remains separate                               |
+| Tool denial and persistence         | Synthetic allowed/forbidden sentinel files, prompt attempting read/write/tool use, explicit no-session flags; inspect accesses and temp/profile artifacts              | One explicitly approved synthetic live run per agent if execution is necessary; blocks claims of confidential text-only operation until verified |
+| Cancellation                        | Fake child/grandchild emitting bounded streams, plus real CLI cancellation later; verify all descendants reaped and no late writes/events                              | Process-runner implementation acceptance, not proof from a direct child kill                                                                     |
+| Parser/path boundary                | Malformed/oversized Markdown, traversal links, symlink swaps, root overlap                                                                                             | Rust adapter fixtures before source writes/import ship                                                                                           |
+| Source pair update/delete           | Synthetic Markdown/audio pairs, stale mobile rewrite, unavailable placeholder, failure after each individual mutation                                                  | Source feature milestone before enabling edit/delete; choose Trash/partial-recovery contract in P1-M2                                            |
 
 No claim of paid/live inference, effective hook suppression, persistence cleanup, third-party subscription-term permission, or macOS sandbox confinement is made. Vendor/account policy and required credentials must be resolved before distribution; execution spikes must not send real diary content. These are explicit blockers on the relevant decisions, not reasons to invent broader permissions.
 

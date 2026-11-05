@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = [".", "crates/*"]
+default-members = [".", "crates/diary-domain", "crates/diary-application", "crates/diary-infrastructure", "crates/diary-api", "crates/diary-server"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+license = "Apache-2.0"
+rust-version = "1.98"
+
+[workspace.dependencies]
+diary-domain = { path = "crates/diary-domain" }
+diary-application = { path = "crates/diary-application" }
+diary-infrastructure = { path = "crates/diary-infrastructure" }
+diary-api = { path = "crates/diary-api" }
+
+[package]
+name = "diary-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tauri = { version = "=2.12.5", features = [] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+reqwest = { version = "=0.13.5", default-features = false, features = ["json", "stream"] }
+tokio = { version = "=1.54.1", features = ["sync", "time"] }
+uuid = { version = "=1.29.0", features = ["v4"] }
+libc = "=0.2.191"
+futures-util = "=0.3.34"
+
+[build-dependencies]
+tauri-build = { version = "=2.7.4", features = [] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+scaffold-smoke = []
+
+[dev-dependencies]
+tempfile = "=3.27.0"
+tokio = { version = "=1.54.1", features = ["macros", "rt", "test-util"] }

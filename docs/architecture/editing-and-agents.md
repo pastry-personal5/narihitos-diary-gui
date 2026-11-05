@@ -36,11 +36,11 @@ The application owns `AgentRunner`: `check(profile) -> ProfileStatus`, `run(Agen
 
 Profile states distinguish `missing`, `unsupported_version`, `unavailable`, `available_auth_unknown`, `unauthenticated`, `ready`, `busy`, `failed`. Read version/status only through verified non-inference checks, bounded to 5 seconds. Never read/copy login files or use a model turn as an auth probe. A missing optional CLI or unavailable system model disables only that profile. CLI adapter compatibility starts with exact versions/protocol fixtures from [agent research](../research/agent-assisted-diary-composition.md); unknown versions remain unsupported until checked, rather than assuming a universal minimum-version comparison proves compatibility.
 
-| Adapter | One-shot protocol family to validate | `profile_home` environment variable | Default binary on `PATH` |
-|---|---|---|---|
-| Codex | `exec`, stdin prompt, NDJSON and output-schema file | `CODEX_HOME` | `codex` |
-| Claude Code | print mode, stdin prompt, stream JSON and JSON Schema | `CLAUDE_CONFIG_DIR` | `claude` |
-| Qwen Code | headless stdin, stream JSON and JSON Schema | `QWEN_HOME` | `qwen` |
+| Adapter     | One-shot protocol family to validate                  | `profile_home` environment variable | Default binary on `PATH` |
+| ----------- | ----------------------------------------------------- | ----------------------------------- | ------------------------ |
+| Codex       | `exec`, stdin prompt, NDJSON and output-schema file   | `CODEX_HOME`                        | `codex`                  |
+| Claude Code | print mode, stdin prompt, stream JSON and JSON Schema | `CLAUDE_CONFIG_DIR`                 | `claude`                 |
+| Qwen Code   | headless stdin, stream JSON and JSON Schema           | `QWEN_HOME`                         | `qwen`                   |
 
 CLI profiles configure the selected home with `agents.profiles[].profile_home`. An optional `executable` overrides the default binary lookup in the server's launch `PATH`; resolve the chosen executable to an absolute path before checks or runs, following the [configuration contract](configuration-and-exports.md#configuration-schema-and-validation). An omitted override is valid; an unavailable executable or profile home disables only that profile. Apple profiles use neither CLI setting.
 

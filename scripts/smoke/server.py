@@ -1,0 +1,154 @@
+"""Synthetic standalone server lifecycle smoke; never loads private app config."""
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+import urllib.error
+
+binary = Path('src-tauri/target/debug/diary-server').resolve()
+with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
+    base = Path(temporary).resolve()
+    workspace, runtime = base / 'workspace', base / 'runtime'
+    for folder in [base, workspace, workspace / '.diary', runtime]:
+        folder.mkdir(exist_ok=True, mode=0o700)
+        folder.chmod(0o700)
+    lock = workspace / '.diary/workspace.lock'
+    lock.touch(mode=0o600)
+    readable, denied = base / 'readable-source', base / 'denied-source'
+    for folder in [readable, denied]:
+        folder.mkdir(mode=0o700)
+        (folder / 'sentinel.txt').write_text('synthetic scaffold sentinel\n')
+    denied.chmod(0o0)
+    config = base / 'config.yaml' 
+    config.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: smoke-readable, type: narihito, root: {readable}}}\n  - {{alias: smoke-denied, type: ayumi, root: {denied}}}\n')
+    config.chmod(0o600)
+    processes = []
+    def start():
+        process = subprocess.Popen([str(binary), '--config', str(config)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        processes.append(process)
+        for _ in range(200):
+            found = list(runtime.glob('*/discovery.json'))
+            if found and process.poll() is None:
+                candidate = json.loads(found[0].read_text())
+                if candidate['pid'] == process.pid:
+                    return process, found[0], candidate
+            if process.poll() is not None:
+                raise AssertionError('server exited before readiness')
+            time.sleep(0.01)
+        raise AssertionError('server readiness timeout')
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    def call(record, path, method='GET', payload=None, session=None, authorized=True):
+        headers = {'Authorization': 'Bearer ' + record['token']} if authorized else {}
+        if payload is not None:
+            headers['Content-Type'] = 'application/json'
+        if session:
+            headers['X-Diary-Session'] = session
+        request = urllib.request.Request(record['origin'] + '/api/v1' + path, data=None if payload is None else json.dumps(payload).encode(), headers=headers, method=method)
+        try:
+            with opener.open(request, timeout=2) as response:
+                data = response.read()
+                return response.status, json.loads(data) if data else None
+        except urllib.error.HTTPError as error:
+            return error.code, None
+        except urllib.error.URLError:
+            return 0, None
+    try:
+        first, discovery, record = start()
+        assert call(record, '/status', authorized=False)[0] == 401
+        code, status = call(record, '/status')
+        assert code == 200 and status['instance_id'] == record['instance_id'] and status['storage_ready'] is False
+        code, lease = call(record, '/sessions', 'POST', {})
+        assert code == 200
+        session = lease['session_id']
+        assert call(record, '/sessions', 'POST', {})[0] == 409
+        assert call(record, '/jobs', session=session)[0] == 200
+        assert call(record, '/sessions/' + session + '/heartbeat', 'POST', session=session)[0] == 204
+        second = subprocess.run([str(binary), '--config', str(config)], capture_output=True, text=True, timeout=3)
+        assert second.returncode != 0
+        assert json.loads(discovery.read_text())['instance_id'] == record['instance_id']
+        assert call(record, '/sessions/' + session, 'DELETE', session=session)[0] == 204
+        assert first.poll() is None
+        first.send_signal(signal.SIGTERM)
+        first.wait(timeout=3)
+        assert first.returncode == 0 and not discovery.exists()
+        restarted, discovery, fresh = start()
+        assert fresh['instance_id'] != record['instance_id'] and fresh['token'] != record['token']
+        restarted.kill()
+        restarted.wait(timeout=3)
+        assert discovery.exists()
+        assert call(fresh, '/status')[0] == 0
+        stale = fresh
+        restarted, discovery, fresh = start()
+        assert fresh['instance_id'] != stale['instance_id'] and fresh['token'] != stale['token']
+
+        if len(sys.argv) == 2:
+            app = Path(sys.argv[1]).resolve()
+            with (base / 'client.log').open('w+') as client_log:
+                client = subprocess.Popen([str(app), '--connect', str(discovery)], stdout=client_log, stderr=client_log, text=True)
+                processes.append(client)
+                for _ in range(180):
+                    client_log.seek(0)
+                    if 'SMOKE main_running_job_read' in client_log.read(): break
+                    if client.poll() is not None: raise AssertionError('native client exited before editor readiness')
+                    time.sleep(0.05)
+                keyboard_script = f'tell application "System Events"\nset targetProcess to first application process whose unix id is {client.pid}\nset frontmost of targetProcess to true\ndelay 0.3\ntell targetProcess to keystroke "synthetic keyboard sentinel"\nreturn {{frontmost of targetProcess, count of windows of targetProcess}}\nend tell'
+                keyboard = subprocess.run(['osascript', '-e', keyboard_script], check=True, capture_output=True, text=True, timeout=5)
+                print('Native target activation/window count: ' + keyboard.stdout.strip())
+                for _ in range(100):
+                    client_log.seek(0)
+                    if 'SMOKE main_cancelled_job_read' in client_log.read(): break
+                    time.sleep(0.05)
+                client_log.seek(0)
+                current_log=client_log.read()
+                if 'SMOKE main_cancelled_job_read' not in current_log:
+                    print('Native editor diagnostics: ' + ', '.join(line for line in current_log.splitlines() if line.startswith('SMOKE editor_probe ')))
+                    raise AssertionError('native editor did not observe typed sentinel')
+                with (base / 'competitor.log').open('w+') as competitor_log:
+                    competitor = subprocess.Popen([str(app), '--connect', str(discovery)], stdout=competitor_log, stderr=competitor_log, text=True)
+                    processes.append(competitor)
+                    for _ in range(80):
+                        competitor_log.seek(0)
+                        if 'SMOKE client_busy_rejected' in competitor_log.read(): break
+                        time.sleep(0.05)
+                    competitor_log.seek(0)
+                    assert 'SMOKE client_busy_rejected' in competitor_log.read(), 'missing competing packaged-client denial'
+                    competitor.terminate(); competitor.wait(timeout=5)
+                expected = {'SMOKE main_window_close_released', 'SMOKE main_window_destroyed', 'SMOKE main_metadata_allowed' , 'SMOKE main_handshake_allowed', 'SMOKE main_session_released', 'SMOKE secondary_command_denied', 'SMOKE main_delivery_acknowledged', 'SMOKE main_cancelled_job_read'}
+                observed = set()
+                for _ in range(400):
+                    client_log.seek(0)
+                    observed = {line.strip() for line in client_log if line.startswith('SMOKE ')}
+                    if expected <= observed or client.poll() is not None:
+                        break
+                    time.sleep(0.05)
+                print('Native IPC observations: ' + ', '.join(sorted(observed)))
+                assert expected <= observed, 'missing packaged IPC evidence'
+                assert not any(line.startswith('SMOKE FAIL') for line in observed)
+                client.wait(timeout=5)
+                assert client.returncode == 0
+                code, replacement = call(fresh, "/sessions", "POST", {})
+                assert code == 200
+                assert call(fresh, "/sessions/" + replacement["session_id"], "DELETE", session=replacement["session_id"])[0] == 204
+                assert restarted.poll() is None
+
+        restarted.send_signal(signal.SIGINT)
+        restarted.wait(timeout=3)
+        assert restarted.returncode == 0 and not discovery.exists()
+        if len(sys.argv) == 2:
+            folder_messages = [line.strip() for line in restarted.stderr.read().splitlines() if line.startswith('SMOKE server_folder_')]
+            assert 'SMOKE server_folder_readable' in folder_messages
+            assert 'SMOKE server_folder_denied' in folder_messages
+            assert any(line.startswith('SMOKE server_folder_denied errno=') for line in folder_messages)
+            print('Server folder observations: ' + ', '.join(folder_messages))
+        print('PASS: standalone launch, auth/status/session exclusion, OS lock exclusion, client release, SIGTERM/SIGINT cleanup, crash/stale rejection, restart rotation')
+    finally:
+        denied.chmod(0o700)
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=3)

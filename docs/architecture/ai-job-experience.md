@@ -10,13 +10,13 @@ The owner chose generation that continues across date changes, in-app feedback w
 
 The following combinations were considered to make the wait useful and understandable:
 
-| Surface | Benefit / tradeoff | Design choice |
-|---|---|---|
-| Persistent Main Toolbar Strip summary with expandable details | Visible across dates without occupying the editor; detailed information is available on demand | Use for current AI activity, elapsed time, completed count, Cancel and result access |
-| Inline Draft and AI Chat states | Shows results in the place where they will be used; alone it would hide another date's activity | Pair with the toolbar summary; keep per-date candidate cards and per-turn chat status |
-| Small completion message plus retained result badge | Gives timely notice while keeping completion discoverable after the message disappears | Use once per completion, without focus or navigation changes |
-| Dedicated activity pane or blocking progress dialog | More room for tasks, with additional layout/attention cost | Keep the approved layout; use an expandable toolbar detail surface |
-| macOS notification / sound / Dock attention | Can alert outside the app, with extra permissions and interruption | Owner chose in-app feedback only; no system notification, sound or attention request |
+| Surface                                                       | Benefit / tradeoff                                                                              | Design choice                                                                         |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Persistent Main Toolbar Strip summary with expandable details | Visible across dates without occupying the editor; detailed information is available on demand  | Use for current AI activity, elapsed time, completed count, Cancel and result access  |
+| Inline Draft and AI Chat states                               | Shows results in the place where they will be used; alone it would hide another date's activity | Pair with the toolbar summary; keep per-date candidate cards and per-turn chat status |
+| Small completion message plus retained result badge           | Gives timely notice while keeping completion discoverable after the message disappears          | Use once per completion, without focus or navigation changes                          |
+| Dedicated activity pane or blocking progress dialog           | More room for tasks, with additional layout/attention cost                                      | Keep the approved layout; use an expandable toolbar detail surface                    |
+| macOS notification / sound / Dock attention                   | Can alert outside the app, with extra permissions and interruption                              | Owner chose in-app feedback only; no system notification, sound or attention request  |
 
 An active-generation summary might read `Generating for 2026-11-05 · candidate 2 of 3 · 1 ready · 00:42`. Details show the selected profile alias, Writing Language, origin date, requested/finished/ready/failed counts, current stage, elapsed time, last observed agent activity and Cancel. Labels identify observed facts. They never expose prompts, raw tool activity, reasoning, private paths or stderr.
 
@@ -32,18 +32,18 @@ The single active agent run remains client-wide. A generation owns that reservat
 
 Lifecycle state, execution stage and observation freshness are separate fields. A connected bridge is not evidence that the model is advancing. Stage labels come from verified adapter/application transitions, never generated progress narration.
 
-| Condition | Display / controls |
-|---|---|
-| Local request not acknowledged | Submitting; preserve input; resolve the same request ID after a timeout |
-| Admitted and preparing | Preparing selected snippets / Starting agent; indeterminate activity and Cancel |
-| Agent started, no output | Waiting for agent output; elapsed time and last observed activity; Cancel |
-| Validated output events arriving | Receiving candidate N of M or Receiving reply; bounded provisional preview when available |
-| Process/native result awaiting final checks | Validating candidate N of M; output is not reviewable yet |
-| One candidate complete, others remain | Ready/failed counts plus current candidate stage; completed valid candidates can be read immediately |
-| No meaningful agent activity for 30 seconds | Still waiting for agent output; last-activity age and Cancel; no assertion that it is frozen |
-| Connection lost or session state unknown | Connection lost — checking run status; retain observed state marked stale; do not imply the run stopped |
-| Cancellation requested | Stopping…; preserve completed candidates; no new run until terminal acknowledgement |
-| All work terminal | N ready / M failed, Completed, Cancelled, or typed failure; Open candidates or explicit retry as appropriate |
+| Condition                                   | Display / controls                                                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Local request not acknowledged              | Submitting; preserve input; resolve the same request ID after a timeout                                      |
+| Admitted and preparing                      | Preparing selected snippets / Starting agent; indeterminate activity and Cancel                              |
+| Agent started, no output                    | Waiting for agent output; elapsed time and last observed activity; Cancel                                    |
+| Validated output events arriving            | Receiving candidate N of M or Receiving reply; bounded provisional preview when available                    |
+| Process/native result awaiting final checks | Validating candidate N of M; output is not reviewable yet                                                    |
+| One candidate complete, others remain       | Ready/failed counts plus current candidate stage; completed valid candidates can be read immediately         |
+| No meaningful agent activity for 30 seconds | Still waiting for agent output; last-activity age and Cancel; no assertion that it is frozen                 |
+| Connection lost or session state unknown    | Connection lost — checking run status; retain observed state marked stale; do not imply the run stopped      |
+| Cancellation requested                      | Stopping…; preserve completed candidates; no new run until terminal acknowledgement                          |
+| All work terminal                           | N ready / M failed, Completed, Cancelled, or typed failure; Open candidates or explicit retry as appropriate |
 
 Thirty seconds is an engineering hint threshold, not a new timeout or promise of normal runtime. Keep the existing 120-second inactivity and 10-minute wall deadlines; real protocol activity, not an SSE heartbeat or UI timer, updates agent activity. If an adapter cannot stream progress, show the known stage and elapsed time until its final result. Never invent substeps, token counts, percentage or time remaining. `1 of 3 finished` measures completed candidate outcomes, not one-third of the execution time. Failure/cancellation counts are explicit, not counted as successful candidates.
 

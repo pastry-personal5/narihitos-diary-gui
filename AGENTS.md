@@ -60,6 +60,7 @@ cargo test --manifest-path src-tauri/Cargo.toml                                 
 npx vitest run                                                                                                   # run UI tests
 cargo fmt --manifest-path src-tauri/Cargo.toml && npx prettier --write .                                         # format
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && npx eslint . --max-warnings 0  # lint
+scripts/gate.sh                                                                                                  # full gate: parallel lanes, quiet, PASS/FAIL per command
 ```
 
 ## Code conventions

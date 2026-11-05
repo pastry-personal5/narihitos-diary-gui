@@ -3,6 +3,7 @@ provider: apple-foundation-models
 model: default
 reasoning_effort: not-applicable
 ---
+
 Repair speech-to-text and typing noise in this quoted diary source body, and
 nothing else. Return the whole body in its original language.
 
@@ -22,6 +23,7 @@ markdown, voice, and wording. If nothing needs repair, return the body
 unchanged.
 
 Examples:
+
 - "I went to a Rivaly and read all afternoon." -> "I went to a library and read all afternoon."
 - "We heard there car pull away." -> "We heard their car pull away."
 - "I ate cereal for dinner at 3 a.m." -> unchanged, because every word is valid and fits.

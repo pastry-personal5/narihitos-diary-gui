@@ -10,13 +10,13 @@ The owner's initial ideas require local files, explicit asset types, a git-like 
 
 ## R12 Proposed lifecycle and decision gaps
 
-| Asset/state | Established behavior | Proposed transition or unresolved rule |
-|---|---|---|
-| Source Snippet | External Markdown; explicit edit/save and confirmed snippet-plus-audio deletion approved | Import records provenance/revision. Separate source edit/write-back from import; metadata updates and guarded related-file deletion need specification. |
-| Imported Snippet | Listed by source, checked by default; focus shows Markdown | Re-import must distinguish unchanged, revised, and conflicted content. Whether local edits also write to source is unresolved. |
-| Candidate | Multiple suggestions, transient | Explicit adoption into Authentic draft; replace/merge and overwrite protection remain owner choices. Never autosave a candidate as if authentic. |
-| Authentic draft / Authentic Entry | **One file, autosaved**, per owner; editable and optionally exported | No separate promotion/copy. Versioned autosave acknowledgement and failure display recommended. Candidate adoption, reopening, and one-per-date identity remain to be specified. |
-| Historical revision | Git-like experience requested | Propose history/diff and restore-as-new-revision. Decide retention, restore scope, and which asset types participate. |
+| Asset/state                       | Established behavior                                                                     | Proposed transition or unresolved rule                                                                                                                                           |
+| --------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source Snippet                    | External Markdown; explicit edit/save and confirmed snippet-plus-audio deletion approved | Import records provenance/revision. Separate source edit/write-back from import; metadata updates and guarded related-file deletion need specification.                          |
+| Imported Snippet                  | Listed by source, checked by default; focus shows Markdown                               | Re-import must distinguish unchanged, revised, and conflicted content. Whether local edits also write to source is unresolved.                                                   |
+| Candidate                         | Multiple suggestions, transient                                                          | Explicit adoption into Authentic draft; replace/merge and overwrite protection remain owner choices. Never autosave a candidate as if authentic.                                 |
+| Authentic draft / Authentic Entry | **One file, autosaved**, per owner; editable and optionally exported                     | No separate promotion/copy. Versioned autosave acknowledgement and failure display recommended. Candidate adoption, reopening, and one-per-date identity remain to be specified. |
+| Historical revision               | Git-like experience requested                                                            | Propose history/diff and restore-as-new-revision. Decide retention, restore scope, and which asset types participate.                                                            |
 
 Autosave needs a per-draft ordered queue: a slow older write must not overwrite a newer revision, and acknowledgement must identify the exact revision persisted. Debounce is an optimization, not a guarantee that pending edits survive immediate process termination. Show saving/saved/failed state and retain unsaved content on errors. Close/date-change behavior while saves are pending needs an owner rule; do not silently discard edits or claim crash recovery without a durable write.
 
@@ -24,12 +24,12 @@ The product and UX docs are placeholders. Keep this transition table as a propos
 
 ## R3.1 History options
 
-| Option | Benefits | Costs and unresolved evidence |
-|---|---|---|
-| Git CLI in an app-managed repository | Standard objects/history/diff and external inspection | Finder executable discovery; subprocess/error handling; isolate config/hooks/filters/signing, author identity, and unrelated user changes. Autosave does not have to mean a commit per keystroke. |
-| `git2` | In-process libgit2 API; no external Git executable needed | Native dependency/build surface; map app operations to repository locking and errors; inspect selected feature licenses. |
-| `gix` | Rust repository API with explicit trust model | Verify every required write/diff/restore operation and feature set before selection; API/feature complexity differs from CLI. |
-| App-managed immutable snapshots + revision manifest | Direct mapping to asset revisions and autosave; no repository tool/config side effects | Must build diff, restore, retention, integrity checks, and recovery; no Git interoperability automatically. |
+| Option                                              | Benefits                                                                               | Costs and unresolved evidence                                                                                                                                                                     |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Git CLI in an app-managed repository                | Standard objects/history/diff and external inspection                                  | Finder executable discovery; subprocess/error handling; isolate config/hooks/filters/signing, author identity, and unrelated user changes. Autosave does not have to mean a commit per keystroke. |
+| `git2`                                              | In-process libgit2 API; no external Git executable needed                              | Native dependency/build surface; map app operations to repository locking and errors; inspect selected feature licenses.                                                                          |
+| `gix`                                               | Rust repository API with explicit trust model                                          | Verify every required write/diff/restore operation and feature set before selection; API/feature complexity differs from CLI.                                                                     |
+| App-managed immutable snapshots + revision manifest | Direct mapping to asset revisions and autosave; no repository tool/config side effects | Must build diff, restore, retention, integrity checks, and recovery; no Git interoperability automatically.                                                                                       |
 
 Recommendation for P1-M2: choose the smallest history contract the owner actually needs before selecting the engine. Compare explicit history checkpoints plus crash-safe autosave against committing every autosave. If ordinary Git interoperability is a requirement, prefer a real Git representation; otherwise app snapshots remain viable. Never initialize history in the source folder or this code repository as an incidental consequence of import. History containing removed diary text is still sensitive retained data.
 
@@ -43,11 +43,11 @@ Candidates stay in memory; the Authentic file is durable and is shared by the Dr
 
 ## R3.5 Index versus authoritative state
 
-| Choice | Useful when | Tradeoff |
-|---|---|---|
-| Filesystem scan only | Small catalog; few persistent jobs | Simplest persistence, but repeated parsing/search and duplicate tracking grow expensive |
+| Choice                    | Useful when                                                | Tradeoff                                                                                             |
+| ------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Filesystem scan only      | Small catalog; few persistent jobs                         | Simplest persistence, but repeated parsing/search and duplicate tracking grow expensive              |
 | Files + `rusqlite` worker | Local catalog, provenance, export receipts, ordered writes | Synchronous DB calls belong off UI/async executor threads; serialized worker is easy to reason about |
-| Files + SQLx SQLite pool | Async query integration is already needed | Pool/runtime/migration setup; async API does not make the file/DB pair a single transaction |
+| Files + SQLx SQLite pool  | Async query integration is already needed                  | Pool/runtime/migration setup; async API does not make the file/DB pair a single transaction          |
 
 Recommend files as content authority and a rebuildable catalog, but separate **non-rebuildable** information: remote page/block IDs, pending write intents, source namespace identities, and user choices cannot necessarily be reconstructed from Markdown. Either encode that durable metadata in owned files or back it up as authoritative state. SQLite transactions protect DB operations; they do not atomically commit an unrelated Markdown write or Notion request. Keep the live DB on local app storage rather than treating iCloud sync as DB replication.
 
