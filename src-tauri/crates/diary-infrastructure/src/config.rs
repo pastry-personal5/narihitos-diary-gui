@@ -1,10 +1,21 @@
 //! Strict private startup configuration. Errors never contain rejected values.
+use diary_logging::private_fs::{FsError, PrivateDir, check_private_metadata};
 use serde::Deserialize;
 use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
 };
+
+impl From<FsError> for ConfigError {
+    fn from(e: FsError) -> Self {
+        match e {
+            FsError::Path => Self::Path,
+            FsError::Permissions => Self::Permissions,
+            FsError::Io => Self::Io,
+        }
+    }
+}
 
 pub const MAX_CONFIG_BYTES: usize = 256 * 1024;
 
@@ -395,37 +406,8 @@ pub fn open_private(path: &Path) -> Result<(fs::File, PathBuf), ConfigError> {
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or(ConfigError::Path)?;
-    let directory = crate::private_fs::PrivateDir::open(parent)?;
+    let directory = PrivateDir::open(parent)?;
     Ok((directory.read(filename)?, path.to_path_buf()))
-}
-
-pub(crate) fn check_private_metadata(
-    metadata: &fs::Metadata,
-    directory: bool,
-) -> Result<(), ConfigError> {
-    use std::os::unix::fs::MetadataExt;
-    // SAFETY: geteuid has no preconditions and does not mutate process state.
-    let uid = unsafe { libc::geteuid() };
-    private_attributes(metadata.uid(), uid, metadata.mode(), directory)
-}
-fn private_attributes(
-    owner: u32,
-    current_user: u32,
-    mode: u32,
-    directory: bool,
-) -> Result<(), ConfigError> {
-    let expected_kind = if directory {
-        libc::S_IFDIR
-    } else {
-        libc::S_IFREG
-    };
-    if owner != current_user
-        || mode & 0o7777 != if directory { 0o700 } else { 0o600 }
-        || mode & u32::from(libc::S_IFMT) != u32::from(expected_kind)
-    {
-        return Err(ConfigError::Permissions);
-    }
-    Ok(())
 }
 
 impl Config {

@@ -1,6 +1,7 @@
-//! Diagnostic logging: bounded, private, asynchronous (see docs/architecture/logging.md).
+//! Diagnostic logging and descriptor-relative private files (see docs/architecture/logging.md).
 pub mod clock;
 pub mod codec;
+pub mod private_fs;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogError {

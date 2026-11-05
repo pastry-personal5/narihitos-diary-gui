@@ -19,14 +19,24 @@ const metadata = JSON.parse(
 const allowed = {
   "diary-domain": [],
   "diary-application": ["diary-domain"],
-  "diary-infrastructure": ["diary-application", "diary-domain"],
+  "diary-logging": ["diary-application"],
+  "diary-infrastructure": [
+    "diary-application",
+    "diary-domain",
+    "diary-logging",
+  ],
   "diary-api": ["diary-application"],
-  "diary-server": ["diary-application", "diary-infrastructure", "diary-api"],
-  "diary-client": [],
+  "diary-server": [
+    "diary-application",
+    "diary-infrastructure",
+    "diary-api",
+    "diary-logging",
+  ],
+  "diary-client": ["diary-application", "diary-logging"],
 };
 
 describe("scaffold assembly", () => {
-  it("selects all six packages in the unchanged Cargo gate", () => {
+  it("selects all seven packages in the unchanged Cargo gate", () => {
     expect(metadata.packages.map((p) => p.name).sort()).toEqual(
       Object.keys(allowed).sort(),
     );

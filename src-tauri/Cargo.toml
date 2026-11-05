@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [".", "crates/*"]
-default-members = [".", "crates/diary-domain", "crates/diary-application", "crates/diary-infrastructure", "crates/diary-api", "crates/diary-server"]
+default-members = [".", "crates/diary-domain", "crates/diary-application", "crates/diary-infrastructure", "crates/diary-logging", "crates/diary-api", "crates/diary-server"]
 
 [workspace.package]
 version = "1.0.0"
@@ -13,6 +13,7 @@ rust-version = "1.98"
 diary-domain = { path = "crates/diary-domain" }
 diary-application = { path = "crates/diary-application" }
 diary-infrastructure = { path = "crates/diary-infrastructure" }
+diary-logging = { path = "crates/diary-logging" }
 diary-api = { path = "crates/diary-api" }
 
 [package]

@@ -693,6 +693,7 @@ name = "diary-infrastructure"
 version = "1.0.0"
 dependencies = [
  "diary-application",
+ "diary-logging",
  "libc",
  "serde",
  "serde_json",
@@ -703,6 +704,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "diary-logging"
+version = "1.0.0"
+dependencies = [
+ "diary-application",
+ "libc",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+]
+
+[[package]]
 name = "diary-server"
 version = "1.0.0"
 dependencies = [
@@ -710,6 +723,7 @@ dependencies = [
  "diary-api",
  "diary-application",
  "diary-infrastructure",
+ "diary-logging",
  "tokio",
 ]
 

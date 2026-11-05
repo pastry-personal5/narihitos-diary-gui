@@ -154,7 +154,7 @@ pub fn read_discovery(path: &Path) -> Result<Discovery, LifecycleError> {
 pub struct PublishedDiscovery {
     pub path: PathBuf,
     instance_id: String,
-    directory: crate::private_fs::PrivateDir,
+    directory: diary_logging::private_fs::PrivateDir,
 }
 impl PublishedDiscovery {
     /// Call only after listener/controller readiness, holding the workspace lock.
@@ -168,7 +168,7 @@ impl PublishedDiscovery {
         if record.workspace_key != lock.workspace_key {
             return Err(LifecycleError::DiscoveryInvalid);
         }
-        let runtime_dir = crate::private_fs::PrivateDir::open(runtime)?;
+        let runtime_dir = diary_logging::private_fs::PrivateDir::open(runtime)?;
         let directory = runtime_dir.child(&record.workspace_key)?;
         let staging = format!(".{}.tmp", record.instance_id);
         let mut file = directory.create(&staging)?;
@@ -232,6 +232,11 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+impl From<diary_logging::private_fs::FsError> for LifecycleError {
+    fn from(e: diary_logging::private_fs::FsError) -> Self {
+        ConfigError::from(e).into()
+    }
+}
 impl From<ConfigError> for LifecycleError {
     fn from(_: ConfigError) -> Self {
         Self::UnsafePath
