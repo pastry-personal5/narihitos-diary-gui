@@ -1,6 +1,7 @@
 import {
   AuthenticError,
   type AppMetadata,
+  type SymbolResult,
   type AuthenticFile,
   type AuthenticPage,
   type Availability,
@@ -29,6 +30,20 @@ export function metadataDto(value: unknown): AppMetadata {
   const version = text(dto.version, 32);
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Invalid app version");
   return { version };
+}
+export function symbolDto(value: unknown): SymbolResult {
+  const dto = record(value);
+  if (dto.status === "unsupported") return { status: "unsupported" };
+  // 32 KiB of PNG is at most 43,692 base64 characters; the Rust side enforces the byte cap.
+  if (
+    dto.status !== "ok" ||
+    typeof dto.png_base64 !== "string" ||
+    dto.png_base64.length === 0 ||
+    dto.png_base64.length > 43_700 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(dto.png_base64)
+  )
+    throw new Error("Invalid symbol response");
+  return { status: "ok", png_base64: dto.png_base64 };
 }
 export function statusDto(value: unknown): Status {
   const dto = record(value);

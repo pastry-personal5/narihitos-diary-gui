@@ -5,6 +5,7 @@ mod discovery;
 mod events;
 #[cfg(feature = "scaffold-smoke")]
 mod native_smoke;
+mod symbols;
 mod user_settings;
 use bridge::{Bridge, Job, JobList, Lease, Metadata, ReloadResult, Settings, Status};
 use diagnostics::{ClientEvent, ClientLog, Reject};
@@ -377,6 +378,27 @@ fn get_app_metadata(
     })
 }
 #[tauri::command]
+async fn get_symbol(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    name: String,
+    size: u16,
+    scale: u8,
+) -> Result<symbols::SymbolResult, &'static str> {
+    main_window(&window)?;
+    symbols::validate(&name, size, scale).map_err(|_| "invalid_symbol")?;
+    // AppKit drawing must run on the main thread; an async command keeps that thread free to do it.
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(symbols::render(&name, size, scale));
+    })
+    .map_err(|_| "symbol_unavailable")?;
+    match tokio::time::timeout(std::time::Duration::from_secs(2), rx).await {
+        Ok(Ok(outcome)) => Ok(outcome.into()),
+        _ => Err("symbol_unavailable"),
+    }
+}
+#[tauri::command]
 fn log_client_event(
     window: WebviewWindow,
     log: State<'_, Arc<ClientLog>>,
@@ -438,6 +460,7 @@ fn main() {
             subscribe_events,
             get_app_metadata,
             log_client_event,
+            get_symbol,
             get_calendar,
             read_source,
             import_date,

@@ -21,6 +21,7 @@ import {
   refreshReportDto,
   saveAckDto,
   metadataDto,
+  symbolDto,
   statusDto,
 } from "./validation";
 
@@ -90,6 +91,8 @@ export const tauriBridge: Bridge = {
   getJob: (jobId) => authentic("get_job", { id: jobId }, importJobDto),
   cancelJob: (jobId) => authentic("cancel_job", { id: jobId }, importJobDto),
   metadata: async () => metadataDto(await invoke<unknown>("get_app_metadata")),
+  getSymbol: async (name, size, scale) =>
+    symbolDto(await invoke<unknown>("get_symbol", { name, size, scale })),
   serverSettings: () => settings("get_settings", undefined, serverSettingsDto),
   reloadSettings: () => settings("reload_settings", undefined, reloadResultDto),
   getUserSettings: () =>

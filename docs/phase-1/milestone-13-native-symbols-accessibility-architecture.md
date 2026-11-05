@@ -1,6 +1,6 @@
 # P1-M13: Native symbols and accessible interaction work plan
 
-Status: Planned
+Status: Done
 
 This plan adds a native symbol route and an accessibility audit to the existing Tauri client and React shell. Scope and checklist are in the [overview](milestone-13-native-symbols-accessibility-overview.md); the contract is the [platform symbols route](../architecture/configuration-and-exports.md#version-and-platform-strategy).
 
@@ -8,14 +8,14 @@ This plan adds a native symbol route and an accessibility audit to the existing 
 
 Interview 2026-11-06, recorded in the [changelog](changelog.md):
 
-1. Add direct macOS-only dependencies `objc2`, `objc2-app-kit` and `objc2-foundation`, pinned (`=`) to the versions already in `Cargo.lock` (0.6.5, 0.3.2, 0.3.2) and re-checked at implementation, under `[target.'cfg(target_os = "macos")'.dependencies]` in `src-tauri/Cargo.toml`. Only the feature flags needed for `NSImage`, `NSBitmapImageRep` and `NSAppearance` are enabled. License notices are reviewed with the existing `scripts/collect-notices.py` flow before the dependency lands.
+1. Add direct macOS-only dependencies `objc2`, `objc2-app-kit` and `objc2-foundation`, pinned (`=`) to the versions already in `Cargo.lock` (0.6.5, 0.3.2, 0.3.2) and re-checked at implementation, under `[target.'cfg(target_os = "macos")'.dependencies]` in `src-tauri/Cargo.toml`. Only the feature flags needed for `NSImage`, `NSImageRep`, `NSBitmapImageRep`, `NSGraphicsContext` and `NSGraphics` are enabled. License notices are reviewed with the existing `scripts/collect-notices.py` flow before the dependency lands.
 2. The milestone closes on automated tests and the gate. Native checks are a known gap carried to P1-M28 and are not claimed.
 
 ## Design decisions
 
 - **Command.** `get_symbol(name: String, size: u16, scale: u8) -> SymbolResult`, where `SymbolResult` is `{ status: "ok", png_base64 }` or `{ status: "unsupported" }`. Out-of-allowlist input is a typed error, not `unsupported`.
-- **Allowlist (proposed, confirmed at runtime).** Names `doc.badge.plus` (Create Empty), `command` (Command palette), `gearshape` (Settings), `sparkles` (Generate), `xmark` (Close tab), `arrow.clockwise` (Refresh); sizes 12, 14, 16, 20; scales 1, 2; appearances `light`, `dark`. A name the OS does not know returns `unsupported`.
-- **Rendering.** Run on the main thread (`AppHandle::run_on_main_thread` plus a oneshot channel). Declare the command `async fn` like the other bridge commands: a sync Tauri command already runs on the main thread, so waiting on the oneshot there would deadlock until the timeout. Look up with `NSImage(systemSymbolName:accessibilityDescription:)`, draw into an `NSBitmapImageRep` of `size*scale` pixels under the requested `NSAppearance`, and encode PNG. Reject output above 32 KiB.
+- **Allowlist (proposed, confirmed at runtime).** Names `doc.badge.plus` (Create Empty), `command` (Command palette), `gearshape` (Settings), `sparkles` (Generate), `xmark` (Close tab), `arrow.clockwise` (Refresh); sizes 12, 14, 16, 20; scales 1, 2; no appearance parameter. A name the OS does not know returns `unsupported`.
+- **Rendering.** Run on the main thread (`AppHandle::run_on_main_thread` plus a oneshot channel). Declare the command `async fn` like the other bridge commands: a sync Tauri command already runs on the main thread, so waiting on the oneshot there would deadlock until the timeout. Look up with `NSImage(systemSymbolName:accessibilityDescription:)`, draw into an `NSBitmapImageRep` of `size*scale` pixels (black template, aspect-fitted), and encode PNG. Reject output above 32 KiB.
 - **Tinting.** The client uses the PNG as a CSS `mask-image` over `currentColor`, so text color, disabled state and dark mode apply without per-color requests. If the template alpha is not usable on a symbol, record it and fall back to text for that name.
 - **Cache.** `Map` keyed by `name|size|scale` in memory in `src/components/Symbol.tsx`, storing the in-flight promise so simultaneous mounts (for example several Close-tab buttons) share one native call; no disk cache, no persisted data. Cache `ok` and a genuine `unsupported` only; a command error or main-thread timeout is not cached as `unsupported` and may retry on the next mount.
 - **Accessibility.** `Symbol` is `aria-hidden`. The control's text label stays in the DOM (visually hidden when the symbol shows) so the accessible name never depends on the symbol. Unsupported symbols show the text label and post one Global Message per name.
@@ -61,3 +61,7 @@ Inputs the contract implies but the tasks would not otherwise pin. Each has a te
 - AppKit calls off the main thread crash; every call goes through `run_on_main_thread`, with a timeout that returns `unsupported`.
 - Symbol names and rendering are verified only by unit tests and, on macOS CI-less local runs, the PNG test; real Retina output is unverified until P1-M28; native VoiceOver and Japanese IME proof are not required in Phase 1.
 - Using Apple's symbols is not license clearance; the owner proceeds despite that concern, as already recorded in AGENTS.md.
+
+## Plan review findings and corrections
+
+A review of this plan found seven issues. Six were corrected in the plan: the command must be `async` (a sync command runs on the main thread and the oneshot would deadlock); the wrapper lives in `main.rs` and `tests/architecture.test.js` lists `get_symbol`; the roadmap no longer says no dependency is approved; the phase goal matches the owner decision; the cache stores in-flight promises and does not cache errors; the P1-M12 phase status was stale. The seventh (drop `appearance`, wire Refresh) was resolved by the owner interview. Each maps to a test: `png_has_signature_and_cap` and the `async` wrapper (S01), the architecture test (S05), `shares one native call` and `falls back on a command error and retries` (S04).

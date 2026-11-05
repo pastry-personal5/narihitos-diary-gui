@@ -115,8 +115,13 @@ export class SettingsError extends Error {
     super(code);
   }
 }
+/** Result of the native SF Symbol lookup; `png_base64` is a template image to tint with CSS. */
+export type SymbolResult =
+  { status: "ok"; png_base64: string } | { status: "unsupported" };
 export interface Bridge extends NavigationBridge {
   metadata(): Promise<AppMetadata>;
+  /** Absent in fakes; symbols then fall back to their text labels. */
+  getSymbol?(name: string, size: number, scale: number): Promise<SymbolResult>;
   serverSettings(): Promise<ServerSettings>;
   reloadSettings(): Promise<ReloadResult>;
   getUserSettings(): Promise<UserSettings>;

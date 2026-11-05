@@ -94,6 +94,7 @@ describe("explicit command permission boundary", () => {
     "subscribe_events",
     "get_app_metadata",
     "log_client_event",
+    "get_symbol",
     "get_calendar",
     "read_source",
     "import_date",

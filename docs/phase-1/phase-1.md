@@ -98,7 +98,7 @@ Plan: [overview](milestone-12-command-palette-shortcuts-overview.md), [work plan
 
 ### P1-M13: Native symbols and accessible interaction
 
-Status: Planned
+Status: Done
 Goal: Add allowlisted AppKit SF Symbols and close the keyboard, focus, pane-resizing and IME-safe-save gaps that automated tests can reach; packaged key, resize and Korean IME proof is carried to P1-M28; native VoiceOver and Japanese IME proof are not required.
 Plan: [overview](milestone-13-native-symbols-accessibility-overview.md), [work plan](milestone-13-native-symbols-accessibility-architecture.md).
 Notes: Owner closes on automated tests only; native proof moves to P1-M28.

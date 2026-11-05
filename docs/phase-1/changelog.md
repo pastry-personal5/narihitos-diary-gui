@@ -6,6 +6,7 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-06 — agent, P1-M13 implemented — `get_symbol` (allowlist, template PNG, async main-thread render), `SymbolLabel` with text fallback and one notice per unsupported name, six wired controls, accessibility tests; gate passed. S07 is evidenced by a coordinator test for Editor-tab focus plus dialog/palette and inclusion focus tests. Milestone Done.
 - 2026-11-06 — owner, P1-M13 scope — Native VoiceOver proof and Japanese IME proof are not needed; Korean IME, key delivery and resize proof stay carried to P1-M28.
 - 2026-11-06 — owner, P1-M13 interview — Approved: drop `appearance` from `get_symbol` (the client tints a template mask; contract updated); add Refresh (`arrow.clockwise`) as the sixth symbol control; controls show the symbol only, with the text label as accessible name and tooltip; one Global Message per unsupported symbol name.
 - 2026-11-06 — owner, P1-M13 interview — Approved direct macOS-only `objc2`, `objc2-app-kit` and `objc2-foundation` dependencies (pinned to the Cargo.lock versions, notice review first) for the `get_symbol` AppKit route, and closing P1-M13 on automated tests plus the gate; native VoiceOver, IME, key and resize proof is carried to P1-M28.

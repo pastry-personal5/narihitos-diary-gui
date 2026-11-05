@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { CalendarAction } from "../application/navigation/contracts";
+import { SymbolLabel } from "./Symbol";
 import type { NavigationModel } from "../application/navigation/model";
 import type {
   Source,
@@ -274,7 +275,7 @@ export function Explorer({ model }: { model: NavigationModel }) {
             }
             onClick={() => date && void model.imports.refresh(date)}
           >
-            Refresh snippets
+            <SymbolLabel name="arrow.clockwise" label="Refresh snippets" />
           </button>
           {context && (
             <>

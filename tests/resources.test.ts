@@ -114,6 +114,21 @@ describe("retained editor resources", () => {
     expect(undo(view())).toBe(true);
     expect(view().state.doc.toString()).toBe("");
   });
+  it("moves focus into the restored editor on a tab change and keeps it there", async () => {
+    const { c, view, host } = setup();
+    await c.connect(true, true);
+    await c.changeDate(a);
+    await c.openAuthentic(b);
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    outside.focus();
+    await c.switchTab(`authentic:${a}`);
+    expect(host.contains(document.activeElement)).toBe(true);
+    expect(view().hasFocus).toBe(true);
+    await c.switchTab(`authentic:${b}`);
+    expect(host.contains(document.activeElement)).toBe(true);
+    outside.remove();
+  });
   it("clears undo history on explicit discard even when the saved text already matches", async () => {
     const { c, view, type } = setup();
     await c.connect(true, true);
