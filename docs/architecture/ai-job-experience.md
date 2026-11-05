@@ -1,0 +1,110 @@
+# Background AI job experience
+
+Status: Active
+
+This contract keeps long-running generation and chat visible while the user continues working. It extends the [agent lifecycle](editing-and-agents.md) and [HTTP/SSE job contract](api-and-processes.md), within the existing Standard Layout; it specifies target behavior, not implemented performance.
+
+## Interaction choices and ownership
+
+The owner chose generation that continues across date changes, in-app feedback without macOS notifications, and regeneration before review when the saved Authentic baseline changes. A background job remains owned by its live client session, not by the mounted editor or currently selected date. Closing the client, lease expiry and server shutdown still cancel runs; this is not a resumable offline agent service.
+
+The following combinations were considered to make the wait useful and understandable:
+
+| Surface | Benefit / tradeoff | Design choice |
+|---|---|---|
+| Persistent Main Toolbar Strip summary with expandable details | Visible across dates without occupying the editor; detailed information is available on demand | Use for current AI activity, elapsed time, completed count, Cancel and result access |
+| Inline Draft and AI Chat states | Shows results in the place where they will be used; alone it would hide another date's activity | Pair with the toolbar summary; keep per-date candidate cards and per-turn chat status |
+| Small completion message plus retained result badge | Gives timely notice while keeping completion discoverable after the message disappears | Use once per completion, without focus or navigation changes |
+| Dedicated activity pane or blocking progress dialog | More room for tasks, with additional layout/attention cost | Keep the approved layout; use an expandable toolbar detail surface |
+| macOS notification / sound / Dock attention | Can alert outside the app, with extra permissions and interruption | Owner chose in-app feedback only; no system notification, sound or attention request |
+
+An active-generation summary might read `Generating for 2026-11-05 · candidate 2 of 3 · 1 ready · 00:42`. Details show the selected profile alias, Writing Language, origin date, requested/finished/ready/failed counts, current stage, elapsed time, last observed agent activity and Cancel. Labels identify observed facts. They never expose prompts, raw tool activity, reasoning, private paths or stderr.
+
+## Immediate response and continued work
+
+On Generate or Send, show a local `Submitting…` state immediately, retain the user's context and prevent duplicate activation of that same request. Aim to display local acknowledgement within 100 ms in the supported packaged environment; this is a measured UI target, not a provider deadline. Server admission returns a job handle without waiting for inference. Only that acknowledgement changes the label to an admitted state. An admission timeout means `Checking whether the request started…`, not proof of failure: resend the same session-scoped request ID to recover the existing handle before offering a new request.
+
+No global busy overlay or application-wide disabled state is used. Date navigation, source reading/editing, Authentic editing/autosave, Create Empty, settings and pane controls remain available under their own normal guards. Changing date may still wait for actual pending saves or an admitted paragraph acceptance; AI latency itself never blocks it. Starting generation captures immutable source/context/baseline data, then releases editor/file locks before invoking the adapter.
+
+The single active agent run remains client-wide. A generation owns that reservation across all of its sequential candidates, including validation and the interval between candidates. Generate/Send for another date/chat explains `An AI run is active for <date or chat>; view it or cancel it.` It does not silently enqueue, cancel the current run, switch providers or discard the user's composed message. Typing a future chat message remains possible; sending waits until the existing run settles. Each admitted user chat message appears exactly once with its turn status; a lost admission reply cannot append it twice.
+
+## Truthful state and delay feedback
+
+Lifecycle state, execution stage and observation freshness are separate fields. A connected bridge is not evidence that the model is advancing. Stage labels come from verified adapter/application transitions, never generated progress narration.
+
+| Condition | Display / controls |
+|---|---|
+| Local request not acknowledged | Submitting; preserve input; resolve the same request ID after a timeout |
+| Admitted and preparing | Preparing selected snippets / Starting agent; indeterminate activity and Cancel |
+| Agent started, no output | Waiting for agent output; elapsed time and last observed activity; Cancel |
+| Validated output events arriving | Receiving candidate N of M or Receiving reply; bounded provisional preview when available |
+| Process/native result awaiting final checks | Validating candidate N of M; output is not reviewable yet |
+| One candidate complete, others remain | Ready/failed counts plus current candidate stage; completed valid candidates can be read immediately |
+| No meaningful agent activity for 30 seconds | Still waiting for agent output; last-activity age and Cancel; no assertion that it is frozen |
+| Connection lost or session state unknown | Connection lost — checking run status; retain observed state marked stale; do not imply the run stopped |
+| Cancellation requested | Stopping…; preserve completed candidates; no new run until terminal acknowledgement |
+| All work terminal | N ready / M failed, Completed, Cancelled, or typed failure; Open candidates or explicit retry as appropriate |
+
+Thirty seconds is an engineering hint threshold, not a new timeout or promise of normal runtime. Keep the existing 120-second inactivity and 10-minute wall deadlines; real protocol activity, not an SSE heartbeat or UI timer, updates agent activity. If an adapter cannot stream progress, show the known stage and elapsed time until its final result. Never invent substeps, token counts, percentage or time remaining. `1 of 3 finished` measures completed candidate outcomes, not one-third of the execution time. Failure/cancellation counts are explicit, not counted as successful candidates.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Submitting
+  Submitting --> Active: Admission confirmed
+  Submitting --> Checking: Reply lost
+  Checking --> Active: Same request resolves to job
+  Active --> Stopping: Explicit cancel
+  Stopping --> Terminal: Cancellation or completion settles
+  Active --> Terminal: Completed or failed
+  Active --> Checking: Connection lost
+  Terminal --> [*]: User opens or dismisses result
+```
+
+Changing dates is deliberately absent from the job state machine: it changes presentation selection, not job ownership.
+
+## Streaming and useful partial results
+
+Stream chat/candidate previews only from supported adapter output events. Show them as provisional and read-only until final schema validation and successful CLI/native completion. Partial JSON, raw provider records and reasoning are never rendered as diary text. An adapter that returns one final response still receives the complete pending/progress/cancel experience.
+
+Generation continues its admitted sequential count. Publish each independently validated candidate with `candidate_ready`; a later failure does not remove earlier candidates. The job succeeds with explicit partial counts if at least one candidate is valid when the requested count finishes; zero valid candidates is failure. Cancel stops remaining work, retaining completed candidates and labeling the interrupted candidate and unstarted slots separately. A failed/incomplete preview cannot be accepted, exported or autosaved. No hidden repair/model retry occurs. Explicit generation again is a new request; show its captured profile/count/selection rather than replaying an unknown outcome. If retained results exhaust the session budget, offer explicit Discard results for completed jobs before another admission. Dismissing a completion notice alone never deletes candidates. Discard removes only that session-owned transient result, never Authentic/source files, and waits for any active review/accept using it to settle.
+
+Keep the user's position while text arrives: follow appended text only when already at the end; scrolling away disables following and exposes a New output affordance. Preserve selection and scroll across updates. Progress and candidate arrival never focus the preview, move the caret in Authentic, open a tab automatically or overwrite editor text.
+
+## Dates, baseline changes and completion attention
+
+Route every job/result by `{instance_id, session_id, job_id, origin_date or chat_id}`. A date change is not a superseded run. Continue processing its events even when its originating editor is not mounted; only matching session/run cancellation epochs or terminal sequences suppress stale events. Returning to a date shows its retained candidate cards and readiness state.
+
+The user may edit the same date during generation. If its saved Authentic revision changes, mark the generation/candidates `Entry changed — regenerate to review`; keep them readable, but require a new generation against the latest saved baseline before review. Do not auto-merge, silently rebase, lock the editor for generation, or make an extra model call. A dirty buffer must be flushed/reconciled before the server's final review precondition check. Paragraph review itself retains its separate manual-edit pause.
+
+On a terminal outcome, update the persistent toolbar/result indicator and issue one polite in-app completion message such as `2 candidates ready; 1 failed`. A View results action performs navigation only when selected, after normal unsaved-edit/save guards. The result indicator remains discoverable until opened or explicitly dismissed, even if the brief message has expired or the app was unfocused. Deduplicate messages by instance/session/job/terminal sequence during the live session. Candidate arrival updates counts; it does not generate a toast for every token or candidate. No macOS notification, sound or automatic focus is requested.
+
+Elapsed time comes from server-observed duration, advanced locally using a monotonic clock between snapshots. Stop the display timer at terminal completion. On app activation or after sleep, refresh job status before claiming it is still active; a suspended heartbeat may have expired the lease. A restarted server loses transient jobs/candidates. Show Interrupted/results unavailable when established by the handshake; do not replay inference automatically or suggest that an endlessly animated spinner represents a surviving run.
+
+## Ports, DTOs and execution isolation
+
+The application owns job orchestration and its progress projection; adapters report bounded typed milestones and text deltas through the existing event sink. `AgentRunner` never calls React or a view directly. A progress snapshot contains:
+
+```text
+job_id, request_id, instance_id, session_id, kind, origin_date?/chat_id?,
+state, phase, job_sequence, profile_id, locale, baseline_revision?,
+candidate_index?, requested_count?, finished_count?, ready_count?, failed_count?,
+cancelled_count?, not_started_count?,
+elapsed_ms, last_agent_activity_at?, cancellation_requested,
+candidate_ids, error_code?
+```
+
+`phase` is a closed enum: `preparing_context`, `starting_agent`, `waiting_for_output`, `receiving_output`, `validating_output`, `between_candidates`, `stopping`, `finished`. Never accept arbitrary adapter text as a phase label. Client-only `submitting`, `checking`, `connected/stale` and unread state are presentation state, not invented server outcomes. Progress DTOs contain no source bodies or raw diagnostics; candidate bodies use their bounded individual read command. Stream previews use the existing content-bearing delta contract, not diagnostic logs.
+
+Add typed `list_jobs` for bounded, paginated session reconciliation and return the same complete progress snapshot from `get_job`. `discard_transient_result` removes a terminal job's result only for its owning live session, retaining its content-free session admission record so a later retry cannot rerun inference. Admission requests use a session-scoped request UUID and normalized input hash; deduplicate before the busy check and return the existing job on retry. A discarded result is reported unavailable, never regenerated implicitly. A disconnected client cannot safely identify a transient job by the currently selected date alone. SSE `job_changed`, `agent_delta` and `candidate_ready` carry job identity/sequence; gap handling re-reads list/status/manifests and complete results rather than reconstructing from partial deltas. No new general HTTP or shell escape hatch is introduced.
+
+Run child/native execution, pipe draining and validation away from HTTP admission, heartbeat and SQLite workers. No inference wait holds a content lock. The Tauri bridge consumes SSE asynchronously, using bounded channels and the existing resync/backpressure contract. A client application job store lives independently of editor components; React subscribes to small immutable job snapshots, while streamed text stays in bounded per-run buffers outside global React context. Existing React primitives suffice; no state/progress library is selected. [React's external-store contract](https://react.dev/reference/react/useSyncExternalStore) requires stable cached snapshots/subscriptions if that hook is used.
+
+Coalesce preview renders to at most ten updates per second per visible run; offscreen runs update metadata without rendering text. Show elapsed time at most once per second, without an accessibility announcement on every tick. Terminal states, cancellation and errors bypass a pending visual text batch. Keep the existing 50 ms/16 KiB server delta batching, encoded SSE/HTTP bounds, 64 MiB session budget and reserved save/control capacity; a slow renderer must not stall CLI drains or saving. These are engineering budgets to measure on the actual device, not established performance claims.
+
+## Accessibility and evidence
+
+Use a polite status region for admission, important stage changes and completion. Keep it outside any busy subtree that would defer its announcements. Apply busy semantics only to the candidate/chat output region, never the entire window or editor. Use named keyboard-operable Open details, Cancel and View results controls, and return focus to the invoker when details close. An indeterminate indicator has no fake numeric value; textual phase/counts remain available with reduced motion. Do not announce token deltas, every elapsed second or repeatedly unchanged waiting messages. W3C's [status-message guidance](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html) supports status updates without moving focus. Apple's [progress guidance](https://developer.apple.com/design/human-interface-guidelines/progress-indicators) supports distinguishing measured progress from an indefinite wait; the concrete thresholds and layout above are engineering choices.
+
+Fake-clock and fake-adapter scenarios must cover 0/30/120-second silence, all wall/lease deadlines, delayed/lost admission, duplicate activation, an adapter with no deltas, reordered/duplicate/gapped events, flooding output, partial success then cancel/failure, terminal cancellation races and stale completion. Verify date switching preserves origin/results, same-date edits require regeneration, initial locale remains snapshotted, and completion never changes focus, caret, tab, scroll or unsaved buffers. A stalled event consumer must leave heartbeat/cancel/save available. Assert zero extra inference calls and no system notification request.
+
+Packaged macOS evidence must demonstrate editing and autosave during a deliberately slow synthetic run, toolbar/detail feedback, visible progress for an off-date run, keyboard/VoiceOver/reduced-motion behavior, loss/recovery of connection and activation after sleep. Measure input-to-feedback (target 100 ms), editing responsiveness under maximum admitted streaming, cancel acknowledgement, rendering budgets and bounds separately from total provider latency. Mocks cannot establish WKWebView responsiveness or native adapter cancellation. Real-agent profiles retain their own compatibility/process/native gates.

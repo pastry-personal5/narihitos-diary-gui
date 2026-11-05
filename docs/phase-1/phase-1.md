@@ -15,7 +15,7 @@ Theme: Diary v1.0.0. Research, architecture, and scaffolding remain the first th
 
 ## Milestones
 
-The three milestones below are the first ones planned. More milestones will be added to this phase as the work becomes clear.
+The [implementation handoff](implementation-handoff.md) defines dependency order and acceptance gates for the remaining work. Detailed plans/checklists are required before implementing each milestone.
 
 ### P1-M1: Research
 Status: Done
@@ -24,12 +24,43 @@ Plan: [overview](milestone-01-research-overview.md), including research sequence
 Notes: Documentation research and its checklist are complete under the docs-only exemption. The overview carries unresolved owner choices and unexecuted feasibility checks into P1-M2 as blockers on dependent decisions, not established capabilities.
 
 ### P1-M2: Architecture
-Status: Active
+Status: Done
 Goal: Decide and document the application architecture, based on the research and owner interview.
-Plan: [overview](milestone-02-architecture-overview.md), [architecture work plan](milestone-02-architecture-architecture.md), [owner decisions](milestone-02-owner-decisions.md).
-Notes: Decisions and plans recorded first; `docs/architecture.md` remains pending. Exempt from the code gate; done only when its completion checklist has evidence.
+Plan: [overview](../archive/milestones/p1-m2/milestone-02-architecture-overview.md), [architecture work plan](../archive/milestones/p1-m2/milestone-02-architecture-architecture.md), [owner decisions](milestone-02-owner-decisions.md), [review/interview](milestone-02-architecture-review.md).
+Notes: [Clean Architecture](../architecture.md) and nine themed contracts complete; configuration/agent/prompt clarifications, architecture review and background-AI design belong to the [P1-M2 completion record](../archive/milestones/p1-m2/milestone-02-architecture-overview.md#architecture-clarifications-and-review). The [handoff](implementation-handoff.md) maps owner decisions and conditional capabilities to later implementation evidence. Documentation-only validation applies; no runtime capability is certified.
 
 ### P1-M3: Scaffolding
 Status: Planned
 Goal: Create the project skeleton following the documented architecture.
-Plan: overview and architecture docs to be created before implementation.
+Plan: [overview](milestone-03-scaffolding-overview.md), [work plan](milestone-03-scaffolding-architecture.md).
+Notes: Scaffolding only: assemble the approved design into a buildable/testable skeleton. Feature implementation remains in P1-M4–P1-M9.
+
+### P1-M4: Authentic persistence
+Status: Planned
+Goal: Implement locked durable Authentic autosave, authoritative operation recovery and rebuildable catalog behavior.
+Plan: [scope and evidence E2](implementation-handoff.md); detailed overview/work plan required before code.
+
+### P1-M5: Source views and GUI
+Status: Planned
+Goal: Implement source/date import, refresh/conflicts, canonical layout/editor ownership, accessibility and native symbols.
+Plan: [scope and evidence E3/E9](implementation-handoff.md); detailed overview/work plan required before code.
+
+### P1-M6: Source mutation
+Status: Planned
+Goal: Enable producer-compatible body saves and confirmed snippet/audio Trash with partial recovery only after verification.
+Plan: [scope and evidence E4](implementation-handoff.md); detailed overview/work plan required before code.
+
+### P1-M7: Agents and review
+Status: Planned
+Goal: Implement optional CLI and Apple Foundation Models profiles, asset-loaded prompts, transient chat/candidates and saved paragraph accept/reject review.
+Plan: [scope and evidence E5/E6/E11](implementation-handoff.md); detailed overview/work plan required before code.
+
+### P1-M8: Optional exports
+Status: Planned
+Goal: Implement saved-revision iCloud/Notion exports with confirmations, durable receipts and ambiguous-result reconciliation.
+Plan: [scope and evidence E7/E8](implementation-handoff.md); detailed overview/work plan required before code.
+
+### P1-M9: Personal release
+Status: Planned
+Goal: Qualify Diary v1.0.0 for the owner's Apple Silicon Mac and separate shell launch with full workflow/native evidence.
+Plan: [release scope](implementation-handoff.md#delivery-order-and-scope); detailed overview/work plan required before code.

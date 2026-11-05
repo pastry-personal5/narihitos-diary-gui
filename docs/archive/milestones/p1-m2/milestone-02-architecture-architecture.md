@@ -1,8 +1,17 @@
 # P1-M2: Architecture work plan
 
-Status: Active
+Status: Archived
 
-This is the plan for producing `docs/architecture.md`, not the finished application architecture. It applies the [owner decisions](milestone-02-owner-decisions.md) and defines the design work and implementation handoff required by the [milestone checklist](milestone-02-architecture-overview.md#completion-checklist).
+This completed work plan produced [the maintained architecture](../../../architecture.md) and themed contracts. It applies the [owner decisions](../../../phase-1/milestone-02-owner-decisions.md); the [milestone checklist](milestone-02-architecture-overview.md#completion-checklist) records final evidence. The remaining text preserves the original design tasks for audit and is no longer maintained.
+
+## Completed owner clarifications and review
+
+Owner-requested organization correction (2026-11-05): the following completed design work belongs to P1-M2 and its [completion record](milestone-02-architecture-overview.md#architecture-clarifications-and-review), rather than P1-M3. This records milestone ownership without reopening implementation.
+
+- Configuration and process contracts: absolute workspace/runtime paths, CLI `profile_home` and optional executable resolution, runtime discovery and port fallback.
+- Agent/prompt contracts: optional Apple Foundation Models through the shared port, external prompt assets, validation/packaging and explicit native evidence limits.
+- [Architecture review and interview](../../../phase-1/milestone-02-architecture-review.md): twelve contract corrections, seven owner answers, durable empty-file creation and updated acceptance mapping.
+- [Background AI experience](../../../architecture/ai-job-experience.md), logging, shortcuts and user settings: interaction/state/transport ownership, bounds and required evidence. P1-M3 assembles the skeleton from these contracts; later feature milestones implement their full behavior according to the handoff.
 
 ## Design approach and deliverables
 
