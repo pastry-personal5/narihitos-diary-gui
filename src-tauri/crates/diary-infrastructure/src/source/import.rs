@@ -25,10 +25,12 @@ use std::{
 };
 
 type Capture = dyn Fn() -> Result<(ImportZone, SystemZone), ZoneError> + Send + Sync;
+type Load = dyn Fn(&str) -> Result<(ImportZone, SystemZone), ZoneError> + Send + Sync;
 pub struct Store {
     sources: Vec<Source>,
     repository: Arc<dyn ImportRepository>,
     capture: Arc<Capture>,
+    load: Arc<Load>,
 }
 impl Store {
     pub fn new(sources: Vec<Source>, repository: Arc<dyn ImportRepository>) -> Self {
@@ -36,6 +38,9 @@ impl Store {
             sources,
             repository,
             capture: Arc::new(SystemZone::capture),
+            load: Arc::new(|name| {
+                SystemZone::from_database(std::path::Path::new(SYSTEM_DATABASE), name)
+            }),
         }
     }
     fn scan(
@@ -55,6 +60,7 @@ impl Store {
         let mut candidates: usize = 0;
         let mut entries = 0;
         let mut roots_by_namespace = BTreeMap::new();
+        let mut bindings = Vec::new();
         for (source, root) in self.sources.iter().zip(resolve_roots(&self.sources)) {
             check(cancelled)?;
             let root = match root {
@@ -113,11 +119,11 @@ impl Store {
                 remaining_bytes -= bytes;
                 roots_by_namespace.insert(listing.token.root_namespace, root.canonical.clone());
                 listing.token.import_id = Some(context.id.clone());
-                self.repository.bind_source(
-                    &listing.id,
-                    &listing.token.root_namespace,
-                    &listing.token.key,
-                )?;
+                bindings.push((
+                    listing.id.clone(),
+                    listing.token.root_namespace,
+                    listing.token.key.clone(),
+                ));
                 scan.listings.push(listing);
             }
             if candidates >= 10_000 || entries >= 100_000 || remaining_bytes < 512 {
@@ -126,6 +132,7 @@ impl Store {
             }
         }
         check(cancelled)?;
+        self.repository.bind_sources(&bindings)?;
         let mut result = ImportListing {
             context,
             included: Vec::new(),
@@ -229,8 +236,17 @@ impl ImportStore for Store {
         };
         // Zone capture must be durable before scanning, including invalid-date attempts.
         self.repository.begin(&context)?;
-        let mut result = self.scan(context, &rules, cancelled)?;
-        check(cancelled)?;
+        let outcome = self
+            .scan(context, &rules, cancelled)
+            .and_then(|r| check(cancelled).map(|()| r));
+        let mut result = match outcome {
+            Ok(r) => r,
+            Err(e) => {
+                // Best effort: an abandoned incomplete row is invisible but never reclaimed.
+                let _ = self.repository.discard(id);
+                return Err(e);
+            }
+        };
         let at = now();
         self.repository.complete(id, at)?;
         result.context.completed_at = Some(at);
@@ -242,9 +258,7 @@ impl ImportStore for Store {
         cancelled: &dyn Fn() -> bool,
     ) -> Result<ImportListing, ImportError> {
         let context = self.repository.context(import_id)?;
-        let (captured, rules) =
-            SystemZone::from_database(std::path::Path::new(SYSTEM_DATABASE), &context.zone.name)
-                .map_err(zone_error)?;
+        let (captured, rules) = (self.load)(&context.zone.name).map_err(zone_error)?;
         // Never silently reinterpret old provenance using a newly installed tzdb.
         if captured != context.zone {
             return Err(ImportError::TimezoneDatabase);
@@ -260,10 +274,11 @@ impl ImportStore for Store {
         generation: u64,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<(), ImportError> {
-        let result = self.list(import_id, cancelled)?;
-        if result.context.config_generation != generation {
+        // Refuse a stale generation before the expensive rescan and rehash.
+        if self.repository.context(import_id)?.config_generation != generation {
             return Err(ImportError::Stale);
         }
+        let result = self.list(import_id, cancelled)?;
         let source = result
             .scan
             .listings

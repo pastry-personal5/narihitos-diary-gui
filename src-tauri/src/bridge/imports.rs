@@ -17,6 +17,8 @@ pub enum ImportFailure {
     FixFilenameDirectoryExternally,
     Cancelled,
     Limit,
+    #[serde(other)]
+    Unknown,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ImportJob {

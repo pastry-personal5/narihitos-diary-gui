@@ -79,7 +79,15 @@ pub enum ImportError {
 
 pub trait ImportRepository: Send + Sync {
     fn bind_source(&self, id: &str, namespace: &[u8; 32], key: &str) -> Result<(), ImportError>;
+    /// One transaction for a whole scan; semantics match `bind_source`.
+    fn bind_sources(&self, items: &[(String, [u8; 32], String)]) -> Result<(), ImportError> {
+        items
+            .iter()
+            .try_for_each(|(id, ns, key)| self.bind_source(id, ns, key))
+    }
     fn begin(&self, context: &ImportContext) -> Result<(), ImportError>;
+    /// Removes a context that never completed (cancelled or failed scan).
+    fn discard(&self, id: &str) -> Result<(), ImportError>;
     fn complete(&self, id: &str, at: i64) -> Result<(), ImportError>;
     /// Incomplete contexts are never returned.
     fn context(&self, id: &str) -> Result<ImportContext, ImportError>;

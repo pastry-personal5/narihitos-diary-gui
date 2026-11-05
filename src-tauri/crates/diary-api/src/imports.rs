@@ -53,6 +53,20 @@ fn cancelled(s: &ServerState, session: &str) -> bool {
             .list(session, s.now(), None, 1)
             .is_err()
 }
+/// Polls `f` on the first call and every 64th after; a `true` is latched.
+/// Scans call the predicate per directory entry, and `f` takes the coordinator lock.
+fn throttled(f: impl Fn() -> bool) -> impl Fn() -> bool {
+    let calls = std::cell::Cell::new(0u32);
+    let hit = std::cell::Cell::new(false);
+    move || {
+        let n = calls.get();
+        calls.set(n.wrapping_add(1));
+        if !hit.get() && n.is_multiple_of(64) {
+            hit.set(f());
+        }
+        hit.get()
+    }
+}
 fn code(e: ImportError) -> &'static str {
     match e {
         ImportError::UnnamedZone => "unnamed_timezone",
@@ -178,14 +192,14 @@ pub(super) async fn create(
     drop(c);
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let check = || {
+        let check = throttled(|| {
             cancelled(&s, &session)
                 || s.coordinator
                     .lock()
                     .expect("coordinator poisoned")
                     .get(&session, s.now(), &job.id)
                     .map_or(true, |j| j.state == JobState::Cancelled)
-        };
+        });
         let result = store.import_date(&job.id, date, generation, &check);
         let mut c = s.coordinator.lock().expect("coordinator poisoned");
         if c.get(&session, s.now(), &job.id).is_err() {
@@ -258,8 +272,9 @@ fn page(r: ImportListing, cursor: usize) -> Result<Value, ImportError> {
     if cursor > total {
         return Err(ImportError::NotFound);
     }
-    let items: Vec<_> = r.included.iter().map(|s| json!({"kind":"included","source":source(&s.source),"instant":instant(s.instant),"misplaced":r.misplaced.contains(&s.source.id)}))
-        .chain(r.warnings.iter().map(|s| json!({"kind":"warning","source":source(s),"misplaced":r.misplaced.contains(&s.id)})))
+    let misplaced: std::collections::BTreeSet<_> = r.misplaced.iter().collect();
+    let items: Vec<_> = r.included.iter().map(|s| json!({"kind":"included","source":source(&s.source),"instant":instant(s.instant),"misplaced":misplaced.contains(&s.source.id)}))
+        .chain(r.warnings.iter().map(|s| json!({"kind":"warning","source":source(s),"misplaced":misplaced.contains(&s.id)})))
         .chain(r.scan.failures.iter().map(|(key,outcome)| json!({"kind":"failure","relative_key":key,"code":failure_code(outcome)})))
         .chain(r.scan.collisions.iter().map(|keys| json!({"kind":"path_collision","relative_keys":keys})))
         .skip(cursor).take(100).collect();
@@ -287,7 +302,7 @@ pub(super) async fn list(
     };
     let result = tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let r = st.list(&q.import_id, &|| cancelled(&s, &session))?;
+        let r = st.list(&q.import_id, &throttled(|| cancelled(&s, &session)))?;
         if r.context.config_generation != s.config_generation.load(Ordering::SeqCst) {
             return Err(ImportError::Stale);
         }
@@ -348,9 +363,14 @@ pub(super) async fn resolve(
     let generation = s.config_generation.load(Ordering::SeqCst);
     match tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        st.resolve(&b.import_id, &id, &digest, authority, generation, &|| {
-            cancelled(&s, &session)
-        })
+        st.resolve(
+            &b.import_id,
+            &id,
+            &digest,
+            authority,
+            generation,
+            &throttled(|| cancelled(&s, &session)),
+        )
     })
     .await
     {

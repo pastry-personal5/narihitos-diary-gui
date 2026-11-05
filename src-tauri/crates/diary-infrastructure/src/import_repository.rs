@@ -24,6 +24,29 @@ impl ImportRepository for Db {
             if matches { Ok(()) } else { Err(DbError::Storage) }
         }).map_err(storage)
     }
+    fn bind_sources(&self, items: &[(String, [u8; 32], String)]) -> Result<(), ImportError> {
+        self.transact(|tx| {
+            for (id, namespace, key) in items {
+                tx.execute("INSERT INTO source_identities VALUES (?1, ?2, ?3) ON CONFLICT(source_id) DO NOTHING", (id, namespace.as_slice(), key)).map_err(|_| DbError::Storage)?;
+                let matches = tx.query_row("SELECT namespace = ?2 AND path_key = ?3 FROM source_identities WHERE source_id = ?1", (id, namespace.as_slice(), key), |r| r.get::<_, bool>(0)).map_err(|_| DbError::Storage)?;
+                if !matches {
+                    return Err(DbError::Storage);
+                }
+            }
+            Ok(())
+        }).map_err(storage)
+    }
+    fn discard(&self, id: &str) -> Result<(), ImportError> {
+        self.with(|db| {
+            db.execute(
+                "DELETE FROM import_contexts WHERE import_id = ?1 AND completed_at IS NULL",
+                [id],
+            )
+            .map(|_| ())
+            .map_err(|_| DbError::Storage)
+        })
+        .map_err(storage)
+    }
     fn begin(&self, c: &ImportContext) -> Result<(), ImportError> {
         if c.completed_at.is_some() {
             return Err(ImportError::Storage);
