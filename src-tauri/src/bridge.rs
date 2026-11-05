@@ -73,9 +73,10 @@ pub struct Availability {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UnavailableReason {
+    /// Available: the wire still carries a reason string, and `available` is true.
+    Ready,
     SourceRootMissing,
     SourceRootDenied,
-    SourceAdapterUnverified,
     ProfileHomeMissing,
     ProfileHomeDenied,
     ExecutableMissing,

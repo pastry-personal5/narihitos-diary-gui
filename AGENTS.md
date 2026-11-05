@@ -43,6 +43,8 @@ See [README.md](README.md) for the overview and [docs/product-behavior.md](docs/
 
 - **P1-M13 approvals (owner, 2026-11-06):** Approved direct macOS-only `objc2`, `objc2-app-kit` and `objc2-foundation` dependencies pinned to the locked versions, with license-notice review, and closing on automated tests plus the full gate. Native key, Korean IME and resize proof moves to P1-M28; native VoiceOver and Japanese IME proof are not required. See the [work plan](docs/phase-1/milestone-13-native-symbols-accessibility-architecture.md#owner-decisions).
 
+- **P1-M14 approvals (owner, 2026-11-06):** Narihito mobile schema 1 body saves copy `title` and `title_origin` unchanged; Ayumi saves stay disabled. Approved the `scripts/smoke/producer.py` evidence harness (a Swift program built with the installed `swiftc` from the pinned mobile codec files, run outside the gate, no dependency) and enabling `write_body` once it passes, with phone-app and live-iCloud proof carried to P1-M28. Unresolved iCloud conflict versions are a recorded known gap (no `NSFileVersion` feature). See the [work plan](docs/phase-1/milestone-14-producer-compatible-source-saves-architecture.md#owner-decisions).
+
 - **P1-M11 smoke waiver (owner, 2026-11-06):** The owner skipped the packaged synthetic navigation smoke and closed P1-M11 on automated tests plus the full gate. This waives only that smoke clause; later milestones still need their own evidence. See the [completion record](docs/archive/milestones/p1-m11/milestone-11-explorer-navigation-overview.md#completion-record).
 
 ## Undecided — ask before inventing

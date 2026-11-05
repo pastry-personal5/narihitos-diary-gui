@@ -149,6 +149,32 @@ describe("scaffold shell", () => {
     expect(document.querySelector(".cm-editor")).toBeNull();
     expect(stop).toHaveBeenCalled();
   });
+  it("tells in Global Messages how to enable source import when no source is available", async () => {
+    render(<App bridge={bridge()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await screen.findByText("Connected · Storage unavailable");
+    const log = screen.getByRole("log");
+    await waitFor(() =>
+      expect(log.textContent).toContain("Source import is off"),
+    );
+    expect(log.textContent).toContain("ayumi or narihito");
+    expect(log.textContent).toContain("Reload configuration");
+  });
+  it("stays quiet about source import when a source is available", async () => {
+    const adapter = {
+      ...bridge(),
+      ...settingsFake(
+        {},
+        { sources: [{ alias: "ayumi", available: true, reason: "ready" }] },
+      ),
+    };
+    render(<App bridge={adapter} />);
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await screen.findByText("Connected · Storage unavailable");
+    expect(screen.getByRole("log").textContent).not.toContain(
+      "Source import is off",
+    );
+  });
   it("does not log rejected connection details to the console", async () => {
     const spies = (["log", "info", "warn", "error"] as const).map((m) =>
       vi.spyOn(console, m).mockImplementation(() => {}),

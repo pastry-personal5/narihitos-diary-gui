@@ -107,6 +107,8 @@ Notes: Owner closes on automated tests only; native proof moves to P1-M28.
 
 Status: Planned
 Goal: Enable explicit body saves only for producer-verified formats, preserving metadata, audio integrity and guarded recovery under concurrent changes.
+Plan: [overview](milestone-14-producer-compatible-source-saves-overview.md), [work plan](milestone-14-producer-compatible-source-saves-architecture.md).
+Notes: Narihito mobile schema 1 only; Ayumi stays disabled without a producer contract. The save ships disabled until the producer round trip passes. Owner decisions (2026-11-06): the title is left unchanged, the producer harness is sufficient evidence to enable the save, and unresolved iCloud conflict versions are a recorded known gap.
 
 ### P1-M15: Source and audio Trash
 

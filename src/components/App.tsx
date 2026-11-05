@@ -15,6 +15,7 @@ import { GlobalMessages } from "./GlobalMessages";
 import { PaneSeparator } from "./PaneSeparator";
 import { NavigationModel } from "../application/navigation/model";
 import { useSettings } from "./useSettings";
+import { sourceImportAdvice } from "../application/sourceAdvice";
 import { CommandPalette } from "./CommandPalette";
 import { SymbolLabel, SymbolProvider, type SymbolHost } from "./Symbol";
 import {
@@ -116,6 +117,10 @@ export function App({ bridge }: { bridge: Bridge }) {
     window.addEventListener("focus", focus);
     return () => window.removeEventListener("focus", focus);
   }, [connected, model]);
+  function adviseSources(sources: Parameters<typeof sourceImportAdvice>[0]) {
+    const advice = sourceImportAdvice(sources);
+    if (advice) model.messages.add(advice, "warning", true);
+  }
   async function connect() {
     const epoch = ++connectionEpoch.current;
     const current = () => mounted.current && connectionEpoch.current === epoch;
@@ -172,6 +177,7 @@ export function App({ bridge }: { bridge: Bridge }) {
         }
         setConnection({ kind: "connected", status });
         activeGeneration.current = server.config_generation;
+        adviseSources(server.sources);
         await model.connect(
           true,
           status.instance_id,
@@ -376,6 +382,7 @@ export function App({ bridge }: { bridge: Bridge }) {
                 if (connection.kind !== "connected") return;
                 try {
                   const server = await bridge.serverSettings();
+                  adviseSources(server.sources);
                   if (activeGeneration.current !== server.config_generation) {
                     activeGeneration.current = server.config_generation;
                     await model.connect(

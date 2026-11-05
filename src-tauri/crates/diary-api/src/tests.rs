@@ -305,13 +305,19 @@ async fn configured_unavailable_profiles_have_redacted_reasons() {
     ServerState::set_startup(
         &mut s,
         diary_application::StartupSummary {
-            sources: vec![diary_application::Availability {
-                alias: "source".into(),
-                reason: diary_application::UnavailableReason::SourceRootMissing,
-            }],
+            sources: vec![
+                diary_application::Availability {
+                    alias: "source".into(),
+                    reason: Some(diary_application::UnavailableReason::SourceRootMissing),
+                },
+                diary_application::Availability {
+                    alias: "mobile".into(),
+                    reason: None,
+                },
+            ],
             profiles: vec![diary_application::Availability {
                 alias: "cli".into(),
-                reason: diary_application::UnavailableReason::ExecutableMissing,
+                reason: Some(diary_application::UnavailableReason::ExecutableMissing),
             }],
         },
     );
@@ -329,12 +335,17 @@ async fn configured_unavailable_profiles_have_redacted_reasons() {
         serde_json::from_slice(&to_bytes(response.into_body(), 10240).await.unwrap()).unwrap();
     assert_eq!(
         value["sources"],
-        json!([{"alias":"source","available":false,"reason":"source_root_missing"}])
+        json!([
+            {"alias":"source","available":false,"reason":"source_root_missing"},
+            {"alias":"mobile","available":true,"reason":"ready"}
+        ])
     );
+    assert_eq!(value["sources_available"], json!(true));
     assert_eq!(
         value["profiles"],
         json!([{"alias":"cli","available":false,"reason":"executable_missing"}])
     );
+    assert_eq!(value["agents_available"], json!(false));
     assert_eq!(
         value.as_object().unwrap().len(),
         if cfg!(feature = "scaffold-smoke") {
@@ -1064,7 +1075,7 @@ async fn applied_reload_bumps_generation_swaps_availability_and_reports_busy_job
         diary_application::ReloadOutcome::Applied(diary_application::StartupSummary {
             sources: vec![diary_application::Availability {
                 alias: "fresh".into(),
-                reason: diary_application::UnavailableReason::SourceRootMissing,
+                reason: Some(diary_application::UnavailableReason::SourceRootMissing),
             }],
             profiles: Vec::new(),
         })

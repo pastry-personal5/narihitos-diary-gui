@@ -55,14 +55,34 @@ const sourceItem = {
   instant: { unix_ms: 0, precision: "milli" },
   misplaced: false,
 };
-async function shell(withSource = false) {
+const secondItem = {
+  ...sourceItem,
+  source: {
+    ...sourceItem.source,
+    id: "two",
+    relative_key: "2024/02/29/two.md",
+  },
+};
+// An unresolved timestamp conflict: listed with a warning, never eligible.
+const conflictItem = {
+  ...sourceItem,
+  kind: "warning",
+  source: {
+    ...sourceItem.source,
+    id: "three",
+    relative_key: "2024/02/29/three.md",
+    eligible: false,
+    dating: { ...sourceItem.source.dating, state: "timestamp_conflict" },
+  },
+};
+async function shell(items: object[] | false = false) {
   const base = navigationFake();
   const bridge = {
     ...base,
-    ...(withSource && {
+    ...(items && {
       listSources: async () => ({
         ...(await base.listSources("import")),
-        items: [sourceItem],
+        items,
         groups: [{ id: "group", alias: "Diary", type: "ayumi" }],
       }),
     }),
@@ -114,8 +134,35 @@ describe("accessible interaction", () => {
         order[i].getAttribute("aria-label") ?? "",
       ).toBeTruthy();
   });
+  it("shows an include or exclude checkbox on every source snippet", async () => {
+    await shell([sourceItem, secondItem, conflictItem]);
+    fireEvent.click(screen.getByRole("button", { name: "Snippet tab" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh snippets" }));
+    const box = async (name: string) =>
+      (await screen.findByRole("checkbox", {
+        name: `Include 2024/02/29/${name}.md`,
+      })) as HTMLInputElement;
+    const [one, two, three] = [
+      await box("one"),
+      await box("two"),
+      await box("three"),
+    ];
+    expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+    // Eligible snippets start included; an unresolved conflict cannot be included.
+    expect([one.checked, two.checked, three.checked]).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    expect(three.disabled).toBe(true);
+    fireEvent.click(two);
+    await waitFor(() => expect(two.checked).toBe(false));
+    expect(one.checked).toBe(true);
+    fireEvent.click(two);
+    await waitFor(() => expect(two.checked).toBe(true));
+  });
   it("keeps focus on the Include checkbox when it is toggled", async () => {
-    await shell(true);
+    await shell([sourceItem]);
     fireEvent.click(screen.getByRole("button", { name: "Snippet tab" }));
     fireEvent.click(screen.getByRole("button", { name: "Refresh snippets" }));
     const box = await screen.findByRole("checkbox", {

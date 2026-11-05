@@ -87,6 +87,9 @@ with tempfile.TemporaryDirectory(prefix='diary-import-smoke-') as temporary:
     try:
         server, record = start()
         session = session_for(record)
+        code, settings = call(record, session, '/settings')
+        assert code == 200 and settings['sources_available'], (code, settings)
+        assert settings['sources'] == [{'alias': 'smoke', 'available': True, 'reason': 'ready'}], settings
         code, authentic = call(record, session, f'/authentic/{DATE}/empty', 'POST', {'operation_id': '00000000-0000-4000-8000-000000000001'})
         assert code == 200, (code, authentic)
         authentic_file = workspace / f'assets/diary/authentic/2024/02/{DATE}.md'

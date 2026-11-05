@@ -425,9 +425,11 @@ impl Config {
             .iter()
             .map(|source| {
                 let reason = match fs::read_dir(&source.root) {
-                    Ok(_) => Reason::SourceAdapterUnverified,
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Reason::SourceRootMissing,
-                    Err(_) => Reason::SourceRootDenied,
+                    Ok(_) => None,
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        Some(Reason::SourceRootMissing)
+                    }
+                    Err(_) => Some(Reason::SourceRootDenied),
                 };
                 Availability {
                     alias: source.alias.clone(),
@@ -459,11 +461,11 @@ impl Config {
                     Profile::AppleFoundationModels { alias } => {
                         return Availability {
                             alias: alias.clone(),
-                            reason: Reason::NativeAdapterUnverified,
+                            reason: Some(Reason::NativeAdapterUnverified),
                         };
                     }
                 };
-                let reason = match fs::read_dir(home) {
+                let reason = Some(match fs::read_dir(home) {
                     Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                         Reason::ProfileHomeMissing
                     }
@@ -482,7 +484,7 @@ impl Config {
                             Reason::ExecutableMissing
                         }
                     }
-                };
+                });
                 Availability {
                     alias: profile.alias().into(),
                     reason,

@@ -194,6 +194,43 @@ describe("Settings", () => {
     expect(screen.getByText("server: restart_required")).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/token|\/Users/u);
   });
+
+  it("posts the source-import advice after a reload leaves no source available", async () => {
+    languages(["en-US"]);
+    const fake = settingsFake(
+      { writing_locale: "en-US", revision: "r0" },
+      { sources: [{ alias: "ayumi", available: true, reason: "ready" }] },
+    );
+    render(<App bridge={bridge(fake)} />);
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await screen.findByText("Connected");
+    expect(screen.getByRole("log").textContent).not.toContain(
+      "Source import is off",
+    );
+    await openSettings();
+    fake.server = {
+      ...fake.server,
+      sources: [
+        { alias: "ayumi", available: false, reason: "source_root_missing" },
+      ],
+      config_generation: 2,
+    };
+    fake.reloadAnswer = {
+      outcome: "applied",
+      config_generation: 2,
+      issues: [],
+    };
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reload configuration" }),
+    );
+    await screen.findByText("Configuration reloaded.");
+    fireEvent.click(screen.getByRole("button", { name: "Close Settings" }));
+    await waitFor(() =>
+      expect(screen.getByRole("log").textContent).toContain(
+        "ayumi: folder not found",
+      ),
+    );
+  });
 });
 
 describe("Command palette and Keyboard Shortcuts", () => {

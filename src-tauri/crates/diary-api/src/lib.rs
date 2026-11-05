@@ -503,8 +503,8 @@ async fn close_session(
 }
 fn availability_dto(items: &[diary_application::Availability]) -> Vec<Value> {
     use diary_application::UnavailableReason as Reason;
-    items.iter().map(|item|json!({"alias":item.alias,"available":false,"reason":match item.reason {
-        Reason::SourceRootMissing=>"source_root_missing",Reason::SourceRootDenied=>"source_root_denied",Reason::SourceAdapterUnverified=>"source_adapter_unverified",Reason::ProfileHomeMissing=>"profile_home_missing",Reason::ProfileHomeDenied=>"profile_home_denied",Reason::ExecutableMissing=>"executable_missing",Reason::AgentAdapterUnverified=>"agent_adapter_unverified",Reason::NativeAdapterUnverified=>"native_adapter_unverified",
+    items.iter().map(|item|json!({"alias":item.alias,"available":item.reason.is_none(),"reason":match item.reason {
+        None=>"ready",Some(Reason::SourceRootMissing)=>"source_root_missing",Some(Reason::SourceRootDenied)=>"source_root_denied",Some(Reason::ProfileHomeMissing)=>"profile_home_missing",Some(Reason::ProfileHomeDenied)=>"profile_home_denied",Some(Reason::ExecutableMissing)=>"executable_missing",Some(Reason::AgentAdapterUnverified)=>"agent_adapter_unverified",Some(Reason::NativeAdapterUnverified)=>"native_adapter_unverified",
     }})).collect()
 }
 async fn settings(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Response {
@@ -520,7 +520,7 @@ async fn settings(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Resp
     {
         Ok(_) => {
             let startup = s.startup.lock().expect("startup state poisoned").clone();
-            let value = json!({"config_schema_version":1,"config_generation":s.config_generation.load(std::sync::atomic::Ordering::SeqCst),"last_reload":s.last_reload.lock().expect("reload state poisoned").clone(),"storage_ready":s.storage_ready,"sources_available":false,"agents_available":false,"exports_available":false,"sources":availability_dto(&startup.sources),"profiles":availability_dto(&startup.profiles)});
+            let value = json!({"config_schema_version":1,"config_generation":s.config_generation.load(std::sync::atomic::Ordering::SeqCst),"last_reload":s.last_reload.lock().expect("reload state poisoned").clone(),"storage_ready":s.storage_ready,"sources_available":startup.sources.iter().any(|s|s.reason.is_none()),"agents_available":false,"exports_available":false,"sources":availability_dto(&startup.sources),"profiles":availability_dto(&startup.profiles)});
             #[cfg(feature = "scaffold-smoke")]
             let value = {
                 let mut value = value;

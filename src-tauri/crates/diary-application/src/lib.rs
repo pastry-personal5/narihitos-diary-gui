@@ -453,7 +453,8 @@ pub trait ConfigReloader: Send + Sync {
 #[cfg(test)]
 mod tests;
 
-/// Content-free startup observations. A readable folder is not a verified adapter.
+/// Content-free startup observations. A readable source folder is available because both
+/// known source adapters are verified for reading; agent profiles stay unverified.
 #[derive(Default, Clone)]
 pub struct StartupSummary {
     pub sources: Vec<Availability>,
@@ -462,13 +463,13 @@ pub struct StartupSummary {
 #[derive(Clone)]
 pub struct Availability {
     pub alias: String,
-    pub reason: UnavailableReason,
+    /// `None` means available.
+    pub reason: Option<UnavailableReason>,
 }
 #[derive(Clone, Copy)]
 pub enum UnavailableReason {
     SourceRootMissing,
     SourceRootDenied,
-    SourceAdapterUnverified,
     ProfileHomeMissing,
     ProfileHomeDenied,
     ExecutableMissing,

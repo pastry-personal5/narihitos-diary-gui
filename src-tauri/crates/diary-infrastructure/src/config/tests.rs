@@ -262,19 +262,42 @@ fn optional_availability_stays_unverified_and_never_reads_profile_files() {
     let summary = c.observe_startup(std::ffi::OsStr::new("missing-bin"), &root);
     assert!(matches!(
         summary.sources[0].reason,
-        Reason::SourceRootMissing
+        Some(Reason::SourceRootMissing)
     ));
     assert!(matches!(
         summary.profiles[0].reason,
-        Reason::ExecutableMissing
+        Some(Reason::ExecutableMissing)
     ));
     assert!(matches!(
         summary.profiles[1].reason,
-        Reason::ProfileHomeMissing
+        Some(Reason::ProfileHomeMissing)
     ));
     assert!(matches!(
         summary.profiles[2].reason,
-        Reason::NativeAdapterUnverified
+        Some(Reason::NativeAdapterUnverified)
+    ));
+}
+
+#[test]
+fn readable_source_roots_are_available_for_both_adapters_without_opt_in() {
+    use diary_application::UnavailableReason as Reason;
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    fs::create_dir(root.join("ayumi")).unwrap();
+    fs::create_dir(root.join("mobile")).unwrap();
+    let yaml = format!(
+        "schema_version: 1\npaths: {{entries_root: '{}', runtime_root: '{}'}}\nsources:\n  - {{alias: ayumi, type: ayumi, root: ayumi}}\n  - {{alias: mobile, type: narihito, root: mobile}}\n  - {{alias: gone, type: ayumi, root: gone}}\n",
+        root.join("workspace").display(),
+        root.join("runtime").display()
+    );
+    let mut c = parse(yaml.as_bytes()).unwrap();
+    c.resolve_paths(&root.join("config.yaml")).unwrap();
+    let summary = c.observe_startup(std::ffi::OsStr::new("missing-bin"), &root);
+    assert!(summary.sources[0].reason.is_none(), "readable ayumi root");
+    assert!(summary.sources[1].reason.is_none(), "readable narihito root");
+    assert!(matches!(
+        summary.sources[2].reason,
+        Some(Reason::SourceRootMissing)
     ));
 }
 
@@ -362,11 +385,11 @@ fn denied_optional_folders_do_not_abort_schema_or_observation() {
     fs::set_permissions(&denied_profile, fs::Permissions::from_mode(0o700)).unwrap();
     assert!(matches!(
         summary.sources[0].reason,
-        Reason::SourceRootDenied
+        Some(Reason::SourceRootDenied)
     ));
     assert!(matches!(
         summary.profiles[0].reason,
-        Reason::ProfileHomeDenied
+        Some(Reason::ProfileHomeDenied)
     ));
 }
 
