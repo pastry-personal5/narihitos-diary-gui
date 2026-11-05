@@ -59,7 +59,9 @@ describe("scaffold assembly", () => {
         if (dep.name.startsWith("diary-"))
           expect(allowed[pkg.name]).toContain(dep.name);
         else if (["diary-domain", "diary-application"].includes(pkg.name))
-          throw new Error(`Outward dependency in ${pkg.name}`);
+          expect(
+            pkg.name === "diary-domain" ? ["unicode-normalization"] : [],
+          ).toContain(dep.name);
       }
     }
   });

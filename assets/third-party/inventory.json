@@ -8300,7 +8300,7 @@
     "version": "1.13.3",
     "license": "Zlib OR Apache-2.0 OR MIT",
     "source_archive": "https://crates.io/api/v1/crates/tinyvec/1.13.3/download",
-    "features": ["alloc", "grab_spare_slice", "std"],
+    "features": ["alloc", "default", "grab_spare_slice", "std"],
     "authors": ["Lokathor <zefria@gmail.com>"],
     "notices": [
       {
@@ -8837,6 +8837,36 @@
       }
     ],
     "selected_licenses": ["MIT", "Unicode-3.0"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "unicode-normalization",
+    "version": "0.1.25",
+    "license": "MIT OR Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/unicode-normalization/0.1.25/download",
+    "features": ["default", "std"],
+    "authors": [
+      "kwantam <kwantam@gmail.com>",
+      "Manish Goregaokar <manishsmail@gmail.com>"
+    ],
+    "notices": [
+      {
+        "original_name": "COPYRIGHT",
+        "file": "licenses/23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d.txt",
+        "sha256": "23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d"
+      },
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0.txt",
+        "sha256": "7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0"
+      }
+    ],
+    "selected_licenses": ["MIT"]
   },
   {
     "ecosystem": "cargo",

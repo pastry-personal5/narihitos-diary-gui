@@ -4,6 +4,8 @@ Narihito's Diary, the GUI: a personal asset management app on your Mac.
 
 The P1-M3 scaffold now builds a separately launched Rust server and Tauri client with an in-memory Markdown scratch editor. Storage, imports, AI and exports are unavailable; scratch edits are never saved. Setup and independent launch commands are in the [contribution guide](docs/contribution-guide.md#setup-and-development). Milestone acceptance remains in progress.
 
+Read-only Ayumi/Narihito adapters are implemented and tested as libraries; source imports and views will be connected to the app in later milestones. See the [P1-M9 acceptance record](docs/archive/milestones/p1-m9/milestone-09-source-reading-overview.md).
+
 The planned AI agents are Codex, Claude Code, Qwen Code, and Apple's on-device Foundation Models. Agent integration is not implemented yet. Prompt templates live in [assets/prompts/](assets/prompts/README.md).
 
 Planned writing language is selected in Settings, initially uses the Mac's preferred language, and is remembered across sessions. Generation requires selected snippets and continues for its original date when you navigate away. **Create Empty** saves a blank draft for the selected date, including without snippets.

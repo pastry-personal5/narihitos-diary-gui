@@ -11,3 +11,5 @@ pub mod lifecycle;
 pub mod sqlite;
 pub mod watch;
 pub mod workspace;
+
+pub mod source;
