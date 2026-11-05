@@ -3,8 +3,8 @@
 
 use super::clock::LocalStamp;
 use diary_application::diagnostics::{
-    ErrorTag, EventCode, Level, OpaqueId, PathClass, Record, ResourceDetail, ResourceKind, Role,
-    StateTag, TraceId,
+    Component, ErrorTag, EventCode, Level, OpaqueId, PathClass, Record, ResourceDetail,
+    ResourceKind, Role, StateTag, TraceId,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -60,6 +60,9 @@ pub fn render_line(h: &Header, r: &Record) -> Option<String> {
         let _ = write!(s, r#","sess":"{}""#, v.as_str());
     }
     let _ = write!(s, r#","code":"{}""#, r.code.as_str());
+    if let Some(v) = r.component {
+        let _ = write!(s, r#","comp":"{}""#, v.as_str());
+    }
     if let Some(v) = &r.trace {
         let _ = write!(s, r#","trace":"{}""#, v.as_str());
     }
@@ -115,6 +118,7 @@ struct WireLine {
     inst: Option<String>,
     sess: Option<String>,
     code: String,
+    comp: Option<String>,
     trace: Option<String>,
     op: Option<String>,
     job: Option<String>,
@@ -179,6 +183,7 @@ fn convert(w: WireLine) -> Result<ParsedLine, ()> {
         level,
         trace: opt(&w.trace, TraceId::parse)?,
         session: id(&w.sess)?,
+        component: opt(&w.comp, Component::parse)?,
         operation: id(&w.op)?,
         job: id(&w.job)?,
         resource,

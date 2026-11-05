@@ -1,6 +1,9 @@
 use crate::delivery::{Delivery, Flow};
+use crate::diagnostics::ClientLog;
 use crate::discovery::{self, Discovery};
 use crate::events::{BridgeEvent, Cursor, Decoder};
+use diary_application::diagnostics::{Component, ErrorTag, EventCode, Level, Record, TraceId};
+use diary_logging::private_fs::PrivateDir;
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -91,8 +94,31 @@ pub struct Bridge {
     client: Client,
     connection: Mutex<Connection>,
     subscription: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    log: Arc<ClientLog>,
+}
+/// One fresh ID per outgoing request; the server echoes it in its own records.
+fn new_trace() -> String {
+    uuid::Uuid::new_v4().simple().to_string()
 }
 impl Bridge {
+    pub fn log(&self) -> Arc<ClientLog> {
+        self.log.clone()
+    }
+    fn note(&self, trace: &str, tag: ErrorTag) {
+        let mut record = Record::new(EventCode::UiBridgeError, Level::Warn)
+            .component(Component::Bridge)
+            .error(tag);
+        if let Some(trace) = TraceId::parse(trace) {
+            record = record.trace(trace);
+        }
+        self.log.log(record);
+    }
+    /// The discovery file's parent is the validated per-workspace runtime directory.
+    fn attach_log(&self) {
+        if let Some(dir) = self.path.parent().and_then(|p| PrivateDir::open(p).ok()) {
+            self.log.attach(&dir);
+        }
+    }
     pub fn new(path: PathBuf) -> Result<Self, &'static str> {
         let client = Client::builder()
             .no_proxy()
@@ -106,6 +132,7 @@ impl Bridge {
             flow: std::sync::Mutex::new(None),
             client,
             subscription: Mutex::new(None),
+            log: ClientLog::new(),
             connection: Mutex::new(Connection {
                 discovery: None,
                 session: None,
@@ -121,18 +148,24 @@ impl Bridge {
         payload: Option<serde_json::Value>,
     ) -> Result<T, &'static str> {
         let d = c.discovery.as_ref().ok_or("disconnected")?;
+        let trace = new_trace();
         let mut request = self
             .client
             .request(method, format!("{}/api/v1{path}", d.origin))
-            .bearer_auth(&d.token);
+            .bearer_auth(&d.token)
+            .header("x-diary-trace-id", &trace);
         if let Some(id) = &c.session {
             request = request.header("x-diary-session", id);
         }
         if let Some(payload) = payload {
             request = request.json(&payload);
         }
-        let mut response = request.send().await.map_err(|_| "server_unavailable")?;
+        let mut response = request.send().await.map_err(|_| {
+            self.note(&trace, ErrorTag::Unavailable);
+            "server_unavailable"
+        })?;
         if !response.status().is_success() {
+            self.note(&trace, ErrorTag::Invalid);
             if response.status() == reqwest::StatusCode::CONFLICT {
                 let mut bytes = Vec::new();
                 while let Some(chunk) = response
@@ -229,6 +262,7 @@ impl Bridge {
             c.session = None;
             return Err("incompatible_server");
         }
+        self.attach_log();
         Ok(status)
     }
     pub async fn status(&self) -> Result<Status, &'static str> {
@@ -345,6 +379,7 @@ impl Bridge {
             .get(format!("{}/api/v1/events", d.origin))
             .bearer_auth(&d.token)
             .header("x-diary-session", &session)
+            .header("x-diary-trace-id", new_trace())
             .header("x-diary-instance", &instance)
             .header("last-event-id", last.to_string())
             .send()
@@ -405,6 +440,7 @@ impl Bridge {
             )
             .bearer_auth(&d.token)
             .header("x-diary-session", id)
+            .header("x-diary-trace-id", new_trace())
             .send()
             .await
             .map_err(|_| "server_unavailable")?;

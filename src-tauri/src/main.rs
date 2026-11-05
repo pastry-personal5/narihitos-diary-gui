@@ -1,10 +1,13 @@
 mod bridge;
 mod delivery;
+mod diagnostics;
 mod discovery;
 mod events;
 #[cfg(feature = "scaffold-smoke")]
 mod native_smoke;
 use bridge::{Bridge, Job, JobList, Lease, Metadata, Settings, Status};
+use diagnostics::{ClientEvent, ClientLog, Reject};
+use std::sync::Arc;
 use tauri::{Manager, State, WebviewWindow};
 fn main_window(window: &WebviewWindow) -> Result<(), &'static str> {
     if window.label() == "main" {
@@ -149,6 +152,18 @@ fn get_app_metadata(
         version: app.package_info().version.to_string(),
     })
 }
+#[tauri::command]
+fn log_client_event(
+    window: WebviewWindow,
+    log: State<'_, Arc<ClientLog>>,
+    event: ClientEvent,
+) -> Result<(), &'static str> {
+    main_window(&window)?;
+    log.client_event(event).map_err(|reject| match reject {
+        Reject::Rate => "rate_limited",
+        Reject::Invalid => "invalid_event",
+    })
+}
 fn main() {
     let mut args = std::env::args_os().skip(1);
     if args.next().as_deref() != Some(std::ffi::OsStr::new("--connect")) {
@@ -164,8 +179,10 @@ fn main() {
         std::process::exit(1);
     }
     let bridge = Bridge::new(path.into()).expect("HTTP bridge setup");
+    let log = bridge.log();
     tauri::Builder::default()
         .manage(bridge)
+        .manage(log)
         .setup(|_app| {
             #[cfg(feature = "scaffold-smoke")]
             native_smoke::setup(_app)?;
@@ -190,7 +207,8 @@ fn main() {
             list_jobs,
             cancel_job,
             subscribe_events,
-            get_app_metadata
+            get_app_metadata,
+            log_client_event
         ])
         .on_window_event(|window, event| {
             if window.label() != "main" {
@@ -216,6 +234,8 @@ fn main() {
                     // The scaffold has only a disposable scratch buffer. Future
                     // durable/source editing supplies its own guarded flush here.
                     let _result = app.state::<Bridge>().close().await;
+                    app.state::<Arc<ClientLog>>()
+                        .shutdown(std::time::Duration::from_millis(500));
                     #[cfg(feature = "scaffold-smoke")]
                     if _result.is_ok() {
                         eprintln!("SMOKE main_window_close_released");

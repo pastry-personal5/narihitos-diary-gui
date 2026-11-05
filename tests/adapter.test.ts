@@ -12,7 +12,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
   },
 }));
-import { tauriBridge } from "../src/adapters/tauri-bridge";
+import { logClientEvent, tauriBridge } from "../src/adapters/tauri-bridge";
 import { streamEvent } from "../src/application/events";
 beforeEach(() => {
   vi.useFakeTimers();
@@ -179,5 +179,37 @@ describe("delivery acknowledgements", () => {
     });
     expect(observer).not.toHaveBeenCalled();
     await stop();
+  });
+});
+
+describe("client diagnostics adapter", () => {
+  it("invokes log_client_event with the snake_case payload", async () => {
+    await logClientEvent({
+      code: "ui.bridge_error",
+      level: "warn",
+      traceId: "a".repeat(32),
+      detail: { component: "bridge", count: 2 },
+    });
+    expect(mocks.invoke).toHaveBeenCalledWith("log_client_event", {
+      event: {
+        code: "ui.bridge_error",
+        level: "warn",
+        trace_id: "a".repeat(32),
+        detail: { component: "bridge", count: 2 },
+      },
+    });
+  });
+  it("omits absent optional fields and never rejects", async () => {
+    mocks.invoke.mockRejectedValue("rate_limited");
+    await expect(
+      logClientEvent({ code: "ui.render_error", level: "error" }),
+    ).resolves.toBeUndefined();
+    expect(mocks.invoke).toHaveBeenCalledWith("log_client_event", {
+      event: { code: "ui.render_error", level: "error" },
+    });
+  });
+  it("rejects server-only codes at the type boundary", () => {
+    // @ts-expect-error server codes are not reportable by the WebView
+    void logClientEvent({ code: "server.started", level: "warn" });
   });
 });

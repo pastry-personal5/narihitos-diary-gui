@@ -672,6 +672,8 @@ dependencies = [
 name = "diary-client"
 version = "1.0.0"
 dependencies = [
+ "diary-application",
+ "diary-logging",
  "futures-util",
  "libc",
  "reqwest",

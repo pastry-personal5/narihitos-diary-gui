@@ -14,6 +14,7 @@
     "allow-list-jobs",
     "allow-cancel-job",
     "allow-subscribe-events",
-    "allow-get-app-metadata"
+    "allow-get-app-metadata",
+    "allow-log-client-event"
   ]
 }

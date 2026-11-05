@@ -10,6 +10,7 @@ const COMMANDS: &[&str] = &[
     "cancel_job",
     "subscribe_events",
     "get_app_metadata",
+    "log_client_event",
 ];
 fn main() {
     tauri_build::try_build(

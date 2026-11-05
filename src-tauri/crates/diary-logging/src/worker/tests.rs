@@ -226,3 +226,19 @@ fn records_reach_the_store_as_parsable_lines() {
     assert_eq!(parsed.role, Role::Server);
     w.shutdown(Duration::from_secs(1));
 }
+
+#[test]
+fn emit_line_writes_a_prerendered_line() {
+    let sink = Sink::default();
+    let w = LogWorker::start_with(
+        None,
+        Role::Server,
+        None,
+        clock(),
+        Box::new(sink.clone()),
+        cfg(),
+    );
+    w.emit_line("{\"x\":1}\n".into());
+    wait_until("line", || sink.text() == "{\"x\":1}\n");
+    w.shutdown(Duration::from_secs(1));
+}

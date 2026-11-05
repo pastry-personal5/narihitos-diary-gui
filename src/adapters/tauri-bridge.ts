@@ -1,7 +1,17 @@
 import { streamEvent } from "../application/events";
 import { Channel, invoke } from "@tauri-apps/api/core";
-import type { Bridge } from "../application/bridge";
+import type { Bridge, ClientEvent } from "../application/bridge";
 import { metadataDto, statusDto } from "./validation";
+/** Fire-and-forget diagnostics: a rejected or rate-limited event never disturbs the UI. */
+export async function logClientEvent(event: ClientEvent): Promise<void> {
+  const payload: Record<string, unknown> = {
+    code: event.code,
+    level: event.level,
+  };
+  if (event.traceId !== undefined) payload.trace_id = event.traceId;
+  if (event.detail !== undefined) payload.detail = event.detail;
+  await invoke("log_client_event", { event: payload }).catch(() => {});
+}
 export const tauriBridge: Bridge = {
   metadata: async () => metadataDto(await invoke<unknown>("get_app_metadata")),
   connect: async () => statusDto(await invoke<unknown>("connect_server")),

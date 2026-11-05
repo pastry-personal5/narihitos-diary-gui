@@ -12,6 +12,16 @@ export interface Status {
   storage_ready: boolean;
   capabilities: string[];
 }
+/** Events the WebView may report; the server-side codes are not reportable. */
+export interface ClientEvent {
+  code: "ui.bridge_error" | "ui.render_error";
+  level: "warn" | "error";
+  traceId?: string;
+  detail?: {
+    component: "editor" | "bridge" | "layout" | "settings";
+    count?: number;
+  };
+}
 export interface Bridge {
   metadata(): Promise<AppMetadata>;
   connect(): Promise<Status>;

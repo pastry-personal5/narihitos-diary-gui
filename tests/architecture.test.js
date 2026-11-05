@@ -88,6 +88,7 @@ describe("explicit command permission boundary", () => {
     "cancel_job",
     "subscribe_events",
     "get_app_metadata",
+    "log_client_event",
   ].sort();
   const main = readFileSync("src-tauri/src/main.rs", "utf8");
   const build = readFileSync("src-tauri/build.rs", "utf8");

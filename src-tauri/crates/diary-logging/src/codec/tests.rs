@@ -18,6 +18,7 @@ fn full() -> (Record, OpaqueId) {
         .operation(OpaqueId::parse("123e4567-e89b-42d3-a456-426614174000").unwrap())
         .job(OpaqueId::parse(&"c".repeat(20)).unwrap())
         .resource(detail)
+        .component(Component::Editor)
         .error(ErrorTag::StaleRevision)
         .count(3);
     (r, OpaqueId::parse(&"d".repeat(32)).unwrap())

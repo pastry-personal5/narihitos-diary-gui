@@ -185,6 +185,13 @@ impl LogWorker {
         worker
     }
 
+    /// Queues an already rendered line (for example one buffered before the log was open).
+    pub fn emit_line(&self, line: String) {
+        if self.tx.try_send(line).is_err() {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
     /// Lines the worker has taken from the queue, written or failed.
     pub fn processed(&self) -> u64 {
         self.processed.load(Ordering::Relaxed)

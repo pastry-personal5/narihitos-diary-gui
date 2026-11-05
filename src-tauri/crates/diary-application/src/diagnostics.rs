@@ -169,6 +169,7 @@ pub struct Record {
     pub level: Level,
     pub trace: Option<TraceId>,
     pub session: Option<OpaqueId>,
+    pub component: Option<Component>,
     pub operation: Option<OpaqueId>,
     pub job: Option<OpaqueId>,
     pub resource: Option<ResourceDetail>,
@@ -183,6 +184,7 @@ impl Record {
             level,
             trace: None,
             session: None,
+            component: None,
             operation: None,
             job: None,
             resource: None,
@@ -196,6 +198,10 @@ impl Record {
     }
     pub fn session(mut self, v: OpaqueId) -> Self {
         self.session = Some(v);
+        self
+    }
+    pub fn component(mut self, v: Component) -> Self {
+        self.component = Some(v);
         self
     }
     pub fn operation(mut self, v: OpaqueId) -> Self {

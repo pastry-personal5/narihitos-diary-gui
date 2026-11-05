@@ -153,3 +153,17 @@ async fn busy_error_is_allowlisted_without_forwarding_private_error_details() {
     assert_eq!(bridge.connect().await.err(), Some("client_busy"));
     task.join().unwrap();
 }
+
+#[tokio::test]
+async fn every_request_carries_a_fresh_lowercase_hex_trace_id() {
+    let (_temp, bridge, task) = fixture(|_| json_response(status()));
+    assert!(bridge.connect().await.is_ok());
+    let request = task.join().unwrap().to_lowercase();
+    let at = request.find("x-diary-trace-id: ").expect("trace header") + "x-diary-trace-id: ".len();
+    let id = &request[at..at + 32];
+    assert!(
+        id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')),
+        "{id}"
+    );
+    assert_eq!(request.as_bytes()[at + 32], b'\r');
+}
