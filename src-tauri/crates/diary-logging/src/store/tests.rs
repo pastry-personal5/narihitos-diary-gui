@@ -180,8 +180,9 @@ fn caps_files_and_total_bytes_drop_without_deleting_younger_files() {
     assert_eq!(s.append(LINE), Err(LogError::Capped));
     assert_eq!(ws.names().len(), 3);
     assert_eq!(ws.read("server-2026-11-05.log"), LINE);
-    // Age pruning frees capacity; the next record is accepted again.
+    // Age pruning frees capacity; the next record after the retry window is accepted again.
     ws.aged("server-2026-11-05.log", &clock, 73 * 3600);
+    clock.advance(61);
     s.append(LINE).unwrap();
     assert_eq!(ws.names().len(), 3);
     assert!(!ws.names().contains(&"server-2026-11-05.log".to_string()));
@@ -248,4 +249,46 @@ fn append_rejects_line_over_2kib() {
     let clock = at("2026-11-05T09:00:00.000+09:00");
     let mut s = ws.store(&clock, Limits::default());
     assert_eq!(s.append(&"x".repeat(2049)), Err(LogError::Oversize));
+}
+
+#[test]
+fn restart_onto_a_truncated_tail_starts_a_fresh_line() {
+    let ws = Ws::new();
+    let clock = at("2026-11-05T09:00:00.000+09:00");
+    ws.aged("server-2026-11-05.log", &clock, 0);
+    std::fs::write(
+        ws.logs().join("server-2026-11-05.log"),
+        "{\"ts\":\"cut mid-wri",
+    )
+    .unwrap();
+    let mut s = ws.store(&clock, Limits::default());
+    s.append(LINE).unwrap();
+    assert_eq!(
+        ws.read("server-2026-11-05.log"),
+        format!("{{\"ts\":\"cut mid-wri\n{LINE}")
+    );
+    s.append(LINE).unwrap();
+    assert_eq!(ws.read("server-2026-11-05.log").matches(LINE).count(), 2);
+}
+
+#[test]
+fn capped_state_does_not_rescan_the_directory_for_every_record() {
+    let ws = Ws::new();
+    let clock = at("2026-11-05T09:00:00.000+09:00");
+    let limits = Limits {
+        file_bytes: 50,
+        max_files: 1,
+        total_bytes: 10_000,
+    };
+    let mut s = ws.store(&clock, limits);
+    s.append(LINE).unwrap();
+    clock.advance(86_400);
+    assert_eq!(s.append(LINE), Err(LogError::Capped));
+    // Capacity appears behind the store's back; within the retry window it is not noticed.
+    std::fs::remove_file(ws.logs().join("server-2026-11-05.log")).unwrap();
+    clock.advance(59);
+    assert_eq!(s.append(LINE), Err(LogError::Capped));
+    clock.advance(2);
+    assert_eq!(s.append(LINE), Ok(()));
+    assert_eq!(ws.names(), ["server-2026-11-06.log"]);
 }

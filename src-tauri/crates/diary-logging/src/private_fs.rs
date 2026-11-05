@@ -268,6 +268,20 @@ impl PrivateDir {
         })
     }
 
+    /// The last byte of a regular file (`None` when empty), judged on the opened object.
+    pub fn last_byte(&self, value: &str) -> Result<Option<u8>, FsError> {
+        use std::os::unix::fs::FileExt;
+        let file = self.open_regular(value, libc::O_RDONLY)?;
+        let len = file.metadata().map_err(|_| FsError::Io)?.len();
+        if len == 0 {
+            return Ok(None);
+        }
+        let mut byte = [0u8; 1];
+        file.read_exact_at(&mut byte, len - 1)
+            .map_err(|_| FsError::Io)?;
+        Ok(Some(byte[0]))
+    }
+
     /// Opens or creates a private (0600, owner-only) regular file for appending.
     pub fn append(&self, value: &str) -> Result<File, FsError> {
         let file = self.open_regular(value, libc::O_WRONLY | libc::O_APPEND | libc::O_CREAT)?;

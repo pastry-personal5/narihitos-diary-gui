@@ -53,7 +53,7 @@ Check an item only with a linked result identifying the tested revision, command
 
 ## Evidence record
 
-Revision `43f1e0c` on branch `p1-m4-diagnostic-logging`, Apple Silicon macOS, 2026-11-05. Ordinary (non-fixture) build unless stated. Runs went through the test-runner; counts below are verbatim per-binary results.
+Revision `158bb89` plus the review fix pass described at the end of this record, on branch `p1-m4-diagnostic-logging`, Apple Silicon macOS, 2026-11-05. Ordinary (non-fixture) build unless stated. Runs went through the test-runner; counts below are verbatim per-binary results.
 
 L01 | `docs/architecture/logging.md`, `api-and-processes.md`, changelog | prettier and relative-link check clean | amendments for trace IDs, resource detail, `comp`, selectors, trace command | Limit: owner approval is recorded in the changelog entry of the same day.
 
@@ -65,11 +65,11 @@ L06 | worker tests (7) and `diary-server/tests/stalled_diagnostics.rs`: 10,000 e
 
 L07 | diary-api diagnostics tests (5) and the server smoke: lifecycle, session, busy, cancel and auth-rejection events with no token or body | pass | Limit: `job.admitted` is not emitted (admission exists only in the fixture build); fixture job IDs are not opaque IDs, so the `job` field is omitted for them.
 
-L08 | `src-tauri/src/diagnostics/tests.rs` (4) and Vitest adapter/architecture tests: allowlist, extra keys, 512-byte detail, 20 events/s, 256-line buffer keeping the earliest, ordered flush, locked-log fallback to stderr, command inventory | pass | Limit: "no log path in any response" is structural (the command returns `Result<(), &'static str>`).
+L08 | `src-tauri/src/diagnostics/tests.rs` (4) and Vitest adapter/architecture tests: allowlist, extra keys, 512-byte detail, 20 events/s, 256-line buffer keeping the earliest, ordered flush, locked-log fallback to stderr, command inventory | pass | Limit: "no log path in any response" is structural (the command returns `Result<(), &'static str>`). Plumbing only: no UI code calls `logClientEvent` yet, so no real WebView event is reported.
 
 L09 | diary-api trace tests and `bridge/tests.rs::every_request_carries_a_fresh_lowercase_hex_trace_id` | pass.
 
-L10 | codec fingerprint test, diary-api seeded body/token test, server smoke grep of every token and a sentinel across the log | pass | Limit: stderr output of the smoke server is not scanned.
+L10 | codec fingerprint test, diary-api seeded body/token test, server smoke grep of every token and a sentinel across the log | pass | Limit: stderr output of the smoke server is not scanned. `Fingerprinter` has no production caller yet; later milestones attach resource detail when they add saves, sources and exports, so L10 is proved on synthetic data only.
 
 L11 | trace tests (9) and `python3 scripts/smoke/server.py` against the real binary: all selectors, epoch ordering across a DST offset change, truncated and oversize lines, injected instruction text, output bounds, no discovery read | pass | Limit: the CLI argument parser has no unit test; it is exercised only by the smoke script.
 
@@ -78,3 +78,5 @@ L12 | Server half run: building `diary-server` and running `python3 scripts/smok
 L13 | contribution guide (debugging procedure), AGENTS.md command, docs index, phase plan, changelog | prettier clean | Limit: the handoff E12 row keeps its text; P1-M12/P1-M13 own shortcut and native key evidence.
 
 G01–G06 | revision `06eae45` (docs-only changes since) | fmt, clippy, prettier, eslint exit 0; the Rust suite passed 123 tests (api 18, application 12, client 1+23, domain 1, infrastructure 24, logging 43, stalled_diagnostics 1); Vitest 29 passed | session output, not retained in the repo.
+
+Review fix pass | whole-branch review of `d25affd..158bb89` found no Critical issues and four Important ones, all fixed with tests: per-code 60/minute producer cap (`a_flooding_code_cannot_silence_other_events`), newline before appending to a truncated tail (`restart_onto_a_truncated_tail_starts_a_fresh_line`), 60-second capped retry gate (`capped_state_does_not_rescan_the_directory_for_every_record`), and a bounded trace collection (`recent_counts_every_match_but_returns_only_the_last_n`, a regression guard: the memory bound itself is not measured) | afterwards the Rust suite passed 127 tests twice with identical results (api 18, application 12, client 1+23, domain 1, infrastructure 24, logging 47, stalled_diagnostics 1), clippy passed with and without `scaffold-smoke`, prettier, eslint and Vitest (29) passed, and the server smoke printed PASS | Ten Minor findings are deferred, not fixed (descriptor `dup` without close-on-exec, planted canonical-name entries occupying cap slots, `ClientLog::attach` holding its mutex while opening, shutdown not waking an idle worker, `ui.bridge_error` for expected 409 responses, duplicate `job.finished` on repeated cancel, unused event codes, `trace` panicking on a closed pipe, loose RFC 3339 parsing, early-exit paths skipping shutdown).

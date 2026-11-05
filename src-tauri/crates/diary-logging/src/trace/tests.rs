@@ -334,3 +334,24 @@ fn does_not_read_the_discovery_file() {
     assert!(report.lines.is_empty());
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
 }
+
+#[test]
+fn recent_counts_every_match_but_returns_only_the_last_n() {
+    let ws = Ws::new();
+    let mut content = String::new();
+    for n in 0..600u32 {
+        content += &line(
+            &format!("2026-11-05T09:{:02}:{:02}.000+09:00", n / 60, n % 60),
+            Role::Server,
+            rec(EventCode::AuthRejected, Level::Warn).count(n),
+        );
+    }
+    ws.write("server", "server-2026-11-05.log", &content);
+    let report = collect(&ws.dir(), &Selector::Recent(3), 200);
+    let counts: Vec<u32> = parsed(&report)
+        .iter()
+        .filter_map(|p| p.record.count)
+        .collect();
+    assert_eq!(counts, [597, 598, 599]);
+    assert_eq!(report.matched, 600);
+}

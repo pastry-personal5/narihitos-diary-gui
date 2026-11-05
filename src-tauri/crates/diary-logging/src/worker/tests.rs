@@ -51,6 +51,7 @@ fn record() -> Record {
 fn cfg() -> WorkerConfig {
     WorkerConfig {
         tick: Duration::from_millis(10),
+        per_code_per_minute: u32::MAX,
         ..WorkerConfig::default()
     }
 }
@@ -241,4 +242,39 @@ fn emit_line_writes_a_prerendered_line() {
     w.emit_line("{\"x\":1}\n".into());
     wait_until("line", || sink.text() == "{\"x\":1}\n");
     w.shutdown(Duration::from_secs(1));
+}
+
+#[test]
+fn a_flooding_code_cannot_silence_other_events() {
+    let sink = Sink::default();
+    let clock = clock();
+    let config = WorkerConfig {
+        tick: Duration::from_millis(10),
+        ..WorkerConfig::default()
+    };
+    assert_eq!(config.per_code_per_minute, 60);
+    let w = LogWorker::start_with(
+        None,
+        Role::Server,
+        None,
+        clock.clone(),
+        Box::new(sink.clone()),
+        config,
+    );
+    for _ in 0..500 {
+        w.emit(record());
+    }
+    w.emit(Record::new(EventCode::ClientBusy, Level::Warn));
+    w.emit(Record::new(EventCode::UiRenderError, Level::Error));
+    wait_until("queue", || w.processed() == 62);
+    let text = sink.text();
+    assert_eq!(text.matches("server.started").count(), 60);
+    assert_eq!(text.matches("session.client_busy").count(), 1);
+    assert_eq!(text.matches("ui.render_error").count(), 1);
+    // The next minute starts a new allowance.
+    clock.advance(60);
+    w.emit(record());
+    wait_until("next minute", || w.processed() == 63);
+    w.shutdown(Duration::from_secs(5));
+    assert_eq!(dropped_counts(&sink.text()).iter().sum::<u32>(), 440);
 }

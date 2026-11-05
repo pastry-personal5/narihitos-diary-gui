@@ -8,7 +8,7 @@ use crate::codec::{Header, MAX_LINE, ParsedLine, parse_line, render_line};
 use crate::private_fs::PrivateDir;
 use crate::store::parse_name;
 use diary_application::diagnostics::{Level, OpaqueId, ResourceKind, Role, TraceId};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const DEFAULT_LIMIT: usize = 200;
 pub const MAX_LIMIT: usize = 500;
@@ -106,8 +106,15 @@ pub fn collect_bounded(
 ) -> TraceReport {
     let limit = limit.clamp(1, MAX_LIMIT);
     let mut report = TraceReport::default();
-    // (epoch_ms, role order, file order) keeps the merge deterministic.
-    let mut matched: Vec<(i64, u8, usize, ParsedLine)> = Vec::new();
+    // Only the records that can be returned are kept: the last n for `recent`, otherwise the
+    // first `limit` in time order (one extra shows truncation). Keys are (epoch_ms, role
+    // order, match order) so the merge is deterministic.
+    let keep = match selector {
+        Selector::Recent(n) => usize::from(*n),
+        _ => limit + 1,
+    };
+    let mut kept: BTreeMap<(i64, u8, usize), ParsedLine> = BTreeMap::new();
+    let mut seen = 0usize;
     if let Ok(logs) = workspace_dir.open_child("logs") {
         for (order, role) in [Role::Server, Role::Client].into_iter().enumerate() {
             let Ok(dir) = logs.open_child(role.as_str()) else {
@@ -129,8 +136,15 @@ pub fn collect_bounded(
                     match parsed {
                         None => report.invalid += 1,
                         Some(line) if selector.matches(&line) => {
-                            let seq = matched.len();
-                            matched.push((line.epoch_ms, order as u8, seq, line));
+                            kept.insert((line.epoch_ms, order as u8, seen), line);
+                            seen += 1;
+                            if kept.len() > keep {
+                                if matches!(selector, Selector::Recent(_)) {
+                                    kept.pop_first();
+                                } else {
+                                    kept.pop_last();
+                                }
+                            }
                         }
                         Some(_) => {}
                     }
@@ -138,16 +152,12 @@ pub fn collect_bounded(
             }
         }
     }
-    matched.sort_by_key(|m| (m.0, m.1, m.2));
-    report.matched = matched.len();
+    report.matched = seen;
     let selected: Vec<&ParsedLine> = match selector {
-        Selector::Recent(n) => {
-            let skip = matched.len().saturating_sub(usize::from(*n));
-            matched[skip..].iter().map(|m| &m.3).collect()
-        }
+        Selector::Recent(_) => kept.values().collect(),
         _ => {
-            report.truncated = matched.len() > limit;
-            matched.iter().take(limit).map(|m| &m.3).collect()
+            report.truncated = seen > limit;
+            kept.values().take(limit).collect()
         }
     };
     let (mut bytes, mut resources) = (0usize, BTreeSet::new());

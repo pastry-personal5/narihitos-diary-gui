@@ -14,6 +14,9 @@ pub const MAX_FILES: usize = 8;
 pub const MAX_TOTAL_BYTES: u64 = 128 * 1024 * 1024;
 /// Rotated files older than this (by modification time) are deleted; exactly 72 hours is kept.
 pub const RETENTION_SECS: i64 = 72 * 3600;
+/// While the directory is at its cap, records are dropped for this long before the directory
+/// is scanned again (a flood must not turn into a scan per record).
+const CAPPED_RETRY_SECS: i64 = 60;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
@@ -45,6 +48,7 @@ pub struct LogStore {
     clock: Arc<dyn Clock>,
     limits: Limits,
     active: Option<Active>,
+    capped: Option<(String, i64)>,
     _lock: File,
 }
 
@@ -105,6 +109,7 @@ impl LogStore {
             clock,
             limits,
             active: None,
+            capped: None,
             _lock: lock,
         };
         let _ = store.prune();
@@ -136,6 +141,13 @@ impl LogStore {
     }
 
     fn activate(&mut self, date: &str, len: u64) -> Result<(), LogError> {
+        let now = self.clock.now().epoch_secs;
+        if let Some((capped_date, retry_at)) = &self.capped
+            && capped_date == date
+            && now < *retry_at
+        {
+            return Err(LogError::Capped);
+        }
         let _ = self.prune();
         // shortcut: rescans the directory on every rotation or capped retry; add counters
         // if profiling shows the retry path matters.
@@ -156,22 +168,31 @@ impl LogStore {
             if let Ok(meta) = self.dir.metadata(&name)
                 && meta.len + len <= self.limits.file_bytes
             {
-                let file = self.dir.append(&name).map_err(map)?;
+                let mut file = self.dir.append(&name).map_err(map)?;
+                let mut size = meta.len;
+                // A crash can leave a partial last line; start the next record on a fresh line.
+                if meta.len > 0 && self.dir.last_byte(&name).map_err(map)? != Some(b'\n') {
+                    file.write_all(b"\n").map_err(|_| LogError::Unavailable)?;
+                    size += 1;
+                }
+                self.capped = None;
                 self.active = Some(Active {
                     file,
                     name,
                     date: date.to_owned(),
-                    size: meta.len,
+                    size,
                 });
                 return Ok(());
             }
         }
         if count >= self.limits.max_files || total >= self.limits.total_bytes {
             self.active = None;
+            self.capped = Some((date.to_owned(), now + CAPPED_RETRY_SECS));
             return Err(LogError::Capped);
         }
         let name = file_name(self.role, date, last.map_or(0, |s| s + 1));
         let file = self.dir.append(&name).map_err(map)?;
+        self.capped = None;
         self.active = Some(Active {
             file,
             name,

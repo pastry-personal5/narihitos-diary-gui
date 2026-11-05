@@ -10,6 +10,7 @@ use crate::codec::{Header, render_line};
 use crate::store::LogStore;
 use diary_application::diagnostics::{Diagnostics, EventCode, Level, OpaqueId, Record, Role};
 use std::{
+    collections::HashMap,
     io::Write,
     sync::{
         Arc, Mutex,
@@ -30,6 +31,9 @@ pub struct WorkerConfig {
     pub tick: Duration,
     pub prune_every_secs: i64,
     pub notice_every_secs: i64,
+    /// Non-error records accepted per event code per minute; the excess is counted in
+    /// `log.dropped`, so one noisy code cannot fill the 8-file cap and silence the rest.
+    pub per_code_per_minute: u32,
 }
 
 impl Default for WorkerConfig {
@@ -39,6 +43,7 @@ impl Default for WorkerConfig {
             tick: Duration::from_secs(1),
             prune_every_secs: 3600,
             notice_every_secs: 60,
+            per_code_per_minute: 60,
         }
     }
 }
@@ -53,6 +58,8 @@ pub struct LogWorker {
     stopping: Arc<AtomicBool>,
     drain_ms: Arc<AtomicU64>,
     done: Mutex<Option<Receiver<()>>>,
+    limit: u32,
+    rates: Mutex<HashMap<&'static str, (i64, u32)>>,
 }
 
 struct Core {
@@ -159,6 +166,8 @@ impl LogWorker {
             stopping: Arc::default(),
             drain_ms: Arc::default(),
             done: Mutex::new(Some(done_rx)),
+            limit: config.per_code_per_minute,
+            rates: Mutex::default(),
         });
         let mut core = Core {
             store,
@@ -183,6 +192,20 @@ impl LogWorker {
             worker.stopping.store(true, Ordering::Relaxed);
         }
         worker
+    }
+
+    fn allow(&self, code: &'static str, epoch_secs: i64) -> bool {
+        let minute = epoch_secs.div_euclid(60);
+        let mut rates = self.rates.lock().unwrap_or_else(|e| e.into_inner());
+        let slot = rates.entry(code).or_insert((minute, 0));
+        if slot.0 != minute {
+            *slot = (minute, 0);
+        }
+        if slot.1 >= self.limit {
+            return false;
+        }
+        slot.1 += 1;
+        true
     }
 
     /// Queues an already rendered line (for example one buffered before the log was open).
@@ -249,7 +272,12 @@ fn run(
 
 impl Diagnostics for LogWorker {
     fn emit(&self, record: Record) {
-        let ts = self.clock.now().rfc3339();
+        let now = self.clock.now();
+        if record.level != Level::Error && !self.allow(record.code.as_str(), now.epoch_secs) {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
+            return;
+        }
+        let ts = now.rfc3339();
         let header = Header {
             ts: &ts,
             role: self.role,
