@@ -3,6 +3,7 @@
 //! Callers supply monotonic elapsed milliseconds and opaque IDs from infrastructure.
 //! No state here survives restart and no job implies a durable content operation.
 
+pub mod diagnostics;
 use std::collections::{BTreeMap, VecDeque};
 
 pub const HEARTBEAT_INTERVAL_MS: u64 = 5_000;
