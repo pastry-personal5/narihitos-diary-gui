@@ -45,7 +45,7 @@ export function useSettings(bridge: Bridge, connected: boolean) {
   }, []);
   const update = useCallback(
     async (section: "writing" | "writing_init", value: unknown) => {
-      if (revision.current === undefined) return;
+      if (revision.current === undefined) return false;
       try {
         const next = await bridge.updateUserSettings({
           section,
@@ -53,15 +53,17 @@ export function useSettings(bridge: Bridge, connected: boolean) {
           expectedRevision: revision.current,
           recover: false,
         });
-        if (!alive.current) return;
+        if (!alive.current) return false;
         adopt(next);
         setError(undefined);
+        return true;
       } catch (e) {
-        if (!alive.current) return;
+        if (!alive.current) return false;
         setError(code(e));
         // A stale or uncertain write is resolved by reloading what is on disk.
         if (["conflict", "uncertain"].includes(code(e)))
           await bridge.getUserSettings().then(adopt, () => {});
+        return false;
       }
     },
     [adopt, bridge],
@@ -69,15 +71,17 @@ export function useSettings(bridge: Bridge, connected: boolean) {
 
   useEffect(() => {
     alive.current = true;
+    // Per-run flag: the shared ref is reset by a StrictMode remount, which would let two loads race.
+    let live = true;
     void (async () => {
       let loaded: UserSettings;
       try {
         loaded = await bridge.getUserSettings();
       } catch (e) {
-        if (alive.current) setError(code(e));
+        if (live) setError(code(e));
         return;
       }
-      if (!alive.current) return;
+      if (!live) return;
       adopt(loaded);
       const blocked =
         loaded.read_only ||
@@ -87,6 +91,7 @@ export function useSettings(bridge: Bridge, connected: boolean) {
         await update("writing_init", [...(navigator.languages ?? [])]);
     })();
     return () => {
+      live = false;
       alive.current = false;
     };
   }, [adopt, bridge, update]);
@@ -145,13 +150,17 @@ export function useSettings(bridge: Bridge, connected: boolean) {
     },
     reload: async () => {
       setReloading(true);
+      let failed: string | undefined;
       try {
         await bridge.reloadSettings();
       } catch (e) {
-        if (alive.current) setServerError(code(e));
+        failed = code(e);
       }
       await refreshServer();
-      if (alive.current) setReloading(false);
+      if (!alive.current) return;
+      // Set after the refresh, which clears serverError on success.
+      if (failed) setServerError(failed);
+      setReloading(false);
     },
   };
 }

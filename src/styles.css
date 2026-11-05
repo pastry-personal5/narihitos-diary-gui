@@ -95,6 +95,9 @@ footer {
   flex: 1;
   min-height: 0;
 }
+.workspace[hidden] {
+  display: none;
+}
 .icon-bar {
   padding: 20px 8px;
   border-right: 1px solid var(--line);

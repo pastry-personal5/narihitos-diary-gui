@@ -123,6 +123,11 @@ export function SettingsView({
                     </ul>
                   </div>
                 )}
+                {model.serverError && (
+                  <p role="alert">
+                    {SETTINGS_MESSAGE[model.serverError] ?? model.serverError}
+                  </p>
+                )}
                 <button disabled={model.reloading} onClick={model.reload}>
                   Reload configuration
                 </button>
@@ -147,10 +152,11 @@ export function SettingsView({
             </label>
             <button
               disabled={user?.read_only || draft.trim() === ""}
-              onClick={() => {
-                void model.setWriting(draft.trim());
-                setDraft("");
-              }}
+              onClick={() =>
+                void model
+                  .setWriting(draft.trim())
+                  .then((saved) => saved && setDraft(""))
+              }
             >
               Save language
             </button>
