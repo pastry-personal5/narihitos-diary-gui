@@ -67,18 +67,19 @@ The CLI is trusted under the owner's account policy. Filtering the app's prompt/
 
 Proposed module locations are a scaffold contract, not a repository restructure already performed:
 
-| Location                                | Responsibility and dependency constraints                                                                                         |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `src-tauri/crates/diary-domain`         | Asset/date/revision values, review alignment and selection/order policies; standard-library-oriented pure code                    |
-| `src-tauri/crates/diary-application`    | Use cases; ports for content, catalog, operations, sources, clock/zone, agent runner, exports and event sink; depends on domain   |
-| `src-tauri/crates/diary-infrastructure` | Port implementations, platform/file/DB/provider/CLI/native model adapters and prompt asset loading; depends on application/domain |
-| `src-tauri/crates/diary-api`            | HTTP/SSE DTO conversion, auth/session admission and error mapping; depends on application                                         |
-| `src-tauri/crates/diary-server`         | Server executable and composition root                                                                                            |
-| `src-tauri/src`                         | Tauri client composition, narrow HTTP bridge, shutdown handshake and native symbols; no server/domain implementation              |
-| `src/application`                       | Client reducers, save/review/session state machines, command registry and typed bridge interface                                  |
-| `src/adapters`                          | Tauri invocations, channel subscription and DTO validation                                                                        |
-| `src/editor`                            | Dedicated CodeMirror state/view/extensions and transaction translation                                                            |
-| `src/components`                        | React layout and accessible controls from the canonical [containment model](ux-information-architecture.md)                       |
+| Location                                | Responsibility and dependency constraints                                                                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src-tauri/crates/diary-domain`         | Asset/date/revision values, review alignment and selection/order policies; standard-library-oriented pure code                                                |
+| `src-tauri/crates/diary-application`    | Use cases; ports for content, catalog, operations, sources, clock/zone, agent runner, exports and event sink; depends on domain                               |
+| `src-tauri/crates/diary-logging`        | Diagnostic log model codec, rotating private log store, asynchronous worker, trace reader and descriptor-relative private file access; depends on application |
+| `src-tauri/crates/diary-infrastructure` | Port implementations, platform/file/DB/provider/CLI/native model adapters and prompt asset loading; depends on application/domain                             |
+| `src-tauri/crates/diary-api`            | HTTP/SSE DTO conversion, auth/session admission and error mapping; depends on application                                                                     |
+| `src-tauri/crates/diary-server`         | Server executable and composition root                                                                                                                        |
+| `src-tauri/src`                         | Tauri client composition, narrow HTTP bridge, shutdown handshake and native symbols; no server/domain implementation                                          |
+| `src/application`                       | Client reducers, save/review/session state machines, command registry and typed bridge interface                                                              |
+| `src/adapters`                          | Tauri invocations, channel subscription and DTO validation                                                                                                    |
+| `src/editor`                            | Dedicated CodeMirror state/view/extensions and transaction translation                                                                                        |
+| `src/components`                        | React layout and accessible controls from the canonical [containment model](ux-information-architecture.md)                                                   |
 
 Use a Cargo workspace rooted at `src-tauri/Cargo.toml` whose default members include the client, server and all Rust crates. This preserves the existing gate command paths while covering the server. Feature code never imports a reference submodule or a transport adapter from the domain/application crates. Architectural tests should reject forbidden dependencies and verify both binaries are included in gate coverage.
 

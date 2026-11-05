@@ -12,7 +12,7 @@ The owner asked on 2026-11-05 for an agent-debugging trace to redacted resource 
 
 **No new external crate or build tool.** The plan uses `std` threads and channels, the already-approved `libc`, `serde_json`, `sha2` and `uuid` crates, and the existing `PrivateDir` helpers. The contract names `tracing` as a preferred candidate; it needs a pruner of our own anyway, so this plan does not adopt it. Adopting it later requires owner approval and a license check.
 
-**Owner confirmation needed before Task 9: internal crate edges.** The `diary-client` package currently depends on no `diary-*` crate. Reusing the log worker, `PrivateDir` and record codec in the client adds `diary-application` and `diary-infrastructure` as path dependencies (workspace members, no new external crate or license). Side effect: the client binary also links `serde_yaml_ng` and `unsafe-libyaml`, which the client does not call. The alternative is a separate logging crate, which needs `PrivateDir` moved out of infrastructure and is a broader restructure. Recommended: the two path dependencies. Tasks 1–8 and 10 do not depend on the answer.
+**Crate layout (owner decision, 2026-11-05).** Logging lives in a new `diary-logging` crate that also takes `PrivateDir` from `diary-infrastructure`. `diary-infrastructure`, `diary-server` and the `diary-client` Tauri package depend on it, so the client does not link the YAML adapter. No new external crate or license; the architecture test lists the new edges.
 
 ## Scope
 

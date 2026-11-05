@@ -6,9 +6,9 @@ Implementation plan for the [P1-M4 overview](milestone-04-diagnostic-logging-ove
 
 **Goal:** Private bounded server/client logs, plus a trace that follows one request to redacted resource detail.
 
-**Architecture:** `diary-application` owns the typed diagnostic model and the `Diagnostics` port (no I/O, no dependencies). `diary-infrastructure::logging` owns the line codec, clock, store, worker and trace reader. The server, bridge and one new `diary-server trace` mode only call those. Producers render a line on their own thread and `try_send` it; a worker thread owns all disk and stderr I/O.
+**Architecture:** `diary-application` owns the typed diagnostic model and the `Diagnostics` port (no I/O, no dependencies). the new `diary-logging` crate owns the line codec, clock, store, worker, trace reader and the descriptor-relative `PrivateDir` (moved from `diary-infrastructure`, which now depends on it). The server, bridge and one new `diary-server trace` mode only call those. Producers render a line on their own thread and `try_send` it; a worker thread owns all disk and stderr I/O.
 
-**Tech stack:** Rust `std` threads and `sync_channel`, existing `libc`, `serde_json`, `sha2` (infrastructure) and `uuid` (`diary-api`, client); no new external crate. Task 9 needs owner confirmation of two internal path dependencies (see the overview).
+**Tech stack:** Rust `std` threads and `sync_channel`, existing `libc`, `serde_json`, `sha2` (infrastructure) and `uuid` (`diary-api`, client); no new external crate. The owner chose a separate `diary-logging` crate over client→infrastructure edges; the client depends on `diary-application` and `diary-logging` only.
 
 ## Global constraints
 
@@ -38,12 +38,12 @@ Behaviors the contract implies but the required evidence does not list. Each has
 | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `src-tauri/crates/diary-application/src/diagnostics.rs` (new)                         | `Level`, `Role`, `EventCode`, `ErrorTag`, `OpaqueId`, `TraceId`, `ResourceDetail`, `Record`, `Diagnostics`, `NullDiagnostics` |
 | `src-tauri/crates/diary-infrastructure/src/logging/mod.rs` (new)                      | Re-exports and `LogError`                                                                                                     |
-| `…/logging/codec.rs` (new)                                                            | `render_line`, `parse_line`, `Fingerprinter`                                                                                  |
-| `…/logging/clock.rs` (new)                                                            | `Clock`, `SystemClock`, `LocalStamp`                                                                                          |
-| `…/logging/store.rs` (new)                                                            | `LogStore`: open, append, rotate, cap, prune                                                                                  |
-| `…/logging/worker.rs` (new)                                                           | `LogWorker`: queue, thread, stderr notice, drain; implements `Diagnostics`                                                    |
-| `…/logging/trace.rs` (new)                                                            | `Selector`, `collect`, `TraceReport`                                                                                          |
-| `src-tauri/crates/diary-infrastructure/src/private_fs.rs`                             | Add `list`, `metadata`, `lock`                                                                                                |
+| `diary-logging/src/codec.rs` (new)                                                    | `render_line`, `parse_line`, `Fingerprinter`                                                                                  |
+| `diary-logging/src/clock.rs` (new)                                                    | `Clock`, `SystemClock`, `LocalStamp`                                                                                          |
+| `diary-logging/src/store.rs` (new)                                                    | `LogStore`: open, append, rotate, cap, prune                                                                                  |
+| `diary-logging/src/worker.rs` (new)                                                   | `LogWorker`: queue, thread, stderr notice, drain; implements `Diagnostics`                                                    |
+| `diary-logging/src/trace.rs` (new)                                                    | `Selector`, `collect`, `TraceReport`                                                                                          |
+| `diary-logging/src/private_fs.rs` (moved from infrastructure)                         | `FsError`, `PrivateDir`; add `list`, `metadata`, `append`, `lock`                                                             |
 | `src-tauri/crates/diary-infrastructure/src/lifecycle.rs`                              | Extract `entropy`, `workspace_key`                                                                                            |
 | `src-tauri/crates/diary-api/src/lib.rs`                                               | Trace-ID middleware, request-scoped records                                                                                   |
 | `src-tauri/crates/diary-server/src/main.rs`                                           | Start worker, emit lifecycle events, `trace` mode                                                                             |
@@ -139,7 +139,7 @@ pub struct NullDiagnostics;  // implements Diagnostics, drops everything
 
 ### Task 3: Line codec and fingerprinter
 
-**Files:** create `diary-infrastructure/src/logging/{mod.rs,codec.rs}`; modify `diary-infrastructure/src/lib.rs`. `diary-application` is already a dependency.
+**Files:** create `diary-logging/src/codec.rs` and its tests. `diary-application` is a dependency of the crate.
 
 **Consumes:** Task 2 types. **Produces:**
 
@@ -155,14 +155,14 @@ impl Fingerprinter { pub fn new(key: [u8; 16]) -> Self;
 ```
 
 - [ ] **Step 1:** Failing tests: `render_then_parse_round_trips_every_field`; `render_is_single_line_with_fixed_key_order`; `render_drops_line_over_2kib` (many-field record cannot exceed it, so test with maximum fields and assert `Some` ≤ 2048, plus a direct oversize header ts); `parse_rejects_unknown_key_bad_enum_bad_id_and_truncated_json`; `parse_derives_epoch_ms_from_offset_timestamp`; `fingerprint_differs_by_key_and_content_and_never_contains_content` (describe a body containing `SECRET-BODY`, render, assert the line lacks it and that two keys give different `fp`); `describe_counts_bytes_and_lines`.
-- [ ] **Step 2:** Run `cargo test … -p diary-infrastructure logging::codec`. Expected: FAIL.
+- [ ] **Step 2:** Run `cargo test … -p diary-logging codec`. Expected: FAIL.
 - [ ] **Step 3:** Implement with `serde_json` (`#[serde(deny_unknown_fields)]` wire structs, converted to typed values through the Task 2 parsers) and `sha2`. Lines are written by `render_line` only; `parse_line` re-validates by converting every field again.
 - [ ] **Step 4:** Re-run. Expected: PASS.
 - [ ] **Step 5:** Commit `feat: add log line codec and resource fingerprints`.
 
-### Task 4: Private directory helpers and shared extractions
+### Task 4: Logging crate, private directory helpers and shared extractions
 
-**Files:** modify `private_fs.rs`, `lifecycle.rs`, tests alongside.
+**Files:** create crate `diary-logging` (workspace member and default member; `diary-infrastructure` and `diary-server` depend on it); move `private_fs.rs` and the owner/mode check from infrastructure with its own `FsError` (infrastructure converts with `From<FsError> for ConfigError`/`LifecycleError`); update `tests/architecture.test.js` allowed edges; modify `lifecycle.rs` in infrastructure for the extractions.
 
 **Produces:**
 
@@ -185,7 +185,7 @@ pub fn workspace_key(canonical_entries_root: &Path) -> String;                  
 
 ### Task 5: Clock
 
-**Files:** create `logging/clock.rs`.
+**Files:** create `diary-logging/src/clock.rs`.
 
 **Produces:**
 
@@ -205,7 +205,7 @@ pub struct SystemClock;   // libc::clock_gettime + localtime_r
 
 ### Task 6: Log store
 
-**Files:** create `logging/store.rs`; modify `logging/mod.rs` (`LogError { Unavailable, Capped, Oversize, Locked }`).
+**Files:** create `diary-logging/src/store.rs`; `LogError { Unavailable, Capped, Oversize, Locked }`).
 
 **Consumes:** Tasks 4–5. **Produces:**
 
@@ -226,7 +226,7 @@ impl LogStore {
 
 ### Task 7: Log worker
 
-**Files:** create `logging/worker.rs`.
+**Files:** create `diary-logging/src/worker.rs`.
 
 **Consumes:** Tasks 3, 5, 6. **Produces:**
 
@@ -298,7 +298,7 @@ export function logClientEvent(event: ClientEvent): Promise<void>;
 
 ### Task 10: Trace reader and command
 
-**Files:** create `logging/trace.rs`; modify `diary-server/src/main.rs` (mode switch before config-only startup).
+**Files:** create `diary-logging/src/trace.rs`; modify `diary-server/src/main.rs` (mode switch before config-only startup).
 
 **Consumes:** Tasks 3, 4. **Produces:**
 
@@ -348,6 +348,8 @@ CLI: `diary-server trace --config PATH --select <selector> [--limit N]`. It load
 
 ## Plan review record
 
+Revised 2026-11-05 during execution: the owner chose the separate `diary-logging` crate (logging modules and `PrivateDir` moved; architecture test updated to seven packages; client edges are `diary-application` and `diary-logging`). The `Component`-style tags and all task interfaces are unchanged.
+
 Reviewed 2026-11-05 before implementation (self-review plus advisor pass). Fixed:
 
 - Crate edges: the client has no `diary-*` dependency; Task 9 now requires owner confirmation of two internal path dependencies, and the overview states the yaml-linking side effect. `diary-api` already has `uuid`, so trace-ID generation needs no new edge; the false claim that infrastructure has `uuid` is removed.
@@ -356,4 +358,4 @@ Reviewed 2026-11-05 before implementation (self-review plus advisor pass). Fixed
 - Tests: moved the stalled-diagnostics isolation test to Task 8 where `ServerState` is available and named it as a job-admission proof (no save exists before P1-M6); added the competing client writer test; fixed the client buffer to drop newest.
 - Debugging entry point: added the `recent:<n>` selector so an agent can find a trace ID with no UI change.
 
-Open: the Task 9 crate-edge confirmation.
+Resolved: the Task 9 crate edges (see the revision above).
