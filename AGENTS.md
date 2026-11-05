@@ -41,6 +41,8 @@ See [README.md](README.md) for the overview and [docs/product-behavior.md](docs/
 
 - **Import snapshots (owner approval, 2026-11-05):** Persist immutable, body-less scan snapshots per completed `import_id`, atomically with completion. Pagination survives source changes and restart. Resolve only the selected source with a fresh observation; a new import refreshes listings and applies choices. Legacy contexts without snapshots require re-import. See the [source/date contract](docs/architecture/sources-and-dates.md#implementation-status).
 
+- **P1-M13 approvals (owner, 2026-11-06):** Approved direct macOS-only `objc2`, `objc2-app-kit` and `objc2-foundation` dependencies pinned to the locked versions, with license-notice review, and closing on automated tests plus the full gate. Native VoiceOver/IME/key/resize proof moves to P1-M28. See the [work plan](docs/phase-1/milestone-13-native-symbols-accessibility-architecture.md#owner-decisions).
+
 - **P1-M11 smoke waiver (owner, 2026-11-06):** The owner skipped the packaged synthetic navigation smoke and closed P1-M11 on automated tests plus the full gate. This waives only that smoke clause; later milestones still need their own evidence. See the [completion record](docs/archive/milestones/p1-m11/milestone-11-explorer-navigation-overview.md#completion-record).
 
 ## Undecided — ask before inventing

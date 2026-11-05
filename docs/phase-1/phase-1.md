@@ -92,14 +92,16 @@ Notes: Closed with the owner-waived packaged navigation smoke (2026-11-06); no n
 
 ### P1-M12: Command palette and keyboard shortcuts
 
-Status: Planned
+Status: Done
 Goal: Route actions through one registry and add the command palette plus editable, persistent, scope-aware shortcuts with conflict and IME protection.
 Plan: [overview](milestone-12-command-palette-shortcuts-overview.md), [work plan](milestone-12-command-palette-shortcuts-architecture.md).
 
 ### P1-M13: Native symbols and accessible interaction
 
 Status: Planned
-Goal: Add allowlisted AppKit SF Symbols and verify keyboard, VoiceOver, focus, pane resizing and Korean/Japanese IME behavior in the packaged macOS interface.
+Goal: Add allowlisted AppKit SF Symbols and close the keyboard, focus, pane-resizing and IME-safe-save gaps that automated tests can reach; packaged VoiceOver, key, resize and Korean/Japanese IME proof is carried to P1-M28.
+Plan: [overview](milestone-13-native-symbols-accessibility-overview.md), [work plan](milestone-13-native-symbols-accessibility-architecture.md).
+Notes: Owner closes on automated tests only; native proof moves to P1-M28.
 
 ### P1-M14: Producer-compatible source saves
 
