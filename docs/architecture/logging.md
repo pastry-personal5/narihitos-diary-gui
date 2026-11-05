@@ -44,6 +44,7 @@ For debugging by a person or an AI coding agent, records can be followed across 
   "inst": "<instance id>",
   "sess": "<session id>",
   "code": "save.rejected",
+  "comp": "editor",
   "trace": "<32 hex>",
   "op": "<id>",
   "job": "<id>",
@@ -62,6 +63,7 @@ For debugging by a person or an AI coding agent, records can be followed across 
 }
 ```
 
+- `comp` is an optional component tag (`editor`, `bridge`, `layout`, `settings`) set only for WebView-reported events.
 - `trace` is a 32-character lowercase hex ID per client request, carried in the `X-Diary-Trace-Id` header; the server replaces a missing or invalid value.
 - `res` describes a resource with a kind, an ID that is only a UUID, a `YYYY-MM-DD` date or 16–64 lowercase hex, optional revision, byte and line counts, a state tag and a path class (`entries_root`, `runtime_root`, `source_root`, `outside_root`, `symlink`, `unknown`). It never holds a path string or content.
 - `fp` is the first 8 bytes of SHA-256(per-process random key, kind, 0x00, bytes). The key lives only in memory: fingerprints compare content across events of one process instance, cannot be reversed by a dictionary, and mean nothing after restart.

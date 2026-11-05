@@ -62,6 +62,7 @@ One JSON object per line, fixed key order, absent keys omitted:
   "inst": "<instance id>",
   "sess": "<session id>",
   "code": "save.rejected",
+  "comp": "editor",
   "trace": "<32 hex>",
   "op": "<id>",
   "job": "<id>",
