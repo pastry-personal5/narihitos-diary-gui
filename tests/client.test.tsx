@@ -11,6 +11,7 @@ import { App } from "../src/components/App";
 import { EditorView } from "@codemirror/view";
 import { mountScratchEditor } from "../src/editor/scratch-editor";
 import type { Bridge } from "../src/application/bridge";
+import { settingsFake } from "./settings-fake";
 const status = {
   instance_id: "instance",
   workspace_key: "workspace",
@@ -24,6 +25,7 @@ afterEach(cleanup);
 function bridge(): Bridge {
   return {
     metadata: async () => ({ version: "1.0.0" }),
+    ...settingsFake(),
     connect: async () => status,
     status: async () => status,
     watch: async () => async () => {},

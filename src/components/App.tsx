@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { Bridge, Connection } from "../application/bridge";
 import { AuthenticPane } from "./AuthenticPane";
+import { SettingsView } from "./SettingsView";
 import { SAVE_LABEL, today, useAuthentic } from "./useAuthentic";
+import { useSettings } from "./useSettings";
 const tabs = ["Date tab", "Snippet tab", "Draft tab", "Entry tab"] as const;
-const unavailable = "This feature is unavailable in the scaffold.";
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 export function App({ bridge }: { bridge: Bridge }) {
   const mounted = useRef(true);
@@ -15,6 +16,8 @@ export function App({ bridge }: { bridge: Bridge }) {
   });
   const [tab, setTab] = useState<(typeof tabs)[number]>("Date tab");
   const connected = connection.kind === "connected";
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settings = useSettings(bridge, connected);
   const auth = useAuthentic(
     bridge,
     connected,
@@ -153,10 +156,20 @@ export function App({ bridge }: { bridge: Bridge }) {
           </button>
         </div>
       </header>
-      <div className="workspace">
+      {settingsOpen && (
+        <SettingsView
+          model={settings}
+          connected={connected}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+      <div className="workspace" hidden={settingsOpen}>
         <nav aria-label="Icon Bar" className="icon-bar">
           <span>Icon Bar</span>
-          <button disabled title={unavailable}>
+          <button
+            aria-pressed={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
             Settings
           </button>
         </nav>

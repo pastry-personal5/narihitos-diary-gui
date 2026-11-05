@@ -366,6 +366,8 @@ impl Config {
     }
 }
 
+mod reload;
+pub use reload::ConfigHandle;
 #[cfg(test)]
 mod tests;
 

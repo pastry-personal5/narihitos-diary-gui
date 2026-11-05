@@ -33,6 +33,10 @@ pub struct Lease {
 #[derive(Serialize, Deserialize)]
 pub struct Settings {
     pub config_schema_version: u32,
+    #[serde(default)]
+    pub config_generation: u64,
+    #[serde(default)]
+    pub last_reload: Option<ReloadResult>,
     pub storage_ready: bool,
     pub sources_available: bool,
     pub agents_available: bool,
@@ -41,6 +45,20 @@ pub struct Settings {
     pub profiles: Vec<Availability>,
     #[cfg(feature = "scaffold-smoke")]
     pub folder_checks: Vec<crate::native_smoke::FolderCheck>,
+}
+/// A redacted reload problem: a coarse config area and a stable code, never a value.
+#[derive(Serialize, Deserialize)]
+pub struct ReloadIssue {
+    pub path: String,
+    pub code: String,
+}
+#[derive(Serialize, Deserialize)]
+pub struct ReloadResult {
+    pub outcome: String,
+    #[serde(default)]
+    pub config_generation: Option<u64>,
+    #[serde(default)]
+    pub issues: Vec<ReloadIssue>,
 }
 #[derive(Serialize, Deserialize)]
 pub struct Availability {
@@ -481,6 +499,28 @@ impl Bridge {
             None,
         )
         .await
+    }
+    pub async fn reload_settings(&self) -> Result<ReloadResult, &'static str> {
+        let result: ReloadResult = self
+            .request(
+                &*self.connection.lock().await,
+                Method::POST,
+                "/settings/reload",
+                None,
+            )
+            .await?;
+        let known = ["applied", "restart_required", "rejected", "busy"];
+        let bounded = |t: &str| t.len() <= 64 && t.bytes().all(|b| b.is_ascii_graphic());
+        if !known.contains(&result.outcome.as_str())
+            || result.issues.len() > 16
+            || result
+                .issues
+                .iter()
+                .any(|i| !bounded(&i.path) || !bounded(&i.code))
+        {
+            return Err("unavailable");
+        }
+        Ok(result)
     }
     pub async fn jobs(&self, cursor: Option<String>) -> Result<JobList, &'static str> {
         if cursor.as_ref().is_some_and(|id| !valid_id(id)) {

@@ -68,8 +68,55 @@ export class AuthenticError extends Error {
     super(code);
   }
 }
+export interface Availability {
+  alias: string;
+  available: boolean;
+  reason: string;
+}
+export interface ReloadIssue {
+  path: string;
+  code: string;
+}
+export interface ReloadResult {
+  outcome: "applied" | "restart_required" | "rejected" | "busy";
+  config_generation: number | null;
+  issues: ReloadIssue[];
+}
+/** Redacted server config status: availability only, never paths, tokens or YAML. */
+export interface ServerSettings {
+  config_generation: number;
+  last_reload: ReloadResult | null;
+  storage_ready: boolean;
+  sources: Availability[];
+  profiles: Availability[];
+}
+export interface UserSettings {
+  revision: string;
+  read_only: boolean;
+  recoverable: boolean;
+  warnings: { section: string; code: string }[];
+  writing_locale: string | null;
+  keybindings: unknown;
+}
+export interface UserSettingsUpdate {
+  /** `writing_init` takes the system's preferred tags and only fills an empty choice. */
+  section: "writing" | "writing_init" | "keybindings";
+  value: unknown;
+  expectedRevision: string;
+  recover: boolean;
+}
+/** Allowlisted failure of a settings command; never carries paths or file contents. */
+export class SettingsError extends Error {
+  constructor(readonly code: string) {
+    super(code);
+  }
+}
 export interface Bridge {
   metadata(): Promise<AppMetadata>;
+  serverSettings(): Promise<ServerSettings>;
+  reloadSettings(): Promise<ReloadResult>;
+  getUserSettings(): Promise<UserSettings>;
+  updateUserSettings(update: UserSettingsUpdate): Promise<UserSettings>;
   connect(): Promise<Status>;
   status(): Promise<Status>;
   listAuthentic(cursor?: string): Promise<AuthenticPage>;

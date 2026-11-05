@@ -444,3 +444,84 @@ fn startup_selection_and_observation_never_execute_cli_files() {
     let _ = select_executable(None, "codex", std::ffi::OsStr::new("bin"), &root);
     assert!(!marker.exists(), "startup must not run CLI executables");
 }
+
+mod reload_tests {
+    use super::*;
+    use diary_application::{ConfigReloader, ReloadOutcome};
+
+    struct Fx {
+        _temp: tempfile::TempDir,
+        file: PathBuf,
+        root: PathBuf,
+        handle: ConfigHandle,
+    }
+    fn write(file: &Path, text: &str) {
+        let _ = fs::remove_file(file);
+        fs::write(file, text).unwrap();
+        fs::set_permissions(file, fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    fn text(root: &Path, port: u16, extra: &str) -> String {
+        format!(
+            "schema_version: 1\npaths: {{entries_root: '{r}/workspace', runtime_root: '{r}/runtime'}}\nserver: {{port: {port}}}\n{extra}",
+            r = root.display()
+        )
+    }
+    fn fx() -> Fx {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().canonicalize().unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+        let file = root.join("config.yaml");
+        write(&file, &text(&root, 8781, ""));
+        let config = load(&file).unwrap();
+        let handle = ConfigHandle::new(&file, &config, "/usr/bin".into(), root.clone());
+        Fx {
+            _temp: temp,
+            file,
+            root,
+            handle,
+        }
+    }
+
+    #[test]
+    fn unchanged_and_profile_changes_apply_and_a_busy_profile_change_waits() {
+        let f = fx();
+        assert!(matches!(f.handle.reload(false), ReloadOutcome::Applied(_)));
+        let with_profile = text(
+            &f.root,
+            8781,
+            "agents:\n  profiles:\n    - {alias: local, type: apple-foundation-models}\n",
+        );
+        write(&f.file, &with_profile);
+        assert!(matches!(f.handle.reload(true), ReloadOutcome::Busy));
+        // Busy changed nothing: the same file applies once idle, then is the baseline.
+        let ReloadOutcome::Applied(summary) = f.handle.reload(false) else {
+            panic!("expected applied");
+        };
+        assert_eq!(summary.profiles.len(), 1);
+        assert!(matches!(f.handle.reload(true), ReloadOutcome::Applied(_)));
+    }
+
+    #[test]
+    fn restart_fields_and_invalid_files_keep_the_last_config_with_redacted_issues() {
+        let f = fx();
+        write(&f.file, &text(&f.root, 8790, ""));
+        let ReloadOutcome::RestartRequired(issues) = f.handle.reload(false) else {
+            panic!("expected restart");
+        };
+        assert_eq!(issues[0].path, "server");
+        write(&f.file, "schema_version: 1\nsecret_key: hunter2\n");
+        let ReloadOutcome::Rejected(issues) = f.handle.reload(false) else {
+            panic!("expected rejection");
+        };
+        assert_eq!((issues[0].path, issues[0].code), ("config", "schema"));
+        assert!(!format!("{issues:?}").contains("hunter2"));
+        // The original file still applies: nothing was adopted from the failures.
+        write(&f.file, &text(&f.root, 8781, ""));
+        assert!(matches!(f.handle.reload(false), ReloadOutcome::Applied(_)));
+        fs::set_permissions(&f.file, fs::Permissions::from_mode(0o644)).unwrap();
+        let ReloadOutcome::Rejected(issues) = f.handle.reload(false) else {
+            panic!("expected rejection");
+        };
+        assert_eq!(issues[0].code, "permissions");
+    }
+}

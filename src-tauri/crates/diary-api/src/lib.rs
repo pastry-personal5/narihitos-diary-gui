@@ -38,7 +38,10 @@ pub struct ServerState {
     instance_id: String,
     workspace_key: String,
     development: bool,
-    startup: diary_application::StartupSummary,
+    startup: Mutex<diary_application::StartupSummary>,
+    reloader: Option<Arc<dyn diary_application::ConfigReloader>>,
+    config_generation: std::sync::atomic::AtomicU64,
+    last_reload: Mutex<Value>,
     storage_ready: bool,
     authentic: Option<Arc<dyn diary_application::authentic::AuthenticStore>>,
     sse_slots: Arc<tokio::sync::Semaphore>,
@@ -65,7 +68,10 @@ impl ServerState {
             instance_id,
             workspace_key,
             development,
-            startup: diary_application::StartupSummary::default(),
+            startup: Mutex::new(diary_application::StartupSummary::default()),
+            reloader: None,
+            config_generation: std::sync::atomic::AtomicU64::new(1),
+            last_reload: Mutex::new(Value::Null),
             storage_ready: false,
             authentic: None,
             authentic_epoch: std::sync::atomic::AtomicU64::new(0),
@@ -109,9 +115,20 @@ impl ServerState {
             .authentic = Some(store);
     }
     pub fn set_startup(state: &mut Arc<Self>, summary: diary_application::StartupSummary) {
+        *Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .startup
+            .get_mut()
+            .expect("startup state poisoned") = summary;
+    }
+    /// Enables `POST /settings/reload`; without it the route answers `unavailable`.
+    pub fn set_reloader(
+        state: &mut Arc<Self>,
+        reloader: Arc<dyn diary_application::ConfigReloader>,
+    ) {
         Arc::get_mut(state)
             .expect("startup precedes shared use")
-            .startup = summary;
+            .reloader = Some(reloader);
     }
     /// Diagnostics sinks must never block; the server wires the asynchronous log worker here.
     pub fn set_diagnostics(state: &mut Arc<Self>, diagnostics: Arc<dyn Diagnostics>) {
@@ -155,6 +172,7 @@ pub fn router(state: Arc<ServerState>) -> Router {
         .route("/api/v1/sessions/{id}/heartbeat", post(heartbeat))
         .route("/api/v1/sessions/{id}", delete(close_session))
         .route("/api/v1/settings", get(settings))
+        .route("/api/v1/settings/reload", post(reload_settings))
         .route("/api/v1/jobs", get(list_jobs))
         .route("/api/v1/jobs/{id}", get(get_job))
         .route("/api/v1/jobs/{id}/cancel", post(cancel_job))
@@ -461,7 +479,8 @@ async fn settings(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Resp
         .list(id, s.now(), None, 1)
     {
         Ok(_) => {
-            let value = json!({"config_schema_version":1,"storage_ready":s.storage_ready,"sources_available":false,"agents_available":false,"exports_available":false,"sources":availability_dto(&s.startup.sources),"profiles":availability_dto(&s.startup.profiles)});
+            let startup = s.startup.lock().expect("startup state poisoned").clone();
+            let value = json!({"config_schema_version":1,"config_generation":s.config_generation.load(std::sync::atomic::Ordering::SeqCst),"last_reload":s.last_reload.lock().expect("reload state poisoned").clone(),"storage_ready":s.storage_ready,"sources_available":false,"agents_available":false,"exports_available":false,"sources":availability_dto(&startup.sources),"profiles":availability_dto(&startup.profiles)});
             #[cfg(feature = "scaffold-smoke")]
             let value = {
                 let mut value = value;
@@ -473,6 +492,51 @@ async fn settings(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Resp
         }
         Err(e) => app_error(e),
     }
+}
+/// Validates a complete new config first; any failure leaves the last one in force.
+async fn reload_settings(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Response {
+    let id = match session(&headers) {
+        Ok(id) => id,
+        Err(e) => return app_error(e),
+    };
+    let busy =
+        match s
+            .coordinator
+            .lock()
+            .expect("coordinator poisoned")
+            .list(id, s.now(), None, 200)
+        {
+            Ok(jobs) => jobs.iter().any(|job| !job.state.is_terminal()),
+            Err(e) => return app_error(e),
+        };
+    let Some(reloader) = s.reloader.clone() else {
+        return failure(StatusCode::SERVICE_UNAVAILABLE, "unavailable");
+    };
+    let issues = |list: &[diary_application::ReloadIssue]| -> Vec<Value> {
+        list.iter()
+            .map(|i| json!({"path":i.path,"code":i.code}))
+            .collect()
+    };
+    let result = match tokio::task::spawn_blocking(move || reloader.reload(busy)).await {
+        Ok(diary_application::ReloadOutcome::Applied(summary)) => {
+            *s.startup.lock().expect("startup state poisoned") = summary;
+            let generation = s
+                .config_generation
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                + 1;
+            json!({"outcome":"applied","config_generation":generation})
+        }
+        Ok(diary_application::ReloadOutcome::RestartRequired(list)) => {
+            json!({"outcome":"restart_required","issues":issues(&list)})
+        }
+        Ok(diary_application::ReloadOutcome::Rejected(list)) => {
+            json!({"outcome":"rejected","issues":issues(&list)})
+        }
+        Ok(diary_application::ReloadOutcome::Busy) => json!({"outcome":"busy"}),
+        Err(_) => return failure(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+    };
+    *s.last_reload.lock().expect("reload state poisoned") = result.clone();
+    Json(result).into_response()
 }
 #[derive(Serialize)]
 struct JobDto {

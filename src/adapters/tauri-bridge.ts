@@ -6,6 +6,10 @@ import {
   authenticFileDto,
   authenticPageDto,
   operationStateDto,
+  reloadResultDto,
+  serverSettingsDto,
+  settingsErrorDto,
+  userSettingsDto,
   refreshReportDto,
   saveAckDto,
   metadataDto,
@@ -29,6 +33,23 @@ async function authentic<T>(
     throw authenticErrorDto({ code: "invalid_response", retryable: false });
   }
 }
+async function settings<T>(
+  command: string,
+  args: Record<string, unknown> | undefined,
+  dto: (value: unknown) => T,
+): Promise<T> {
+  let value: unknown;
+  try {
+    value = await invoke<unknown>(command, args);
+  } catch (error) {
+    throw settingsErrorDto(error);
+  }
+  try {
+    return dto(value);
+  } catch {
+    throw settingsErrorDto("invalid_response");
+  }
+}
 /** Fire-and-forget diagnostics: a rejected or rate-limited event never disturbs the UI. */
 export async function logClientEvent(event: ClientEvent): Promise<void> {
   const payload: Record<string, unknown> = {
@@ -41,6 +62,21 @@ export async function logClientEvent(event: ClientEvent): Promise<void> {
 }
 export const tauriBridge: Bridge = {
   metadata: async () => metadataDto(await invoke<unknown>("get_app_metadata")),
+  serverSettings: () => settings("get_settings", undefined, serverSettingsDto),
+  reloadSettings: () => settings("reload_settings", undefined, reloadResultDto),
+  getUserSettings: () =>
+    settings("get_user_settings", undefined, userSettingsDto),
+  updateUserSettings: (u) =>
+    settings(
+      "update_user_settings",
+      {
+        section: u.section,
+        value: u.value,
+        expectedRevision: u.expectedRevision,
+        recover: u.recover,
+      },
+      userSettingsDto,
+    ),
   connect: async () => statusDto(await invoke<unknown>("connect_server")),
   status: async () => statusDto(await invoke<unknown>("get_status")),
   listAuthentic: (cursor) =>

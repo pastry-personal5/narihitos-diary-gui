@@ -5,8 +5,10 @@ mod discovery;
 mod events;
 #[cfg(feature = "scaffold-smoke")]
 mod native_smoke;
-use bridge::{Bridge, Job, JobList, Lease, Metadata, Settings, Status};
+mod user_settings;
+use bridge::{Bridge, Job, JobList, Lease, Metadata, ReloadResult, Settings, Status};
 use diagnostics::{ClientEvent, ClientLog, Reject};
+use diary_application::diagnostics::{ErrorTag, EventCode, Level, Record};
 use std::sync::{Arc, Mutex};
 use tauri::{Manager, State, WebviewWindow, ipc::Channel};
 
@@ -110,6 +112,76 @@ async fn get_settings(
 ) -> Result<Settings, &'static str> {
     main_window(&window)?;
     state.settings().await
+}
+#[tauri::command]
+async fn reload_settings(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+) -> Result<ReloadResult, &'static str> {
+    main_window(&window)?;
+    state.reload_settings().await
+}
+#[tauri::command]
+async fn get_user_settings(
+    window: WebviewWindow,
+    store: State<'_, user_settings::Store>,
+    log: State<'_, Arc<ClientLog>>,
+) -> Result<user_settings::Snapshot, &'static str> {
+    main_window(&window)?;
+    let snapshot = store.snapshot();
+    log.log(
+        Record::new(EventCode::SettingsLoaded, Level::Info)
+            .count(u32::try_from(snapshot.warnings.len()).unwrap_or(u32::MAX)),
+    );
+    Ok(snapshot)
+}
+#[derive(serde::Serialize)]
+struct UserSettingsError {
+    code: &'static str,
+}
+/// `section` is `writing`, `writing_init` (value: preferred tags) or `keybindings`; `recover`
+/// ignores both and replaces an invalid or newer file after a private backup.
+#[tauri::command]
+async fn update_user_settings(
+    window: WebviewWindow,
+    store: State<'_, user_settings::Store>,
+    log: State<'_, Arc<ClientLog>>,
+    section: String,
+    value: serde_json::Value,
+    expected_revision: String,
+    recover: bool,
+) -> Result<user_settings::Snapshot, UserSettingsError> {
+    use user_settings::{Change, Error};
+    let fail = |e: Error| {
+        let tag = match e {
+            Error::Conflict => ErrorTag::StaleRevision,
+            Error::Uncertain | Error::Unavailable => ErrorTag::Unavailable,
+            _ => ErrorTag::Invalid,
+        };
+        log.log(Record::new(EventCode::SettingsFailed, Level::Warn).error(tag));
+        UserSettingsError { code: e.code() }
+    };
+    if main_window(&window).is_err() {
+        return Err(UserSettingsError {
+            code: "permission_denied",
+        });
+    }
+    let change = match (recover, section.as_str(), value) {
+        _ if expected_revision.len() > 64 => Err(Error::Invalid),
+        (true, ..) => Ok(Change::Recover),
+        (_, "writing", serde_json::Value::String(tag)) => Ok(Change::Writing(tag)),
+        (_, "writing_init", serde_json::Value::Array(items)) if items.len() <= 32 => items
+            .into_iter()
+            .map(|v| v.as_str().map(str::to_owned).ok_or(Error::Invalid))
+            .collect::<Result<_, _>>()
+            .map(Change::InitWriting),
+        (_, "keybindings", v) => Ok(Change::Keybindings(v)),
+        _ => Err(Error::Invalid),
+    }
+    .map_err(fail)?;
+    let snapshot = store.update(&expected_revision, change).map_err(fail)?;
+    log.log(Record::new(EventCode::SettingsSaved, Level::Info));
+    Ok(snapshot)
 }
 #[tauri::command]
 async fn list_jobs(
@@ -282,9 +354,10 @@ fn main() {
         .manage(bridge)
         .manage(log)
         .manage(CloseGate::default())
-        .setup(|_app| {
+        .setup(|app| {
+            app.manage(user_settings::Store::new(app.path().app_config_dir()?));
             #[cfg(feature = "scaffold-smoke")]
-            native_smoke::setup(_app)?;
+            native_smoke::setup(app)?;
             Ok(())
         })
         .on_page_load(|_webview, _payload| {
@@ -302,6 +375,9 @@ fn main() {
             heartbeat_session,
             close_session,
             get_settings,
+            reload_settings,
+            get_user_settings,
+            update_user_settings,
             get_job,
             list_jobs,
             cancel_job,

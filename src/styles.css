@@ -194,3 +194,21 @@ footer {
     gap: 12px;
   }
 }
+
+.settings {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  flex: 1;
+  min-height: 0;
+}
+.settings nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 12px;
+  border-right: 1px solid var(--line);
+}
+.settings-body {
+  padding: 20px;
+  overflow: auto;
+}

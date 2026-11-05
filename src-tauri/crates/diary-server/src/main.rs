@@ -207,6 +207,15 @@ async fn run() -> Result<(), &'static str> {
         &mut state,
         config.observe_startup(&launch_path, &launch_cwd),
     );
+    diary_api::ServerState::set_reloader(
+        &mut state,
+        Arc::new(config::ConfigHandle::new(
+            &path,
+            &config,
+            launch_path.clone(),
+            launch_cwd.clone(),
+        )),
+    );
     #[cfg(feature = "scaffold-smoke")]
     diary_api::ServerState::set_smoke_folders(&mut state, native_smoke::folders(&config));
     // shortcut: a tree that does not exist yet is not watched until the next start.

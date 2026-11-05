@@ -429,6 +429,27 @@ fn validate_id(value: &str) -> Result<(), Error> {
     }
 }
 
+/// A redacted reload problem: a coarse config area and a stable code, never a value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReloadIssue {
+    pub path: &'static str,
+    pub code: &'static str,
+}
+pub enum ReloadOutcome {
+    /// The new snapshot is validated and adopted.
+    Applied(StartupSummary),
+    /// A change needs a restart; the last config stays in force.
+    RestartRequired(Vec<ReloadIssue>),
+    /// Profile or export settings changed while an operation may be using them.
+    Busy,
+    /// The new snapshot is invalid; the last config stays in force.
+    Rejected(Vec<ReloadIssue>),
+}
+/// Re-reads and validates the private server config. `busy` is true while any job is not terminal.
+pub trait ConfigReloader: Send + Sync {
+    fn reload(&self, busy: bool) -> ReloadOutcome;
+}
+
 #[cfg(test)]
 mod tests;
 

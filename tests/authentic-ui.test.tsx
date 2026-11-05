@@ -18,6 +18,7 @@ import {
 } from "../src/application/bridge";
 import type { StreamEvent } from "../src/application/events";
 
+import { settingsFake } from "./settings-fake";
 const status = {
   instance_id: "instance",
   workspace_key: "workspace",
@@ -45,6 +46,7 @@ class FakeServer {
   bridge(): Bridge {
     return {
       metadata: async () => ({ version: "1.0.0" }),
+      ...settingsFake(),
       connect: async () => status,
       status: async () => status,
       watch: async (observer) => {

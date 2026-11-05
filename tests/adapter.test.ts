@@ -276,3 +276,65 @@ describe("authentic commands", () => {
     ).toEqual({ kind: "authentic_changed", instance_id: "i", session_id: "s" });
   });
 });
+
+describe("settings commands", () => {
+  const user = {
+    revision: "missing",
+    read_only: false,
+    recoverable: false,
+    warnings: [],
+    writing_locale: "ja-JP",
+    keybindings: {},
+    path: "/Users/me/secret",
+  };
+  it("sends camelCase arguments and rebuilds the user settings DTO", async () => {
+    mocks.invoke.mockResolvedValueOnce(user);
+    const got = await tauriBridge.updateUserSettings({
+      section: "writing",
+      value: "ja-JP",
+      expectedRevision: "missing",
+      recover: false,
+    });
+    expect(mocks.invoke).toHaveBeenCalledWith("update_user_settings", {
+      section: "writing",
+      value: "ja-JP",
+      expectedRevision: "missing",
+      recover: false,
+    });
+    expect(got.writing_locale).toBe("ja-JP");
+    expect(JSON.stringify(got)).not.toContain("secret");
+  });
+  it("turns rejections into allowlisted codes and never forwards raw text", async () => {
+    mocks.invoke.mockRejectedValueOnce({ code: "conflict" });
+    await expect(tauriBridge.getUserSettings()).rejects.toMatchObject({
+      code: "conflict",
+    });
+    mocks.invoke.mockRejectedValueOnce("/Users/me/secret path");
+    const error = await tauriBridge.reloadSettings().catch((e) => e);
+    expect(error.code).toBe("unavailable");
+    expect(String(error.message)).not.toContain("secret");
+    mocks.invoke.mockResolvedValueOnce({ outcome: "exploded" });
+    await expect(tauriBridge.reloadSettings()).rejects.toMatchObject({
+      code: "invalid_response",
+    });
+  });
+  it("keeps only allowlisted server status fields", async () => {
+    mocks.invoke.mockResolvedValueOnce({
+      config_generation: 3,
+      last_reload: { outcome: "busy", config_generation: null },
+      storage_ready: true,
+      sources: [
+        { alias: "m", available: false, reason: "source_root_missing" },
+      ],
+      profiles: [],
+      token: "secret",
+    });
+    const got = await tauriBridge.serverSettings();
+    expect(got.last_reload).toEqual({
+      outcome: "busy",
+      config_generation: null,
+      issues: [],
+    });
+    expect(JSON.stringify(got)).not.toContain("secret");
+  });
+});

@@ -3,6 +3,11 @@ import {
   type AppMetadata,
   type AuthenticFile,
   type AuthenticPage,
+  type Availability,
+  type ReloadResult,
+  type ServerSettings,
+  SettingsError,
+  type UserSettings,
   type OperationState,
   type RefreshReport,
   type Revision,
@@ -154,4 +159,98 @@ export function authenticErrorDto(value: unknown): AuthenticError {
       return new AuthenticError(dto.code, dto.retryable);
   }
   return new AuthenticError("unavailable", false);
+}
+
+function list(value: unknown, max: number): unknown[] {
+  if (!Array.isArray(value) || value.length > max)
+    throw new Error("Invalid server response");
+  return value;
+}
+function availabilityDto(value: unknown): Availability {
+  const dto = record(value);
+  if (typeof dto.available !== "boolean")
+    throw new Error("Invalid server response");
+  return {
+    alias: text(dto.alias, 64),
+    available: dto.available,
+    reason: text(dto.reason, 64),
+  };
+}
+export function reloadResultDto(value: unknown): ReloadResult {
+  const dto = record(value);
+  if (
+    dto.outcome !== "applied" &&
+    dto.outcome !== "restart_required" &&
+    dto.outcome !== "rejected" &&
+    dto.outcome !== "busy"
+  )
+    throw new Error("Invalid server response");
+  const generation = dto.config_generation;
+  if (
+    generation != null &&
+    (!Number.isSafeInteger(generation) || (generation as number) < 0)
+  )
+    throw new Error("Invalid server response");
+  return {
+    outcome: dto.outcome,
+    config_generation: (generation as number | null | undefined) ?? null,
+    issues: list(dto.issues ?? [], 16).map((item) => {
+      const issue = record(item);
+      return { path: text(issue.path, 64), code: text(issue.code, 64) };
+    }),
+  };
+}
+export function serverSettingsDto(value: unknown): ServerSettings {
+  const dto = record(value);
+  if (
+    !Number.isSafeInteger(dto.config_generation) ||
+    typeof dto.storage_ready !== "boolean"
+  )
+    throw new Error("Invalid server response");
+  return {
+    config_generation: dto.config_generation as number,
+    last_reload:
+      dto.last_reload == null ? null : reloadResultDto(dto.last_reload),
+    storage_ready: dto.storage_ready,
+    sources: list(dto.sources, 64).map(availabilityDto),
+    profiles: list(dto.profiles, 64).map(availabilityDto),
+  };
+}
+export function userSettingsDto(value: unknown): UserSettings {
+  const dto = record(value);
+  if (
+    typeof dto.read_only !== "boolean" ||
+    typeof dto.recoverable !== "boolean" ||
+    (dto.writing_locale != null && typeof dto.writing_locale !== "string")
+  )
+    throw new Error("Invalid settings response");
+  return {
+    revision: text(dto.revision, 64),
+    read_only: dto.read_only,
+    recoverable: dto.recoverable,
+    warnings: list(dto.warnings, 16).map((item) => {
+      const warning = record(item);
+      return {
+        section: text(warning.section, 32),
+        code: text(warning.code, 32),
+      };
+    }),
+    writing_locale:
+      dto.writing_locale == null ? null : text(dto.writing_locale, 35),
+    keybindings: dto.keybindings ?? {},
+  };
+}
+/** The bridge answers `{code}` or a bare code string; anything else becomes `unavailable`. */
+export function settingsErrorDto(value: unknown): SettingsError {
+  const code =
+    typeof value === "string"
+      ? value
+      : typeof value === "object" && value !== null
+        ? (value as Record<string, unknown>).code
+        : undefined;
+  return new SettingsError(
+    typeof code === "string" && /^[a-z_]{1,40}$/.test(code)
+      ? code
+      : "unavailable",
+  );
 }

@@ -25,6 +25,21 @@ impl Write for Gated {
     }
 }
 
+fn complete(response: &str) -> bool {
+    let Some((head, body)) = response.split_once("\r\n\r\n") else {
+        return false;
+    };
+    head.to_ascii_lowercase()
+        .lines()
+        .find_map(|l| {
+            l.strip_prefix("content-length: ")?
+                .trim()
+                .parse::<usize>()
+                .ok()
+        })
+        .is_some_and(|n| body.len() >= n)
+}
+
 fn http(port: u16, method: &str, path: &str, token: &str, body: &str) -> String {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream
@@ -38,7 +53,11 @@ fn http(port: u16, method: &str, path: &str, token: &str, body: &str) -> String 
     )
     .unwrap();
     let mut out = String::new();
-    stream.read_to_string(&mut out).unwrap();
+    // The server may reject a request without reading its body and close the socket; that can
+    // reset the connection after a complete response was sent, so judge the bytes received.
+    if let Err(e) = stream.read_to_string(&mut out) {
+        assert!(complete(&out), "{method} {path}: {e}; partial {out:?}");
+    }
     out
 }
 
