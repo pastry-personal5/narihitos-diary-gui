@@ -22,7 +22,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings &
 
 ## Required validation
 
-Before opening a pull request, run the full checks from the repository root:
+Before opening a pull request, run the full checks below from the repository root, except for the owner-approved docs-only P1-M1/P1-M2 exemption. See [development-process.md](development-process.md#definition-of-done) for that exemption and the required documentation review.
 
 ```sh
 cargo fmt --manifest-path src-tauri/Cargo.toml --check

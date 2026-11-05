@@ -14,7 +14,7 @@ See [README.md](README.md) for the overview and [docs/product-behavior.md](docs/
 
 - Work only on a clear task in the active milestone. Read its plans, relevant design docs, and applicable "Undecided" items first.
 - Before implementation, add a verifiable completion checklist to the milestone overview. Check items only when evidence exists.
-- Keep implementation, tests, and affected docs together. A milestone is done only when its checklist is complete and the gate passes: `cargo fmt --manifest-path src-tauri/Cargo.toml --check`, `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`, `cargo test --manifest-path src-tauri/Cargo.toml`, `npx prettier --check .`, `npx eslint . --max-warnings 0`, and `npx vitest run`. If a command cannot run, leave its item unchecked and report the blocker.
+- Keep implementation, tests, and affected docs together. A milestone is done only when its checklist is complete and the gate passes: `cargo fmt --manifest-path src-tauri/Cargo.toml --check`, `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`, `cargo test --manifest-path src-tauri/Cargo.toml`, `npx prettier --check .`, `npx eslint . --max-warnings 0`, and `npx vitest run`. The owner-approved docs-only P1-M1/P1-M2 exception is recorded in [development-process.md](docs/development-process.md#definition-of-done). Otherwise, if a command cannot run, leave its item unchecked and report the blocker.
 - Ask before building on an undecided item, changing dependencies or build tools, deleting user data, or broadly restructuring the repository. Other work within the approved task and milestone may proceed.
 - Follow the active phase and milestone order in `docs/roadmap.md` unless the phase plan says otherwise. Create the roadmap when planning the first phase.
 
@@ -25,10 +25,17 @@ See [README.md](README.md) for the overview and [docs/product-behavior.md](docs/
 - **Interaction model:** [ux-gui.md](docs/ux-gui.md). Component vocabulary is in [ux-terms.md](docs/ux-terms.md) and the layout containment model in [ux-information-architecture.md](docs/ux-information-architecture.md).
 - **License:** Apache-2.0 for all project code.
 - **Process:** numbered phases contain numbered milestones; milestone numbering restarts per phase. IDs use `P1-M2`. See [docs/development-process.md](docs/development-process.md).
+- **Owner research clarifications (2026-11-05):** Phase 1 delivers Diary v1.0.0; the Authentic draft and Authentic Entry are one autosaved file (candidates remain transient). Users explicitly edit/save source snippets and delete a snippet plus related audio from the Explorer tree with deletion confirmation. Imports capture the system timezone; saved Entry dates remain fixed. See [Phase 1 changelog](docs/phase-1/changelog.md).
+- **P1-M2 owner decisions (2026-11-05):** [Interview record](docs/phase-1/milestone-02-owner-decisions.md) D01–D17 is authoritative for separate shell-launched local server/client, HTTP/SSE and local token, one workspace/client, Markdown plus SQLite, deferred history, paragraph accept/reject, path-based source views, Trash deletion, trusted optional CLIs, private YAML credentials, export conflict confirmation, original GUI layout, SF Symbols, and delegated internal design. The detailed contracts and evidence limits are recorded there.
 
 ## Undecided — ask before inventing
 
-Nothing yet. Add open product and architecture questions here.
+The [P1-M2 owner interview](docs/phase-1/milestone-02-owner-decisions.md) resolves the earlier product choices. The [architecture work plan](docs/phase-1/milestone-02-architecture-architecture.md) tracks internal design work delegated to the agent; do not ask again about already approved choices. Ask before changing those choices or inventing new product behavior outside the delegation.
+
+- **Internal contracts still to document:** exact path-identity normalization/conflict handling, paragraph-review alignment, file/config schemas, durable recovery protocols, timestamp-conflict resolution, date ambiguity rules, source metadata updates/related-audio ownership, export reconciliation, API/auth/discovery details, and version strategy. These are architecture work under D17, not permission to implement before the design is written.
+- **Evidence gaps:** producer-compatible source saves/deletes, packaged macOS/iCloud access, process supervision, and service recovery remain unverified. Record the blocked feature and required acceptance evidence; do not turn an interview preference into a runtime capability claim.
+- **Agents/privacy:** the owner chose trusted installed CLIs, superseding the proposed confinement prerequisite. Do not infer selected-text confinement or CLI/provider retention guarantees. Account terms and actual CLI capabilities are not verified by that trust choice.
+- **Delivery/assets:** personal Apple Silicon/shell-launch scope and SF Symbols are chosen. Exact support baseline and SF Symbols rendering remain design work; the owner's instruction to proceed despite licensing concerns is not evidence of license clearance. No new dependency/build tool is approved by a research recommendation or a documentation-level architecture choice.
 
 ## Environment
 

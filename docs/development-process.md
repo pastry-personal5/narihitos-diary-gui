@@ -22,6 +22,8 @@ A milestone is done when:
 
 A phase is done when every milestone is `Done` or `Dropped` and its exit criteria hold.
 
+Owner-approved exception: P1-M1 Research and P1-M2 Architecture produce documentation only and are exempt from the code gate in item 2; see the [Phase 1 changelog](phase-1/changelog.md). Their checklists, evidence, affected-doc updates, and local-link/whitespace review still apply. P1-M3 requires the full gate. This exception does not authorize code or dependency changes in the docs-only milestones.
+
 ## Plan files
 
 Create a phase directory when planning that phase.
