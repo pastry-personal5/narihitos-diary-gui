@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M3 is Done; P1-M4–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5–P1-M28 remain Planned.
 
 ### P1-M1: Research
 
@@ -40,9 +40,9 @@ Notes: Scaffolding only: S01–S10/G01–G06 map approved setup, the implemented
 
 ### P1-M4: Diagnostic logging
 
-Status: Active
+Status: Done
 Goal: Add private server/client diagnostics with bounded asynchronous writes, daily rotation, three-day retention and content redaction.
-Plan: [overview](milestone-04-diagnostic-logging-overview.md), [work plan](milestone-04-diagnostic-logging-architecture.md).
+Plan: [overview](../archive/milestones/p1-m4/milestone-04-diagnostic-logging-overview.md), [work plan](../archive/milestones/p1-m4/milestone-04-diagnostic-logging-architecture.md).
 Notes: Includes the owner-requested agent-debugging trace to redacted resource detail (trace IDs, keyed fingerprints, read-only `diary-server trace`).
 
 ### P1-M5: Workspace and durable operations

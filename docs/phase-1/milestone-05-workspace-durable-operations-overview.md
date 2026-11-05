@@ -6,7 +6,7 @@ Implement locked workspace initialization, the versioned SQLite authority, durab
 
 ## Entry conditions
 
-- P1-M4 is Done (its L12 packaged-client smoke is still open). Do not start code until it is closed or the owner waives it.
+- P1-M4 is Done (closed by the owner on 2026-11-05; its L12 packaged-client smoke rests on the owner's reported run).
 - **Owner approval needed: `rusqlite`.** The [dependency table](../architecture/configuration-and-exports.md#dependency-candidates) names it only as a preferred candidate, and [AGENTS.md](../../AGENTS.md) requires approval before adding it. Task 0 of the work plan asks for it with exact version, features and licence check. No other new crate or build tool is planned.
 - Read handoff row E2 and the P1-M5 row. Nothing in `AGENTS.md` "Undecided" blocks this milestone.
 

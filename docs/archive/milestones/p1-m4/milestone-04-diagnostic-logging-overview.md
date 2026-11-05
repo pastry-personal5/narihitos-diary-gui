@@ -2,13 +2,13 @@
 
 Status: Active
 
-Implement the [logging contract](../architecture/logging.md): private, bounded, asynchronous server and client logs with daily rotation, 72-hour retention and content redaction. Add a debugging trace that lets a person or an AI coding agent follow one request across server and client logs to redacted resource details (kind, opaque ID, revision, size, keyed fingerprint, state), without any diary content, credential or path. The work plan is [milestone-04-diagnostic-logging-architecture.md](milestone-04-diagnostic-logging-architecture.md).
+Implement the [logging contract](../../../architecture/logging.md): private, bounded, asynchronous server and client logs with daily rotation, 72-hour retention and content redaction. Add a debugging trace that lets a person or an AI coding agent follow one request across server and client logs to redacted resource details (kind, opaque ID, revision, size, keyed fingerprint, state), without any diary content, credential or path. The work plan is [milestone-04-diagnostic-logging-architecture.md](milestone-04-diagnostic-logging-architecture.md).
 
 ## Entry conditions
 
-P1-M3 is Done. Read the logging contract, its [required evidence](../architecture/logging.md#required-evidence), the [`log_client_event` row](../architecture/api-and-processes.md#operations-and-tauri-commands) and handoff row E12. No owner product question blocks this milestone.
+P1-M3 is Done. Read the logging contract, its [required evidence](../../../architecture/logging.md#required-evidence), the [`log_client_event` row](../../../architecture/api-and-processes.md#operations-and-tauri-commands) and handoff row E12. No owner product question blocks this milestone.
 
-The owner asked on 2026-11-05 for an agent-debugging trace to redacted resource detail. That addition (trace IDs, resource descriptors, read-only trace command) extends the logging and API contracts; task 1 of the work plan amends them and records the request in the [changelog](changelog.md) before code.
+The owner asked on 2026-11-05 for an agent-debugging trace to redacted resource detail. That addition (trace IDs, resource descriptors, read-only trace command) extends the logging and API contracts; task 1 of the work plan amends them and records the request in the [changelog](../../../phase-1/changelog.md) before code.
 
 **No new external crate or build tool.** The plan uses `std` threads and channels, the already-approved `libc`, `serde_json`, `sha2` and `uuid` crates, and the existing `PrivateDir` helpers. The contract names `tracing` as a preferred candidate; it needs a pruner of our own anyway, so this plan does not adopt it. Adopting it later requires owner approval and a license check.
 
@@ -31,7 +31,7 @@ The owner asked on 2026-11-05 for an agent-debugging trace to redacted resource 
 
 Check an item only with a linked result identifying the tested revision, command or manual procedure, observed outcome and limitations. [Acceptance matrix](milestone-04-diagnostic-logging-architecture.md#acceptance-matrix) rows use the same L IDs; G IDs are the unchanged repository gate.
 
-- [x] **L01 — Contracts:** Amend [logging](../architecture/logging.md) and [API](../architecture/api-and-processes.md) for trace IDs, resource descriptors, the trace command and diagnostic-only read-back; record the owner request in the changelog.
+- [x] **L01 — Contracts:** Amend [logging](../../../architecture/logging.md) and [API](../../../architecture/api-and-processes.md) for trace IDs, resource descriptors, the trace command and diagnostic-only read-back; record the owner request in the changelog.
 - [x] **L02 — Diagnostic model:** `Record` can be built only from allowlisted codes and typed fields; a free-form string cannot be attached; a rendered line over 2 KiB is dropped, not truncated.
 - [x] **L03 — Store:** Role directories are 0700 and files 0600; symlinks and nonregular files are rejected on open, rotation and pruning using opened objects; a second writer fails to lock.
 - [x] **L04 — Rotation:** Daily rollover at local midnight including DST transitions, 16 MiB size rotation, suffix allocation without truncation after restart, and a backward clock change.

@@ -1,8 +1,8 @@
 # P1-M4: Diagnostic logging work plan
 
-Status: Planned
+Status: Done
 
-Implementation plan for the [P1-M4 overview](milestone-04-diagnostic-logging-overview.md). It follows the [logging contract](../architecture/logging.md) and adds an agent-debugging trace to redacted resource detail. Each task ends with a commit; execute with `superpowers:subagent-driven-development` or `superpowers:executing-plans`, and use `- [ ]` steps as the progress record.
+Implementation plan for the [P1-M4 overview](milestone-04-diagnostic-logging-overview.md). It follows the [logging contract](../../../architecture/logging.md) and adds an agent-debugging trace to redacted resource detail. Each task ends with a commit; execute with `superpowers:subagent-driven-development` or `superpowers:executing-plans`, and use `- [ ]` steps as the progress record.
 
 **Goal:** Private bounded server/client logs, plus a trace that follows one request to redacted resource detail.
 
