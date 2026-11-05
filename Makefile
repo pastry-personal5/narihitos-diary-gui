@@ -1,8 +1,9 @@
 # Thin wrappers over the commands in AGENTS.md. Run `make help` for targets.
 M := src-tauri/Cargo.toml
 APP := src-tauri/target/debug/bundle/macos/Narihito's Diary.app/Contents/MacOS/diary-client
+DISCOVERY ?=
 
-.PHONY: help install dev build bundle bundle-smoke fmt fmt-check clippy lint test test-rust test-ui \
+.PHONY: help install dev server gui build bundle bundle-smoke fmt fmt-check clippy lint test test-rust test-ui \
 	typecheck versions gate smoke exclusion clean
 
 help: ## List targets
@@ -13,6 +14,13 @@ install: ## Install npm dependencies from the lockfile
 
 dev: ## Run the app in development
 	npm run tauri dev
+
+server: ## Run the local server with the global configuration
+	cargo run --manifest-path $(M) -p diary-server -- --config config/global_config.yaml
+
+gui: ## Run the GUI app in development (DISCOVERY=/path/to/discovery.json)
+	@test -n "$(DISCOVERY)" || { echo "Set DISCOVERY to the server discovery file, for example: make gui DISCOVERY=/path/to/discovery.json"; exit 1; }
+	npm run tauri dev -- -- -- --connect "$(DISCOVERY)"
 
 build: ## Frontend production build (version check, tsc, vite)
 	npm run build

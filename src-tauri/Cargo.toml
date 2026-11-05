@@ -18,6 +18,7 @@ diary-api = { path = "crates/diary-api" }
 
 [package]
 name = "diary-client"
+default-run = "diary-client"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
