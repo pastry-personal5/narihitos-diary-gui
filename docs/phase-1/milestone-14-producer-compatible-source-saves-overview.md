@@ -20,7 +20,7 @@ Not included: Ayumi saves (no producer contract; they stay `save: false`); Trash
 
 Check only with recorded evidence. Planning does not complete these items.
 
-- [ ] C01 — Both adapters report `capabilities.save` and a reason from one allowlist in listings and reads: Ayumi is always `false` (`producer_unverified`), Narihito is `false` until C13 (`writer_unverified`). The TypeScript validator accepts `save: boolean` with those reasons only; `trash` stays `false`.
+- [ ] C01 — Both adapters report `capabilities.save` and a reason from one allowlist. Listings stay body-less and always say `false` with `checked_on_open`; the read result is per file: Ayumi is always `false` (`producer_unverified`), Narihito is `false` with `unsupported_format` when the file fails the gate, else `false` until C13 (`writer_unverified`). The TypeScript validator accepts `save: boolean` with those reasons only; `trash` stays `false`.
 - [ ] C02 — The write gate accepts only bytes the pinned producer decoder accepts: LF only, no BOM or CR, `---\n` prefix, exact `\n---\n\n` close, supported schema/kind/method/title origin, canonical id equal to the filename id, `audio_filename` `<id>.m4a`, strict `updated_at`. Anything else stays readable with `save: false` and reason `unsupported_format`.
 - [ ] C03 — The splice changes only the body and the `updated_at` line: all other front-matter bytes (unknown scalars, order, audio and transcription fields) are identical. An unchanged body writes nothing, and the output passes the gate before it is staged.
 - [ ] C04 — `updated_at` is whole-second `YYYY-MM-DDTHH:mm:ssZ`, strictly later than the previous value (previous + 1 s when the clock has not passed it); a previous value in another form refuses the save.
