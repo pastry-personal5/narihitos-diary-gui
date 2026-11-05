@@ -94,6 +94,7 @@ Notes: Closed with the owner-waived packaged navigation smoke (2026-11-06); no n
 
 Status: Planned
 Goal: Route actions through one registry and add the command palette plus editable, persistent, scope-aware shortcuts with conflict and IME protection.
+Plan: [overview](milestone-12-command-palette-shortcuts-overview.md), [work plan](milestone-12-command-palette-shortcuts-architecture.md).
 
 ### P1-M13: Native symbols and accessible interaction
 

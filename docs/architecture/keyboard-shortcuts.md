@@ -32,7 +32,7 @@ Factory defaults. Shortcuts use macOS names; the stored key names are `Command`,
 ## Editing rules
 
 - A shortcut is a modifier set plus one non-modifier key. `app` shortcuts require Command, Control or Option, since Shift alone types text. `snippetTree` shortcuts may use Shift alone with Backspace or ForwardDelete, as in the defaults.
-- Reserved and not rebindable: text-editing and clipboard keys (Command+C/X/V/Z/A, arrows, Option+arrow, plain typing), macOS system keys (Command+Q/H/M/W/Tab), and any key during IME composition, which is never intercepted.
+- Reserved and not rebindable: text-editing and clipboard keys (Command+C/X/V/Z/A, Shift+Command+Z, arrows, Option+arrow, plain typing, Option with a printable key alone, Control+A/E/K/F/B/N/P). In `app` scope, Command/Option+Backspace and +ForwardDelete are also reserved; `snippetTree` allows them as defaults, macOS system keys (Command+Q/H/M/W/Tab), and any key during IME composition, which is never intercepted.
 - A shortcut already used by another action in an overlapping scope (`app` overlaps every scope) is a conflict. The editor names the other action and requires an explicit Reassign, which removes it from that action; it never silently steals a binding.
 - Removing every shortcut of an action is allowed; the action stays reachable from the command palette and toolbar. The palette and toolbar tooltips show an action's current shortcuts.
 
