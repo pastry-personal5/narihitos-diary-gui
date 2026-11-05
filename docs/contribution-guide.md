@@ -37,6 +37,16 @@ For the isolated ordinary server smoke, run `python3 scripts/smoke/server.py` af
 
 `python3 scripts/collect-notices.py` refreshes exact resolved dependency notice assets using the local Cargo/npm installation. The [third-party notice record](../third-party-notices.md) identifies current review gaps. Keep upstream legal text byte-for-byte and retain source provenance; do not infer license clearance from package metadata alone.
 
+## Debugging with the redacted trace
+
+Logs live under `<runtime_root>/<workspace-key>/logs/{server,client}` (0700/0600, kept 72 hours) and hold codes, IDs and sizes only: never diary text, credentials, prompts or paths. To debug a failure, from a person or an AI agent:
+
+1. Find a trace ID: the `X-Diary-Trace-Id` response header of the failing request, or `cargo run --manifest-path src-tauri/Cargo.toml -p diary-server -- trace --config PATH --select recent:20` for the last warn/error records.
+2. Follow it: `… trace --config PATH --select trace:<32 hex>` (other selectors: `op:<id>`, `job:<id>`, `res:<kind>:<id>`). The output merges server and client records by time, then ends with a summary line that lists the distinct resources and a legend.
+3. Read `res`: `rev`, `bytes`, `lines`, `state` and `path` describe the resource; `fp` is a keyed fingerprint, so equal `fp` at two events of one process run means identical content without revealing it. Fingerprints mean nothing after a restart.
+
+The trace command is read-only, bounded to 200 records (`--limit` up to 500) and 256 KiB, and drops any line that fails strict validation, so it is safe to hand to an agent. If a client has no log file (another client holds it, or discovery was never validated), its records are on its stderr only.
+
 ## Required validation
 
 Before opening a pull request, run the full checks below from the repository root, except for the owner-approved docs-only P1-M1/P1-M2 exemption. See [development-process.md](development-process.md#definition-of-done) for that exemption and the required documentation review.

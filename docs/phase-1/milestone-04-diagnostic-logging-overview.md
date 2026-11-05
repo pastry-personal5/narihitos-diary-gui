@@ -1,6 +1,6 @@
 # P1-M4: Diagnostic logging overview
 
-Status: Planned
+Status: Active
 
 Implement the [logging contract](../architecture/logging.md): private, bounded, asynchronous server and client logs with daily rotation, 72-hour retention and content redaction. Add a debugging trace that lets a person or an AI coding agent follow one request across server and client logs to redacted resource details (kind, opaque ID, revision, size, keyed fingerprint, state), without any diary content, credential or path. The work plan is [milestone-04-diagnostic-logging-architecture.md](milestone-04-diagnostic-logging-architecture.md).
 

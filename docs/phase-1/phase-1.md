@@ -40,7 +40,7 @@ Notes: Scaffolding only: S01–S10/G01–G06 map approved setup, the implemented
 
 ### P1-M4: Diagnostic logging
 
-Status: Planned
+Status: Active
 Goal: Add private server/client diagnostics with bounded asynchronous writes, daily rotation, three-day retention and content redaction.
 Plan: [overview](milestone-04-diagnostic-logging-overview.md), [work plan](milestone-04-diagnostic-logging-architecture.md).
 Notes: Includes the owner-requested agent-debugging trace to redacted resource detail (trace IDs, keyed fingerprints, read-only `diary-server trace`).

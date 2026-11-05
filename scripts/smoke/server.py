@@ -28,6 +28,8 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
     config.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: smoke-readable, type: narihito, root: {readable}}}\n  - {{alias: smoke-denied, type: ayumi, root: {denied}}}\n')
     config.chmod(0o600)
     processes = []
+    tokens = []
+    TRACE = 'feedfacefeedfacefeedfacefeedface'
     def start():
         process = subprocess.Popen([str(binary), '--config', str(config)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         processes.append(process)
@@ -36,18 +38,21 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
             if found and process.poll() is None:
                 candidate = json.loads(found[0].read_text())
                 if candidate['pid'] == process.pid:
+                    tokens.append(candidate['token'])
                     return process, found[0], candidate
             if process.poll() is not None:
                 raise AssertionError('server exited before readiness')
             time.sleep(0.01)
         raise AssertionError('server readiness timeout')
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    def call(record, path, method='GET', payload=None, session=None, authorized=True):
+    def call(record, path, method='GET', payload=None, session=None, authorized=True, trace=None):
         headers = {'Authorization': 'Bearer ' + record['token']} if authorized else {}
         if payload is not None:
             headers['Content-Type'] = 'application/json'
         if session:
             headers['X-Diary-Session'] = session
+        if trace:
+            headers['X-Diary-Trace-Id'] = trace
         request = urllib.request.Request(record['origin'] + '/api/v1' + path, data=None if payload is None else json.dumps(payload).encode(), headers=headers, method=method)
         try:
             with opener.open(request, timeout=2) as response:
@@ -59,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
             return 0, None
     try:
         first, discovery, record = start()
-        assert call(record, '/status', authorized=False)[0] == 401
+        assert call(record, '/status', authorized=False, trace=TRACE)[0] == 401
         code, status = call(record, '/status')
         assert code == 200 and status['instance_id'] == record['instance_id'] and status['storage_ready'] is False
         code, lease = call(record, '/sessions', 'POST', {})
@@ -117,6 +122,15 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
                         time.sleep(0.05)
                     competitor_log.seek(0)
                     assert 'SMOKE client_busy_rejected' in competitor_log.read(), 'missing competing packaged-client denial'
+                    # The main client holds the client log, so the competitor logs to stderr only.
+                    competitor_trace = None
+                    for _ in range(80):
+                        competitor_log.seek(0)
+                        rows = [json.loads(l) for l in competitor_log.read().splitlines() if l.startswith('{"ts"')]
+                        competitor_trace = next((r['trace'] for r in rows if r['code'] == 'ui.bridge_error' and 'trace' in r), None)
+                        if competitor_trace: break
+                        time.sleep(0.05)
+                    assert competitor_trace, 'missing competitor client trace on stderr'
                     competitor.terminate(); competitor.wait(timeout=5)
                 expected = {'SMOKE main_window_close_released', 'SMOKE main_window_destroyed', 'SMOKE main_metadata_allowed' , 'SMOKE main_handshake_allowed', 'SMOKE main_session_released', 'SMOKE secondary_command_denied', 'SMOKE main_delivery_acknowledged', 'SMOKE main_cancelled_job_read'}
                 observed = set()
@@ -139,13 +153,44 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
         restarted.send_signal(signal.SIGINT)
         restarted.wait(timeout=3)
         assert restarted.returncode == 0 and not discovery.exists()
+        # P1-M4 diagnostics: private logs, no seeded secret in any log or trace, redacted trace.
+        mode = lambda path: path.stat().st_mode & 0o7777
+        server_logs = list(runtime.glob('*/logs/server'))
+        assert len(server_logs) == 1, 'missing server log directory'
+        assert mode(server_logs[0].parent) == 0o700 and mode(server_logs[0]) == 0o700
+        log_files = [p for p in server_logs[0].iterdir() if p.suffix == '.log']
+        assert log_files and all(mode(p) == 0o600 for p in log_files)
+        log_text = ''.join(p.read_text() for p in log_files)
+        assert tokens and not any(token in log_text for token in tokens), 'token leaked into the log'
+        assert 'synthetic scaffold sentinel' not in log_text
+        codes = {json.loads(l)['code'] for l in log_text.splitlines()}
+        assert {'server.started', 'server.listener_bound', 'server.discovery_published', 'server.stopping', 'session.opened', 'session.closed', 'session.client_busy', 'http.auth_rejected'} <= codes, codes
+        def trace(selector):
+            done = subprocess.run([str(binary), 'trace', '--config', str(config), '--select', selector], capture_output=True, text=True, timeout=5)
+            assert done.returncode == 0, done.stderr
+            assert not any(token in done.stdout for token in tokens), 'token leaked into trace output'
+            lines = [json.loads(l) for l in done.stdout.splitlines()]
+            return lines[:-1], lines[-1]['summary']
+        rows, summary = trace('trace:' + TRACE)
+        assert [r['code'] for r in rows] == ['http.auth_rejected'] and rows[0]['trace'] == TRACE and rows[0]['role'] == 'server'
+        assert summary['returned'] == 1 and summary['invalid'] == 0 and not summary['truncated']
+        assert any(r.get('trace') == TRACE for r in trace('recent:10')[0])
+        if len(sys.argv) == 2:
+            client_logs = list(runtime.glob('*/logs/client'))
+            assert len(client_logs) == 1 and mode(client_logs[0]) == 0o700, 'missing client log directory'
+            assert all(mode(p) == 0o600 for p in client_logs[0].iterdir()), 'client log file modes'
+            client_text = ''.join(p.read_text() for p in client_logs[0].iterdir() if p.suffix == '.log')
+            assert not any(token in client_text for token in tokens), 'token leaked into the client log'
+            rows, _ = trace('trace:' + competitor_trace)
+            assert any(r['code'] == 'session.client_busy' and r['role'] == 'server' for r in rows), 'competitor request not found in the server log'
+            print('Trace correlation: competitor client stderr trace ' + competitor_trace + ' found in the server log')
         if len(sys.argv) == 2:
             folder_messages = [line.strip() for line in restarted.stderr.read().splitlines() if line.startswith('SMOKE server_folder_')]
             assert 'SMOKE server_folder_readable' in folder_messages
             assert 'SMOKE server_folder_denied' in folder_messages
             assert any(line.startswith('SMOKE server_folder_denied errno=') for line in folder_messages)
             print('Server folder observations: ' + ', '.join(folder_messages))
-        print('PASS: standalone launch, auth/status/session exclusion, OS lock exclusion, client release, SIGTERM/SIGINT cleanup, crash/stale rejection, restart rotation')
+        print('PASS: private 0700/0600 server logs, seeded-secret scan, redacted trace by trace/recent selectors, standalone launch, auth/status/session exclusion, OS lock exclusion, client release, SIGTERM/SIGINT cleanup, crash/stale rejection, restart rotation')
     finally:
         denied.chmod(0o700)
         for process in processes:

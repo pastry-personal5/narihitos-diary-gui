@@ -61,6 +61,7 @@ npx vitest run                                                                  
 cargo fmt --manifest-path src-tauri/Cargo.toml && npx prettier --write .                                         # format
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && npx eslint . --max-warnings 0  # lint
 scripts/gate.sh                                                                                                  # full gate: parallel lanes, quiet, PASS/FAIL per command
+cargo run --manifest-path src-tauri/Cargo.toml -p diary-server -- trace --config PATH --select recent:20        # redacted debugging trace of the logs
 ```
 
 ## Code conventions
