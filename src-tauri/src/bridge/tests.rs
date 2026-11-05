@@ -151,6 +151,11 @@ async fn busy_error_is_allowlisted_without_forwarding_private_error_details() {
         )
     });
     assert_eq!(bridge.connect().await.err(), Some("client_busy"));
+    assert_eq!(
+        bridge.log().buffered(),
+        1,
+        "a busy rejection leaves one traced record"
+    );
     task.join().unwrap();
 }
 

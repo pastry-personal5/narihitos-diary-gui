@@ -196,6 +196,9 @@ impl Bridge {
                     .ok()
                     .is_some_and(|value| value["error"]["code"] == "client_busy")
                 {
+                    // The one expected conflict worth a client record: it ties a rejected second
+                    // client to the server's `session.client_busy` record by trace ID.
+                    self.note(&trace, ErrorTag::Busy);
                     return Err("client_busy");
                 }
             }
