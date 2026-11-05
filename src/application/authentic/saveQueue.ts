@@ -131,23 +131,22 @@ function send(s: QueueState, newId: () => string): Result {
 }
 
 function settle(s: QueueState, newId: () => string): Result {
-  // After an acknowledgement: reload if an invalidation was held back, then send newer text.
-  const effects: Effect[] = s.recheck ? [{ kind: "reload" }] : [];
+  // After an acknowledgement: reload if an invalidation was held back (newer text goes out
+  // once `loaded` has checked the revision), else send newer text.
   if (s.recheck)
     return out(
       { ...s, recheck: false, state: dirty(s) ? "dirty" : "clean" },
-      ...effects,
+      { kind: "reload" },
     );
-  const base = { ...s, recheck: false };
-  if (!dirty(base)) return out({ ...base, state: "clean" }, ...effects);
-  if (base.flushPending && !base.composing) {
-    const next = send(base, newId);
-    return out(next.state, ...effects, ...next.effects);
-  }
-  return out({ ...base, state: "dirty" }, ...effects, {
-    kind: "schedule_tick",
-    delayMs: DEBOUNCE_MS,
-  });
+  if (!dirty(s)) return out({ ...s, state: "clean" });
+  if (s.flushPending && !s.composing) return send(s, newId);
+  return out(
+    { ...s, state: "dirty" },
+    {
+      kind: "schedule_tick",
+      delayMs: DEBOUNCE_MS,
+    },
+  );
 }
 
 function fail(s: QueueState, error: string): Result {
@@ -320,10 +319,13 @@ export function step(s: QueueState, a: Action, newId: () => string): Result {
         );
       }
       if (s.inFlight) return out({ ...s, recheck: true });
-      if (same(a.revision, s.acknowledged) && s.state !== "external_conflict")
-        return s.flushPending && dirty(s) && !s.paused && !s.composing
+      if (same(a.revision, s.acknowledged) && s.state !== "external_conflict") {
+        // Text typed during the save or composition was held back for this check.
+        if (!dirty(s) || blocked || s.paused || s.composing) return out(s);
+        return s.flushPending
           ? send(s, newId)
-          : out(s);
+          : out(s, { kind: "schedule_tick", delayMs: DEBOUNCE_MS });
+      }
       if (s.state === "external_conflict")
         return out({ ...s, external: a.revision });
       if (dirty(s) || blocked)

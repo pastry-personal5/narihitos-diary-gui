@@ -134,14 +134,12 @@ impl Store {
                     listing.token.root_namespace,
                     listing.token.key.clone(),
                 ));
+                // Display only: a stamp the zone cannot show (e.g. year 9999 in a positive
+                // offset) must not fail the whole-library import.
                 let header = choose(&listing.dating, Authority::Header)
-                    .map(|t| zone.display(t.unix_ms))
-                    .transpose()
-                    .map_err(window_error)?;
+                    .and_then(|t| zone.display(t.unix_ms).ok());
                 let filename = choose(&listing.dating, Authority::Filename)
-                    .map(|t| zone.display(t.unix_ms))
-                    .transpose()
-                    .map_err(window_error)?;
+                    .and_then(|t| zone.display(t.unix_ms).ok());
                 navigation.sources.insert(
                     listing.id.clone(),
                     SourceDisplay {

@@ -111,6 +111,7 @@ export class NavigationModel {
     this.online = online;
     const epoch = ++this.epoch;
     this.calendarEpoch++;
+    this.calendarLoading = false; // a superseded browse() never clears it
     this.imports.connect(online ? `${instance}:*:${epoch}` : null, generation);
     this.catalog.connect(online);
     await this.resources.connect(online, writable);
@@ -157,6 +158,7 @@ export class NavigationModel {
     if (!this.online) return;
     const epoch = ++this.calendarEpoch;
     const connection = this.epoch;
+    this.calendarLoading = false; // a superseded browse() never clears it
     try {
       const calendar = await this.bridge.getCalendar(undefined, "today");
       if (

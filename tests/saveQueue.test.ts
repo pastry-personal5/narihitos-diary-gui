@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEBOUNCE_MS,
   type Action,
   type Effect,
   type QueueState,
@@ -398,6 +399,25 @@ describe("save queue", () => {
     expect(r.state.state).toBe("clean");
     expect(r.effects).toEqual([{ kind: "replace_body", body: "disk" }]);
     expect(guard(r.state)).toBe("proceed");
+  });
+
+  it("still saves text typed during a save when an invalidation was held back", () => {
+    counter = 0;
+    let r = run(initialQueue(rev(1)), ...edits(1), { kind: "tick" });
+    r = run(r.state, ...edits(2), { kind: "invalidated" });
+    r = run(r.state, { kind: "loaded", revision: rev(1), body: "same" });
+    expect(r.state.recheck).toBe(true);
+    r = run(r.state, {
+      kind: "ack",
+      operationId: "op-1",
+      generation: 1,
+      revision: rev(2),
+    });
+    expect(r.effects).toEqual([{ kind: "reload" }]);
+    r = run(r.state, { kind: "loaded", revision: rev(2), body: "same" });
+    expect(r.effects).toEqual([
+      { kind: "schedule_tick", delayMs: DEBOUNCE_MS },
+    ]);
   });
 
   it("guards transitions", () => {
