@@ -71,6 +71,34 @@ impl DiaryDate {
     pub fn month(self) -> u8 {
         self.month
     }
+    pub fn day(self) -> u8 {
+        self.day
+    }
+
+    /// Calendar arithmetic, independent of elapsed hours or a timezone.
+    pub fn next(self) -> Option<Self> {
+        Self::from_ymd(self.year, self.month, self.day + 1).or_else(|| {
+            if self.month == 12 {
+                Self::from_ymd(self.year + 1, 1, 1)
+            } else {
+                Self::from_ymd(self.year, self.month + 1, 1)
+            }
+        })
+    }
+
+    pub fn previous(self) -> Option<Self> {
+        if self.day > 1 {
+            return Self::from_ymd(self.year, self.month, self.day - 1);
+        }
+        let (year, month) = if self.month == 1 {
+            (self.year.checked_sub(1)?, 12)
+        } else {
+            (self.year, self.month - 1)
+        };
+        (28..=31)
+            .rev()
+            .find_map(|day| Self::from_ymd(year, month, day))
+    }
 }
 
 impl fmt::Display for DiaryDate {

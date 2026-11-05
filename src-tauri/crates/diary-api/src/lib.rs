@@ -1,5 +1,6 @@
 //! Explicit authenticated scaffold transport; no content mutation or fake admission route.
 mod authentic;
+mod imports;
 #[cfg(feature = "scaffold-smoke")]
 mod smoke;
 use axum::{
@@ -44,6 +45,9 @@ pub struct ServerState {
     last_reload: Mutex<Value>,
     storage_ready: bool,
     authentic: Option<Arc<dyn diary_application::authentic::AuthenticStore>>,
+    imports: Option<Arc<dyn diary_application::imports::ImportStore>>,
+    source_slots: Arc<tokio::sync::Semaphore>,
+    import_errors: Mutex<(String, std::collections::BTreeMap<String, &'static str>)>,
     sse_slots: Arc<tokio::sync::Semaphore>,
     clock: Arc<dyn Fn() -> u64 + Send + Sync>,
     stopping: std::sync::atomic::AtomicBool,
@@ -74,6 +78,9 @@ impl ServerState {
             last_reload: Mutex::new(Value::Null),
             storage_ready: false,
             authentic: None,
+            imports: None,
+            source_slots: Arc::new(tokio::sync::Semaphore::new(2)),
+            import_errors: Mutex::new((String::new(), std::collections::BTreeMap::new())),
             authentic_epoch: std::sync::atomic::AtomicU64::new(0),
             sse_slots: Arc::new(tokio::sync::Semaphore::new(4)),
             clock: Arc::new(|| {
@@ -113,6 +120,14 @@ impl ServerState {
         Arc::get_mut(state)
             .expect("startup precedes shared use")
             .authentic = Some(store);
+    }
+    pub fn set_imports(
+        state: &mut Arc<Self>,
+        store: Arc<dyn diary_application::imports::ImportStore>,
+    ) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .imports = Some(store);
     }
     pub fn set_startup(state: &mut Arc<Self>, summary: diary_application::StartupSummary) {
         *Arc::get_mut(state)
@@ -177,6 +192,15 @@ pub fn router(state: Arc<ServerState>) -> Router {
         .route("/api/v1/jobs/{id}", get(get_job))
         .route("/api/v1/jobs/{id}/cancel", post(cancel_job))
         .route("/api/v1/events", get(events))
+        .route(
+            "/api/v1/imports",
+            post(imports::create).layer(DefaultBodyLimit::max(4096)),
+        )
+        .route("/api/v1/sources", get(imports::list))
+        .route(
+            "/api/v1/sources/{id}/time-resolution",
+            post(imports::resolve).layer(DefaultBodyLimit::max(4096)),
+        )
         .route("/api/v1/authentic", get(authentic::list))
         .route("/api/v1/authentic/refresh", post(authentic::refresh))
         .route(
@@ -293,14 +317,18 @@ async fn authenticate(
         || request.uri().scheme().is_some()
         || request.uri().authority().is_some()
         || request.uri().query().is_some_and(|query| {
-            !matches!(request.uri().path(), "/api/v1/jobs" | "/api/v1/authentic")
-                || !query.strip_prefix("cursor=").is_some_and(|cursor| {
-                    !cursor.is_empty()
-                        && cursor.len() <= 64
-                        && cursor
-                            .bytes()
-                            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-                })
+            if request.uri().path() == "/api/v1/sources" {
+                !imports::valid_query(query)
+            } else {
+                !matches!(request.uri().path(), "/api/v1/jobs" | "/api/v1/authentic")
+                    || !query.strip_prefix("cursor=").is_some_and(|cursor| {
+                        !cursor.is_empty()
+                            && cursor.len() <= 64
+                            && cursor
+                                .bytes()
+                                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+                    })
+            }
         })
         || headers.contains_key("forwarded")
         || headers
@@ -602,7 +630,19 @@ async fn get_job(
         .expect("coordinator poisoned")
         .get(id, s.now(), &job)
     {
-        Ok(job) => Json(JobDto::from(job)).into_response(),
+        Ok(job) => {
+            let errors = s.import_errors.lock().expect("import errors poisoned");
+            let code = if errors.0 == id {
+                errors.1.get(&job.id).copied()
+            } else {
+                None
+            };
+            let mut value = serde_json::to_value(JobDto::from(job)).expect("fixed DTO");
+            if let Some(code) = code {
+                value["error_code"] = json!(code);
+            }
+            Json(value).into_response()
+        }
         Err(e) => app_error(e),
     }
 }

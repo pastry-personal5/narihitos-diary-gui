@@ -80,6 +80,14 @@ const SERVER_CODES: &[&str] = &[
     "session_expired",
     "client_busy",
     "limit",
+    "unnamed_timezone",
+    "timezone_database_unavailable",
+    "invalid_diary_date",
+    "source_stale",
+    "invalid_time_authority",
+    "fix_filename_directory_externally",
+    "cancelled",
+    "request_mismatch",
 ];
 const LOCAL_CODES: &[&str] = &[
     "permission_denied",
@@ -91,7 +99,7 @@ const LOCAL_CODES: &[&str] = &[
 ];
 
 impl AuthenticError {
-    fn new(code: &'static str) -> Self {
+    pub(super) fn new(code: &'static str) -> Self {
         let retryable = matches!(
             code,
             "outcome_uncertain"
@@ -145,7 +153,7 @@ fn revision_json(r: &Revision) -> Result<serde_json::Value, AuthenticError> {
 }
 
 impl Bridge {
-    async fn authentic<T: serde::de::DeserializeOwned>(
+    pub(super) async fn authentic<T: serde::de::DeserializeOwned>(
         &self,
         method: Method,
         path: &str,
@@ -156,13 +164,17 @@ impl Bridge {
             .discovery
             .as_ref()
             .ok_or(AuthenticError::local("disconnected"))?;
+        let origin = d.origin.clone();
+        let token = d.token.clone();
+        let session = c.session.clone();
+        drop(c);
         let trace = super::new_trace();
         let mut request = self
             .client
-            .request(method, format!("{}/api/v1{path}", d.origin))
-            .bearer_auth(&d.token)
+            .request(method, format!("{origin}/api/v1{path}"))
+            .bearer_auth(&token)
             .header("x-diary-trace-id", &trace);
-        if let Some(id) = &c.session {
+        if let Some(id) = &session {
             request = request.header("x-diary-session", id);
         }
         if let Some(payload) = payload {

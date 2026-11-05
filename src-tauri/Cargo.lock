@@ -703,6 +703,7 @@ dependencies = [
  "diary-application",
  "diary-domain",
  "diary-logging",
+ "jiff",
  "libc",
  "notify",
  "objc2",

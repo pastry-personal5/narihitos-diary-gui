@@ -193,6 +193,40 @@ async fn list_jobs(
     state.jobs(cursor).await
 }
 #[tauri::command]
+async fn import_date(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    date: String,
+    request_id: String,
+) -> Result<bridge::ImportAck, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.import_date(date, request_id).await
+}
+#[tauri::command]
+async fn list_sources(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    import_id: String,
+    cursor: Option<usize>,
+) -> Result<bridge::ImportPage, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.list_sources(import_id, cursor).await
+}
+#[tauri::command]
+async fn resolve_source_time(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    import_id: String,
+    source_id: String,
+    digest: String,
+    authority: bridge::TimeAuthority,
+) -> Result<bridge::ResolutionAck, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state
+        .resolve_source_time(import_id, source_id, digest, authority)
+        .await
+}
+#[tauri::command]
 async fn list_authentic(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -384,6 +418,9 @@ fn main() {
             subscribe_events,
             get_app_metadata,
             log_client_event,
+            import_date,
+            list_sources,
+            resolve_source_time,
             list_authentic,
             load_authentic,
             save_authentic,

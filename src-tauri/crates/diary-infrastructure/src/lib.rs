@@ -12,4 +12,6 @@ pub mod sqlite;
 pub mod watch;
 pub mod workspace;
 
+pub mod import_repository;
 pub mod source;
+pub mod zone;

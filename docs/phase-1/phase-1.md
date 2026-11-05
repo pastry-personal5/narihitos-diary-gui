@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M28 remain Planned.
 
 ### P1-M1: Research
 
@@ -79,8 +79,9 @@ Plan: [overview](../archive/milestones/p1-m9/milestone-09-source-reading-overvie
 
 ### P1-M10: Civil-date imports and timestamp resolution
 
-Status: Planned
+Status: Done
 Goal: Import D-1/D/D+1 in a captured system timezone, preserve fixed Entry dates and support explicit timestamp-authority choices without rewriting sources.
+Plan: [overview](../archive/milestones/p1-m10/milestone-10-civil-date-imports-overview.md), [work plan](../archive/milestones/p1-m10/milestone-10-civil-date-imports-architecture.md).
 
 ### P1-M11: Explorer and editor navigation
 

@@ -88,10 +88,8 @@ fn symlinked_database_is_refused() {
 fn altered_migration_checksum_is_damage() {
     let (_t, dir, path) = private_dir();
     let db = Db::create(&dir, &path.join(DB_FILE)).unwrap();
-    let altered = [
-        (1, "CREATE TABLE schema_migrations (version INTEGER);"),
-        MIGRATIONS[1],
-    ];
+    let mut altered = MIGRATIONS.to_vec();
+    altered[0] = (1, "CREATE TABLE schema_migrations (version INTEGER);");
     assert_eq!(db.with(|c| migrate(c, &altered)), Err(DbError::Damaged));
 }
 
@@ -115,14 +113,12 @@ fn newer_schema_is_refused_not_downgraded() {
 fn failed_migration_rolls_back_whole() {
     let (_t, dir, path) = private_dir();
     let db = Db::create(&dir, &path.join(DB_FILE)).unwrap();
-    let next = [
-        MIGRATIONS[0],
-        MIGRATIONS[1],
-        (
-            3,
-            "CREATE TABLE half_done (x INTEGER) STRICT; CREATE TABLE half_done (y INTEGER);",
-        ),
-    ];
+    let version = MIGRATIONS.last().unwrap().0 + 1;
+    let mut next = MIGRATIONS.to_vec();
+    next.push((
+        version,
+        "CREATE TABLE half_done (x INTEGER) STRICT; CREATE TABLE half_done (y INTEGER);",
+    ));
     assert_eq!(db.with(|c| migrate(c, &next)), Err(DbError::Storage));
     assert_eq!(pragma(&db, "user_version"), MIGRATIONS.len() as i64);
     let leaked: i64 = db
@@ -137,13 +133,10 @@ fn failed_migration_rolls_back_whole() {
         .unwrap();
     assert_eq!(leaked, 0);
     // A later correct migration still applies.
-    let good = [
-        MIGRATIONS[0],
-        MIGRATIONS[1],
-        (3, "CREATE TABLE later (x INTEGER) STRICT;"),
-    ];
+    let mut good = MIGRATIONS.to_vec();
+    good.push((version, "CREATE TABLE later (x INTEGER) STRICT;"));
     db.with(|c| migrate(c, &good)).unwrap();
-    assert_eq!(pragma(&db, "user_version"), 3);
+    assert_eq!(pragma(&db, "user_version"), i64::from(version));
 }
 
 #[test]
@@ -160,4 +153,29 @@ fn missing_required_table_is_damage() {
         Db::open_existing(&dir, &path.join(DB_FILE), false).err(),
         Some(DbError::Damaged)
     );
+}
+
+#[test]
+fn m10_upgrades_the_released_schema_without_changing_existing_rows() {
+    let (_t, dir, path) = private_dir();
+    dir.create(DB_FILE).unwrap();
+    let mut conn = Connection::open(path.join(DB_FILE)).unwrap();
+    migrate(&mut conn, &MIGRATIONS[..2]).unwrap();
+    conn.execute(
+        "INSERT INTO workspace_meta VALUES (1, 'existing-workspace')",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+    let db = Db::open_existing(&dir, &path.join(DB_FILE), false).unwrap();
+    let id = db
+        .with(|c| {
+            c.query_row("SELECT workspace_id FROM workspace_meta", [], |r| {
+                r.get::<_, String>(0)
+            })
+            .map_err(|_| DbError::Storage)
+        })
+        .unwrap();
+    assert_eq!(id, "existing-workspace");
+    assert_eq!(pragma(&db, "user_version"), 3);
 }

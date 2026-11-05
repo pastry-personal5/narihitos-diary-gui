@@ -2,13 +2,13 @@
 
 Narihito's Diary, the GUI: a personal asset management app on your Mac.
 
-The P1-M3 scaffold now builds a separately launched Rust server and Tauri client with an in-memory Markdown scratch editor. Storage, imports, AI and exports are unavailable; scratch edits are never saved. Setup and independent launch commands are in the [contribution guide](docs/contribution-guide.md#setup-and-development). Milestone acceptance remains in progress.
+The app runs a separately launched Rust server and Tauri client, with saved Authentic editing, Create Empty, autosave and Settings. AI and exports remain unavailable. Setup and independent launch commands are in the [contribution guide](docs/contribution-guide.md#setup-and-development). Feature delivery follows the [roadmap](docs/roadmap.md).
 
-Read-only Ayumi/Narihito adapters are implemented and tested as libraries; source imports and views will be connected to the app in later milestones. See the [P1-M9 acceptance record](docs/archive/milestones/p1-m9/milestone-09-source-reading-overview.md).
+Read-only Ayumi/Narihito date imports and timestamp-resolution choices are available through the server and typed bridge commands. The Explorer and source UI are planned for P1-M11. See the [P1-M10 acceptance record](docs/archive/milestones/p1-m10/milestone-10-civil-date-imports-overview.md).
 
 The planned AI agents are Codex, Claude Code, Qwen Code, and Apple's on-device Foundation Models. Agent integration is not implemented yet. Prompt templates live in [assets/prompts/](assets/prompts/README.md).
 
-Planned writing language is selected in Settings, initially uses the Mac's preferred language, and is remembered across sessions. Generation requires selected snippets and continues for its original date when you navigate away. **Create Empty** saves a blank draft for the selected date, including without snippets.
+Writing language is selected in Settings, initially uses the Mac's preferred language, and is remembered across sessions. Planned generation requires selected snippets and continues for its original date when you navigate away. **Create Empty** saves a blank draft for the selected date, including without snippets.
 
 The [planned background AI experience](docs/architecture/ai-job-experience.md) keeps editing available with visible progress, cancellation and in-app completion feedback.
 

@@ -2,3 +2,4 @@
 pub mod front_matter;
 pub mod path;
 pub mod stamp;
+pub mod window;

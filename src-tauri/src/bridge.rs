@@ -1,4 +1,5 @@
 mod authentic;
+mod imports;
 use crate::delivery::{Delivery, Flow};
 use crate::diagnostics::ClientLog;
 use crate::discovery::{self, Discovery};
@@ -8,6 +9,7 @@ pub use authentic::{
 };
 use diary_application::diagnostics::{Component, ErrorTag, EventCode, Level, Record, TraceId};
 use diary_logging::private_fs::PrivateDir;
+pub use imports::{ImportAck, ImportPage, ResolutionAck, TimeAuthority};
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -92,6 +94,8 @@ pub struct Job {
     pub id: String,
     pub sequence: u64,
     pub state: JobState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<imports::ImportFailure>,
 }
 #[derive(Serialize, Deserialize)]
 pub struct JobList {

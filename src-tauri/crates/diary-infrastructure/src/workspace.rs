@@ -67,6 +67,18 @@ pub(crate) enum Fault {
 }
 
 impl Workspace {
+    pub fn open_imports(
+        &self,
+        sources: Vec<crate::config::Source>,
+    ) -> Option<Arc<crate::source::import::Store>> {
+        match (&self.db, self.readiness) {
+            (Some(db), Readiness::Ready) => Some(Arc::new(crate::source::import::Store::new(
+                sources,
+                db.clone(),
+            ))),
+            _ => None,
+        }
+    }
     /// The lock proves exclusivity; recovery and inspection modes expose no ledger.
     pub fn open(lock: &WorkspaceLock) -> Result<Self, WorkspaceError> {
         open_with(lock, None)

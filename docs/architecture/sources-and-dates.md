@@ -52,7 +52,9 @@ If a crash loses a Trash reply, reconcile using the native operation receipt/res
 
 ## Implementation status
 
-P1-M9 implements read-only library adapters and bounded scans; [acceptance evidence](../archive/milestones/p1-m9/milestone-09-source-reading-overview.md#evidence-record) records synthetic coverage and provider/mount limitations. HTTP/import contexts belong to P1-M10; write and Trash capabilities stay disabled.
+P1-M9 implements read-only library adapters and bounded scans; [acceptance evidence](../archive/milestones/p1-m9/milestone-09-source-reading-overview.md#evidence-record) records synthetic coverage and provider/mount limitations. P1-M10 adds captured-zone date imports, immutable SQLite provenance, digest-bound authority choices, HTTP routes and three typed Tauri commands; the [completion record](../archive/milestones/p1-m10/milestone-10-civil-date-imports-overview.md#evidence-record) records synthetic and real-server evidence. The Explorer and resolution UI belong to P1-M11; source write and Trash capabilities stay disabled.
+
+On macOS, each import reads `/etc/localtime` afresh, resolves a named zone inside the canonical system database and records its `+VERSION`. No process timezone cache or shell `TZ` override replaces the configured Mac zone. Unknown/unreadable zones and versions fail. Listing an old context after a tzdb replacement fails explicitly; a new import is required. Source listings re-observe current bytes, carry the import ID, and expose digest/relative identity without native file identifiers or source bodies.
 
 ## Required evidence
 

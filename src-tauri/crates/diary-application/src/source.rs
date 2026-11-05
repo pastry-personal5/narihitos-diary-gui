@@ -43,6 +43,8 @@ pub struct ObservationToken {
     pub mtime_ns: i128,
     pub ctime_ns: i128,
     pub config_generation: u64,
+    /// Absent for raw diagnostic scans; imports bind every observation to provenance.
+    pub import_id: Option<String>,
 }
 impl fmt::Debug for ObservationToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -99,6 +101,8 @@ pub struct ScanReport {
     pub failures: Vec<(String, SourceOutcome)>,
     pub collisions: Vec<Vec<String>>,
     pub incomplete: bool,
+    pub entries_seen: usize,
+    pub candidates_seen: usize,
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum ViewError {

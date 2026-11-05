@@ -5,7 +5,7 @@ use axum::{
 };
 use tower::ServiceExt;
 
-fn state() -> Arc<ServerState> {
+pub(crate) fn state() -> Arc<ServerState> {
     ServerState::new(
         "a".repeat(64),
         8781,
@@ -14,7 +14,7 @@ fn state() -> Arc<ServerState> {
         false,
     )
 }
-fn request(method: &str, path: &str) -> HttpRequest<Body> {
+pub(crate) fn request(method: &str, path: &str) -> HttpRequest<Body> {
     let mut req = HttpRequest::builder()
         .method(method)
         .uri(path)

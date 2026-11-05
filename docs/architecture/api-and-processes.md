@@ -77,6 +77,14 @@ A read of a source ID always revalidates its configured root; no request accepts
 
 Every request may carry `X-Diary-Trace-Id` (32 lowercase hex). The server uses a valid value, otherwise generates one, and echoes it in the response header; the error body schema is unchanged. The ID correlates [log](logging.md#trace-and-resource-detail) records only. `diary-server trace --config PATH --select …` is a read-only diagnostic mode of the server binary, not an HTTP endpoint.
 
+## Implemented date-import surface (P1-M10)
+
+`POST /imports` takes `{date, request_id}` and returns HTTP 202 `{import_id, job}`. Poll `GET /jobs/{import_id}` or consume job events; a terminal failure includes an allowlisted `error_code` in the job lookup. Cancellation and session expiry stop scanning; incomplete contexts cannot be listed. IDs are opaque and credentials remain in Rust.
+
+`GET /sources?import_id=…&cursor=…` returns immutable context provenance plus up to 100 tagged `included`, `warning`, `failure` or `path_collision` records, an integer `next_cursor` or null, and `incomplete`. Included records precede warnings and use resolved-instant/canonical-path ordering. Listings are fresh observations of the current source tree, so callers refresh from the first page after a change. No body or absolute root path is returned. `POST /sources/{id}/time-resolution` takes `{import_id, digest, authority: "header" | "filename"}` and returns `{resolved: true}` after a fresh digest/config check. A filename/directory mismatch returns `fix_filename_directory_externally`.
+
+All three require the currently admitted owning session; imports are available only on a ready workspace. Requests reject unknown fields and absolute paths, mutation bodies are capped at 4 KiB, and source work runs off the async executor with two worker slots. The bridge exposes `import_date`, `list_sources` and `resolve_source_time` with individual main-window permissions. Source-body commands and Explorer UI remain P1-M11.
+
 ## Jobs, events and recovery
 
 Job states: `queued → running → succeeded | failed | cancelled | needs_confirmation | uncertain`. Only `succeeded`, `failed` and `cancelled` are terminal. A terminal failure/cancellation reports any completed effects; it never implies rollback. `needs_confirmation` is paused and resumes only with a fresh valid confirmation; `uncertain` is quarantined and resumes only after reconciliation proves the next safe step. Cancellation is idempotent. Before a side effect it cancels outright; after admission to a file publication/remote request it requests cancellation and then reconciles. A successful HTTP 202 means admitted, never saved/exported/deleted. Query the terminal result to establish outcome. Source save and Authentic save may return a terminal 200 or 202 with the same operation handle. Durable operation IDs remain the recovery handle when instance-local job handles disappear.

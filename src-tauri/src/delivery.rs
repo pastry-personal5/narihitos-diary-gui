@@ -193,6 +193,7 @@ mod channel_tests {
                 id: "x".repeat(65536),
                 sequence: 1,
                 state: crate::bridge::JobState::Running,
+                error_code: None,
             }],
             first: true,
             complete: true,

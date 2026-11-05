@@ -197,6 +197,9 @@ async fn run() -> Result<(), &'static str> {
     );
     diary_api::ServerState::set_diagnostics(&mut state, diagnostics.clone());
     diary_api::ServerState::set_storage_ready(&mut state, workspace.readiness == Readiness::Ready);
+    if let Some(store) = workspace.open_imports(config.sources.clone()) {
+        diary_api::ServerState::set_imports(&mut state, store);
+    }
     let watched_store = authentic.clone();
     if let Some(store) = authentic {
         diary_api::ServerState::set_authentic(&mut state, store);

@@ -122,6 +122,7 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
                 current_log=client_log.read()
                 if 'SMOKE main_cancelled_job_read' not in current_log:
                     print('Native editor diagnostics: ' + ', '.join(line for line in current_log.splitlines() if line.startswith('SMOKE editor_probe ')))
+                    print('Native client log tail: ' + ' | '.join(l[:300] for l in current_log.splitlines() if 'editor_probe' not in l)[-3000:])
                     raise AssertionError('native editor did not observe typed sentinel')
                 with (base / 'competitor.log').open('w+') as competitor_log:
                     competitor = subprocess.Popen([str(app), '--connect', str(discovery)], stdout=competitor_log, stderr=competitor_log, text=True)

@@ -37,6 +37,8 @@ See [README.md](README.md) for the overview and [docs/product-behavior.md](docs/
 
 - **P1-M9 approvals (owner, 2026-11-05):** Approved the reviewed source-reading plan, pinned `unicode-normalization` with license-notice review, stable source IDs across reloads, body-less scans and library-only exposure until P1-M10. See the [completion record](docs/archive/milestones/p1-m9/milestone-09-source-reading-overview.md).
 
+- **P1-M10 approvals (owner, 2026-11-05):** Approved pinned `jiff` (direct dependency in `diary-infrastructure`, with license-notice review), server routes plus bridge commands without UI, and the system timezone database `+VERSION` as the recorded version. See the [work plan](docs/archive/milestones/p1-m10/milestone-10-civil-date-imports-architecture.md#owner-decisions).
+
 ## Undecided — ask before inventing
 
 The [P1-M2 owner interview](docs/phase-1/milestone-02-owner-decisions.md) resolves the earlier product choices. The maintained [architecture](docs/architecture.md) resolves delegated internal design work; do not ask again about already approved choices. Ask before changing those choices or inventing new product behavior outside the delegation.
@@ -63,6 +65,7 @@ npx vitest run                                                                  
 cargo fmt --manifest-path src-tauri/Cargo.toml && npx prettier --write .                                         # format
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && npx eslint . --max-warnings 0  # lint
 scripts/gate.sh                                                                                                  # full gate + tsc typecheck: parallel lanes, quiet, PASS/FAIL per command
+python3 scripts/smoke/imports.py                                                                                   # Civil-date import/resolution/restart smoke on the real server binary
 python3 scripts/smoke/authentic.py                                                                                 # Authentic create/save/restart/kill-recovery smoke on the real server binary
 cargo run --manifest-path src-tauri/Cargo.toml -p diary-server -- trace --config PATH --select recent:20        # redacted debugging trace of the logs
 ```

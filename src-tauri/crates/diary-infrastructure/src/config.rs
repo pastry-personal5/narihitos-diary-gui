@@ -68,7 +68,7 @@ impl Default for Server {
         }
     }
 }
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Source {
     pub alias: String,
@@ -76,7 +76,7 @@ pub struct Source {
     pub kind: SourceKind,
     pub root: PathBuf,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SourceKind {
     Narihito,

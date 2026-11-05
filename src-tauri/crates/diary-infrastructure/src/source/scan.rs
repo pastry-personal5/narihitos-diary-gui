@@ -31,6 +31,9 @@ struct Walker<'a> {
     producers: BTreeMap<String, Vec<usize>>,
     identities: IdentityIndex,
     entry_limit: usize,
+    candidate_limit: usize,
+    directories: Option<&'a BTreeSet<String>>,
+    cancelled: &'a dyn Fn() -> bool,
 }
 
 pub fn scan(root: &ResolvedRoot, kind: &SourceKind, generation: u64) -> ScanReport {
@@ -41,6 +44,27 @@ fn scan_bounded(
     kind: &SourceKind,
     generation: u64,
     entry_limit: usize,
+) -> ScanReport {
+    scan_selected(
+        root,
+        kind,
+        generation,
+        entry_limit,
+        MAX_CANDIDATES,
+        None,
+        &|| false,
+    )
+}
+
+/// Restrict descent before opening files; preserve the M9 collision/no-follow rules.
+pub fn scan_selected(
+    root: &ResolvedRoot,
+    kind: &SourceKind,
+    generation: u64,
+    entry_limit: usize,
+    candidate_limit: usize,
+    directories: Option<&BTreeSet<String>>,
+    cancelled: &dyn Fn() -> bool,
 ) -> ScanReport {
     let mut w = Walker {
         root,
@@ -53,6 +77,9 @@ fn scan_bounded(
         producers: BTreeMap::new(),
         identities: IdentityIndex::default(),
         entry_limit,
+        candidate_limit,
+        directories,
+        cancelled,
     };
     match validated_root(root) {
         Ok(fd) => w.walk(fd, "", 0),
@@ -77,6 +104,8 @@ fn scan_bounded(
             .unwrap_or_else(|_| p.clone())
     });
     w.report.collisions.sort();
+    w.report.entries_seen = w.entries;
+    w.report.candidates_seen = w.candidates;
     w.report
 }
 impl Walker<'_> {
@@ -86,6 +115,10 @@ impl Walker<'_> {
             .push((rel, SourceOutcome::Unavailable(e)));
     }
     fn walk(&mut self, dir: File, prefix: &str, depth: usize) {
+        if (self.cancelled)() {
+            self.report.incomplete = true;
+            self.stopped = true;
+        }
         if self.stopped {
             return;
         }
@@ -160,6 +193,11 @@ impl Walker<'_> {
                 .unwrap_or_default()
         });
         for i in indices {
+            if (self.cancelled)() {
+                self.report.incomplete = true;
+                self.stopped = true;
+                break;
+            }
             let Some(name) = strings[i] else {
                 self.failure(prefix.into(), Unavailable::InvalidPath);
                 continue;
@@ -179,6 +217,17 @@ impl Walker<'_> {
                     continue;
                 }
             };
+            if let Some(dirs) = self.directories {
+                let relevant = if depth < 3 {
+                    dirs.iter()
+                        .any(|d| d == &rel || d.starts_with(&format!("{rel}/")))
+                } else {
+                    depth == 3 && dirs.contains(prefix)
+                };
+                if !relevant {
+                    continue;
+                }
+            }
             let file = match open_at(raw, &names[i], false) {
                 Ok(f) => f,
                 Err(e) => {
@@ -256,7 +305,7 @@ impl Walker<'_> {
         }
     }
     fn admit(&mut self) -> bool {
-        if self.candidates == MAX_CANDIDATES {
+        if self.candidates == self.candidate_limit {
             self.report.incomplete = true;
             self.stopped = true;
             false

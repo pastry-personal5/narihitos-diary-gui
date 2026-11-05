@@ -11,6 +11,7 @@ pub const DB_FILE: &str = "state.sqlite3";
 pub const MIGRATIONS: &[(u32, &str)] = &[
     (1, include_str!("sqlite/0001_init.sql")),
     (2, include_str!("sqlite/0002_catalog.sql")),
+    (3, include_str!("sqlite/0003_imports.sql")),
 ];
 const REQUIRED_TABLES: &[&str] = &[
     "schema_migrations",
@@ -19,6 +20,9 @@ const REQUIRED_TABLES: &[&str] = &[
     "operation_resources",
     "operation_steps",
     "catalog_authentic",
+    "source_identities",
+    "import_contexts",
+    "time_resolutions",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

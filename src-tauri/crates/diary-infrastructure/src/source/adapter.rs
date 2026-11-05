@@ -65,6 +65,7 @@ fn token(
         mtime_ns: obs.mtime_ns,
         ctime_ns: obs.ctime_ns,
         config_generation: generation,
+        import_id: None,
     }
 }
 pub(crate) fn interpret(
@@ -139,11 +140,14 @@ pub fn read_view(
 ) -> Result<SourceView, ViewError> {
     let obs =
         read_fresh(root, rel).map_err(|e| ViewError::Outcome(SourceOutcome::Unavailable(e)))?;
-    if &token(root, rel, &obs, generation) != expected {
+    let mut fresh = token(root, rel, &obs, generation);
+    fresh.import_id.clone_from(&expected.import_id);
+    if &fresh != expected {
         return Err(ViewError::Stale);
     }
     let p = parse(&obs.bytes).map_err(|e| ViewError::Outcome(SourceOutcome::Malformed(e)))?;
-    let (_, listing) = interpret(root, kind, rel, &obs, generation, &p);
+    let (_, mut listing) = interpret(root, kind, rel, &obs, generation, &p);
+    listing.token.import_id.clone_from(&expected.import_id);
     Ok(SourceView {
         listing,
         body: p.body,
