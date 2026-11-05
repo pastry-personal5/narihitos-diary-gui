@@ -2,4 +2,5 @@
 pub mod config;
 pub mod lifecycle;
 
+pub mod logging;
 mod private_fs;
