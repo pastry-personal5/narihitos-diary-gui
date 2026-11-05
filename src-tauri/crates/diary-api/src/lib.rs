@@ -2,15 +2,18 @@
 #[cfg(feature = "scaffold-smoke")]
 mod smoke;
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, Request, State},
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode},
     middleware::{self, Next},
     response::{
         IntoResponse, Response,
         sse::{Event as SseEvent, KeepAlive, Sse},
     },
     routing::{delete, get, post},
+};
+use diary_application::diagnostics::{
+    Diagnostics, ErrorTag, EventCode, Level, NullDiagnostics, OpaqueId, Record, TraceId,
 };
 use diary_application::{Coordinator, Error, Job, JobState, Limits, Replay};
 use serde::{Deserialize, Serialize};
@@ -39,6 +42,7 @@ pub struct ServerState {
     clock: Arc<dyn Fn() -> u64 + Send + Sync>,
     stopping: std::sync::atomic::AtomicBool,
     coordinator: Mutex<Coordinator>,
+    diagnostics: Arc<dyn Diagnostics>,
 }
 impl ServerState {
     pub fn new(
@@ -74,6 +78,7 @@ impl ServerState {
                     .saturating_add(value.tv_nsec as u64 / 1_000_000)
             }),
             stopping: std::sync::atomic::AtomicBool::new(false),
+            diagnostics: Arc::new(NullDiagnostics),
         })
     }
     pub fn set_startup(state: &mut Arc<Self>, summary: diary_application::StartupSummary) {
@@ -81,12 +86,21 @@ impl ServerState {
             .expect("startup precedes shared use")
             .startup = summary;
     }
+    /// Diagnostics sinks must never block; the server wires the asynchronous log worker here.
+    pub fn set_diagnostics(state: &mut Arc<Self>, diagnostics: Arc<dyn Diagnostics>) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .diagnostics = diagnostics;
+    }
     #[cfg(feature = "scaffold-smoke")]
     pub fn set_smoke_folders(state: &mut Arc<Self>, checks: Vec<FolderCheck>) {
         Arc::get_mut(state).expect("startup unshared").folder_checks = checks;
     }
     fn now(&self) -> u64 {
         (self.clock)()
+    }
+    fn log(&self, record: Record) {
+        self.diagnostics.emit(record);
     }
     pub fn shutdown(&self) {
         self.stopping
@@ -121,7 +135,50 @@ pub fn router(state: Arc<ServerState>) -> Router {
         .fallback(|| async { failure(StatusCode::NOT_FOUND, "not_found") })
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
         .layer(middleware::from_fn_with_state(state.clone(), authenticate))
+        .layer(middleware::from_fn(trace))
         .with_state(state)
+}
+
+/// Correlates one request across client and server logs. A missing or invalid caller value
+/// is replaced, never trusted; the ID is echoed so a caller can quote it when debugging.
+async fn trace(mut request: Request, next: Next) -> Response {
+    let id = header(request.headers(), "x-diary-trace-id")
+        .and_then(TraceId::parse)
+        .unwrap_or_else(|| {
+            TraceId::parse(&Uuid::new_v4().simple().to_string()).expect("32 lowercase hex")
+        });
+    request.extensions_mut().insert(id.clone());
+    let mut response = next.run(request).await;
+    if let Ok(value) = HeaderValue::from_str(id.as_str()) {
+        response.headers_mut().insert("x-diary-trace-id", value);
+    }
+    response
+}
+fn traced(code: EventCode, level: Level, trace: &TraceId) -> Record {
+    Record::new(code, level).trace(trace.clone())
+}
+fn in_session(record: Record, session: &str) -> Record {
+    match OpaqueId::parse(session) {
+        Some(id) => record.session(id),
+        None => record,
+    }
+}
+/// Access-boundary rejection: logged by code only, never with the token, headers or body.
+fn rejected(
+    state: &ServerState,
+    trace: &Option<TraceId>,
+    status: StatusCode,
+    code: &'static str,
+) -> Response {
+    let tag = match code {
+        "server_stopping" | "request_timeout" => ErrorTag::Unavailable,
+        "request_limit" => ErrorTag::Limit,
+        _ => ErrorTag::Invalid,
+    };
+    let mut record = Record::new(EventCode::AuthRejected, Level::Warn).error(tag);
+    record.trace = trace.clone();
+    state.log(record);
+    failure(status, code)
 }
 
 fn failure(status: StatusCode, code: &'static str) -> Response {
@@ -154,8 +211,14 @@ async fn authenticate(
     request: Request,
     next: Next,
 ) -> Response {
+    let trace = request.extensions().get::<TraceId>().cloned();
     if state.stopping.load(std::sync::atomic::Ordering::Acquire) {
-        return failure(StatusCode::SERVICE_UNAVAILABLE, "server_stopping");
+        return rejected(
+            &state,
+            &trace,
+            StatusCode::SERVICE_UNAVAILABLE,
+            "server_stopping",
+        );
     }
     let headers = request.headers();
     let peer_ok = request
@@ -167,7 +230,7 @@ async fn authenticate(
         .unwrap_or("");
     let token_ok: bool = token.as_bytes().ct_eq(state.token.as_bytes()).into();
     if !peer_ok || !token_ok {
-        return failure(StatusCode::UNAUTHORIZED, "unauthorized");
+        return rejected(&state, &trace, StatusCode::UNAUTHORIZED, "unauthorized");
     }
     if header(headers, "host") != Some(state.host.as_str())
         || request.uri().scheme().is_some()
@@ -187,20 +250,25 @@ async fn authenticate(
             .keys()
             .any(|k| k.as_str().starts_with("x-forwarded-"))
     {
-        return failure(StatusCode::FORBIDDEN, "invalid_destination");
+        return rejected(&state, &trace, StatusCode::FORBIDDEN, "invalid_destination");
     }
     if headers.contains_key("origin") {
         let origin = header(headers, "origin");
         if origin != Some("tauri://localhost")
             && !(state.development && origin == Some("http://localhost:1420"))
         {
-            return failure(StatusCode::FORBIDDEN, "invalid_origin");
+            return rejected(&state, &trace, StatusCode::FORBIDDEN, "invalid_origin");
         }
     }
     if headers.contains_key("content-type")
         && header(headers, "content-type") != Some("application/json")
     {
-        return failure(StatusCode::UNSUPPORTED_MEDIA_TYPE, "unsupported_media_type");
+        return rejected(
+            &state,
+            &trace,
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "unsupported_media_type",
+        );
     }
     let (parts, body) = request.into_parts();
     let bytes = match tokio::time::timeout(
@@ -209,8 +277,22 @@ async fn authenticate(
     )
     .await
     {
-        Err(_) => return failure(StatusCode::REQUEST_TIMEOUT, "request_timeout"),
-        Ok(Err(_)) => return failure(StatusCode::PAYLOAD_TOO_LARGE, "request_limit"),
+        Err(_) => {
+            return rejected(
+                &state,
+                &trace,
+                StatusCode::REQUEST_TIMEOUT,
+                "request_timeout",
+            );
+        }
+        Ok(Err(_)) => {
+            return rejected(
+                &state,
+                &trace,
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "request_limit",
+            );
+        }
         Ok(Ok(bytes)) => bytes,
     };
     next.run(Request::from_parts(parts, axum::body::Body::from(bytes)))
@@ -228,6 +310,7 @@ struct OpenSession {
 }
 async fn open_session(
     State(s): State<Arc<ServerState>>,
+    Extension(trace): Extension<TraceId>,
     payload: Result<Json<OpenSession>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     let input = match payload {
@@ -258,10 +341,19 @@ async fn open_session(
             if let Err(error) = smoke::admit(&mut coordinator, &id, s.now()) {
                 return app_error(error);
             }
+            s.log(in_session(
+                traced(EventCode::SessionOpened, Level::Info, &trace),
+                &id,
+            ));
             Json(json!({"session_id":id,"heartbeat_interval_ms":5000,"lease_duration_ms":30000}))
                 .into_response()
         }
-        Err(e) => app_error(e),
+        Err(e) => {
+            if e == Error::ClientBusy {
+                s.log(traced(EventCode::ClientBusy, Level::Warn, &trace).error(ErrorTag::Busy));
+            }
+            app_error(e)
+        }
     }
 }
 fn session(headers: &HeaderMap) -> Result<&str, Error> {
@@ -289,6 +381,7 @@ async fn heartbeat(
 }
 async fn close_session(
     State(s): State<Arc<ServerState>>,
+    Extension(trace): Extension<TraceId>,
     Path(id): Path<String>,
     headers: HeaderMap,
 ) -> Response {
@@ -301,7 +394,13 @@ async fn close_session(
         .expect("coordinator poisoned")
         .close(&id, s.now())
     {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Ok(()) => {
+            s.log(in_session(
+                traced(EventCode::SessionClosed, Level::Info, &trace),
+                &id,
+            ));
+            StatusCode::NO_CONTENT.into_response()
+        }
         Err(e) => app_error(e),
     }
 }
@@ -406,6 +505,7 @@ async fn get_job(
 }
 async fn cancel_job(
     State(s): State<Arc<ServerState>>,
+    Extension(trace): Extension<TraceId>,
     Path(job): Path<String>,
     headers: HeaderMap,
 ) -> Response {
@@ -420,6 +520,13 @@ async fn cancel_job(
             let dto = JobDto::from(job.clone());
             let bytes = serde_json::to_vec(&json!({"instance_id":s.instance_id,"session_id":id,"event_id":u64::MAX,"job_id":job.id,"job_sequence":job.sequence,"kind":"job_changed","payload":dto})).expect("fixed DTO").len();
             let _ = c.publish(id, s.now(), &job.id, bytes);
+            if job.state.is_terminal() {
+                let mut record =
+                    in_session(traced(EventCode::JobFinished, Level::Info, &trace), id);
+                // Fixture job IDs are not opaque IDs; real (UUID) job IDs are recorded.
+                record.job = OpaqueId::parse(&job.id);
+                s.log(record);
+            }
             Json(JobDto::from(job)).into_response()
         }
         Err(e) => app_error(e),

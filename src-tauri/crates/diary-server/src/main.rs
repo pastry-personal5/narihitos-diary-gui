@@ -1,10 +1,35 @@
 #[cfg(feature = "scaffold-smoke")]
 mod native_smoke;
+use diary_application::diagnostics::{Diagnostics, EventCode, Level, OpaqueId, Record, Role};
 use diary_infrastructure::{
     config,
     lifecycle::{Discovery, PublishedDiscovery, WorkspaceLock, bind_loopback},
 };
-use std::path::PathBuf;
+use diary_logging::{
+    clock::SystemClock, private_fs::PrivateDir, store::LogStore, worker::LogWorker,
+};
+use std::{path::PathBuf, sync::Arc, time::Duration};
+
+/// A log directory problem must never stop the server: without a store the worker writes
+/// diagnostics to stderr only.
+fn start_logging(
+    runtime_root: &std::path::Path,
+    workspace_key: &str,
+    instance: &str,
+) -> Arc<LogWorker> {
+    let clock = Arc::new(SystemClock);
+    let store = PrivateDir::open(runtime_root)
+        .and_then(|d| d.child(workspace_key))
+        .ok()
+        .and_then(|d| LogStore::open(&d, Role::Server, clock.clone()).ok());
+    LogWorker::start(
+        store,
+        Role::Server,
+        OpaqueId::parse(instance),
+        clock,
+        Box::new(std::io::stderr()),
+    )
+}
 
 #[tokio::main]
 async fn main() {
@@ -48,6 +73,13 @@ async fn run() -> Result<(), &'static str> {
     let listener =
         tokio::net::TcpListener::from_std(listener).map_err(|_| "listener unavailable")?;
     let record = Discovery::fresh(&lock.workspace_key, port).map_err(|_| "entropy unavailable")?;
+    let diagnostics = start_logging(
+        &config.paths.runtime_root,
+        &lock.workspace_key,
+        &record.instance_id,
+    );
+    diagnostics.emit(Record::new(EventCode::ServerStarted, Level::Info));
+    diagnostics.emit(Record::new(EventCode::ListenerBound, Level::Info).count(u32::from(port)));
     let mut state = diary_api::ServerState::new(
         record.token.clone(),
         port,
@@ -55,6 +87,7 @@ async fn run() -> Result<(), &'static str> {
         record.workspace_key.clone(),
         development,
     );
+    diary_api::ServerState::set_diagnostics(&mut state, diagnostics.clone());
     let launch_path = std::env::var_os("PATH").unwrap_or_default();
     let launch_cwd = std::env::current_dir().map_err(|_| "launch directory unavailable")?;
     diary_api::ServerState::set_startup(
@@ -70,6 +103,7 @@ async fn run() -> Result<(), &'static str> {
         .map_err(|_| "signal registration failed")?;
     let published = PublishedDiscovery::publish(&config.paths.runtime_root, &record, &lock)
         .map_err(|_| "discovery unavailable")?;
+    diagnostics.emit(Record::new(EventCode::DiscoveryPublished, Level::Info));
     println!("Discovery: {}", published.path.display());
     let sweeper = tokio::spawn(state.clone().sweep());
     let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
@@ -84,6 +118,7 @@ async fn run() -> Result<(), &'static str> {
     tokio::select! {
         result = &mut service => { result.map_err(|_| "server transport failed")?; },
         _ = async { tokio::select! { _ = interrupt.recv() => (), _ = term.recv() => () } } => {
+            diagnostics.emit(Record::new(EventCode::ServerStopping, Level::Info));
             state.shutdown();
             let _ = stop_tx.send(());
             // No durable work is implemented; stop streams and cap network drain.
@@ -93,6 +128,7 @@ async fn run() -> Result<(), &'static str> {
         },
     }
     sweeper.abort();
+    diagnostics.shutdown(Duration::from_secs(2));
     drop(published);
     drop(lock);
     Ok(())
