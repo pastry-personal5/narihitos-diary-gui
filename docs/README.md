@@ -24,17 +24,16 @@ This index lists the design and process docs, one line each. Read only the doc y
 | [ux-terms.md](ux-terms.md) | Canonical component names for UI text, with their code-facing identifiers. |
 | [ux-information-architecture.md](ux-information-architecture.md) | The Standard Layout: how the app's components contain one another. |
 | [ux-gui.md](ux-gui.md) | Target navigation, saves/review/export feedback, keyboard/accessibility and native acceptance scenarios. |
-| [phase-1/phase-1.md](phase-1/phase-1.md) | Phase 1 (Diary v1.0.0): goal, exit criteria and P1-M1–P1-M9 delivery sequence. |
+| [phase-1/phase-1.md](phase-1/phase-1.md) | Phase 1 (Diary v1.0.0): goal, exit criteria and P1-M1–P1-M28 milestone themes and order. |
 | [phase-1/changelog.md](phase-1/changelog.md) | Phase 1 decisions and plan changes. |
 | [phase-1/milestone-01-research-overview.md](phase-1/milestone-01-research-overview.md) | P1-M1 research items R1–R14, evidence register, decision blockers, research sequence, and completion checklists. |
 | [archive/milestones/p1-m2/milestone-02-architecture-overview.md](archive/milestones/p1-m2/milestone-02-architecture-overview.md) | Completed P1-M2 checklist, configuration/agent/prompt clarifications, review/AI design, requirement audit and documentation evidence. |
 | [archive/milestones/p1-m2/milestone-02-architecture-architecture.md](archive/milestones/p1-m2/milestone-02-architecture-architecture.md) | P1-M2 design work plan and completed owner clarifications/review; implementation handoff stays separate. |
 | [phase-1/milestone-02-owner-decisions.md](phase-1/milestone-02-owner-decisions.md) | P1-M2 owner interview decisions D01–D17, superseded research proposals, and delegated design authority. |
 | [phase-1/milestone-02-architecture-review.md](phase-1/milestone-02-architecture-review.md) | P1-M2 architecture review findings/fixes, acceptance mapping and resolved writing-language, creation and background-AI interview. |
-| [phase-1/milestone-02-security-review.md](phase-1/milestone-02-security-review.md) | Security review against preventing AI-caused computer harm: CLI authority, secrets/state access, executable customizations, resource use and cancellation evidence; findings only. |
-| [phase-1/implementation-handoff.md](phase-1/implementation-handoff.md) | D01–D17 coverage, unverified capability gates and P1-M3 through personal-release sequencing. |
-| [phase-1/milestone-03-scaffolding-overview.md](phase-1/milestone-03-scaffolding-overview.md) | Scaffolding-only P1-M3 scope/checklist, synthetic native evidence and full six-command implementation gate. |
-| [phase-1/milestone-03-scaffolding-architecture.md](phase-1/milestone-03-scaffolding-architecture.md) | Scaffold sequencing, dependency approval, gate coverage and independent server/client assembly. |
+| [phase-1/implementation-handoff.md](phase-1/implementation-handoff.md) | D01–D17 coverage and unverified capability gates mapped to P1-M3–P1-M28 themes. |
+| [phase-1/milestone-03-scaffolding-overview.md](phase-1/milestone-03-scaffolding-overview.md) | P1-M3 entry/scope, numbered acceptance checklist, evidence record and full six-command gate; implementation remains Planned. |
+| [phase-1/milestone-03-scaffolding-architecture.md](phase-1/milestone-03-scaffolding-architecture.md) | Scaffold modules/command subset, approval/sequencing, storage and fixture boundaries, acceptance matrix and packaged macOS procedure. |
 | [research/agent-assisted-diary-composition.md](research/agent-assisted-diary-composition.md) | P1-M1 R5 findings: Codex, Claude Code, and Qwen Code as agents: profiles, chat, draft candidates, confinement, and failure handling. |
 | [research/source-formats-and-prior-art.md](research/source-formats-and-prior-art.md) | R1/R2: sample schema inventory, UTC layout, identity/import policies, reuse map, source-inspected risks, and licenses. |
 | [research/date-and-time.md](research/date-and-time.md) | R8: captured import timezone, stable diary dates, UTC scan bounds, library options, and synthetic boundary evidence. |

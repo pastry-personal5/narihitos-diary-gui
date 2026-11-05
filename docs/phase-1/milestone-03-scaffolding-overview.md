@@ -2,35 +2,55 @@
 
 Status: Planned
 
-Create a buildable client/server skeleton from the completed [P1-M2 architecture](../archive/milestones/p1-m2/milestone-02-architecture-overview.md). This milestone implements scaffolding only and requires the full six-command gate.
+Create a buildable, independently launched server/Tauri client skeleton from the completed [P1-M2 architecture](../archive/milestones/p1-m2/milestone-02-architecture-overview.md). This plan covers scaffolding and synthetic transport evidence; completing the plan review does not complete the milestone or authorize dependency changes.
+
+## Entry conditions
+
+P1-M1 and P1-M2 are Done; P1-M3 remains Planned until scaffold implementation begins. Read the [work plan](milestone-03-scaffolding-architecture.md), its contract links and the [handoff evidence register](implementation-handoff.md#capability-evidence-register) before implementation. No owner product question currently blocks scaffolding.
+
+The first implementation prerequisite is approval of the concrete dependency/build-tool inventory in S01. Prepare that review before asking for approval; do not infer approval from the fixed stack or architecture recommendations. This documentation change selects no package versions, installs nothing and starts no implementation.
 
 ## Scope
 
-In: approved package/tool setup, Rust workspace/crate boundaries, independently launched server/Tauri client, configuration/discovery/auth/session/status wiring, typed bridge and fake-job HTTP/SSE, a minimal text-labeled Standard Layout with a dedicated CodeMirror module, version consistency and test infrastructure. Plan: [work plan](milestone-03-scaffolding-architecture.md).
+| Included in P1-M3 | Deferred capability and owner milestone |
+|---|---|
+| Approved tool setup, inward Cargo workspace, two executables, frontend build/type checks and test infrastructure | Feature algorithms/adapters remain in their consuming milestones; do not prebuild every future port or add unused dependencies |
+| Startup config validation, OS lock exclusion, port selection, private discovery, authentication, one-client lease and redacted status | Workspace/SQLite/durable operations: P1-M5; Authentic persistence/recovery: P1-M6; client autosave and Create Empty: P1-M7 |
+| Narrow typed Tauri bridge, bounded HTTP/SSE and deterministic in-memory fake jobs in a test harness | Sources/imports/navigation: P1-M9–P1-M11; source saves/Trash: P1-M14/P1-M15; agent/AI/review features: P1-M16–P1-M24; exports: P1-M25–P1-M27 |
+| Text-labeled Standard Layout, dedicated CodeMirror module and explicitly synthetic editor state | Logging: P1-M4; preferences/reload: P1-M8; full layout: P1-M11; shortcuts: P1-M12; native symbols/interaction: P1-M13; complete AI activity/results: P1-M23 |
+| Version/protocol checks, full code gate and packaged synthetic server/client smoke evidence | Personal release and complete workflow/platform qualification: P1-M28 |
 
-Out: architecture design/review and owner product interviews, durable Diary/source operations, settings persistence and recovery, complete logging rotation/retention, shortcut editing, complete AI activity/results UI, live agents/prompts/inference, exports, history, remote/MCP clients and public distribution. Completed design and interview evidence belongs to [P1-M2](../archive/milestones/p1-m2/milestone-02-architecture-overview.md#architecture-clarifications-and-review); the [handoff](implementation-handoff.md#delivery-order-and-scope) assigns feature implementation and acceptance to later milestones. Concrete package/build-tool approval remains a prerequisite for scaffold setup.
+Architecture design/review and owner interviews are completed [P1-M2 inputs](../archive/milestones/p1-m2/milestone-02-architecture-overview.md#architecture-clarifications-and-review). History, remote/MCP clients and public distribution remain outside Phase 1. The [work plan](milestone-03-scaffolding-architecture.md#startup-and-fixture-boundaries) defines the storage and fake-job limits so scaffolding cannot be mistaken for a working Diary feature.
 
 ## Completion checklist
 
-- [ ] Obtain dependency/build-tool approval for the concrete versions/license/features inventory before editing manifests.
-- [ ] Create the specified Cargo workspace with the client, server and inward crates included in the existing gate paths; verify dependency direction and package coverage.
-- [ ] Run separate shell server/client commands with explicit config/discovery, private token lifecycle and workspace lock exclusion.
-- [ ] Validate the startup configuration schema and port range against the maintained contracts, including absolute roots, CLI profile fields/default executable resolution and alias/type-only Apple profiles; optional profiles remain unavailable without inference or CLI execution.
-- [ ] Verify first-available binding from 8781 through 8789 by default, fallback count 0–8, overflow rejection and failure after range exhaustion.
-- [ ] Verify E1/E10 scaffold acceptance in the [evidence register](implementation-handoff.md#capability-evidence-register): discovery/auth/origin/Host/lease failures, stale discovery, second-client rejection and independently packaged server/client identities.
-- [ ] Provide only the implemented typed session/status/fake-job bridge commands and channels with matching manifests/permissions; deny generic URL/path/shell inputs and commands from secondary windows.
-- [ ] Verify bounded fake-job admission, cancellation, request deduplication, ordered events and reconnect/resync, including a lost event notification; no durable operation or real-agent capability is inferred from these fakes.
-- [ ] Render the text-labeled Standard Layout and dedicated CodeMirror editor with typed fake state; frontend state/logs contain no private config or token. Feature controls stay disabled or explicitly synthetic.
-- [ ] Set SemVer metadata from the approved version source, show `Version v1.0.0`, and reject release-version drift or an incompatible client/server protocol.
-- [ ] Pass `cargo fmt --manifest-path src-tauri/Cargo.toml --check`.
-- [ ] Pass `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`.
-- [ ] Pass `cargo test --manifest-path src-tauri/Cargo.toml`.
-- [ ] Pass `npx prettier --check .`.
-- [ ] Pass `npx eslint . --max-warnings 0`.
-- [ ] Pass `npx vitest run`.
-- [ ] Record a packaged macOS synthetic smoke test for separate launch, typed IPC, denied window/command and readable/denied folders; mocks alone do not establish native behavior.
-- [ ] Update contribution/run instructions, index and phase status with scaffold evidence; keep unimplemented feature capabilities disabled.
+Check an item only with a linked result identifying the tested revision, command/test or manual procedure, observed outcome and limitations. [Acceptance matrix](milestone-03-scaffolding-architecture.md#acceptance-matrix) rows use the same S IDs; G IDs are the unchanged repository gate.
+
+- [ ] **S01 — Approved setup:** Record owner approval of exact dependency/tool versions, licenses/notices, features, scripts and build integration before changing manifests or installing tools.
+- [ ] **S02 — Assembly:** Build the specified inward crate/client structure; prove workspace membership and unchanged gate paths cover both binaries and every Rust crate. Frontend production build/type checking succeeds.
+- [ ] **S03 — Configuration:** Pass strict schema, path/permission/root validation and tagged CLI/Apple profile fixtures without invoking an agent or loading real credentials.
+- [ ] **S04 — Server lifecycle:** Demonstrate independent launch, OS lock exclusion, first-available port selection/range exhaustion, private discovery publication/removal, stale/crashed-server handling and restart credential rotation.
+- [ ] **S05 — Access boundary:** Pass authenticated status/session/lease tests, hostile discovery/Host/Origin/proxy cases, redaction checks and matching Tauri command/permission/capability inventories. Deny secondary-window and generic input access.
+- [ ] **S06 — Transport harness:** Pass bounded fake-job admission/deduplication/cancellation, event ordering and replay/resync tests, including a lost gap notification. Prove fixture composition is absent from the ordinary build and no fake-admission endpoint/command is exposed.
+- [ ] **S07 — Client skeleton:** Render the canonical text-labeled regions and dedicated CodeMirror module; verify typed DTO validation, subscription/editor cleanup and disconnected state. Synthetic edits never claim persistence; unavailable feature controls explain why.
+- [ ] **S08 — Versions:** Derive UI metadata from the app, show `Version v1.0.0`, reject package/Cargo/Tauri version drift and reject incompatible protocol/capabilities during handshake. Version text is not a release-completion claim.
+- [ ] **S09 — Native smoke:** Record independently packaged macOS server/client identities, separate shell launch, allowed/denied IPC, readable/denied synthetic folders and cleanup/restart. Test actual packaged Origin/CSP behavior; mocks do not establish native access.
+- [ ] **S10 — Handoff:** Update run/contribution instructions, document the approved setup and evidence, and update the index/phase/roadmap. Leave E2–E9 and E11–E13 feature/runtime evidence with their assigned milestones.
+- [ ] **G01:** Pass `cargo fmt --manifest-path src-tauri/Cargo.toml --check`.
+- [ ] **G02:** Pass `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`.
+- [ ] **G03:** Pass `cargo test --manifest-path src-tauri/Cargo.toml`.
+- [ ] **G04:** Pass `npx prettier --check .`.
+- [ ] **G05:** Pass `npx eslint . --max-warnings 0`.
+- [ ] **G06:** Pass `npx vitest run`.
+
+## Evidence record
+
+Implementation evidence is pending for every S/G item. Record results here as implementation proceeds, linking longer reports from the documentation index if needed. A failed/unavailable command or missing native observation leaves its item unchecked; successful documentation review or mocked tests cannot substitute for the full gate or S09.
+
+For each result record: `S/G ID | revision and environment | command/test/procedure | observed result | evidence link or blocker`. Native results also identify the OS/CPU, executable/bundle identities, fixture paths by role (without private discovery contents), and ordinary versus fixture build. Retain no credentials, private source text or real config in evidence.
 
 ## Acceptance boundary
 
-E1/E10 and E11's configuration-schema preparation apply here. Fake jobs establish the transport/test skeleton; E2–E9 and the E11–E13 feature/runtime evidence remain assigned to their consuming milestones. Architecture documentation checks are P1-M2 evidence and do not check off this milestone. The absent scaffold/manifests and unavailable JS tooling leave the implementation gate pending.
+E1/E10 and E11's configuration-schema preparation apply here. Fake jobs establish transport behavior only: no durable-save, producer compatibility, model supervision, native inference, service recovery or measured AI responsiveness claim follows. The [handoff](implementation-handoff.md#delivery-order-and-scope) preserves those later gates.
+
+P1-M3 is Done only when S01–S10 and G01–G06 have evidence and the [process requirements](../development-process.md#definition-of-done) hold. Archive the completed milestone plans and fix links at that point. This plan review leaves P1-M3 Planned and all implementation items unchecked; absent manifests/tooling are current gate blockers, not a docs-only exemption.

@@ -3,7 +3,7 @@
 Status: Active
 Goal: Research, design, and deliver the Diary v1.0.0 app on macOS.
 
-Theme: Diary v1.0.0. Research, architecture, and scaffolding remain the first three milestones. Plan the feature and release milestones from the research handoff before implementation; expanding the phase does not authorize skipping those foundations.
+Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architecture.md). Research, architecture and scaffolding remain the first three milestones; the remaining milestones separate durable local workflows, source interoperability, optional agents, AI interaction, exports and personal release.
 
 ## Exit criteria
 
@@ -15,7 +15,7 @@ Theme: Diary v1.0.0. Research, architecture, and scaffolding remain the first th
 
 ## Milestones
 
-The [implementation handoff](implementation-handoff.md) defines dependency order and acceptance gates for the remaining work. Detailed plans/checklists are required before implementing each milestone.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. All implementation milestones remain Planned.
 
 ### P1-M1: Research
 Status: Done
@@ -33,34 +33,104 @@ Notes: [Clean Architecture](../architecture.md) and nine themed contracts comple
 Status: Planned
 Goal: Create the project skeleton following the documented architecture.
 Plan: [overview](milestone-03-scaffolding-overview.md), [work plan](milestone-03-scaffolding-architecture.md).
-Notes: Scaffolding only: assemble the approved design into a buildable/testable skeleton. Feature implementation remains in P1-M4–P1-M9.
+Notes: Scaffolding only: S01–S10/G01–G06 map approved setup, the implemented command subset, fixture transport, build/type checks and packaged evidence to verifiable acceptance. Workspace initialization/recovery and all feature implementation remain in P1-M4–P1-M28; plan review does not complete P1-M3.
 
-### P1-M4: Authentic persistence
+### P1-M4: Diagnostic logging
 Status: Planned
-Goal: Implement locked durable Authentic autosave, authoritative operation recovery and rebuildable catalog behavior.
-Plan: [scope and evidence E2](implementation-handoff.md); detailed overview/work plan required before code.
+Goal: Add private server/client diagnostics with bounded asynchronous writes, daily rotation, three-day retention and content redaction.
 
-### P1-M5: Source views and GUI
+### P1-M5: Workspace and durable operations
 Status: Planned
-Goal: Implement source/date import, refresh/conflicts, canonical layout/editor ownership, accessibility and native symbols.
-Plan: [scope and evidence E3/E9](implementation-handoff.md); detailed overview/work plan required before code.
+Goal: Establish locked workspace initialization, versioned SQLite authority, durable operation/step identities, resource reservations and startup recovery classification.
 
-### P1-M6: Source mutation
+### P1-M6: Authentic persistence and recovery
 Status: Planned
-Goal: Enable producer-compatible body saves and confirmed snippet/audio Trash with partial recovery only after verification.
-Plan: [scope and evidence E4](implementation-handoff.md); detailed overview/work plan required before code.
+Goal: Implement canonical Authentic Markdown, guarded durable saves and empty-file creation, saved-date catalogs, external-change detection and interrupted-save recovery.
 
-### P1-M7: Agents and review
+### P1-M7: Authentic editing and autosave
 Status: Planned
-Goal: Implement optional CLI and Apple Foundation Models profiles, asset-loaded prompts, transient chat/candidates and saved paragraph accept/reject review.
-Plan: [scope and evidence E5/E6/E11](implementation-handoff.md); detailed overview/work plan required before code.
+Goal: Connect one shared Draft/Entry buffer to ordered IME-aware autosave, Create Empty, acknowledged save feedback and guarded date/close transitions.
 
-### P1-M8: Optional exports
+### P1-M8: Settings and configuration reload
 Status: Planned
-Goal: Implement saved-revision iCloud/Notion exports with confirmations, durable receipts and ambiguous-result reconciliation.
-Plan: [scope and evidence E7/E8](implementation-handoff.md); detailed overview/work plan required before code.
+Goal: Add guarded client-owned preferences, persistent Writing Language and redacted Settings status with explicit validated server-config reload.
 
-### P1-M9: Personal release
+### P1-M9: Source identity and reading
 Status: Planned
-Goal: Qualify Diary v1.0.0 for the owner's Apple Silicon Mac and separate shell launch with full workflow/native evidence.
-Plan: [release scope](implementation-handoff.md#delivery-order-and-scope); detailed overview/work plan required before code.
+Goal: Implement bounded Ayumi/Narihito body views, metadata parsing, canonical path identities and fresh observations with independent per-file capability outcomes.
+
+### P1-M10: Civil-date imports and timestamp resolution
+Status: Planned
+Goal: Import D-1/D/D+1 in a captured system timezone, preserve fixed Entry dates and support explicit timestamp-authority choices without rewriting sources.
+
+### P1-M11: Explorer and editor navigation
+Status: Planned
+Goal: Complete the resizable Standard Layout, civil-date calendar, grouped source selection, saved-date navigation and resource-owned tabs with guarded refresh and dirty-source handling.
+
+### P1-M12: Command palette and keyboard shortcuts
+Status: Planned
+Goal: Route actions through one registry and add the command palette plus editable, persistent, scope-aware shortcuts with conflict and IME protection.
+
+### P1-M13: Native symbols and accessible interaction
+Status: Planned
+Goal: Add allowlisted AppKit SF Symbols and verify keyboard, VoiceOver, focus, pane resizing and Korean/Japanese IME behavior in the packaged macOS interface.
+
+### P1-M14: Producer-compatible source saves
+Status: Planned
+Goal: Enable explicit body saves only for producer-verified formats, preserving metadata, audio integrity and guarded recovery under concurrent changes.
+
+### P1-M15: Source and audio Trash
+Status: Planned
+Goal: Add confirmed snippet/audio Trash with exact ownership previews, durable per-member outcomes and safe partial-operation reconciliation and retry.
+
+### P1-M16: Agent contracts and prompt assets
+Status: Planned
+Goal: Establish the shared agent port, profile capability model, immutable bounded request/output contracts and validated release-packaged prompt assets.
+
+### P1-M17: CLI supervision and Codex adapter
+Status: Planned
+Goal: Implement bounded process-group execution, cancellation and versioned Codex compatibility through the common agent port.
+
+### P1-M18: Claude Code adapter
+Status: Planned
+Goal: Add independently verified Claude Code profile checks, one-shot streaming/schema conversion and supervised lifecycle behavior.
+
+### P1-M19: Qwen Code adapter
+Status: Planned
+Goal: Add independently verified Qwen Code profile checks, one-shot streaming/schema conversion and supervised lifecycle behavior.
+
+### P1-M20: Apple Foundation Models adapter
+Status: Planned
+Goal: Integrate the optional on-device system model with explicit availability, fresh native sessions, guided-output validation and verified cancellation.
+
+### P1-M21: Transient AI Chat
+Status: Planned
+Goal: Implement profile-fixed, memory-only chat using the active editor snapshot, saved writing locale and bounded explicit turn/context handling.
+
+### P1-M22: Candidate generation
+Status: Planned
+Goal: Generate one to five sequential validated candidates from eligible selected snapshots, preserving immutable date/baseline context and independent candidate outcomes.
+
+### P1-M23: Background AI activity and results
+Status: Planned
+Goal: Complete nonblocking cross-date AI progress, provisional previews, cancellation, reconnect/result discovery and accessible in-app completion feedback.
+
+### P1-M24: Paragraph review and acceptance
+Status: Planned
+Goal: Add deterministic lossless paragraph/structure review with serialized durable accepts, transient rejects and regeneration after baseline changes.
+
+### P1-M25: Export coordination and confirmations
+Status: Planned
+Goal: Establish saved-revision export snapshots, destination reservations, authoritative receipts and checkpointed conflict confirmation and reconciliation.
+
+### P1-M26: iCloud export
+Status: Planned
+Goal: Export exact saved Markdown through verified File Provider availability and coordinated publication, with external-change confirmation and honest local-write outcomes.
+
+### P1-M27: Notion export
+Status: Planned
+Goal: Export deterministic year/month/daily projections with ascending dates, bounded chunking, service-limit handling and provenance-aware ambiguous-write recovery.
+
+### P1-M28: Personal release qualification
+Status: Planned
+Goal: Qualify Diary v1.0.0 on the owner's Apple Silicon Mac with separate shell launch, complete workflow/recovery/native evidence and the full release gate.
