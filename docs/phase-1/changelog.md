@@ -6,6 +6,8 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-06 — owner, P1-M13 scope — Native VoiceOver proof and Japanese IME proof are not needed; Korean IME, key delivery and resize proof stay carried to P1-M28.
+- 2026-11-06 — owner, P1-M13 interview — Approved: drop `appearance` from `get_symbol` (the client tints a template mask; contract updated); add Refresh (`arrow.clockwise`) as the sixth symbol control; controls show the symbol only, with the text label as accessible name and tooltip; one Global Message per unsupported symbol name.
 - 2026-11-06 — owner, P1-M13 interview — Approved direct macOS-only `objc2`, `objc2-app-kit` and `objc2-foundation` dependencies (pinned to the Cargo.lock versions, notice review first) for the `get_symbol` AppKit route, and closing P1-M13 on automated tests plus the gate; native VoiceOver, IME, key and resize proof is carried to P1-M28.
 - 2026-11-06 — agent, P1-M13 planned — Added the [overview/checklist](milestone-13-native-symbols-accessibility-overview.md) and [work plan](milestone-13-native-symbols-accessibility-architecture.md).
 - 2026-11-06 — owner, P1-M12 interview — Approved: reserve Option-only printable and Control+A/E/K/F/B/N/P in `app` scope (contract updated, with `app` Command/Option+Backspace/ForwardDelete also reserved); consume unavailable-action shortcuts and explain in Global Messages; Command+S on a source posts "Source saving is not available yet"; no table search field in P1-M12.
