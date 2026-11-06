@@ -1,0 +1,6 @@
+{"type":"system","subtype":"init","claude_code_version":"2.1.319","tools":["StructuredOutput"]}
+{"type":"assistant","message":{"content":[{"type":"thinking"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"StructuredOutput","input":{"draft_markdown":"Hello.","claim_support":[{"claim":"Hello","snippet_ids":["snippet-1"]}],"warnings":[]}}]}}
+{"type":"user"}
+{"type":"rate_limit_event"}
+{"type":"result","subtype":"success","is_error":false,"api_error_status":null,"terminal_reason":"completed","result":"{\"draft_markdown\":\"Hello.\",\"claim_support\":[{\"claim\":\"Hello\",\"snippet_ids\":[\"snippet-1\"]}],\"warnings\":[]}","structured_output":{"draft_markdown":"Hello.","claim_support":[{"claim":"Hello","snippet_ids":["snippet-1"]}],"warnings":[]}}

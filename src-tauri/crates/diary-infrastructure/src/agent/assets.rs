@@ -24,6 +24,8 @@ macro_rules! asset {
 pub const EMBEDDED: &Table<'static> = &[
     asset!(AgentKind::Codex, "codex", "generate-candidate"),
     asset!(AgentKind::Codex, "codex", "chat"),
+    asset!(AgentKind::Claude, "claude", "generate-candidate"),
+    asset!(AgentKind::Claude, "claude", "chat"),
     asset!(
         AgentKind::AppleFoundationModels,
         "apple-foundation-models",
@@ -372,13 +374,15 @@ mod tests {
     fn capabilities_follow_assets_and_adapter() {
         let a = PromptAssets::embedded();
         for action in [Action::Chat, Action::Generate] {
-            for k in [AgentKind::Claude, AgentKind::Qwen] {
-                assert_eq!(
-                    a.capability(k, action, false),
-                    Capability::Unavailable(AssetsMissing)
-                );
-            }
-            for k in [AgentKind::Codex, AgentKind::AppleFoundationModels] {
+            assert_eq!(
+                a.capability(AgentKind::Qwen, action, false),
+                Capability::Unavailable(AssetsMissing)
+            );
+            for k in [
+                AgentKind::Codex,
+                AgentKind::Claude,
+                AgentKind::AppleFoundationModels,
+            ] {
                 assert_eq!(
                     a.capability(k, action, false),
                     Capability::Unavailable(AdapterUnimplemented)
@@ -425,7 +429,11 @@ mod tests {
 
     #[test]
     fn generate_asset_matches_schema_and_packet() {
-        for k in [AgentKind::Codex, AgentKind::AppleFoundationModels] {
+        for k in [
+            AgentKind::Codex,
+            AgentKind::Claude,
+            AgentKind::AppleFoundationModels,
+        ] {
             let b = real(k, GENERATE).body;
             for want in [
                 "draft_markdown",
@@ -455,11 +463,20 @@ mod tests {
             (c.model.as_str(), c.reasoning_effort.as_str()),
             ("gpt-5.6-luna", "medium")
         );
+        let c = real(AgentKind::Claude, GENERATE);
+        assert_eq!(
+            (c.model.as_str(), c.reasoning_effort.as_str()),
+            ("claude-sonnet-4-6", "low")
+        );
     }
 
     #[test]
     fn generate_asset_names_all_five_styles() {
-        for k in [AgentKind::Codex, AgentKind::AppleFoundationModels] {
+        for k in [
+            AgentKind::Codex,
+            AgentKind::Claude,
+            AgentKind::AppleFoundationModels,
+        ] {
             let b = real(k, GENERATE).body;
             for s in diary_application::agent::Style::ALL {
                 assert!(b.contains(&format!("`{}`", s.id())), "{k:?} {}", s.id());
@@ -469,7 +486,11 @@ mod tests {
 
     #[test]
     fn chat_asset_matches_packet() {
-        for k in [AgentKind::Codex, AgentKind::AppleFoundationModels] {
+        for k in [
+            AgentKind::Codex,
+            AgentKind::Claude,
+            AgentKind::AppleFoundationModels,
+        ] {
             let b = real(k, CHAT).body;
             for want in ["document", "transcript", "user_message", "unsaved", "kind"] {
                 assert!(b.contains(want), "{k:?} {want}");

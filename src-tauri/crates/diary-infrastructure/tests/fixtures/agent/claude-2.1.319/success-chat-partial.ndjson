@@ -1,0 +1,12 @@
+{"type":"system","subtype":"init","claude_code_version":"2.1.319","tools":[]}
+{"type":"system","subtype":"status","claude_code_version":null,"tools":null}
+{"type":"stream_event","event":{"type":"message_start"}}
+{"type":"stream_event","event":{"type":"content_block_start"}}
+{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"<redacted>"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"<redacted>"}}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"<redacted>"}]}}
+{"type":"stream_event","event":{"type":"content_block_stop"}}
+{"type":"stream_event","event":{"type":"message_delta","delta":{"type":null}}}
+{"type":"stream_event","event":{"type":"message_stop"}}
+{"type":"rate_limit_event"}
+{"type":"result","subtype":"success","is_error":false,"api_error_status":null,"terminal_reason":"completed","result":"<redacted>"}

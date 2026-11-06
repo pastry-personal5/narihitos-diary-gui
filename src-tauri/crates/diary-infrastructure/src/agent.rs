@@ -5,7 +5,9 @@ use crate::config::Profile;
 use diary_application::agent::{AgentKind, ProfileHandle};
 
 pub mod assets;
+pub mod claude;
 pub mod codex;
+pub mod host;
 pub mod output;
 pub mod packet;
 pub mod process;

@@ -3,127 +3,30 @@
 //! logs or `AgentError`. Output is accepted only through the M16 validators and `Run`.
 use super::{
     assets::{AssetError, CHAT, GENERATE, PromptAssets},
+    host::{Host, RunDir, read_bounded},
     output::{validate_generation, validate_reply},
     packet::encode_packet,
     process::{Exit, Limits, Outcome, Spec, Stop, Supervisor},
     profiles::{Entry, ProfileTable},
 };
-use crate::config::select_executable;
-use diary_application::{
-    agent::*,
-    diagnostics::{Diagnostics, ErrorTag, EventCode, Level, Record},
-};
+use diary_application::{agent::*, diagnostics::Diagnostics};
 use serde_json::Value;
 use std::{
     ffi::OsString,
-    io::Read,
-    os::unix::fs::{DirBuilderExt, OpenOptionsExt},
+    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-    },
+    sync::Arc,
     time::Instant,
 };
 
 pub const SUPPORTED_VERSION: &str = "codex-cli 0.167.0";
 
-/// Strict structured-output schema for schema-1 generation: closed objects, every property required.
-pub const GENERATION_SCHEMA: &str = r#"{"type":"object","additionalProperties":false,"required":["draft_markdown","claim_support","warnings"],"properties":{"draft_markdown":{"type":"string"},"claim_support":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["claim","snippet_ids"],"properties":{"claim":{"type":"string"},"snippet_ids":{"type":"array","items":{"type":"string"}}}}},"warnings":{"type":"array","items":{"type":"string"}}}}"#;
-
-/// Fresh owner-private directory under `<runtime_root>/agent-runs`, removed on drop.
-struct RunDir(PathBuf);
-impl RunDir {
-    fn create(runtime_root: &Path) -> std::io::Result<Self> {
-        let parent = runtime_root.join("agent-runs");
-        std::fs::DirBuilder::new()
-            .recursive(true)
-            .mode(0o700)
-            .create(&parent)?;
-        let name = crate::lifecycle::random_uuid()
-            .map_err(|_| std::io::Error::other("entropy unavailable"))?;
-        let dir = parent.join(name);
-        std::fs::DirBuilder::new().mode(0o700).create(&dir)?;
-        Ok(Self(dir.canonicalize()?))
-    }
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-impl Drop for RunDir {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
-    }
-}
-/// Startup cleanup: nothing is running yet, so every leftover run directory is stale.
-pub fn sweep_stale_runs(runtime_root: &Path) {
-    let _ = std::fs::remove_dir_all(runtime_root.join("agent-runs"));
-}
+pub use super::host::{GENERATION_SCHEMA, classify, sweep_stale_runs};
 
 pub struct CodexAdapter {
     table: Arc<ProfileTable>,
     assets: PromptAssets,
-    runtime_root: PathBuf,
-    launch_path: OsString,
-    launch_cwd: PathBuf,
-    home: Option<OsString>,
-    lang: Option<OsString>,
-    limits: Limits,
-    probe: Limits,
-    diagnostics: Arc<dyn Diagnostics>,
-    active: AtomicUsize,
-    shutdown: Arc<AtomicBool>,
-    /// One stop flag per in-flight probe or run, so a lease end can stop them without poisoning later ones.
-    flags: Mutex<Vec<Arc<AtomicBool>>>,
-}
-struct StopFlag<'a>(&'a CodexAdapter, Arc<AtomicBool>);
-impl Drop for StopFlag<'_> {
-    fn drop(&mut self) {
-        self.0
-            .flags
-            .lock()
-            .expect("flags poisoned")
-            .retain(|f| !Arc::ptr_eq(f, &self.1));
-    }
-}
-struct Active<'a>(&'a AtomicUsize);
-impl Drop for Active<'_> {
-    fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::SeqCst);
-    }
-}
-
-fn code_tag(c: AgentErrorCode) -> ErrorTag {
-    match c {
-        AgentErrorCode::Busy => ErrorTag::Busy,
-        AgentErrorCode::Unavailable | AgentErrorCode::AssetsUnavailable => ErrorTag::Unavailable,
-        AgentErrorCode::RateLimited | AgentErrorCode::Context | AgentErrorCode::Timeout => {
-            ErrorTag::Limit
-        }
-        AgentErrorCode::InvalidOutput | AgentErrorCode::UnsupportedLanguage => ErrorTag::Invalid,
-        _ => ErrorTag::Internal,
-    }
-}
-
-/// Fixed class patterns recorded with the fixtures. The first group is observed in 0.167.0 captures;
-/// the rate-limit and context patterns are synthetic (taken from the binary's strings), not captured.
-pub fn classify(message: &str) -> AgentErrorCode {
-    let m = message.to_ascii_lowercase();
-    let has = |needles: &[&str]| needles.iter().any(|n| m.contains(n));
-    // Status codes match whole tokens only, so "req_14290" is not a 429.
-    let code = |c: &str| {
-        m.split(|ch: char| !ch.is_ascii_alphanumeric())
-            .any(|t| t == c)
-    };
-    if has(&["usage limit", "rate limit", "too many requests"]) || code("429") {
-        AgentErrorCode::RateLimited
-    } else if has(&["context window", "context length", "maximum context"]) {
-        AgentErrorCode::Context
-    } else if code("401") || has(&["unauthorized", "not logged in", "log in", "sign in"]) {
-        AgentErrorCode::Unavailable
-    } else {
-        AgentErrorCode::Failed
-    }
+    host: Arc<Host>,
 }
 
 #[derive(Default)]
@@ -205,18 +108,6 @@ pub fn summarize(ndjson: &[u8]) -> Summary {
     }
 }
 
-fn read_bounded(path: &Path) -> Result<Vec<u8>, AgentError> {
-    let f = std::fs::File::open(path).map_err(|_| AgentError::from(AgentErrorCode::Failed))?;
-    let mut buf = Vec::new();
-    f.take(MAX_RESULT_BYTES as u64 + 1)
-        .read_to_end(&mut buf)
-        .map_err(|_| AgentError::from(AgentErrorCode::Failed))?;
-    if buf.len() > MAX_RESULT_BYTES {
-        return Err(AgentErrorCode::InvalidOutput.into());
-    }
-    Ok(buf)
-}
-
 impl CodexAdapter {
     pub fn new(
         table: Arc<ProfileTable>,
@@ -244,70 +135,46 @@ impl CodexAdapter {
         limits: Limits,
         probe: Limits,
     ) -> Self {
-        Self {
-            table,
-            assets: PromptAssets::embedded(),
+        let host = Host::new(
             runtime_root,
             launch_path,
             launch_cwd,
-            home: std::env::var_os("HOME"),
-            lang: std::env::var_os("LANG"),
+            diagnostics,
             limits,
             probe,
-            diagnostics,
-            active: AtomicUsize::new(0),
-            shutdown: Arc::new(AtomicBool::new(false)),
-            flags: Mutex::new(Vec::new()),
+        );
+        Self {
+            table,
+            assets: PromptAssets::embedded(),
+            host: Arc::new(host),
         }
     }
-    /// Server shutdown: in-flight runs and probes stop like a cancel (TERM, grace, KILL, reap) and
-    /// new ones are refused. Lease expiry and close reach a run through its job's `Run` cancel.
+    /// The shared process host; the Claude adapter and the server's lease/shutdown hooks use it.
+    pub fn host(&self) -> Arc<Host> {
+        self.host.clone()
+    }
     pub fn shutdown(&self) {
-        self.shutdown.store(true, Ordering::SeqCst);
-        self.cancel_all();
+        self.host.shutdown();
     }
-    /// The client lease ended (expiry or close): stop everything in flight; later runs are unaffected.
     pub fn cancel_all(&self) {
-        for f in self.flags.lock().expect("flags poisoned").iter() {
-            f.store(true, Ordering::SeqCst);
-        }
-    }
-    fn stop_flag(&self) -> StopFlag<'_> {
-        let f = Arc::new(AtomicBool::new(self.shutdown.load(Ordering::SeqCst)));
-        self.flags.lock().expect("flags poisoned").push(f.clone());
-        StopFlag(self, f)
+        self.host.cancel_all();
     }
     pub fn assets(&self) -> &PromptAssets {
         &self.assets
     }
 
     fn env(&self, exe: &Path, codex_home: &Path, tmp: &Path) -> Vec<(OsString, OsString)> {
-        // The launch PATH (absolute entries) lets a symlinked shim such as `#!/usr/bin/env node` find
-        // its interpreter; `exe` is already canonical, so its own directory alone is not enough.
-        let mut dirs: Vec<PathBuf> = exe.parent().map(Path::to_path_buf).into_iter().collect();
-        dirs.extend(std::env::split_paths(&self.launch_path).filter(|d| d.is_absolute()));
-        dirs.extend(["/usr/bin", "/bin", "/usr/sbin", "/sbin"].map(PathBuf::from));
-        let path = std::env::join_paths(dirs).unwrap_or_default();
-        let mut env = vec![
-            ("PATH".into(), path),
-            ("TMPDIR".into(), tmp.as_os_str().to_owned()),
-            ("CODEX_HOME".into(), codex_home.as_os_str().to_owned()),
-        ];
-        env.extend(self.home.clone().map(|h| ("HOME".into(), h)));
-        env.extend(self.lang.clone().map(|l| ("LANG".into(), l)));
-        env
-    }
-
-    fn resolve(&self, e: &Entry) -> Option<PathBuf> {
-        select_executable(
-            e.executable.as_deref(),
-            "codex",
-            &self.launch_path,
-            &self.launch_cwd,
+        self.host.env(
+            exe,
+            tmp,
+            vec![("CODEX_HOME".into(), codex_home.as_os_str().to_owned())],
         )
     }
 
-    /// Runs a status probe and returns its stdout text plus stderr tail for matching.
+    fn resolve(&self, e: &Entry) -> Option<PathBuf> {
+        self.host.resolve(e, "codex")
+    }
+
     fn probe(
         &self,
         exe: &Path,
@@ -316,24 +183,8 @@ impl CodexAdapter {
         args: &[&str],
         cancel: &CancelToken,
     ) -> Option<(Outcome, String)> {
-        let stop = self.stop_flag();
-        let spec = Spec {
-            executable: exe.to_path_buf(),
-            argv: args.iter().map(OsString::from).collect(),
-            env: self.env(exe, home, dir.path()),
-            stdin: Vec::new(),
-            cwd: dir.path().to_path_buf(),
-            limits: self.probe,
-            shutdown: Some(stop.1.clone()),
-        };
-        let mut text = String::new();
-        let o = Supervisor::run(spec, cancel, &mut |r| {
-            text.push_str(&String::from_utf8_lossy(r));
-            text.push('\n');
-        })
-        .ok()?;
-        text.push_str(&String::from_utf8_lossy(&o.stderr_tail));
-        Some((o, text))
+        self.host
+            .probe(exe, self.env(exe, home, dir.path()), dir, args, cancel)
     }
 
     /// `Ok` only for the allowlisted version.
@@ -361,23 +212,29 @@ impl CodexAdapter {
     }
 
     fn check_entry(&self, e: &Entry) -> ProfileStatus {
-        if self.active.load(Ordering::SeqCst) > 0 {
+        if self.host.is_busy() {
             return ProfileStatus::Busy;
         }
         let Some(exe) = self.resolve(e) else {
             return ProfileStatus::Missing;
         };
-        let home = e.home.as_ref().map(|h| self.launch_cwd.join(h));
+        let home = e.home.as_ref().map(|h| self.host.launch_cwd.join(h));
         let Some(home) = home.as_deref().filter(|h| h.is_dir()) else {
             return ProfileStatus::Unavailable;
         };
-        let Ok(dir) = RunDir::create(&self.runtime_root) else {
+        let Ok(dir) = RunDir::create(&self.host.runtime_root) else {
             return ProfileStatus::Failed;
         };
         if let Err(s) = self.version(&exe, home, &dir, &CancelToken::default()) {
             return s;
         }
-        match self.probe(&exe, home, &dir, &["login", "status"], &CancelToken::default()) {
+        match self.probe(
+            &exe,
+            home,
+            &dir,
+            &["login", "status"],
+            &CancelToken::default(),
+        ) {
             Some((o, _)) if o.stop.is_none() && o.escaped == 0 && o.exit == Exit::Success => {
                 ProfileStatus::Ready
             }
@@ -439,10 +296,10 @@ impl CodexAdapter {
         run: &Run,
     ) -> Result<AgentOutput, AgentError> {
         let unavailable = || AgentError::from(AgentErrorCode::Unavailable);
-        if run.token().is_cancelled() || self.shutdown.load(Ordering::SeqCst) {
+        if run.token().is_cancelled() || self.host.is_shutdown() {
             return Err(AgentErrorCode::Cancelled.into());
         }
-        let stop = self.stop_flag();
+        let stop = self.host.stop_flag();
         let handle = request.profile();
         if handle.kind != AgentKind::Codex {
             return Err(unavailable());
@@ -464,13 +321,14 @@ impl CodexAdapter {
         let exe = self.resolve(&entry).ok_or_else(unavailable)?;
         // The child runs in its own cwd, so a relative `profile_home` must be made absolute here.
         let home = self
+            .host
             .launch_cwd
             .join(entry.home.as_deref().ok_or_else(unavailable)?);
         let home = home.as_path();
         if !home.is_dir() {
             return Err(unavailable());
         }
-        let dir = RunDir::create(&self.runtime_root)
+        let dir = RunDir::create(&self.host.runtime_root)
             .map_err(|_| AgentError::from(AgentErrorCode::Failed))?;
         if let Some(e) = run.accept(AgentEvent::Phase(Phase::StartingAgent)) {
             events.event(e);
@@ -510,7 +368,7 @@ impl CodexAdapter {
             executable: exe,
             stdin,
             cwd: dir.path().to_path_buf(),
-            limits: self.limits,
+            limits: self.host.limits,
             shutdown: Some(stop.1.clone()),
         };
 
@@ -575,28 +433,14 @@ impl AgentRunner for CodexAdapter {
         events: &mut dyn EventSink,
         cancel: &CancelToken,
     ) -> Result<AgentOutput, AgentError> {
-        self.active.fetch_add(1, Ordering::SeqCst);
-        let _active = Active(&self.active);
+        let _active = self.host.enter();
         let started = Instant::now();
         let run = Run::from(cancel.clone());
         let result = run.finish(self.execute(&request, events, &run));
         if let Some(e) = run.accept(AgentEvent::Phase(Phase::Finished)) {
             events.event(e);
         }
-        // Content-free: code tag and duration only.
-        let mut rec = Record::new(
-            EventCode::AgentRun,
-            if result.is_ok() {
-                Level::Info
-            } else {
-                Level::Warn
-            },
-        )
-        .count(u32::try_from(started.elapsed().as_millis()).unwrap_or(u32::MAX));
-        if let Err(e) = &result {
-            rec = rec.error(code_tag(e.0));
-        }
-        self.diagnostics.emit(rec);
+        self.host.log_run(&result, started);
         result
     }
 }

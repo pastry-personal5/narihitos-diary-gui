@@ -1,7 +1,8 @@
 #![allow(clippy::zombie_processes)] // the scenarios deliberately orphan children
 
 //! Test double for supervised CLIs. Scenario is argv[1]; codex-shaped invocations (`--version`,
-//! `login status`, `exec ...`) read their scenario from `$CODEX_HOME/scenario`. Never shipped.
+//! `login status`, `exec ...`) read their scenario from `$CODEX_HOME/scenario`; claude-shaped ones
+//! (`--version`, `auth status`, `-p ...`, recognised by `$CLAUDE_CONFIG_DIR`) from `$CLAUDE_CONFIG_DIR/scenario`. Never shipped.
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::time::Duration;
@@ -120,6 +121,7 @@ fn main() {
             out("started");
             sleep(60);
         }
+        _ if std::env::var_os("CLAUDE_CONFIG_DIR").is_some() => claude(&args),
         _ => codex(&args),
     }
 }
@@ -260,6 +262,149 @@ fn codex(args: &[String]) {
             started();
             message(&body(GOOD));
             done();
+        }
+    }
+}
+
+/// Emulates the parts of `claude` the adapter uses. Scenario and recordings live in `$CLAUDE_CONFIG_DIR`.
+fn claude(args: &[String]) {
+    let home = std::path::PathBuf::from(std::env::var("CLAUDE_CONFIG_DIR").unwrap_or_default());
+    let file = |n: &str| {
+        std::fs::read_to_string(home.join(n))
+            .unwrap_or_default()
+            .trim()
+            .to_owned()
+    };
+    let a0 = args.first().map(String::as_str).unwrap_or("");
+    if a0 == "--version" {
+        let v = file("version");
+        out(if v.is_empty() {
+            "2.1.319 (Claude Code)"
+        } else {
+            &v
+        });
+        return;
+    }
+    if a0 == "auth" {
+        match file("login").as_str() {
+            "none" => {
+                out("{\n  \"loggedIn\": false\n}");
+                std::process::exit(1);
+            }
+            "boom" => std::process::exit(2),
+            "garbage" => out("not json"),
+            _ => out("{\n  \"loggedIn\": true,\n  \"authMethod\": \"claude.ai\"\n}"),
+        }
+        return;
+    }
+    if a0 != "-p" {
+        std::process::exit(64);
+    }
+    let mut prompt = String::new();
+    std::io::stdin().read_to_string(&mut prompt).unwrap();
+    let _ = std::fs::write(home.join("argv"), args.join("\n"));
+    let _ = std::fs::write(home.join("stdin"), &prompt);
+    let _ = std::fs::write(
+        home.join("env"),
+        std::env::vars()
+            .map(|(k, _)| k)
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
+    let _ = std::fs::write(
+        home.join("cwd"),
+        std::env::current_dir().unwrap().display().to_string(),
+    );
+    let chat = !args.iter().any(|a| a == "--json-schema");
+    let text = if chat { "A reply." } else { GOOD };
+    let started = || out(r#"{"type":"system","subtype":"init","claude_code_version":"2.1.319"}"#);
+    let assistant = |t: &str| {
+        out(&serde_json::json!({"type":"assistant","message":{"content":[{"type":"text","text":t}]}}).to_string())
+    };
+    let result = |is_error: bool, t: &str, structured: bool, status: Option<i64>| {
+        let mut v = serde_json::json!({"type":"result","subtype":"success","is_error":is_error,
+            "terminal_reason": if is_error {"api_error"} else {"completed"},"result":t,"api_error_status":status});
+        if structured && let Ok(o) = serde_json::from_str::<serde_json::Value>(t) {
+            v["structured_output"] = o;
+        }
+        out(&v.to_string());
+    };
+    let fail = |m: &str, status: Option<i64>| {
+        started();
+        assistant(m);
+        result(true, m, false, status);
+        std::process::exit(1);
+    };
+    match file("scenario").as_str() {
+        "malformed" => {
+            started();
+            result(false, "not json", false, None);
+        }
+        "unstructured" => {
+            started();
+            result(false, GOOD, false, None);
+        }
+        "fenced" => {
+            started();
+            let t = format!("```json\n{GOOD}\n```");
+            result(false, &t, true, None);
+        }
+        "invalid-structured" => {
+            started();
+            // structured_output is an object, but the text is not the closed schema-1 object.
+            out(
+                r#"{"type":"result","subtype":"success","is_error":false,"terminal_reason":"completed","result":"{\"draft_markdown\":\"\"}","structured_output":{"draft_markdown":""}}"#,
+            );
+        }
+        "no-result" => {
+            started();
+            assistant(text);
+        }
+        "split" => {
+            started();
+            let line = serde_json::json!({"type":"result","subtype":"success","is_error":false,"terminal_reason":"completed","result":text,"structured_output": if chat {serde_json::Value::Null} else {serde_json::from_str(GOOD).unwrap()}}).to_string();
+            let (a, b) = line.split_at(line.len() / 2);
+            let mut o = std::io::stdout().lock();
+            let _ = o.write_all(a.as_bytes());
+            let _ = o.flush();
+            std::thread::sleep(Duration::from_millis(150));
+            let _ = writeln!(o, "{b}");
+        }
+        "unknown-events" => {
+            started();
+            out(r#"{"type":"mystery"}"#);
+            assistant(text);
+            result(false, text, !chat, None);
+        }
+        "unauthorized" => fail("Not logged in \u{b7} Please run /login", None),
+        "ratelimit" => fail("You've hit your usage limit", Some(429)),
+        "context" => fail("Prompt is too long: exceeds the context window", None),
+        "otherfail" => fail("something odd", None),
+        "silent-exec" => {
+            started();
+            sleep(60);
+        }
+        "late" => {
+            started();
+            extern "C" fn on_term(_: libc::c_int) {
+                let msg = b"{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"terminal_reason\":\"completed\",\"result\":\"late\"}\n";
+                // SAFETY: write(2) and _exit are async-signal-safe.
+                unsafe { libc::write(1, msg.as_ptr().cast(), msg.len()) };
+                unsafe { libc::_exit(0) };
+            }
+            // SAFETY: handler is async-signal-safe.
+            unsafe { libc::signal(libc::SIGTERM, on_term as *const () as usize) };
+            sleep(60);
+        }
+        _ => {
+            started();
+            if chat {
+                for piece in ["A ", "reply."] {
+                    out(&serde_json::json!({"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":piece}}}).to_string());
+                }
+            }
+            assistant(text);
+            result(false, text, !chat, None);
         }
     }
 }

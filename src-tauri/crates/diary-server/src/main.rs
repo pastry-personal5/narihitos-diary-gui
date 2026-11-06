@@ -223,7 +223,7 @@ async fn run() -> Result<(), &'static str> {
         config.observe_startup(&launch_path, &launch_cwd),
     );
     // Read-only profile status; nothing here starts a run (P1-M21/P1-M22 own that).
-    diary_infrastructure::agent::codex::sweep_stale_runs(&config.paths.runtime_root);
+    diary_infrastructure::agent::host::sweep_stale_runs(&config.paths.runtime_root);
     let profile_table =
         Arc::new(diary_infrastructure::agent::profiles::ProfileTable::from_config(&config));
     let adapter = Arc::new(diary_infrastructure::agent::codex::CodexAdapter::new(
@@ -233,7 +233,12 @@ async fn run() -> Result<(), &'static str> {
         launch_cwd.clone(),
         diagnostics.clone(),
     ));
+    let claude = Arc::new(diary_infrastructure::agent::claude::ClaudeAdapter::new(
+        profile_table.clone(),
+        adapter.host(),
+    ));
     {
+        // One shared host: a single cancel/shutdown covers Codex and Claude runs.
         let adapter = adapter.clone();
         diary_api::ServerState::set_lease_ended(&mut state, Arc::new(move || adapter.cancel_all()));
     }
@@ -242,6 +247,7 @@ async fn run() -> Result<(), &'static str> {
         Arc::new(diary_infrastructure::agent::profiles::ProfileService::new(
             profile_table.clone(),
             adapter.clone(),
+            claude,
         )),
     );
     diary_api::ServerState::set_reloader(
