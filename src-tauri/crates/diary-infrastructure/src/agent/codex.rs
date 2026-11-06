@@ -6,10 +6,10 @@ use super::{
     host::{Host, RunDir, read_bounded},
     output::{validate_generation, validate_reply},
     packet::encode_packet,
-    process::{Exit, Limits, Outcome, Spec, Stop, Supervisor},
+    process::{Exit, Outcome, Spec, Stop, Supervisor},
     profiles::{Entry, ProfileTable},
 };
-use diary_application::{agent::*, diagnostics::Diagnostics};
+use diary_application::agent::*;
 use serde_json::Value;
 use std::{
     ffi::OsString,
@@ -109,55 +109,12 @@ pub fn summarize(ndjson: &[u8]) -> Summary {
 }
 
 impl CodexAdapter {
-    pub fn new(
-        table: Arc<ProfileTable>,
-        runtime_root: PathBuf,
-        launch_path: OsString,
-        launch_cwd: PathBuf,
-        diagnostics: Arc<dyn Diagnostics>,
-    ) -> Self {
-        Self::with_limits(
-            table,
-            runtime_root,
-            launch_path,
-            launch_cwd,
-            diagnostics,
-            Limits::production(),
-            Limits::probe(),
-        )
-    }
-    pub fn with_limits(
-        table: Arc<ProfileTable>,
-        runtime_root: PathBuf,
-        launch_path: OsString,
-        launch_cwd: PathBuf,
-        diagnostics: Arc<dyn Diagnostics>,
-        limits: Limits,
-        probe: Limits,
-    ) -> Self {
-        let host = Host::new(
-            runtime_root,
-            launch_path,
-            launch_cwd,
-            diagnostics,
-            limits,
-            probe,
-        );
+    pub fn new(table: Arc<ProfileTable>, host: Arc<Host>) -> Self {
         Self {
             table,
             assets: PromptAssets::embedded(),
-            host: Arc::new(host),
+            host,
         }
-    }
-    /// The shared process host; the Claude adapter and the server's lease/shutdown hooks use it.
-    pub fn host(&self) -> Arc<Host> {
-        self.host.clone()
-    }
-    pub fn shutdown(&self) {
-        self.host.shutdown();
-    }
-    pub fn cancel_all(&self) {
-        self.host.cancel_all();
     }
     pub fn assets(&self) -> &PromptAssets {
         &self.assets
@@ -421,10 +378,10 @@ impl CodexAdapter {
 }
 
 impl AgentRunner for CodexAdapter {
-    fn check(&self, profile: &ProfileHandle) -> ProfileStatus {
+    fn check(&self, profile: &ProfileHandle) -> ProfileCheck {
         match self.table.get(&profile.alias) {
-            Some(e) if e.kind == AgentKind::Codex => self.check_entry(&e),
-            _ => ProfileStatus::Unavailable,
+            Some(e) if e.kind == AgentKind::Codex => self.check_entry(&e).into(),
+            _ => ProfileStatus::Unavailable.into(),
         }
     }
     fn run(

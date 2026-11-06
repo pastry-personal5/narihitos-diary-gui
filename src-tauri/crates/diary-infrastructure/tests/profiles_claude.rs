@@ -1,11 +1,11 @@
 //! `ProfileService` with a Claude profile: real status through the adapter, capabilities from the
 //! embedded assets, no run started.
 use diary_application::{agent::*, diagnostics::NullDiagnostics};
+mod support;
 use diary_infrastructure::agent::{
-    claude::ClaudeAdapter,
-    codex::CodexAdapter,
+    process::Limits,
     profiles::{Entry, ProfileService, ProfileTable},
-    qwen::QwenAdapter,
+    registry::Agents,
 };
 use std::sync::Arc;
 
@@ -24,16 +24,9 @@ fn service(home: &std::path::Path, login: &str) -> ProfileService {
         home: Some(home.to_path_buf()),
         executable: Some(exe),
     }]));
-    let codex = Arc::new(CodexAdapter::new(
-        table.clone(),
-        home.to_path_buf(),
-        "/usr/bin:/bin".into(),
-        home.to_path_buf(),
-        Arc::new(NullDiagnostics),
-    ));
-    let claude = Arc::new(ClaudeAdapter::new(table.clone(), codex.host()));
-    let qwen = Arc::new(QwenAdapter::new(table.clone(), codex.host()));
-    ProfileService::new(table, codex, claude, qwen)
+    let host = support::host(home, Arc::new(NullDiagnostics), Limits::production());
+    let agents = Arc::new(Agents::standard(table.clone(), host));
+    ProfileService::new(table, agents)
 }
 
 #[test]

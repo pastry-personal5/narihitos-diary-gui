@@ -7,8 +7,9 @@
 //! (`live_chat`) and a cancelled run (`live_cancel`); select with a test-name filter. The profile home
 //! is only passed as `CODEX_HOME`; no login file is read or copied. A rejected model pin is
 //! reported (never replaced) and the test fails so the owner can decide.
-use diary_application::{agent::*, diagnostics::NullDiagnostics};
+use diary_application::agent::*;
 use diary_domain::authentic::DiaryDate;
+mod support;
 use diary_infrastructure::agent::{
     codex::CodexAdapter,
     profiles::{Entry, ProfileTable},
@@ -36,13 +37,7 @@ fn adapter() -> Option<(CodexAdapter, tempfile::TempDir)> {
         home: Some(home),
         executable: None,
     }]));
-    let adapter = CodexAdapter::new(
-        table,
-        root.path().to_path_buf(),
-        std::env::var_os("PATH").unwrap_or_default(),
-        std::env::current_dir().unwrap(),
-        Arc::new(NullDiagnostics),
-    );
+    let adapter = CodexAdapter::new(table, support::live_host(root.path()));
     Some((adapter, root))
 }
 fn handle() -> ProfileHandle {
@@ -88,7 +83,7 @@ fn live_check_and_generation() {
         return;
     };
     assert_eq!(
-        adapter.check(&handle()),
+        adapter.check(&handle()).status,
         ProfileStatus::Ready,
         "profile must be ready"
     );

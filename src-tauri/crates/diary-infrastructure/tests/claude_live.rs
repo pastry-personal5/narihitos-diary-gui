@@ -7,11 +7,11 @@
 //! (`live_chat`) and a cancelled run (`live_cancel`); select with a test-name filter. The profile home
 //! is only passed as `CLAUDE_CONFIG_DIR` (omitted for `$HOME/.claude`, the default login); no login file is read or copied. A rejected model pin is
 //! reported (never replaced) and the test fails so the owner can decide.
-use diary_application::{agent::*, diagnostics::NullDiagnostics};
+use diary_application::agent::*;
 use diary_domain::authentic::DiaryDate;
+mod support;
 use diary_infrastructure::agent::{
     claude::ClaudeAdapter,
-    codex::CodexAdapter,
     profiles::{Entry, ProfileTable},
 };
 use std::{path::PathBuf, sync::Arc, time::Instant};
@@ -37,14 +37,8 @@ fn adapter() -> Option<(ClaudeAdapter, tempfile::TempDir)> {
         home: Some(home),
         executable: None,
     }]));
-    let codex = CodexAdapter::new(
-        table.clone(),
-        root.path().to_path_buf(),
-        std::env::var_os("PATH").unwrap_or_default(),
-        std::env::current_dir().unwrap(),
-        Arc::new(NullDiagnostics),
-    );
-    let adapter = ClaudeAdapter::new(table, codex.host());
+    let host = support::live_host(root.path());
+    let adapter = ClaudeAdapter::new(table, host);
     Some((adapter, root))
 }
 fn handle() -> ProfileHandle {
@@ -90,7 +84,7 @@ fn live_check_and_generation() {
         return;
     };
     assert_eq!(
-        adapter.check(&handle()),
+        adapter.check(&handle()).status,
         ProfileStatus::Ready,
         "profile must be ready"
     );

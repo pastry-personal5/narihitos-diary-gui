@@ -1,11 +1,11 @@
 //! `ProfileService` with a Qwen profile: real status through the adapter, capabilities from the
 //! embedded assets, no run started.
 use diary_application::{agent::*, diagnostics::NullDiagnostics};
+mod support;
 use diary_infrastructure::agent::{
-    claude::ClaudeAdapter,
-    codex::CodexAdapter,
+    process::Limits,
     profiles::{Entry, ProfileService, ProfileTable},
-    qwen::QwenAdapter,
+    registry::Agents,
 };
 use std::sync::Arc;
 
@@ -24,16 +24,9 @@ fn service(home: Option<&std::path::Path>) -> ProfileService {
         home: home.map(std::path::Path::to_path_buf),
         executable: Some(exe),
     }]));
-    let codex = Arc::new(CodexAdapter::new(
-        table.clone(),
-        root.clone(),
-        "/usr/bin:/bin".into(),
-        root,
-        Arc::new(NullDiagnostics),
-    ));
-    let claude = Arc::new(ClaudeAdapter::new(table.clone(), codex.host()));
-    let qwen = Arc::new(QwenAdapter::new(table.clone(), codex.host()));
-    ProfileService::new(table, codex, claude, qwen)
+    let host = support::host(&root, Arc::new(NullDiagnostics), Limits::production());
+    let agents = Arc::new(Agents::standard(table.clone(), host));
+    ProfileService::new(table, agents)
 }
 
 #[test]

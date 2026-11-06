@@ -4,9 +4,10 @@ use diary_application::{
     diagnostics::{Diagnostics, EventCode, Record},
 };
 use diary_domain::authentic::DiaryDate;
+mod support;
 use diary_infrastructure::agent::{
+    host::Host,
     claude::ClaudeAdapter,
-    codex::CodexAdapter,
     host::GENERATION_SCHEMA,
     process::Limits,
     profiles::{Entry, ProfileTable},
@@ -46,7 +47,7 @@ struct Rig {
     root: tempfile::TempDir,
     adapter: ClaudeAdapter,
     /// Owns the shared host; lease end and shutdown go through it.
-    codex: CodexAdapter,
+    host: Arc<Host>,
     logs: Arc<Logs>,
 }
 impl Rig {
@@ -81,22 +82,10 @@ fn rig_with(exe: Option<PathBuf>, make_home: bool) -> Rig {
         executable: Some(exe.unwrap_or_else(fake)),
     }]));
     let logs = Arc::new(Logs::default());
-    let codex = CodexAdapter::with_limits(
-        table.clone(),
-        root.path().join("runtime"),
-        "/usr/bin:/bin".into(),
-        root.path().to_path_buf(),
-        logs.clone(),
-        limits(),
-        Limits {
-            inactivity: Duration::from_secs(5),
-            wall: Duration::from_secs(5),
-            ..limits()
-        },
-    );
-    let adapter = ClaudeAdapter::new(table, codex.host());
+    let host = support::host(root.path(), logs.clone(), limits());
+    let adapter = ClaudeAdapter::new(table, host.clone());
     Rig {
-        codex,
+        host,
         root,
         adapter,
         logs,
@@ -162,31 +151,31 @@ fn code(r: Result<AgentOutput, AgentError>) -> AgentErrorCode {
 #[test]
 fn claude_check_maps_each_status() {
     let r = rig();
-    assert_eq!(r.adapter.check(&handle()), ProfileStatus::Ready);
+    assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Ready);
     r.set("login", "none");
-    assert_eq!(r.adapter.check(&handle()), ProfileStatus::Unauthenticated);
+    assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Unauthenticated);
     for bad in ["boom", "garbage"] {
         r.set("login", bad);
-        assert_eq!(r.adapter.check(&handle()), ProfileStatus::Failed, "{bad}");
+        assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Failed, "{bad}");
     }
     r.set("login", "");
     r.set("version", "garbage");
-    assert_eq!(r.adapter.check(&handle()), ProfileStatus::Failed);
+    assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Failed);
     assert_eq!(
         rig_with(Some("/nonexistent/claude".into()), true)
             .adapter
-            .check(&handle()),
+            .check(&handle()).status,
         ProfileStatus::Missing
     );
     assert_eq!(
-        rig_with(None, false).adapter.check(&handle()),
+        rig_with(None, false).adapter.check(&handle()).status,
         ProfileStatus::Unavailable
     );
     let other = ProfileHandle {
         alias: "nope".into(),
         kind: AgentKind::Claude,
     };
-    assert_eq!(r.adapter.check(&other), ProfileStatus::Unavailable);
+    assert_eq!(r.adapter.check(&other).status, ProfileStatus::Unavailable);
 }
 
 #[test]
@@ -199,13 +188,13 @@ fn claude_unknown_version_is_unsupported() {
     ] {
         r.set("version", v);
         assert_eq!(
-            r.adapter.check(&handle()),
+            r.adapter.check(&handle()).status,
             ProfileStatus::UnsupportedVersion,
             "{v}"
         );
     }
     r.set("version", "2.1.7 (Claude Code)");
-    assert_eq!(r.adapter.check(&handle()), ProfileStatus::Ready);
+    assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Ready);
     r.set("version", "2.2.0 (Claude Code)");
     assert_eq!(code(run(&r, chat_request())), AgentErrorCode::Unavailable);
 }
@@ -519,13 +508,13 @@ fn lease_end_cancels_claude_runs() {
     let result = std::thread::scope(|s| {
         s.spawn(|| {
             std::thread::sleep(Duration::from_millis(500));
-            r.codex.cancel_all();
+            r.host.cancel_all();
         });
         run(&r, chat_request())
     });
     assert_eq!(code(result), AgentErrorCode::Cancelled);
     r.set("scenario", "");
     assert!(run(&r, chat_request()).is_ok());
-    r.codex.shutdown();
+    r.host.shutdown();
     assert_eq!(code(run(&r, chat_request())), AgentErrorCode::Cancelled);
 }

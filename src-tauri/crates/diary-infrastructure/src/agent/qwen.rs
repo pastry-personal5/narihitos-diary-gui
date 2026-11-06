@@ -402,10 +402,10 @@ impl QwenAdapter {
 }
 
 impl AgentRunner for QwenAdapter {
-    fn check(&self, profile: &ProfileHandle) -> ProfileStatus {
+    fn check(&self, profile: &ProfileHandle) -> ProfileCheck {
         match self.table.get(&profile.alias) {
-            Some(e) if e.kind == AgentKind::Qwen => self.check_entry(&e),
-            _ => ProfileStatus::Unavailable,
+            Some(e) if e.kind == AgentKind::Qwen => self.check_entry(&e).into(),
+            _ => ProfileStatus::Unavailable.into(),
         }
     }
     fn run(

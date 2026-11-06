@@ -226,23 +226,20 @@ async fn run() -> Result<(), &'static str> {
     diary_infrastructure::agent::host::sweep_stale_runs(&config.paths.runtime_root);
     let profile_table =
         Arc::new(diary_infrastructure::agent::profiles::ProfileTable::from_config(&config));
-    let adapter = Arc::new(diary_infrastructure::agent::codex::CodexAdapter::new(
-        profile_table.clone(),
+    let host = Arc::new(diary_infrastructure::agent::host::Host::new(
         config.paths.runtime_root.clone(),
         launch_path.clone(),
         launch_cwd.clone(),
         diagnostics.clone(),
+        diary_infrastructure::agent::process::Limits::production(),
+        diary_infrastructure::agent::process::Limits::probe(),
     ));
-    let claude = Arc::new(diary_infrastructure::agent::claude::ClaudeAdapter::new(
+    let adapter = Arc::new(diary_infrastructure::agent::registry::Agents::standard(
         profile_table.clone(),
-        adapter.host(),
-    ));
-    let qwen = Arc::new(diary_infrastructure::agent::qwen::QwenAdapter::new(
-        profile_table.clone(),
-        adapter.host(),
+        host,
     ));
     {
-        // One shared host: a single cancel/shutdown covers Codex, Claude and Qwen runs.
+        // One shared host: a single cancel/shutdown covers every agent's runs.
         let adapter = adapter.clone();
         diary_api::ServerState::set_lease_ended(&mut state, Arc::new(move || adapter.cancel_all()));
     }
@@ -251,8 +248,6 @@ async fn run() -> Result<(), &'static str> {
         Arc::new(diary_infrastructure::agent::profiles::ProfileService::new(
             profile_table.clone(),
             adapter.clone(),
-            claude,
-            qwen,
         )),
     );
     diary_api::ServerState::set_reloader(

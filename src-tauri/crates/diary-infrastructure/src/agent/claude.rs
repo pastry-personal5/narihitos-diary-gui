@@ -394,10 +394,10 @@ impl ClaudeAdapter {
 }
 
 impl AgentRunner for ClaudeAdapter {
-    fn check(&self, profile: &ProfileHandle) -> ProfileStatus {
+    fn check(&self, profile: &ProfileHandle) -> ProfileCheck {
         match self.table.get(&profile.alias) {
-            Some(e) if e.kind == AgentKind::Claude => self.check_entry(&e),
-            _ => ProfileStatus::Unavailable,
+            Some(e) if e.kind == AgentKind::Claude => self.check_entry(&e).into(),
+            _ => ProfileStatus::Unavailable.into(),
         }
     }
     fn run(

@@ -7,10 +7,10 @@
 //! (`live_chat`) and a cancelled run (`live_cancel`); select with a test-name filter. The profile home
 //! is only passed as `QWEN_HOME`; no settings or login file is read or copied. The adapter fails a run whose
 //! `system.init` reports another model, so a silently replaced pin is reported, never accepted.
-use diary_application::{agent::*, diagnostics::NullDiagnostics};
+use diary_application::agent::*;
 use diary_domain::authentic::DiaryDate;
+mod support;
 use diary_infrastructure::agent::{
-    codex::CodexAdapter,
     profiles::{Entry, ProfileTable},
     qwen::QwenAdapter,
 };
@@ -37,14 +37,8 @@ fn adapter() -> Option<(QwenAdapter, tempfile::TempDir)> {
         home: Some(home),
         executable: None,
     }]));
-    let codex = CodexAdapter::new(
-        table.clone(),
-        root.path().to_path_buf(),
-        std::env::var_os("PATH").unwrap_or_default(),
-        std::env::current_dir().unwrap(),
-        Arc::new(NullDiagnostics),
-    );
-    let adapter = QwenAdapter::new(table, codex.host());
+    let host = support::live_host(root.path());
+    let adapter = QwenAdapter::new(table, host);
     Some((adapter, root))
 }
 fn handle() -> ProfileHandle {
@@ -97,7 +91,7 @@ fn live_check_and_generation() {
         return;
     };
     assert_eq!(
-        adapter.check(&handle()),
+        adapter.check(&handle()).status,
         ProfileStatus::Ready,
         "profile must be ready"
     );

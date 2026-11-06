@@ -1,6 +1,6 @@
 //! Profile table (config → port mapping, updated on reload) and the read-only status service behind
 //! `GET /profiles`. Listing never spawns anything; only an explicit check does, and never inference.
-use super::{assets::PromptAssets, claude::ClaudeAdapter, codex::CodexAdapter, qwen::QwenAdapter};
+use super::registry::Agents;
 use crate::config::{Config, Profile};
 use diary_application::agent::{
     Action, AgentKind, AgentRunner, ProfileDirectory, ProfileHandle, ProfileView,
@@ -94,27 +94,18 @@ impl ProfileTable {
 
 pub struct ProfileService {
     table: Arc<ProfileTable>,
-    adapter: Arc<CodexAdapter>,
-    claude: Arc<ClaudeAdapter>,
-    qwen: Arc<QwenAdapter>,
+    agents: Arc<Agents>,
     cache: Mutex<(
         u64,
         HashMap<String, diary_application::agent::ProfileStatus>,
     )>,
 }
 impl ProfileService {
-    pub fn new(
-        table: Arc<ProfileTable>,
-        adapter: Arc<CodexAdapter>,
-        claude: Arc<ClaudeAdapter>,
-        qwen: Arc<QwenAdapter>,
-    ) -> Self {
+    pub fn new(table: Arc<ProfileTable>, agents: Arc<Agents>) -> Self {
         Self {
             cache: Mutex::new((table.generation(), HashMap::new())),
             table,
-            adapter,
-            claude,
-            qwen,
+            agents,
         }
     }
     fn cached(&self, alias: &str) -> Option<diary_application::agent::ProfileStatus> {
@@ -130,11 +121,8 @@ impl ProfileService {
         e: &Entry,
         status: Option<diary_application::agent::ProfileStatus>,
     ) -> ProfileView {
-        let assets: &PromptAssets = self.adapter.assets();
-        let registered = matches!(
-            e.kind,
-            AgentKind::Codex | AgentKind::Claude | AgentKind::Qwen
-        );
+        let assets = self.agents.assets();
+        let registered = self.agents.registered(e.kind);
         ProfileView {
             alias: e.alias.clone(),
             kind: e.kind,
@@ -159,18 +147,12 @@ impl ProfileDirectory for ProfileService {
     fn check(&self, alias: &str) -> Option<ProfileView> {
         let generation = self.table.generation();
         let e = self.table.get(alias)?;
-        let runner: Option<&dyn AgentRunner> = match e.kind {
-            AgentKind::Codex => Some(&*self.adapter),
-            AgentKind::Claude => Some(&*self.claude),
-            AgentKind::Qwen => Some(&*self.qwen),
-            _ => None,
-        };
-        let status = runner.map(|runner| {
+        let status = self.agents.registered(e.kind).then(|| {
             let handle = ProfileHandle {
                 alias: e.alias.clone(),
                 kind: e.kind,
             };
-            let s = runner.check(&handle);
+            let s = self.agents.check(&handle).status;
             let mut c = self.cache.lock().expect("profile cache poisoned");
             // Busy is transient (a run was active); caching it would show a stale "busy" later.
             // A reload during the probe makes the answer stale; the cache itself may lag behind.
