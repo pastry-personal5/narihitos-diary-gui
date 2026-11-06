@@ -67,6 +67,11 @@ pub fn validate_generation(bytes: &[u8], snippet_count: usize) -> Result<Candida
             || c.snippet_ids.is_empty()
             || c.snippet_ids.len() > snippet_count
             || !c.snippet_ids.iter().all(|i| valid_id(i, snippet_count))
+            || c.snippet_ids
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                != c.snippet_ids.len()
         {
             return Err(bad());
         }

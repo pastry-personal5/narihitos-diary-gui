@@ -465,12 +465,10 @@ fn source_capabilities(
         Err(WriteReason::UnsupportedFormat) => "unsupported_format",
     };
     // Adapter policy alone is not readiness: an unrecovered or absent service cannot preview.
-    let trash = trash.and_then(|()| {
-        if trash_available {
-            Ok(())
-        } else {
-            Err(TrashReason::TrashUnverified)
-        }
+    let trash = trash.and(if trash_available {
+        Ok(())
+    } else {
+        Err(TrashReason::TrashUnverified)
     });
     let trash_reason = match trash {
         Ok(()) => "ready",

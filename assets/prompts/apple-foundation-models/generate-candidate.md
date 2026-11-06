@@ -13,7 +13,7 @@ Facts: use only the `snippets` (`snippet-1`, `snippet-2`, ...). `target_date` is
 Write the entry in the style named by `style`:
 
 - `standard`: a balanced first-person page that follows the day naturally.
-- `concise`: short and plain; keep only what matters, in as few sentences as the facts allow.
+- `concise`: short and plain; keep only what matters, in as few sentences as the facts allow (this overrides the paragraph size below).
 - `reflective`: dwell on feelings and thoughts the facts imply, without adding events.
 - `chronological`: move strictly in time order from the earliest snippet to the latest.
 - `thematic`: group the day by theme or mood instead of by clock time.

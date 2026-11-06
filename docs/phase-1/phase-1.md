@@ -119,7 +119,7 @@ Notes: Narihito schema 1 Trash is enabled after native process-fault/receipt/res
 
 ### P1-M16: Agent contracts and prompt assets
 
-Status: Active
+Status: Done
 Goal: Establish the shared agent port, profile capability model, immutable bounded request/output contracts and validated release-packaged prompt assets.
 Plan: [overview](milestone-16-agent-contracts-prompt-assets-overview.md), [work plan](milestone-16-agent-contracts-prompt-assets-architecture.md).
 Notes: Library-only; no adapter, route, command or UI. Claude and Qwen assets wait for P1-M18/P1-M19; Codex model/effort pins pass through unverified until P1-M17.

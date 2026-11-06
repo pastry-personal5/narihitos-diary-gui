@@ -1,6 +1,6 @@
 # P1-M16: Agent contracts and prompt assets work plan
 
-Status: Active
+Status: Done
 
 This plan defines the shared agent port, profile and action capability model, bounded immutable request/result contracts and release-embedded, validated prompt assets, with no live adapter and no exposure beyond the libraries. Scope and checklist are in the [overview](milestone-16-agent-contracts-prompt-assets-overview.md); the contracts are [agent port and profiles](../architecture/editing-and-agents.md#agent-port-and-profiles), [context, output and limits](../architecture/editing-and-agents.md#context-output-and-limits), the [background AI experience](../architecture/ai-job-experience.md#ports-dtos-and-execution-isolation) and the [prompt asset contract](../../assets/prompts/README.md).
 
