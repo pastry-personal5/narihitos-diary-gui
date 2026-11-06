@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Active; P1-M21–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Done; P1-M21 is Planned with an [overview](milestone-21-transient-ai-chat-overview.md) and [work plan](milestone-21-transient-ai-chat-architecture.md) under owner review; P1-M22–P1-M28 remain Planned.
 
 ### P1-M1: Research
 
@@ -154,8 +154,10 @@ Notes: Staged A abstractions (generic engine and registry; Codex, Claude and Qwe
 
 ### P1-M21: Transient AI Chat
 
-Status: Planned
+Status: Planned (plan under review)
 Goal: Implement profile-fixed, memory-only chat using the active editor snapshot, saved writing locale and bounded explicit turn/context handling.
+Plan: [overview](milestone-21-transient-ai-chat-overview.md), [work plan](milestone-21-transient-ai-chat-architecture.md).
+Notes: Also builds the real job layer (single-run busy gate, runner, bounded SSE progress) that P1-M22 reuses; streams provisional text; server keeps the transcript for the lease; one live turn plus cancel per adapter.
 
 ### P1-M22: Candidate generation
 

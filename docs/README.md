@@ -92,3 +92,5 @@ This index lists the design and process docs, one line each. Read only the doc y
 
 | [phase-1/milestone-20-apple-foundation-models-adapter-overview.md](phase-1/milestone-20-apple-foundation-models-adapter-overview.md) | P1-M20 scope, C01–C20 checklist, gate and evidence record |
 | [phase-1/milestone-20-apple-foundation-models-adapter-architecture.md](phase-1/milestone-20-apple-foundation-models-adapter-architecture.md) | P1-M20 work plan: abstraction, diagnostics and Apple adapter findings, decisions, tests |
+| [phase-1/milestone-21-transient-ai-chat-overview.md](phase-1/milestone-21-transient-ai-chat-overview.md) | P1-M21 scope, C01–C17 checklist and gate |
+| [phase-1/milestone-21-transient-ai-chat-architecture.md](phase-1/milestone-21-transient-ai-chat-architecture.md) | P1-M21 work plan: job layer, chat service, UI findings, decisions, tests |

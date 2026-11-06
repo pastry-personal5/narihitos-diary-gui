@@ -8,6 +8,7 @@ pub mod agent;
 pub mod authentic;
 pub mod diagnostics;
 pub mod operations;
+pub mod run;
 pub mod source_trash;
 use std::collections::{BTreeMap, VecDeque};
 
@@ -23,6 +24,8 @@ pub const MAX_EVENT_BYTES: usize = 64 * 1024;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     ClientBusy,
+    /// Another agent run is active for this client.
+    Busy,
     SessionExpired,
     RequestMismatch,
     NotFound,
@@ -98,6 +101,8 @@ struct Session {
     id: String,
     last_heartbeat: u64,
     jobs: BTreeMap<String, Job>,
+    /// The latest agent job; chat and generation share one run slot per client.
+    agent_job: Option<String>,
     requests: BTreeMap<String, Request>,
     published: BTreeMap<String, Event>,
     retained_bytes: usize,
@@ -154,6 +159,7 @@ impl Coordinator {
                     id: proposed_id.into(),
                     last_heartbeat: now,
                     jobs: BTreeMap::new(),
+                    agent_job: None,
                     requests: BTreeMap::new(),
                     published: BTreeMap::new(),
                     retained_bytes: 0,
@@ -196,6 +202,34 @@ impl Coordinator {
         job_id: &str,
         reserved_bytes: usize,
     ) -> Result<Job, Error> {
+        self.admit_inner(id, now, request_id, digest, job_id, reserved_bytes, false)
+    }
+
+    /// Admits an agent run: after the idempotent lookup, a second active agent job is `Busy`
+    /// whatever its request ID, so a retry with a new ID cannot bypass the gate.
+    pub fn admit_agent(
+        &mut self,
+        id: &str,
+        now: u64,
+        request_id: &str,
+        digest: &str,
+        job_id: &str,
+        reserved_bytes: usize,
+    ) -> Result<Job, Error> {
+        self.admit_inner(id, now, request_id, digest, job_id, reserved_bytes, true)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn admit_inner(
+        &mut self,
+        id: &str,
+        now: u64,
+        request_id: &str,
+        digest: &str,
+        job_id: &str,
+        reserved_bytes: usize,
+        agent: bool,
+    ) -> Result<Job, Error> {
         validate_id(request_id)?;
         validate_id(job_id)?;
         if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -217,6 +251,15 @@ impl Coordinator {
         }
         if session.jobs.contains_key(job_id) {
             return Err(Error::InvalidInput);
+        }
+        if agent
+            && session
+                .agent_job
+                .as_ref()
+                .and_then(|j| session.jobs.get(j))
+                .is_some_and(|j| !j.state.is_terminal())
+        {
+            return Err(Error::Busy);
         }
         let metadata_bytes = request_id.len() + digest.len() + job_id.len() + 2048;
         let bytes = reserved_bytes
@@ -251,6 +294,9 @@ impl Coordinator {
             },
         );
         session.jobs.insert(job_id.into(), job.clone());
+        if agent {
+            session.agent_job = Some(job_id.into());
+        }
         Ok(job)
     }
 
@@ -309,6 +355,20 @@ impl Coordinator {
         }
         job.sequence = job.sequence.checked_add(1).ok_or(Error::Limit)?;
         job.state = state;
+        Ok(job.clone())
+    }
+
+    /// Records observable progress (stage or provisional text) so a new event can be published.
+    pub fn touch(&mut self, id: &str, now: u64, job_id: &str) -> Result<Job, Error> {
+        let job = self
+            .authorized(id, now)?
+            .jobs
+            .get_mut(job_id)
+            .ok_or(Error::NotFound)?;
+        if job.state.is_terminal() {
+            return Err(Error::InvalidTransition);
+        }
+        job.sequence = job.sequence.checked_add(1).ok_or(Error::Limit)?;
         Ok(job.clone())
     }
 

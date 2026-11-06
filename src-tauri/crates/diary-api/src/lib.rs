@@ -339,6 +339,7 @@ fn failure(status: StatusCode, code: &'static str) -> Response {
 fn app_error(error: Error) -> Response {
     let (status, code) = match error {
         Error::ClientBusy => (StatusCode::CONFLICT, "client_busy"),
+        Error::Busy => (StatusCode::CONFLICT, "busy"),
         Error::SessionExpired => (StatusCode::UNAUTHORIZED, "session_expired"),
         Error::NotFound => (StatusCode::NOT_FOUND, "not_found"),
         Error::Limit => (StatusCode::TOO_MANY_REQUESTS, "limit"),
