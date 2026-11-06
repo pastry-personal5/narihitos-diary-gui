@@ -355,3 +355,50 @@ fn recent_counts_every_match_but_returns_only_the_last_n() {
     assert_eq!(counts, [597, 598, 599]);
     assert_eq!(report.matched, 600);
 }
+
+#[test]
+fn agent_timeline_shows_refused_failed_and_cancelled_runs_and_recent_lists_warnings() {
+    use diary_application::agent::{AgentErrorCode, AgentKind, Reason};
+    use diary_application::diagnostics::{ActionTag, AgentDetail, PhaseTag, StopTag};
+    let ws = Ws::new();
+    let agent = |code: EventCode, level: Level, f: &dyn Fn(&mut AgentDetail)| {
+        let mut d = AgentDetail::new(AgentKind::Codex);
+        d.action = Some(ActionTag::Chat);
+        f(&mut d);
+        rec(code, level).agent(d).count(12)
+    };
+    let refused = agent(EventCode::AgentBlocked, Level::Warn, &|d| {
+        d.reason = Some(Reason::HostShuttingDown);
+        d.code = Some(AgentErrorCode::Cancelled);
+    });
+    let failed = agent(EventCode::AgentRun, Level::Warn, &|d| {
+        d.phase = Some(PhaseTag::ReceivingOutput);
+        d.code = Some(AgentErrorCode::Timeout);
+        d.stop = Some(StopTag::Inactivity);
+    });
+    let cancelled = agent(EventCode::AgentRun, Level::Info, &|d| {
+        d.code = Some(AgentErrorCode::Cancelled);
+        d.stop = Some(StopTag::Cancelled);
+    });
+    let content = [refused, failed, cancelled]
+        .into_iter()
+        .enumerate()
+        .map(|(i, r)| line(&format!("2026-11-05T09:0{i}:00.000+09:00"), Role::Server, r))
+        .collect::<String>();
+    ws.write("server", "server-2026-11-05.log", &content);
+    let all = collect(&ws.dir(), &Selector::Recent(5), 200);
+    // Recent keeps warn and error only: the refusal and the timeout, not the info-level cancel.
+    let lines = parsed(&all);
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0].record.code, EventCode::AgentBlocked);
+    assert_eq!(
+        lines[0].record.agent.as_ref().unwrap().reason,
+        Some(Reason::HostShuttingDown)
+    );
+    assert_eq!(
+        lines[1].record.agent.as_ref().unwrap().stop,
+        Some(StopTag::Inactivity)
+    );
+    assert!(all.lines[1].contains(r#""agent":{"kind":"codex""#));
+    assert_eq!(all.invalid, 0);
+}
