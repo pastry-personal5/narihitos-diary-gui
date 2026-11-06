@@ -135,7 +135,7 @@ fn each(f: impl Fn(&Rig)) {
 }
 
 #[test]
-fn registry_dispatches_every_cli_kind() {
+fn registry_dispatches_every_kind() {
     each(|r| {
         assert!(r.agents.registered(r.kind));
         assert_eq!(
@@ -314,4 +314,26 @@ fn missing_home_or_executable_is_unavailable() {
         );
         assert_eq!(r.code(r.chat()), AgentErrorCode::Unavailable);
     });
+}
+
+#[test]
+fn every_agent_kind_has_a_protocol() {
+    // Apple joins in stage C; until then it is the one deliberately unregistered kind.
+    let r = Rig::new(AgentKind::Codex);
+    for k in AgentKind::ALL {
+        assert_eq!(
+            r.agents.registered(k),
+            k != AgentKind::AppleFoundationModels,
+            "{k:?}"
+        );
+    }
+}
+
+#[test]
+fn registry_rejects_unregistered_kind() {
+    let r = Rig::new(AgentKind::Codex);
+    let h = r.handle(AgentKind::AppleFoundationModels);
+    assert_eq!(r.agents.check(&h).status, ProfileStatus::Unavailable);
+    let req = AgentRequest::new(h, Locale::parse("en").unwrap(), r.chat().mode().clone());
+    assert_eq!(r.code(req), AgentErrorCode::Unavailable);
 }

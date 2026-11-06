@@ -44,9 +44,6 @@ impl Agents {
     pub fn assets(&self) -> &PromptAssets {
         &self.assets
     }
-    pub fn host(&self) -> &Arc<Host> {
-        &self.host
-    }
     pub fn shutdown(&self) {
         self.host.shutdown();
     }
