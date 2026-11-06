@@ -18,6 +18,7 @@ pub struct Snapshot {
     pub phase: Option<Phase>,
     pub text: String,
     pub revision: u64,
+    pub last_activity_at: Option<u64>,
 }
 pub type Shared = Arc<Mutex<Snapshot>>;
 
@@ -60,6 +61,10 @@ impl EventSink for Pump<'_> {
         let Some(event) = self.run.accept(event) else {
             return;
         };
+        self.shared
+            .lock()
+            .expect("snapshot poisoned")
+            .last_activity_at = Some((self.clock)());
         match event {
             AgentEvent::Phase(p) => {
                 self.flush();

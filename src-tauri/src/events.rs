@@ -21,6 +21,14 @@ pub enum BridgeEvent {
         job_sequence: u64,
         payload: Job,
     },
+    CandidateReady {
+        instance_id: String,
+        session_id: String,
+        event_id: u64,
+        job_id: String,
+        job_sequence: u64,
+        payload: Job,
+    },
     ResyncRequired {
         instance_id: String,
         session_id: String,
@@ -99,7 +107,7 @@ impl Cursor {
                 session_id: session.into(),
             }));
         }
-        if kind != Some("job_changed") {
+        if !matches!(kind, Some("job_changed" | "candidate_ready")) {
             return Err("unknown_event");
         }
         let wire: WireEvent = serde_json::from_str(&data).map_err(|_| "invalid_event")?;
@@ -107,7 +115,7 @@ impl Cursor {
             return Ok(None);
         }
         if id != Some(wire.event_id)
-            || wire.kind != "job_changed"
+            || Some(wire.kind.as_str()) != kind
             || wire.job_id != wire.payload.id
             || wire.job_sequence != wire.payload.sequence
         {
@@ -132,13 +140,24 @@ impl Cursor {
         }
         self.sequences
             .insert(wire.job_id.clone(), wire.job_sequence);
-        Ok(Some(BridgeEvent::JobChanged {
-            instance_id: wire.instance_id,
-            session_id: wire.session_id,
-            event_id: wire.event_id,
-            job_id: wire.job_id,
-            job_sequence: wire.job_sequence,
-            payload: wire.payload,
+        Ok(Some(if wire.kind == "candidate_ready" {
+            BridgeEvent::CandidateReady {
+                instance_id: wire.instance_id,
+                session_id: wire.session_id,
+                event_id: wire.event_id,
+                job_id: wire.job_id,
+                job_sequence: wire.job_sequence,
+                payload: wire.payload,
+            }
+        } else {
+            BridgeEvent::JobChanged {
+                instance_id: wire.instance_id,
+                session_id: wire.session_id,
+                event_id: wire.event_id,
+                job_id: wire.job_id,
+                job_sequence: wire.job_sequence,
+                payload: wire.payload,
+            }
         }))
     }
 }
@@ -179,6 +198,16 @@ mod tests {
         format!(
             "event: job_changed\nid: {event}\ndata: {{\"kind\":\"job_changed\",\"instance_id\":\"{instance}\",\"session_id\":\"{session}\",\"event_id\":{event},\"job_id\":\"job\",\"job_sequence\":{sequence},\"payload\":{{\"id\":\"job\",\"sequence\":{sequence},\"state\":\"running\"}}}}\n\n"
         )
+    }
+    #[test]
+    fn candidate_ready_preserves_envelope_and_deduplicates() {
+        let f = frame("i", "s", 1, 1).replace("job_changed", "candidate_ready");
+        let mut c = Cursor::default();
+        assert!(matches!(
+            c.decode(&f, "i", "s").unwrap(),
+            Some(BridgeEvent::CandidateReady { .. })
+        ));
+        assert!(c.decode(&f, "i", "s").unwrap().is_none());
     }
     #[test]
     fn split_frames_crlf_comments_and_limits() {

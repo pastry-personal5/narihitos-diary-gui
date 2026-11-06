@@ -26,6 +26,7 @@ pub enum Error {
     InvalidInput,
     Context,
     Unavailable,
+    ProfileNotReady,
     DiscardRequired,
     NotFound,
     Busy,
@@ -257,6 +258,7 @@ pub struct Counts {
 
 pub struct Generation {
     pub job_id: String,
+    pub request_id: String,
     pub session: String,
     pub context: Frozen,
     pub run: Run,
@@ -267,6 +269,7 @@ pub struct Generation {
     pub error: Option<AgentErrorCode>,
     pub candidate_index: Option<u8>,
     pub started_at: u64,
+    pub finished_at: Option<u64>,
     reservation: usize,
     output_bytes: usize,
 }
@@ -300,7 +303,7 @@ impl Generation {
         self.context.bytes() + self.output_bytes
     }
     pub fn cancel(&self) -> bool {
-        self.run.request_cancel()
+        self.terminal.is_none() && self.run.request_cancel()
     }
     pub fn cancellation_requested(&self) -> bool {
         self.run.token().is_cancelled()
@@ -322,6 +325,9 @@ pub struct Admission<'a> {
     pub job_id: &'a str,
 }
 impl Store {
+    pub fn is_empty(&self) -> bool {
+        self.jobs.is_empty()
+    }
     pub fn get(&self, session: &str, job_id: &str) -> Option<Shared> {
         self.jobs
             .get(job_id)
@@ -337,6 +343,9 @@ impl Store {
         if let Some(job) = coordinator.lookup_request(a.session, a.now, a.request_id, a.digest)? {
             let existing = self.get(a.session, &job.id).ok_or(Error::NotFound)?;
             return Ok((job, existing));
+        }
+        if coordinator.active_agent(a.session, a.now)?.is_some() {
+            return Err(Error::Coordination(crate::Error::Busy));
         }
         if self.jobs.len() >= MAX_JOBS {
             return Err(Error::DiscardRequired);
@@ -361,6 +370,7 @@ impl Store {
         )?;
         let g = Arc::new(Mutex::new(Generation {
             job_id: job.id.clone(),
+            request_id: a.request_id.into(),
             session: a.session.into(),
             slots: vec![Slot::NotStarted; frozen.count as usize],
             candidates: vec![None; frozen.count as usize],
@@ -371,6 +381,7 @@ impl Store {
             error: None,
             candidate_index: None,
             started_at: a.now,
+            finished_at: None,
             reservation,
             output_bytes: 0,
         }));
@@ -403,7 +414,9 @@ impl Store {
         job_id: &str,
     ) -> Result<(), Error> {
         let g = self.get(session, job_id).ok_or(Error::NotFound)?;
-        if g.lock().expect("generation poisoned").terminal.is_none() {
+        if g.lock().expect("generation poisoned").terminal.is_none()
+            || !coordinator.get(session, now, job_id)?.state.is_terminal()
+        {
             return Err(Error::Busy);
         }
         coordinator.settle_result(session, now, job_id, 0)?;
@@ -513,6 +526,7 @@ pub fn execute(
     }
     {
         let mut g = generation.lock().expect("generation poisoned");
+        g.finished_at = Some(clock());
         g.terminal = Some(if g.cancellation_requested() {
             JobState::Cancelled
         } else if g.counts().ready > 0 {

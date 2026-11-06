@@ -2,7 +2,7 @@
 //! line read back can never carry text that was not an allowlisted code, tag or ID.
 
 use super::clock::LocalStamp;
-use diary_application::agent::{AgentErrorCode, AgentKind, Reason};
+use diary_application::agent::{AgentErrorCode, AgentKind, Reason, Style};
 use diary_application::diagnostics::{
     ActionTag, AgentDetail, Component, ErrorTag, EventCode, ExitTag, Level, OpaqueId, PathClass,
     PhaseTag, Record, ResourceDetail, ResourceKind, Role, StateTag, StatusTag, StopTag, TraceId,
@@ -120,6 +120,7 @@ pub fn render_line(h: &Header, r: &Record) -> Option<String> {
         tag(&mut s, "exit", a.exit.map(ExitTag::as_str));
         tag(&mut s, "reason", a.reason.map(Reason::as_str));
         tag(&mut s, "status", a.status.map(StatusTag::as_str));
+        tag(&mut s, "style", a.style.map(Style::id));
         if let Some(v) = a.changed {
             let _ = write!(s, r#","changed":{v}"#);
         }
@@ -128,6 +129,12 @@ pub fn render_line(h: &Header, r: &Record) -> Option<String> {
             ("ev", a.events),
             ("in", a.input_bytes),
             ("out", a.output_bytes),
+            ("candidate_index", a.candidate_index),
+            ("requested", a.requested),
+            ("ready", a.ready),
+            ("failed", a.failed),
+            ("cancelled", a.cancelled),
+            ("not_started", a.not_started),
         ] {
             if let Some(v) = v {
                 let _ = write!(s, r#","{k}":{v}"#);
@@ -179,6 +186,13 @@ struct WireAgent {
     input: Option<u32>,
     out: Option<u32>,
     xn: Option<i32>,
+    candidate_index: Option<u32>,
+    style: Option<String>,
+    requested: Option<u32>,
+    ready: Option<u32>,
+    failed: Option<u32>,
+    cancelled: Option<u32>,
+    not_started: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -249,6 +263,13 @@ fn convert(w: WireLine) -> Result<ParsedLine, ()> {
             input_bytes: a.input,
             output_bytes: a.out,
             exit_number: a.xn,
+            candidate_index: a.candidate_index,
+            style: opt(&a.style, |s| Style::ALL.into_iter().find(|v| v.id() == s))?,
+            requested: a.requested,
+            ready: a.ready,
+            failed: a.failed,
+            cancelled: a.cancelled,
+            not_started: a.not_started,
         }),
     };
     let record = Record {

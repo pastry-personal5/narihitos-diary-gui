@@ -1,3 +1,4 @@
+import type { GenerationBridge } from "./generation/contracts";
 import type { NavigationBridge } from "./navigation/contracts";
 import type { TrashBridge, TrashResult } from "./trash/contracts";
 import type { StreamEvent } from "./events";
@@ -180,7 +181,8 @@ export class SettingsError extends Error {
 /** Result of the native SF Symbol lookup; `png_base64` is a template image to tint with CSS. */
 export type SymbolResult =
   { status: "ok"; png_base64: string } | { status: "unsupported" };
-export interface Bridge extends NavigationBridge, TrashBridge {
+export interface Bridge
+  extends NavigationBridge, TrashBridge, GenerationBridge {
   metadata(): Promise<AppMetadata>;
   /** Absent in fakes; symbols then fall back to their text labels. */
   getSymbol?(name: string, size: number, scale: number): Promise<SymbolResult>;

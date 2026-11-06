@@ -223,10 +223,7 @@ async fn cancel_wins_over_late_success_and_leaves_transcript_empty() {
     let (_, a) = send(&s, &chat, "r1", "hello").await;
     let job = a["job"]["id"].as_str().unwrap();
     let (st, c) = call(&s, "POST", &format!("/api/v1/jobs/{job}/cancel"), None).await;
-    assert_eq!(
-        (st, c["state"].as_str()),
-        (StatusCode::OK, Some("cancelled"))
-    );
+    assert_eq!((st, c["state"].as_str()), (StatusCode::OK, Some("running")));
     let v = until(&s, &chat, "cancelled").await;
     assert!(v["transcript"].as_array().unwrap().is_empty());
 }

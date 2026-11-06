@@ -20,6 +20,9 @@ import {
   profileDto,
   profileListDto,
   chatDto,
+  generationDto,
+  generationAcceptedDto,
+  candidateDto,
   chatOpenedDto,
   turnAcceptedDto,
   serverSettingsDto,
@@ -130,6 +133,14 @@ export const tauriBridge: Bridge = {
     ),
   getChat: (chatId) => authentic("get_chat", { chatId }, chatDto),
   closeChat: (chatId) => authentic("close_chat", { chatId }, () => undefined),
+  startGeneration: (input) =>
+    authentic("start_generation", { input }, generationAcceptedDto),
+  getGeneration: (jobId) =>
+    authentic("get_generation", { jobId }, generationDto),
+  readCandidate: (candidateId) =>
+    authentic("read_candidate", { candidateId }, candidateDto),
+  discardGeneration: (jobId) =>
+    authentic("discard_generation", { jobId }, () => undefined),
   getUserSettings: () =>
     settings("get_user_settings", undefined, userSettingsDto),
   updateUserSettings: (u) =>
@@ -232,7 +243,8 @@ export const tauriBridge: Bridge = {
               observer({ kind: "disconnected" });
           });
           observer(event);
-          if (event.kind === "job_changed") gaps = 0;
+          if (event.kind === "job_changed" || event.kind === "candidate_ready")
+            gaps = 0;
           if (event.kind === "resync_required" && !recovering) {
             if (++gaps > 3) {
               observer({ kind: "disconnected" });

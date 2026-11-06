@@ -197,6 +197,13 @@ fn agent_record() -> Record {
     a.input_bytes = Some(1234);
     a.output_bytes = Some(56);
     a.exit_number = Some(-1);
+    a.candidate_index = Some(3);
+    a.style = Some(diary_application::agent::Style::Reflective);
+    a.requested = Some(5);
+    a.ready = Some(2);
+    a.failed = Some(1);
+    a.cancelled = Some(1);
+    a.not_started = Some(1);
     Record::new(EventCode::AgentRun, Level::Warn)
         .count(87)
         .agent(a)

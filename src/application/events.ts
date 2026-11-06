@@ -13,7 +13,7 @@ export type StreamEvent =
       complete: boolean;
     }
   | {
-      kind: "job_changed";
+      kind: "job_changed" | "candidate_ready";
       instance_id: string;
       session_id: string;
       event_id: number;
@@ -86,7 +86,7 @@ export function streamEvent(value: unknown): StreamEvent {
     };
   const p = e.payload as Record<string, unknown> | null;
   if (
-    e.kind !== "job_changed" ||
+    (e.kind !== "job_changed" && e.kind !== "candidate_ready") ||
     !Number.isSafeInteger(e.event_id) ||
     (e.event_id as number) < 1 ||
     !Number.isSafeInteger(e.job_sequence) ||
@@ -102,7 +102,7 @@ export function streamEvent(value: unknown): StreamEvent {
   )
     throw new Error("Invalid event");
   return {
-    kind: "job_changed",
+    kind: e.kind as "job_changed" | "candidate_ready",
     instance_id: e.instance_id,
     session_id: e.session_id,
     event_id: e.event_id as number,

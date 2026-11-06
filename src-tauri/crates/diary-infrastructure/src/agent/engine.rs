@@ -499,6 +499,16 @@ impl<P: Protocol> AgentRunner for Adapter<P> {
             Mode::Chat(_) => ActionTag::Chat,
             Mode::Candidate { .. } => ActionTag::Generate,
         });
+        if let Mode::Candidate {
+            index,
+            count,
+            packet,
+        } = request.mode()
+        {
+            d.candidate_index = Some((*index).into());
+            d.requested = Some((*count).into());
+            d.style = Some(packet.style());
+        }
         // The last phase before `Finished`, which every run reaches.
         d.phase = last_phase;
         d.code = result.as_ref().err().map(|e| e.0);

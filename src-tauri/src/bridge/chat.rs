@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 const STATES: [&str; 4] = ["running", "done", "failed", "cancelled"];
-const STAGES: [&str; 8] = [
+pub(super) const STAGES: [&str; 8] = [
     "preparing_context",
     "starting_agent",
     "waiting_for_output",

@@ -2,6 +2,7 @@
 mod authentic;
 mod calendar;
 mod chats;
+mod generations;
 mod imports;
 mod profiles;
 #[cfg(feature = "scaffold-smoke")]
@@ -56,6 +57,7 @@ pub struct ServerState {
     profiles: Option<Arc<dyn diary_application::agent::ProfileDirectory>>,
     agent_runner: Option<Arc<dyn diary_application::agent::AgentRunner + Send + Sync>>,
     chat: Mutex<Option<diary_application::chat::Chat>>,
+    generations: Mutex<diary_application::generation::Store>,
     lease_ended: Option<Arc<dyn Fn() + Send + Sync>>,
     source_slots: Arc<tokio::sync::Semaphore>,
     import_errors: Mutex<(String, std::collections::BTreeMap<String, &'static str>)>,
@@ -95,6 +97,7 @@ impl ServerState {
             profiles: None,
             agent_runner: None,
             chat: Mutex::new(None),
+            generations: Mutex::new(Default::default()),
             lease_ended: None,
             source_slots: Arc::new(tokio::sync::Semaphore::new(2)),
             import_errors: Mutex::new((String::new(), std::collections::BTreeMap::new())),
@@ -173,18 +176,27 @@ impl ServerState {
         if let Some(chat) = self.chat.lock().expect("chat poisoned").take() {
             chat.cancel();
         }
+        self.generations
+            .lock()
+            .expect("generations poisoned")
+            .clear();
         if let Some(hook) = &self.lease_ended {
             hook();
         }
     }
-    /// One sweep step; the hook runs after the coordinator lock is released.
+    /// Serialized with admission: expiry discovered by any coordinator read must also erase
+    /// content, and a new lease cannot start while the old runs receive cancellation.
     fn expire_leases(&self, now: u64) {
-        let expired = self
-            .coordinator
-            .lock()
-            .expect("coordinator poisoned")
-            .expire(now);
-        if expired {
+        let mut c = self.coordinator.lock().expect("coordinator poisoned");
+        let expired = c.expire(now);
+        let orphaned = !c.has_session()
+            && (self.chat.lock().expect("chat poisoned").is_some()
+                || !self
+                    .generations
+                    .lock()
+                    .expect("generations poisoned")
+                    .is_empty());
+        if expired || orphaned {
             self.lease_ended();
         }
     }
@@ -276,6 +288,19 @@ pub fn router(state: Arc<ServerState>) -> Router {
             post(chats::turn).layer(DefaultBodyLimit::max(chats::BODY_LIMIT)),
         )
         .route("/api/v1/chats/{id}", get(chats::get).delete(chats::close))
+        .route(
+            "/api/v1/generations",
+            post(generations::start).layer(DefaultBodyLimit::max(256 * 1024)),
+        )
+        .route(
+            "/api/v1/generations/{id}",
+            get(generations::get).delete(generations::discard),
+        )
+        .route(
+            "/api/v1/jobs/{id}/result",
+            get(generations::result).delete(generations::discard),
+        )
+        .route("/api/v1/candidates/{id}", get(generations::candidate))
         .route("/api/v1/profiles", get(profiles::list))
         .route("/api/v1/profiles/{alias}/check", post(profiles::check))
         .route("/api/v1/calendar", get(calendar::get_calendar))
@@ -491,7 +516,7 @@ async fn authenticate(
 }
 async fn status(State(s): State<Arc<ServerState>>) -> Json<Value> {
     Json(
-        json!({"instance_id":s.instance_id,"workspace_key":s.workspace_key,"server_version":env!("CARGO_PKG_VERSION"),"api_version":1,"api_minor":0,"config_schema_version":1,"storage_ready":s.storage_ready,"capabilities":["status","sessions","jobs","events","chat"],"limits":{"http_bytes":10485760,"event_bytes":65536,"replay_events":2048,"replay_bytes":4194304,"transient_bytes":67108864,"business_jobs":32,"reserved_save_slots":8,"sse_connections":4}}),
+        json!({"instance_id":s.instance_id,"workspace_key":s.workspace_key,"server_version":env!("CARGO_PKG_VERSION"),"api_version":1,"api_minor":0,"config_schema_version":1,"storage_ready":s.storage_ready,"capabilities":["status","sessions","jobs","events","chat","generation"],"limits":{"http_bytes":10485760,"event_bytes":65536,"replay_events":2048,"replay_bytes":4194304,"transient_bytes":67108864,"business_jobs":32,"reserved_save_slots":8,"sse_connections":4,"candidate_jobs":5,"candidate_bytes":8388608}}),
     )
 }
 #[derive(Deserialize)]
@@ -504,6 +529,7 @@ async fn open_session(
     Extension(trace): Extension<TraceId>,
     payload: Result<Json<OpenSession>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
+    s.expire_leases(s.now());
     let input = match payload {
         Ok(Json(input)) => input,
         Err(error) => {
@@ -694,6 +720,14 @@ impl From<Job> for JobDto {
         }
     }
 }
+fn job_value(s: &ServerState, session: &str, job: Job) -> Value {
+    let progress = generations::progress(s, session, &job);
+    let mut value = serde_json::to_value(JobDto::from(job)).expect("fixed DTO");
+    if let Some(Value::Object(p)) = progress {
+        value.as_object_mut().expect("object").extend(p);
+    }
+    value
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct JobQuery {
@@ -717,7 +751,7 @@ async fn list_jobs(
             } else {
                 None
             };
-            Json(json!({"jobs":jobs.into_iter().map(JobDto::from).collect::<Vec<_>>(),"next_cursor":next,"event_cursor":coordinator.event_cursor()})).into_response()
+            Json(json!({"jobs":jobs.into_iter().map(|j| job_value(&s,id,j)).collect::<Vec<_>>(),"next_cursor":next,"event_cursor":coordinator.event_cursor()})).into_response()
         }
         Err(e) => app_error(e),
     }
@@ -744,7 +778,7 @@ async fn get_job(
             } else {
                 None
             };
-            let mut value = serde_json::to_value(JobDto::from(job)).expect("fixed DTO");
+            let mut value = job_value(&s, id, job);
             if let Some(code) = code {
                 value["error_code"] = json!(code);
             }
@@ -767,6 +801,50 @@ async fn cancel_job(
     let was_terminal = c
         .get(id, s.now(), &job)
         .is_ok_and(|j| j.state.is_terminal());
+    let generation = s
+        .generations
+        .lock()
+        .expect("generations poisoned")
+        .get(id, &job);
+    if let Some(g) = generation {
+        let changed = {
+            let g = g.lock().expect("generation poisoned");
+            if !was_terminal && g.cancel() {
+                let mut snap = g.shared.lock().expect("snapshot poisoned");
+                snap.phase = Some(diary_application::agent::Phase::Stopping);
+                snap.text = String::new();
+                snap.revision += 1;
+                true
+            } else {
+                false
+            }
+        };
+        if changed && let Ok(j) = c.touch(id, s.now(), &job) {
+            imports::publish(&s, &mut c, id, &j);
+        }
+        return match c.get(id, s.now(), &job) {
+            Ok(j) => Json(job_value(&s, id, j)).into_response(),
+            Err(e) => app_error(e),
+        };
+    }
+    let chat_job = {
+        let chat = s.chat.lock().expect("chat poisoned");
+        chat.as_ref()
+            .and_then(|c| c.turn())
+            .is_some_and(|t| t.job_id == job)
+    };
+    if chat_job && !was_terminal {
+        if let Some(chat) = s.chat.lock().expect("chat poisoned").as_ref() {
+            chat.cancel_job(&job);
+        }
+        if let Ok(j) = c.touch(id, s.now(), &job) {
+            imports::publish(&s, &mut c, id, &j);
+        }
+        return match c.get(id, s.now(), &job) {
+            Ok(j) => Json(JobDto::from(j)).into_response(),
+            Err(e) => app_error(e),
+        };
+    }
     match c.cancel(id, s.now(), &job) {
         Ok(job) => {
             if let Some(chat) = s.chat.lock().expect("chat poisoned").as_ref() {
@@ -852,10 +930,10 @@ async fn events(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Respon
                     Ok(Replay::Events(events)) => {
                         if let Some(event) = events.first() {
                             after = event.event_id;
-                            let data = json!({"instance_id":event.instance_id,"session_id":event.session_id,"event_id":event.event_id,"job_id":event.job.id,"job_sequence":event.job.sequence,"kind":"job_changed","payload":JobDto::from(event.job.clone())});
+                            let data = json!({"instance_id":event.instance_id,"session_id":event.session_id,"event_id":event.event_id,"job_id":event.job.id,"job_sequence":event.job.sequence,"kind":event.kind.as_str(),"payload":JobDto::from(event.job.clone())});
                             let item = SseEvent::default()
                                 .id(after.to_string())
-                                .event("job_changed")
+                                .event(event.kind.as_str())
                                 .json_data(data)
                                 .expect("fixed DTO");
                             return Some((Ok(item), (s, id, instance, after, false, permit, seen)));

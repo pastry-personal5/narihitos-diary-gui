@@ -266,6 +266,42 @@ async fn close_chat(
     state.close_chat(chat_id).await
 }
 #[tauri::command]
+async fn start_generation(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    input: bridge::GenerationInput,
+) -> Result<bridge::TurnAccepted, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.start_generation(input).await
+}
+#[tauri::command]
+async fn get_generation(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    job_id: String,
+) -> Result<bridge::GenerationView, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.get_generation(job_id).await
+}
+#[tauri::command]
+async fn read_candidate(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    candidate_id: String,
+) -> Result<bridge::CandidateView, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.read_candidate(candidate_id).await
+}
+#[tauri::command]
+async fn discard_generation(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    job_id: String,
+) -> Result<(), bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.discard_generation(job_id).await
+}
+#[tauri::command]
 async fn read_source(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -574,6 +610,10 @@ fn main() {
             send_chat,
             get_chat,
             close_chat,
+            start_generation,
+            get_generation,
+            read_candidate,
+            discard_generation,
             read_source,
             save_source,
             preview_source_delete,

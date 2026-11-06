@@ -58,8 +58,23 @@ pub struct Job {
     pub state: JobState,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventKind {
+    JobChanged,
+    CandidateReady,
+}
+impl EventKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::JobChanged => "job_changed",
+            Self::CandidateReady => "candidate_ready",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Event {
+    pub kind: EventKind,
     pub instance_id: String,
     pub session_id: String,
     pub event_id: u64,
@@ -130,6 +145,10 @@ impl Coordinator {
             session: None,
             event_id: 0,
         }
+    }
+
+    pub fn has_session(&self) -> bool {
+        self.session.is_some()
     }
 
     /// A production clock adapter must provide monotonic time, including wake gaps.
@@ -305,6 +324,15 @@ impl Coordinator {
         Ok(job)
     }
 
+    pub fn active_agent(&mut self, id: &str, now: u64) -> Result<Option<Job>, Error> {
+        let s = self.authorized(id, now)?;
+        Ok(s.agent_job
+            .as_ref()
+            .and_then(|id| s.jobs.get(id))
+            .filter(|j| !j.state.is_terminal())
+            .cloned())
+    }
+
     /// Retry lookup before fresh source/profile/capacity checks. Authorizes before inspecting IDs.
     pub fn lookup_request(
         &mut self,
@@ -437,6 +465,16 @@ impl Coordinator {
         job_id: &str,
         encoded_bytes: usize,
     ) -> Result<Event, Error> {
+        self.publish_kind(id, now, job_id, encoded_bytes, EventKind::JobChanged)
+    }
+    pub fn publish_kind(
+        &mut self,
+        id: &str,
+        now: u64,
+        job_id: &str,
+        encoded_bytes: usize,
+        kind: EventKind,
+    ) -> Result<Event, Error> {
         let job = self.get(id, now, job_id)?;
         if let Some(event) = self.authorized(id, now)?.published.get(job_id)
             && event.job.sequence == job.sequence
@@ -446,6 +484,7 @@ impl Coordinator {
         let next = self.event_id.checked_add(1).ok_or(Error::Limit)?;
         self.event_id = next;
         let event = Event {
+            kind,
             instance_id: self.instance_id.clone(),
             session_id: id.into(),
             event_id: next,

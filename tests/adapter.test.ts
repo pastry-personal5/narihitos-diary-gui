@@ -1,3 +1,4 @@
+import { generationView, candidateView } from "./generation-fixtures";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -361,5 +362,40 @@ describe("settings commands", () => {
       issues: [],
     });
     expect(JSON.stringify(got)).not.toContain("secret");
+  });
+});
+
+describe("generation commands", () => {
+  it("uses fixed commands and typed input/result arguments", async () => {
+    const input = {
+      request_id: "r",
+      date: "2026-11-06",
+      profile: "main",
+      locale: "ko-KR",
+      count: 2,
+      selections: [{ import_id: "import", source_id: "source" }],
+    };
+    mocks.invoke.mockResolvedValueOnce({
+      job: { id: "j", state: "running", sequence: 2 },
+    });
+    await tauriBridge.startGeneration!(input);
+    expect(mocks.invoke).toHaveBeenLastCalledWith("start_generation", {
+      input,
+    });
+    mocks.invoke.mockResolvedValueOnce(generationView());
+    expect(await tauriBridge.getGeneration!("j")).toEqual(generationView());
+    expect(mocks.invoke).toHaveBeenLastCalledWith("get_generation", {
+      jobId: "j",
+    });
+    mocks.invoke.mockResolvedValueOnce(candidateView());
+    expect(await tauriBridge.readCandidate!("j-1")).toEqual(candidateView());
+    expect(mocks.invoke).toHaveBeenLastCalledWith("read_candidate", {
+      candidateId: "j-1",
+    });
+    mocks.invoke.mockResolvedValueOnce({});
+    await tauriBridge.discardGeneration!("j");
+    expect(mocks.invoke).toHaveBeenLastCalledWith("discard_generation", {
+      jobId: "j",
+    });
   });
 });

@@ -1,3 +1,8 @@
+import type {
+  GenerationView,
+  CandidateView,
+  CandidateSlot,
+} from "../application/generation/contracts";
 import { trashResultDto } from "./trash-validation";
 import {
   AuthenticError,
@@ -471,4 +476,176 @@ export function chatDto(value: unknown): ChatSnapshot {
     transcript,
     turn: chatTurnDto(dto.turn),
   };
+}
+
+const SLOT_STATES = ["not_started", "running", "ready", "failed", "cancelled"];
+function generationCode(value: unknown): string | null {
+  if (value === null) return null;
+  const c = text(value, 40);
+  if (!AGENT_ERRORS.includes(c)) throw new Error("Invalid generation response");
+  return c;
+}
+function generationId(value: unknown): string {
+  const id = text(value, 64);
+  if (!/^[a-zA-Z0-9_-]+$/u.test(id))
+    throw new Error("Invalid generation response");
+  return id;
+}
+function generationText(value: unknown, max: number): string {
+  if (typeof value !== "string" || new TextEncoder().encode(value).length > max)
+    throw new Error("Invalid generation response");
+  return value;
+}
+export function generationAcceptedDto(value: unknown): {
+  job: GenerationView["job"];
+} {
+  const v = record(record(value).job);
+  if (
+    !["queued", "running", "succeeded", "failed", "cancelled"].includes(
+      String(v.state),
+    ) ||
+    count(v.sequence) < 1
+  )
+    throw new Error("Invalid generation response");
+  return {
+    job: {
+      id: generationId(v.id),
+      sequence: count(v.sequence),
+      state: v.state as GenerationView["job"]["state"],
+    },
+  };
+}
+export function generationDto(value: unknown): GenerationView {
+  const d = record(value),
+    p = record(d.progress);
+  const job = generationAcceptedDto(d).job;
+  const n = count(d.count);
+  const day = date(d.date),
+    profile = generationId(d.profile),
+    locale = text(d.locale, 35);
+  const slot = (value: unknown): CandidateSlot => {
+    const c = record(value),
+      status = text(c.status, 16);
+    if (!SLOT_STATES.includes(status))
+      throw new Error("Invalid candidate status");
+    return {
+      index: count(c.index),
+      id: c.id === null ? null : generationId(c.id),
+      status: status as CandidateSlot["status"],
+      error_code: generationCode(c.error_code),
+    };
+  };
+  const candidates = list(d.candidates, 5).map(slot);
+  const fields = [
+    "requested_count",
+    "finished_count",
+    "ready_count",
+    "failed_count",
+    "cancelled_count",
+    "not_started_count",
+  ] as const;
+  for (const k of fields)
+    if (count(p[k]) > 5) throw new Error("Invalid generation count");
+  const progress: GenerationView["progress"] = {
+    kind: "generation",
+    job_id: generationId(p.job_id),
+    request_id: generationId(p.request_id),
+    instance_id: generationId(p.instance_id),
+    session_id: generationId(p.session_id),
+    origin_date: date(p.origin_date),
+    profile_id: generationId(p.profile_id),
+    locale: text(p.locale, 35),
+    baseline_revision: maybeRevision(p.baseline_revision),
+    candidate_index:
+      p.candidate_index === null ? null : count(p.candidate_index),
+    requested_count: count(p.requested_count),
+    finished_count: count(p.finished_count),
+    ready_count: count(p.ready_count),
+    failed_count: count(p.failed_count),
+    cancelled_count: count(p.cancelled_count),
+    not_started_count: count(p.not_started_count),
+    phase: p.phase === null ? null : text(p.phase, 32),
+    elapsed_ms: count(p.elapsed_ms),
+    last_agent_activity_at:
+      p.last_agent_activity_at === null
+        ? null
+        : count(p.last_agent_activity_at),
+    cancellation_requested: p.cancellation_requested as boolean,
+    candidate_ids: list(p.candidate_ids, 5).map(generationId),
+    error_code: generationCode(p.error_code),
+  };
+  if (
+    n < 1 ||
+    n > 5 ||
+    candidates.length !== n ||
+    candidates.some(
+      (s, i) =>
+        s.index !== i + 1 ||
+        (s.status === "ready" ? s.id !== `${job.id}-${i + 1}` : s.id !== null),
+    ) ||
+    typeof d.stale_baseline !== "boolean" ||
+    typeof p.cancellation_requested !== "boolean" ||
+    p.kind !== "generation" ||
+    progress.job_id !== job.id ||
+    progress.origin_date !== day ||
+    progress.profile_id !== profile ||
+    progress.locale !== locale ||
+    progress.requested_count !== n ||
+    progress.finished_count !==
+      progress.ready_count + progress.failed_count + progress.cancelled_count ||
+    progress.finished_count + progress.not_started_count > n ||
+    (progress.candidate_index !== null &&
+      (progress.candidate_index < 1 || progress.candidate_index > n)) ||
+    (progress.phase !== null && !CHAT_STAGES.includes(progress.phase)) ||
+    ["ready", "failed", "cancelled", "not_started"].some(
+      (status) =>
+        candidates.filter((s) => s.status === status).length !==
+        p[`${status}_count`],
+    ) ||
+    JSON.stringify(progress.candidate_ids) !==
+      JSON.stringify(candidates.flatMap((s) => (s.id ? [s.id] : [])))
+  )
+    throw new Error("Invalid generation response");
+  return {
+    job,
+    date: day,
+    profile,
+    locale,
+    count: n,
+    stale_baseline: d.stale_baseline,
+    candidates,
+    progress,
+    provisional:
+      d.provisional === null ? null : generationText(d.provisional, MAX_REPLY),
+  };
+}
+export function candidateDto(value: unknown): CandidateView {
+  const d = record(value),
+    id = generationId(d.id),
+    job = generationId(d.job_id),
+    index = count(d.index);
+  if (index < 1 || index > 5 || id !== `${job}-${index}`)
+    throw new Error("Invalid candidate response");
+  const claim_support = list(d.claim_support, 2000).map((value) => {
+    const c = record(value);
+    const ids = list(c.snippet_ids, 2048).map((value) => text(value, 32));
+    if (!ids.length || ids.some((id) => !/^snippet-[1-9][0-9]*$/u.test(id)))
+      throw new Error("Invalid candidate support");
+    return { claim: generationText(c.claim, 2048), snippet_ids: ids };
+  });
+  const candidate = {
+    id,
+    job_id: job,
+    index,
+    date: date(d.date),
+    draft_markdown: generationText(d.draft_markdown, MAX_REPLY),
+    claim_support,
+    warnings: list(d.warnings, 100).map((w) => generationText(w, 2048)),
+  };
+  if (
+    new TextEncoder().encode(JSON.stringify(candidate)).length >
+    8 * 1024 * 1024
+  )
+    throw new Error("Invalid candidate response");
+  return candidate;
 }

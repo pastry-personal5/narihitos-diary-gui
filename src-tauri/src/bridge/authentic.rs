@@ -116,6 +116,9 @@ const SERVER_CODES: &[&str] = &[
     "busy",
     "profile_not_ready",
     "context",
+    "empty_selection",
+    "discard_required",
+    "result_unavailable",
 ];
 const LOCAL_CODES: &[&str] = &[
     "permission_denied",

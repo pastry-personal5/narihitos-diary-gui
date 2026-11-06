@@ -1,6 +1,7 @@
 mod authentic;
 mod calendar;
 mod chat;
+mod generation;
 mod imports;
 mod profiles;
 mod source_trash;
@@ -15,6 +16,7 @@ pub use calendar::{Calendar, CalendarAction};
 pub use chat::{ChatDocument, ChatOpened, ChatView, TurnAccepted};
 use diary_application::diagnostics::{Component, ErrorTag, EventCode, Level, Record, TraceId};
 use diary_logging::private_fs::PrivateDir;
+pub use generation::{CandidateView, GenerationInput, GenerationView};
 pub use imports::{ImportAck, ImportPage, ResolutionAck, SourceBody, SourceSaved, TimeAuthority};
 pub use profiles::{ProfileList, ProfileStatus};
 use reqwest::{Client, Method};
@@ -106,7 +108,18 @@ pub struct Job {
     pub sequence: u64,
     pub state: JobState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error_code: Option<imports::ImportFailure>,
+    #[serde(deserialize_with = "job_error")]
+    pub error_code: Option<String>,
+}
+fn job_error<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    let code = Option::<String>::deserialize(d)?;
+    if let Some(c) = &code
+        && diary_application::agent::AgentErrorCode::parse(c).is_none()
+        && serde_json::from_value::<imports::ImportFailure>(serde_json::json!(c)).is_err()
+    {
+        return Err(serde::de::Error::custom("invalid job error"));
+    }
+    Ok(code)
 }
 #[derive(Serialize, Deserialize)]
 pub struct JobList {

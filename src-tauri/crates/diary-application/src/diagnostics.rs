@@ -1,7 +1,7 @@
 //! Typed diagnostic model. No free-form text can be attached to a `Record`:
 //! every field is an enum, a number or a validated opaque ID.
 
-use crate::agent::{AgentErrorCode, AgentKind, Phase, ProfileStatus, Reason};
+use crate::agent::{AgentErrorCode, AgentKind, Phase, ProfileStatus, Reason, Style};
 
 macro_rules! tag_enum {
     ($(#[$m:meta])* $name:ident { $($var:ident => $s:literal),+ $(,)? }) => {
@@ -173,6 +173,13 @@ pub struct AgentDetail {
     pub input_bytes: Option<u32>,
     pub output_bytes: Option<u32>,
     pub exit_number: Option<i32>,
+    pub candidate_index: Option<u32>,
+    pub style: Option<Style>,
+    pub requested: Option<u32>,
+    pub ready: Option<u32>,
+    pub failed: Option<u32>,
+    pub cancelled: Option<u32>,
+    pub not_started: Option<u32>,
 }
 impl AgentDetail {
     pub fn new(kind: AgentKind) -> Self {
@@ -191,6 +198,13 @@ impl AgentDetail {
             input_bytes: None,
             output_bytes: None,
             exit_number: None,
+            candidate_index: None,
+            style: None,
+            requested: None,
+            ready: None,
+            failed: None,
+            cancelled: None,
+            not_started: None,
         }
     }
 }

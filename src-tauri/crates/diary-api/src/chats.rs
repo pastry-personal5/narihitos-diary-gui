@@ -48,7 +48,7 @@ pub(super) struct Turn {
     document: Option<Doc>,
 }
 
-fn phase(p: Option<Phase>) -> Value {
+pub(super) fn phase(p: Option<Phase>) -> Value {
     json!(p.map(|p| match p {
         Phase::PreparingContext => "preparing_context",
         Phase::StartingAgent => "starting_agent",
