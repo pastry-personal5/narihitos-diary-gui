@@ -2,21 +2,15 @@
 //! turn), fixed-argv one-shot run on stdin, stream-json parsing and error mapping. No diary or chat
 //! text reaches argv, logs or `AgentError`. Output is accepted only through the M16 validators.
 use super::{
-    assets::{AssetError, CHAT, GENERATE, PromptAssets},
+    assets::Prompt,
+    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream},
     host::{GENERATION_SCHEMA, Host, RunDir, classify},
-    output::{validate_generation, validate_reply},
-    packet::encode_packet,
-    process::{Exit, Spec, Stop, Supervisor},
-    profiles::{Entry, ProfileTable},
+    process::{Exit, Outcome},
+    profiles::ProfileTable,
 };
 use diary_application::agent::*;
 use serde_json::Value;
-use std::{
-    ffi::OsString,
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Instant,
-};
+use std::{ffi::OsString, path::Path, sync::Arc};
 
 /// Whether `--version` output is `2.1.<n> (Claude Code)`.
 pub fn supported_version(first_line: &str) -> bool {
@@ -32,7 +26,7 @@ pub fn supported_version(first_line: &str) -> bool {
 }
 
 #[derive(Default)]
-struct Stream {
+struct ClaudeStream {
     /// `(is_error, text, structured output present, api status, completed)` of the terminal event.
     result: Option<Final>,
     delta_started: bool,
@@ -47,7 +41,7 @@ struct Final {
     status: Option<i64>,
     completed: bool,
 }
-impl Stream {
+impl ClaudeStream {
     fn record(&mut self, rec: &[u8], chat: bool, run: &Run, sink: &mut dyn EventSink) {
         if rec.iter().all(u8::is_ascii_whitespace) {
             return;
@@ -126,7 +120,7 @@ pub fn summarize(ndjson: &[u8]) -> Summary {
     impl EventSink for Null {
         fn event(&mut self, _: AgentEvent) {}
     }
-    let mut stream = Stream::default();
+    let mut stream = ClaudeStream::default();
     for rec in ndjson.split(|&b| b == b'\n') {
         stream.record(rec, true, &run, &mut Null);
     }
@@ -140,120 +134,52 @@ pub fn summarize(ndjson: &[u8]) -> Summary {
     }
 }
 
-pub struct ClaudeAdapter {
-    table: Arc<ProfileTable>,
-    assets: PromptAssets,
-    host: Arc<Host>,
-    user: Option<OsString>,
+impl Stream for ClaudeStream {
+    fn record(&mut self, rec: &[u8], chat: bool, run: &Run, sink: &mut dyn EventSink) {
+        ClaudeStream::record(self, rec, chat, run, sink)
+    }
+    fn conclude(&mut self, o: &Outcome, _: &Invocation, _: &Prompt) -> Result<(), AgentError> {
+        if let Some(code) = self.failure() {
+            return Err(code.into());
+        }
+        if o.exit != Exit::Success {
+            let msg = String::from_utf8_lossy(&o.stderr_tail).into_owned();
+            return Err(classify(&msg).into());
+        }
+        let ok = self.result.as_ref().is_some_and(|r| r.completed);
+        if !ok
+            || self.bad
+            || self
+                .result
+                .as_ref()
+                .is_some_and(|r| r.text.len() > MAX_RESULT_BYTES)
+        {
+            return Err(AgentErrorCode::InvalidOutput.into());
+        }
+        Ok(())
+    }
+    fn collect(&mut self, _: &Invocation) -> Result<Collected, AgentError> {
+        let fin = self.result.take().expect("concluded with a result");
+        Ok(Collected {
+            bytes: fin.text.into_bytes(),
+            structured: Some(fin.structured),
+        })
+    }
 }
 
+pub struct Claude {
+    user: Option<OsString>,
+}
+pub type ClaudeAdapter = Adapter<Claude>;
 impl ClaudeAdapter {
     pub fn new(table: Arc<ProfileTable>, host: Arc<Host>) -> Self {
-        Self {
-            table,
-            assets: PromptAssets::embedded(),
-            host,
-            // The macOS keychain lookup of the login needs USER; LOGNAME is deliberately not passed.
-            user: std::env::var_os("USER"),
-        }
+        // The macOS keychain lookup of the login needs USER; LOGNAME is deliberately not passed.
+        let user = std::env::var_os("USER");
+        Adapter::with_protocol(table, host, Claude { user })
     }
-    pub fn assets(&self) -> &PromptAssets {
-        &self.assets
-    }
+}
 
-    /// The owner's default login is keyed to an unset `CLAUDE_CONFIG_DIR`, so the variable is
-    /// omitted when `profile_home` is `$HOME/.claude` and set for any other directory.
-    fn env(&self, exe: &Path, home: &Path, tmp: &Path) -> Vec<(OsString, OsString)> {
-        let default = self.host.home.as_ref().is_some_and(|h| {
-            Path::new(h)
-                .join(".claude")
-                .canonicalize()
-                .is_ok_and(|d| home.canonicalize().is_ok_and(|p| p == d))
-        });
-        let mut extra: Vec<(OsString, OsString)> = vec![("DISABLE_AUTOUPDATER".into(), "1".into())];
-        if !default {
-            extra.push(("CLAUDE_CONFIG_DIR".into(), home.as_os_str().to_owned()));
-        }
-        extra.extend(self.user.clone().map(|u| ("USER".into(), u)));
-        self.host.env(exe, tmp, extra)
-    }
-
-    fn probe(
-        &self,
-        exe: &Path,
-        home: &Path,
-        dir: &RunDir,
-        args: &[&str],
-        cancel: &CancelToken,
-    ) -> Option<(super::process::Outcome, String)> {
-        self.host
-            .probe(exe, self.env(exe, home, dir.path()), dir, args, cancel)
-    }
-
-    fn check_entry(&self, e: &Entry) -> ProfileStatus {
-        if self.host.is_busy() {
-            return ProfileStatus::Busy;
-        }
-        let Some(exe) = self.host.resolve(e, "claude") else {
-            return ProfileStatus::Missing;
-        };
-        let home = e.home.as_ref().map(|h| self.host.launch_cwd.join(h));
-        let Some(home) = home.as_deref().filter(|h| h.is_dir()) else {
-            return ProfileStatus::Unavailable;
-        };
-        let Ok(dir) = RunDir::create(&self.host.runtime_root) else {
-            return ProfileStatus::Failed;
-        };
-        if let Err(s) = self.version(&exe, home, &dir, &CancelToken::default()) {
-            return s;
-        }
-        let Some((o, text)) = self.probe(
-            &exe,
-            home,
-            &dir,
-            &["auth", "status"],
-            &CancelToken::default(),
-        ) else {
-            return ProfileStatus::Failed;
-        };
-        if o.stop.is_some() || o.escaped > 0 {
-            return ProfileStatus::Failed;
-        }
-        // shortcut: first `{` to last `}` of stdout plus stderr tail; upgrade if stderr gains braces.
-        let json = text
-            .find('{')
-            .zip(text.rfind('}'))
-            .and_then(|(a, b)| serde_json::from_str::<Value>(text.get(a..=b)?).ok());
-        match (json.as_ref().and_then(|v| v["loggedIn"].as_bool()), o.exit) {
-            (Some(true), Exit::Success) => ProfileStatus::Ready,
-            (Some(false), Exit::Status(1)) => ProfileStatus::Unauthenticated,
-            _ => ProfileStatus::Failed,
-        }
-    }
-
-    fn version(
-        &self,
-        exe: &Path,
-        home: &Path,
-        dir: &RunDir,
-        cancel: &CancelToken,
-    ) -> Result<(), ProfileStatus> {
-        let (o, text) = self
-            .probe(exe, home, dir, &["--version"], cancel)
-            .ok_or(ProfileStatus::Failed)?;
-        if o.exit != Exit::Success || o.stop.is_some() || o.escaped > 0 {
-            return Err(ProfileStatus::Failed);
-        }
-        let first = text.lines().next().unwrap_or_default();
-        if supported_version(first) {
-            Ok(())
-        } else if first.trim().ends_with("(Claude Code)") {
-            Err(ProfileStatus::UnsupportedVersion)
-        } else {
-            Err(ProfileStatus::Failed)
-        }
-    }
-
+impl Claude {
     /// Fixed argv. Values come from assets and the schema constant only. Chat streams text deltas.
     fn argv(model: &str, effort: &str, chat: bool) -> Vec<OsString> {
         let s = OsString::from;
@@ -283,138 +209,78 @@ impl ClaudeAdapter {
         a.extend([s("--model"), s(model), s("--effort"), s(effort)]);
         a
     }
-
-    fn execute(
-        &self,
-        request: &AgentRequest,
-        events: &mut dyn EventSink,
-        run: &Run,
-    ) -> Result<AgentOutput, AgentError> {
-        let unavailable = || AgentError::from(AgentErrorCode::Unavailable);
-        if run.token().is_cancelled() || self.host.is_shutdown() {
-            return Err(AgentErrorCode::Cancelled.into());
-        }
-        let stop = self.host.stop_flag();
-        let handle = request.profile();
-        if handle.kind != AgentKind::Claude {
-            return Err(unavailable());
-        }
-        let entry = self.table.get(&handle.alias).ok_or_else(unavailable)?;
-        let (chat, name) = match request.mode() {
-            Mode::Chat(_) => (true, CHAT),
-            Mode::Candidate { .. } => (false, GENERATE),
-        };
-        let prompt = self
-            .assets
-            .get(AgentKind::Claude, name)
-            .map_err(|_: AssetError| AgentError::from(AgentErrorCode::AssetsUnavailable))?;
-        let data = encode_packet(request.mode())?;
-        let stdin = prompt.render(request.locale(), Some(&data)).into_bytes();
-        let exe = self
-            .host
-            .resolve(&entry, "claude")
-            .ok_or_else(unavailable)?;
-        let home: PathBuf = self
-            .host
-            .launch_cwd
-            .join(entry.home.as_deref().ok_or_else(unavailable)?);
-        if !home.is_dir() {
-            return Err(unavailable());
-        }
-        let dir = RunDir::create(&self.host.runtime_root)
-            .map_err(|_| AgentError::from(AgentErrorCode::Failed))?;
-        if let Some(e) = run.accept(AgentEvent::Phase(Phase::StartingAgent)) {
-            events.event(e);
-        }
-        self.version(&exe, &home, &dir, &run.token()).map_err(|_| {
-            if run.token().is_cancelled() {
-                AgentErrorCode::Cancelled.into()
-            } else {
-                unavailable()
-            }
-        })?;
-        let spec = Spec {
-            argv: Self::argv(&prompt.model, &prompt.reasoning_effort, chat),
-            env: self.env(&exe, &home, dir.path()),
-            executable: exe,
-            stdin,
-            cwd: dir.path().to_path_buf(),
-            limits: self.host.limits,
-            shutdown: Some(stop.1.clone()),
-        };
-        let mut stream = Stream::default();
-        let outcome = Supervisor::run(spec, &run.token(), &mut |rec| {
-            stream.record(rec, chat, run, events)
-        })
-        .map_err(|_| unavailable())?;
-
-        if let Some(stop) = outcome.stop {
-            return Err(match stop {
-                Stop::Cancelled => AgentErrorCode::Cancelled,
-                Stop::Inactivity | Stop::Wall => AgentErrorCode::Timeout,
-                Stop::RecordTooLarge | Stop::OutputTooLarge => AgentErrorCode::InvalidOutput,
-            }
-            .into());
-        }
-        if outcome.escaped > 0 {
-            return Err(AgentErrorCode::Failed.into());
-        }
-        if let Some(code) = stream.failure() {
-            return Err(code.into());
-        }
-        if outcome.exit != Exit::Success {
-            let msg = String::from_utf8_lossy(&outcome.stderr_tail).into_owned();
-            return Err(classify(&msg).into());
-        }
-        let Some(fin) = stream.result.filter(|r| r.completed) else {
-            return Err(AgentErrorCode::InvalidOutput.into());
-        };
-        if stream.bad || fin.text.len() > MAX_RESULT_BYTES {
-            return Err(AgentErrorCode::InvalidOutput.into());
-        }
-        if let Some(e) = run.accept(AgentEvent::Phase(Phase::ValidatingOutput)) {
-            events.event(e);
-        }
-        match request.mode() {
-            Mode::Candidate { packet, .. } => {
-                if !fin.structured {
-                    return Err(AgentErrorCode::InvalidOutput.into());
-                }
-                validate_generation(fin.text.as_bytes(), packet.snippets().len())
-                    .map(AgentOutput::Candidate)
-            }
-            Mode::Chat(_) => {
-                if fin.text.trim().is_empty() {
-                    return Err(AgentErrorCode::InvalidOutput.into());
-                }
-                validate_reply(fin.text)
-            }
-        }
-    }
 }
 
-impl AgentRunner for ClaudeAdapter {
-    fn check(&self, profile: &ProfileHandle) -> ProfileCheck {
-        match self.table.get(&profile.alias) {
-            Some(e) if e.kind == AgentKind::Claude => self.check_entry(&e).into(),
-            _ => ProfileStatus::Unavailable.into(),
+impl Protocol for Claude {
+    fn kind(&self) -> AgentKind {
+        AgentKind::Claude
+    }
+    fn default_binary(&self) -> &'static str {
+        "claude"
+    }
+    /// The owner's default login is keyed to an unset `CLAUDE_CONFIG_DIR`, so the variable is
+    /// omitted when `profile_home` is `$HOME/.claude` and set for any other directory.
+    fn env(&self, host: &Host, exe: &Path, home: &Path, tmp: &Path) -> Vec<(OsString, OsString)> {
+        let default = host.home.as_ref().is_some_and(|h| {
+            Path::new(h)
+                .join(".claude")
+                .canonicalize()
+                .is_ok_and(|d| home.canonicalize().is_ok_and(|p| p == d))
+        });
+        let mut extra: Vec<(OsString, OsString)> = vec![("DISABLE_AUTOUPDATER".into(), "1".into())];
+        if !default {
+            extra.push(("CLAUDE_CONFIG_DIR".into(), home.as_os_str().to_owned()));
+        }
+        extra.extend(self.user.clone().map(|u| ("USER".into(), u)));
+        host.env(exe, tmp, extra)
+    }
+    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), ProfileStatus> {
+        let (o, text) = ctx
+            .probe(&["--version"], cancel)
+            .ok_or(ProfileStatus::Failed)?;
+        if o.exit != Exit::Success || o.stop.is_some() || o.escaped > 0 {
+            return Err(ProfileStatus::Failed);
+        }
+        let first = text.lines().next().unwrap_or_default();
+        if supported_version(first) {
+            Ok(())
+        } else if first.trim().ends_with("(Claude Code)") {
+            Err(ProfileStatus::UnsupportedVersion)
+        } else {
+            Err(ProfileStatus::Failed)
         }
     }
-    fn run(
-        &self,
-        request: AgentRequest,
-        events: &mut dyn EventSink,
-        cancel: &CancelToken,
-    ) -> Result<AgentOutput, AgentError> {
-        let _active = self.host.enter();
-        let started = Instant::now();
-        let run = Run::from(cancel.clone());
-        let result = run.finish(self.execute(&request, events, &run));
-        if let Some(e) = run.accept(AgentEvent::Phase(Phase::Finished)) {
-            events.event(e);
+    fn auth(&self, ctx: &Ctx) -> ProfileStatus {
+        let Some((o, text)) = ctx.probe(&["auth", "status"], &CancelToken::default()) else {
+            return ProfileStatus::Failed;
+        };
+        if o.stop.is_some() || o.escaped > 0 {
+            return ProfileStatus::Failed;
         }
-        self.host.log_run(&result, started);
-        result
+        // shortcut: first `{` to last `}` of stdout plus stderr tail; upgrade if stderr gains braces.
+        let json = text
+            .find('{')
+            .zip(text.rfind('}'))
+            .and_then(|(a, b)| serde_json::from_str::<Value>(text.get(a..=b)?).ok());
+        match (json.as_ref().and_then(|v| v["loggedIn"].as_bool()), o.exit) {
+            (Some(true), Exit::Success) => ProfileStatus::Ready,
+            (Some(false), Exit::Status(1)) => ProfileStatus::Unauthenticated,
+            _ => ProfileStatus::Failed,
+        }
+    }
+    fn invocation(
+        &self,
+        _: &RunDir,
+        prompt: &Prompt,
+        chat: bool,
+    ) -> Result<Invocation, AgentError> {
+        Ok(Invocation {
+            argv: Self::argv(&prompt.model, &prompt.reasoning_effort, chat),
+            result_file: None,
+        })
+    }
+    fn stream(&self) -> Box<dyn Stream> {
+        Box::new(ClaudeStream::default())
     }
 }
 
@@ -444,7 +310,7 @@ mod tests {
     #[test]
     fn argv_has_no_user_text_and_disables_tools() {
         for chat in [false, true] {
-            let a: Vec<String> = ClaudeAdapter::argv("m", "low", chat)
+            let a: Vec<String> = Claude::argv("m", "low", chat)
                 .iter()
                 .map(|s| s.to_string_lossy().into_owned())
                 .collect();
