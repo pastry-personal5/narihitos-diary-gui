@@ -55,7 +55,7 @@ earlier `extract-memories`, `refine-source` and `review-paragraph` templates are
 extraction, AI source repair or non-deterministic paragraph review.
 
 Evidence limits: only one live Codex generation/chat turn (P1-M17) has run these prompts, with a
-synthetic one-snippet packet; Apple and quality are unproven. Tests pin field names, placeholders
+synthetic one-snippet packet; quality is unproven. P1-M20 ran the Apple templates once each (chat in English and Korean, one synthetic schema-1 generation) through the real helper on macOS 26.7.1; that proves they are accepted and validate, not that the output is good. Tests pin field names, placeholders
 and the embedded table, not output quality. P1-M17 links the loader into
 `diary-server` through profile status; `scripts/smoke/agent.py` checks that the built binary contains the
 embedded Codex prompts. The pins `gpt-5.6-luna`/`medium` were accepted by a live Codex 0.167.0 turn.

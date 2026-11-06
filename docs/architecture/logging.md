@@ -68,6 +68,24 @@ For debugging by a person or an AI coding agent, records can be followed across 
 - `trace` is a 32-character lowercase hex ID per client request, carried in the `X-Diary-Trace-Id` header; the server replaces a missing or invalid value.
 - `res` describes a resource with a kind, an ID that is only a UUID, a `YYYY-MM-DD` date or 16–64 lowercase hex, optional revision, byte and line counts, a state tag and a path class (`entries_root`, `runtime_root`, `source_root`, `outside_root`, `symlink`, `unknown`). It never holds a path string or content.
 - `fp` is the first 8 bytes of SHA-256(per-process random key, kind, 0x00, bytes). The key lives only in memory: fingerprints compare content across events of one process instance, cannot be reversed by a dictionary, and mean nothing after restart.
+
+### Agent records
+
+Agent activity (P1-M20) uses four event codes and one optional `agent` object, written after `n`. Every field is a closed tag or a number; none takes text.
+
+- `agent.check`: a status check (`status`, `reason`, `changed` = the `(status, reason)` pair differs from the previous check of that alias, `n` = milliseconds).
+- `agent.blocked`: a run refused before any process started (the `reason` says why; `code` is the `AgentErrorCode` the caller saw).
+- `agent.run`: a run that started a process, whatever its end (`stop`, `exit`, `xn` exit number, `esc` escaped descendants, `out` bytes, `n` = milliseconds).
+- `agent.helper`: native helper events (extraction, hash check, launch, unmapped native error), used from the Apple adapter on.
+
+```json
+"agent": {"kind": "codex", "action": "chat", "phase": "receiving_output", "code": "timeout",
+          "stop": "inactivity", "exit": "signal", "reason": "record_too_large", "status": "failed",
+          "changed": true, "esc": 0, "ev": 9, "in": 1234, "out": 560, "xn": 15}
+```
+
+Tags: `kind` (`codex`, `claude`, `qwen`, `apple-foundation-models`); `action` (`check`, `chat`, `generate`); `phase` = last phase reached; `code` = one of the 11 `AgentErrorCode` values; `stop` (`cancelled`, `inactivity`, `wall`, `record_too_large`, `output_too_large`); `exit` (`success`, `code`, `signal`); `status` = a `ProfileStatus`; `reason` = the closed `Reason` set (see [editing and agents](editing-and-agents.md)). Levels: successes, cancellations and busy or unauthenticated checks are `info`; refusals and failures `warn`; escaped descendants `error`. Child stderr and native errors are classified into a `code` or `reason` in code and never logged; prompts, replies, diary text, paths, executable names and environment values never reach a record. Old lines without `agent` still parse, and the parser rejects any unknown agent key or value.
+
 - `state` and `err` are enum tags; no field accepts free text.
 
 `diary-server trace --config PATH --select <selector> [--limit N]` prints a bounded timeline merged from the server and client logs. Selectors: `trace:<hex>`, `op:<id>`, `job:<id>`, `res:<kind>:<id>`, `recent:<n>` (the last n ≤ 50 warn/error records, to find a trace ID). It is read-only, never reads the discovery file or takes the workspace lock, parses every line strictly, drops lines that fail validation (including a truncated last line), re-renders output from parsed values rather than copying bytes, sorts by epoch time, and prints at most 200 records (limit up to 500) and 256 KiB, followed by a summary line with distinct resources, invalid-line count and truncation.

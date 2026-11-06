@@ -1,4 +1,4 @@
-"""P1-M17/P1-M18 smoke: the built diary-server contains the embedded prompt assets and reports read-only
+"""P1-M17..P1-M20 smoke: the built diary-server contains the embedded prompt assets and reports read-only
 profile status through the real API with a fake `codex`, `claude` and `qwen`. Nothing here starts a run; synthetic only."""
 import json
 import os
@@ -13,7 +13,7 @@ import urllib.request
 
 root = Path(__file__).resolve().parents[2]
 subprocess.run(['cargo', 'build', '--quiet', '--manifest-path', str(root / 'src-tauri/Cargo.toml'), '-p', 'diary-server'], check=True)
-binary = root / 'src-tauri/target/debug/diary-server'
+binary = Path(os.environ.get('CARGO_TARGET_DIR', root / 'src-tauri/target')) / 'debug/diary-server'
 
 # Embedding proof: Codex and Claude share their body text, so each phrase appears at least twice,
 # and each Claude asset carries its own front matter.
@@ -22,6 +22,11 @@ for phrase in [b'celebrated, award-winning novelist', b'careful writing companio
     assert data.count(phrase) >= 2, f'embedded prompt asset missing from the binary: {phrase!r}'
 assert data.count(b'provider: claude\nmodel: claude-sonnet-4-6') >= 2, 'embedded Claude assets missing'
 assert data.count(b'provider: qwen\nmodel: qwen3.6:35b-a3b') >= 2, 'embedded Qwen assets missing'
+
+# The Apple helper is compiled by build.rs and embedded. Only the compiled Swift program carries its
+# framework load path (the Rust code never names it). On a machine without swiftc or the SDK the
+# embedded file is empty and the profile reports helper_missing.
+helper_built = b'FoundationModels.framework' in data
 
 with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
     base = Path(temporary).resolve()
@@ -46,6 +51,7 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
         f'    - {{alias: main, type: codex, profile_home: {home}, executable: {fake}}}\n'
         f'    - {{alias: other, type: claude, profile_home: {home}, executable: {fake_claude}}}\n'
         f'    - {{alias: third, type: qwen, profile_home: {home}, executable: {fake_qwen}}}\n'
+        f'    - {{alias: mac, type: apple-foundation-models}}\n'
     )
     config.chmod(0o600)
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -95,12 +101,28 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
         assert code == 200 and checked_claude['status'] == 'ready', (code, checked_claude)
         code, checked_qwen = call('/profiles/third/check', 'POST', session)
         assert code == 200 and checked_qwen['status'] == 'ready', (code, checked_qwen)
+        # Apple: availability only (no inference). Ready when Apple Intelligence is on here; otherwise one
+        # closed reason; helper_missing exactly when the helper was not built.
+        assert by['mac']['type'] == 'apple-foundation-models' and by['mac']['status'] == 'unchecked', listing
+        assert by['mac']['capabilities']['chat'] == {'available': True, 'reason': None}, by['mac']
+        code, checked_apple = call('/profiles/mac/check', 'POST', session)
+        assert code == 200, (code, checked_apple)
+        if checked_apple['status'] == 'ready':
+            assert helper_built and checked_apple['reason'] is None, checked_apple
+        else:
+            assert checked_apple['reason'], checked_apple
+            assert (checked_apple['reason'] == 'helper_missing') == (not helper_built), (helper_built, checked_apple)
+        for p in (checked, checked_claude, checked_qwen):
+            assert p['reason'] is None, p
         assert call('/profiles/nope/check', 'POST', session)[0] == 404
         code, settings = call('/settings', session=session)
         assert settings['agents_available'] is False, settings
-        text = json.dumps(listing) + json.dumps(checked) + json.dumps(checked_claude) + json.dumps(checked_qwen)
+        text = json.dumps(listing) + json.dumps(checked_apple) + json.dumps(checked) + json.dumps(checked_claude) + json.dumps(checked_qwen)
         assert str(base) not in text and 'codex-home' not in text, 'a path leaked into the profile response'
         assert not list((runtime).glob('agent-runs/*')), 'a probe left its run directory behind'
+        if helper_built:
+            native = list((runtime).glob('native/apple-fm-*'))
+            assert len(native) == 1 and oct(native[0].stat().st_mode & 0o777) == '0o700', native
     finally:
         process.send_signal(signal.SIGINT)
         process.wait(timeout=10)

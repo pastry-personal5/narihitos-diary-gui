@@ -478,3 +478,63 @@ fn apple_helper_source_never_uses_cloud_or_tools_and_mirrors_the_schema() {
         assert!(claim.contains(&format!("var {f}:")), "{f}");
     }
 }
+
+fn fixture(name: &str) -> Vec<u8> {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/agent/apple-macos26.7.1-sdk27.2")
+        .join(name);
+    std::fs::read(p).unwrap()
+}
+
+#[test]
+fn recorded_macos_26_7_1_streams_parse() {
+    use diary_infrastructure::agent::{apple::summarize, output::validate_generation};
+    let a = parse_availability(&String::from_utf8(fixture("availability-available.json")).unwrap())
+        .unwrap();
+    assert!(a.available);
+    assert_eq!(a.context, Some(4096));
+    assert!(a.languages.iter().any(|l| l == "ko") && a.languages.iter().any(|l| l == "en"));
+
+    let chat = summarize(&fixture("chat-reply.ndjson"));
+    assert!(!chat.malformed && chat.failure.is_none());
+    assert_eq!((chat.deltas, chat.result.is_some()), (1, true));
+
+    let gen_ = summarize(&fixture("generate-candidate.ndjson"));
+    let text = gen_.result.expect("a result line");
+    assert!(validate_generation(text.as_bytes(), 1).is_ok());
+
+    let ctx = summarize(&fixture("error-context.ndjson"));
+    assert_eq!(ctx.failure, Some((AgentErrorCode::Context, None)));
+    let loc = summarize(&fixture("error-locale.ndjson"));
+    assert_eq!(
+        loc.failure,
+        Some((
+            AgentErrorCode::UnsupportedLanguage,
+            Some(Reason::LocaleUnsupported)
+        ))
+    );
+    assert!(ctx.result.is_none() && loc.result.is_none());
+}
+
+#[test]
+fn apple_inactivity_becomes_timeout_and_lease_end_cancels_without_poisoning() {
+    let r = rig();
+    r.set("slow");
+    assert_eq!(code(r.run(chat())), AgentErrorCode::Timeout);
+    assert_eq!(r.leftovers(), 0);
+    let res = std::thread::scope(|s| {
+        s.spawn(|| {
+            std::thread::sleep(Duration::from_millis(500));
+            r.host.cancel_all();
+        });
+        r.run(chat())
+    });
+    assert_eq!(code(res), AgentErrorCode::Cancelled);
+    assert_eq!(r.reasons().last(), Some(&Some(Reason::LeaseEnded)));
+    r.set("");
+    assert!(
+        r.run(chat()).is_ok(),
+        "a later run is not poisoned by the lease end"
+    );
+    assert_eq!(r.leftovers(), 0);
+}

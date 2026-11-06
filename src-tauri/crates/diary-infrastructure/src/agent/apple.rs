@@ -346,3 +346,35 @@ impl Protocol for Apple {
         Box::new(AppleStream::default())
     }
 }
+
+/// What a recorded helper stream says, for fixture replay: the same parser the adapter uses.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Summary {
+    pub result: Option<String>,
+    pub deltas: usize,
+    /// The caller-facing code of a terminal error line, with its log reason.
+    pub failure: Option<(AgentErrorCode, Option<Reason>)>,
+    pub malformed: bool,
+}
+pub fn summarize(ndjson: &[u8]) -> Summary {
+    struct Count(usize);
+    impl EventSink for Count {
+        fn event(&mut self, e: AgentEvent) {
+            if matches!(e, AgentEvent::Delta(_)) {
+                self.0 += 1;
+            }
+        }
+    }
+    let run = Run::new();
+    let mut sink = Count(0);
+    let mut s = AppleStream::default();
+    for rec in ndjson.split(|&b| b == b'\n') {
+        s.record(rec, true, &run, &mut sink);
+    }
+    Summary {
+        result: s.result.clone(),
+        deltas: sink.0,
+        failure: s.error.as_deref().map(map_native),
+        malformed: s.bad,
+    }
+}

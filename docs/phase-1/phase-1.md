@@ -150,7 +150,7 @@ Notes: Allowlists the `0.26.x` family; `ready` after `--version` only (no auth p
 Status: Active
 Goal: Give all four agents one engine, registry and typed diagnostic vocabulary, then integrate the optional on-device system model with explicit detailed availability reasons, fresh native sessions, guided-output validation and verified cancellation.
 Plan: [overview](milestone-20-apple-foundation-models-adapter-overview.md), [work plan](milestone-20-apple-foundation-models-adapter-architecture.md).
-Notes: Staged A abstractions (generic engine and registry; Codex, Claude and Qwen ported with no behavior change), B typed content-free diagnostics for every failure, blocked and locked state, C Apple adapter. Swift helper process; `build.rs` compiles it with `swiftc` and skips softly (`helper_missing`); closed reason set shown in Settings; agent-run live test, no human gate; no run-starting surface.
+Notes: Staged A abstractions (generic engine and registry; Codex, Claude and Qwen ported with no behavior change), B typed content-free diagnostics for every failure, blocked and locked state, C Apple adapter. Swift helper process; `build.rs` compiles it with `swiftc` and skips softly (`helper_missing`); closed reason set shown in Settings; agent-run live test, no human gate; no run-starting surface. Progress 2026-11-06: stages A, B and C are implemented and gated; C08, C09, C10 and C14 remain open (see the [evidence record](milestone-20-apple-foundation-models-adapter-overview.md#evidence-record)).
 
 ### P1-M21: Transient AI Chat
 
