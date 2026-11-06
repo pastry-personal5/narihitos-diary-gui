@@ -63,7 +63,6 @@ pub trait Stream: Send {
 
 pub trait Protocol: Send + Sync + 'static {
     fn kind(&self) -> AgentKind;
-    fn default_binary(&self) -> &'static str;
     fn env(&self, host: &Host, exe: &Path, home: &Path, tmp: &Path) -> Vec<(OsString, OsString)>;
     /// `Ok` only for a supported version; runs before every run and every check.
     fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), ProfileStatus>;
@@ -105,6 +104,14 @@ impl<P: Protocol> Adapter<P> {
         &self.assets
     }
 
+    fn binary(&self) -> &'static str {
+        self.proto
+            .kind()
+            .spec()
+            .default_binary
+            .expect("CLI kinds have a default binary")
+    }
+
     fn ctx<'a>(&'a self, exe: &'a Path, home: &'a Path, dir: &'a RunDir) -> Ctx<'a> {
         Ctx {
             host: &self.host,
@@ -119,7 +126,7 @@ impl<P: Protocol> Adapter<P> {
         if self.host.is_busy() {
             return ProfileStatus::Busy;
         }
-        let Some(exe) = self.host.resolve(e, self.proto.default_binary()) else {
+        let Some(exe) = self.host.resolve(e, self.binary()) else {
             return ProfileStatus::Missing;
         };
         let home = e.home.as_ref().map(|h| self.host.launch_cwd.join(h));
@@ -156,7 +163,13 @@ impl<P: Protocol> Adapter<P> {
         if handle.kind != self.proto.kind() {
             return Err(unavailable());
         }
-        let entry = self.table.get(&handle.alias).ok_or_else(unavailable)?;
+        // Also reject an entry configured for another kind: `check` already does, and a stale or
+        // forged handle must not run one agent's profile with another agent's argv.
+        let entry = self
+            .table
+            .get(&handle.alias)
+            .filter(|e| e.kind == self.proto.kind())
+            .ok_or_else(unavailable)?;
         let (chat, name) = match request.mode() {
             Mode::Chat(_) => (true, CHAT),
             Mode::Candidate { .. } => (false, GENERATE),
@@ -170,7 +183,7 @@ impl<P: Protocol> Adapter<P> {
         let stdin = prompt.render(request.locale(), Some(&data)).into_bytes();
         let exe = self
             .host
-            .resolve(&entry, self.proto.default_binary())
+            .resolve(&entry, self.binary())
             .ok_or_else(unavailable)?;
         // The child runs in its own cwd, so a relative `profile_home` must be made absolute here.
         let home = self

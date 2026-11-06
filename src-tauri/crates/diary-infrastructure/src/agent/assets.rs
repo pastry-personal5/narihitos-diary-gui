@@ -120,9 +120,7 @@ fn parse(kind: AgentKind, name: &str, text: &str) -> Result<Prompt, &'static str
     if provider != kind.asset_dir() {
         return Err("provider does not match directory");
     }
-    if kind == AgentKind::AppleFoundationModels
-        && (model != "default" || reasoning_effort != "not-applicable")
-    {
+    if kind.spec().fixed_pins && (model != "default" || reasoning_effort != "not-applicable") {
         return Err("apple model and effort must be default / not-applicable");
     }
     let body = body.trim_start_matches('\n');
@@ -210,7 +208,7 @@ impl PromptAssets {
             GENERATE
         };
         let mut v = vec![task];
-        if kind == AgentKind::AppleFoundationModels {
+        if kind.spec().session_asset {
             v.push(SESSION);
         }
         v

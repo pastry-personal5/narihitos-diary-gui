@@ -33,15 +33,56 @@ impl AgentKind {
         Self::Qwen,
         Self::AppleFoundationModels,
     ];
-    /// Directory under `assets/prompts` and the config `type` name.
-    pub fn asset_dir(self) -> &'static str {
+    /// Per-kind facts, kept in one place.
+    pub const fn spec(self) -> &'static KindSpec {
         match self {
-            Self::Codex => "codex",
-            Self::Claude => "claude",
-            Self::Qwen => "qwen",
-            Self::AppleFoundationModels => "apple-foundation-models",
+            Self::Codex => &KindSpec {
+                asset_dir: "codex",
+                default_binary: Some("codex"),
+                needs_home: true,
+                session_asset: false,
+                fixed_pins: false,
+            },
+            Self::Claude => &KindSpec {
+                asset_dir: "claude",
+                default_binary: Some("claude"),
+                needs_home: true,
+                session_asset: false,
+                fixed_pins: false,
+            },
+            Self::Qwen => &KindSpec {
+                asset_dir: "qwen",
+                default_binary: Some("qwen"),
+                needs_home: true,
+                session_asset: false,
+                fixed_pins: false,
+            },
+            Self::AppleFoundationModels => &KindSpec {
+                asset_dir: "apple-foundation-models",
+                default_binary: None,
+                needs_home: false,
+                session_asset: true,
+                fixed_pins: true,
+            },
         }
     }
+    /// Directory under `assets/prompts` and the config `type` name.
+    pub fn asset_dir(self) -> &'static str {
+        self.spec().asset_dir
+    }
+}
+
+/// What differs between agent kinds without any behavior: names, requirements, pin policy.
+#[derive(Debug, PartialEq, Eq)]
+pub struct KindSpec {
+    pub asset_dir: &'static str,
+    /// Binary looked up on the launch `PATH` when no `executable` override is set.
+    pub default_binary: Option<&'static str>,
+    pub needs_home: bool,
+    /// Whether a `session-instructions` asset is required next to the task prompts.
+    pub session_asset: bool,
+    /// Apple-style pins: model `default`, effort `not-applicable`.
+    pub fixed_pins: bool,
 }
 
 /// The only profile reference a request carries: no command, path or executable.
@@ -777,6 +818,18 @@ mod tests {
             run.finish(Err(AgentErrorCode::Timeout.into())),
             Err(AgentErrorCode::Timeout.into())
         );
+    }
+
+    #[test]
+    fn kind_spec_covers_every_kind() {
+        for k in AgentKind::ALL {
+            let sp = k.spec();
+            assert_eq!(sp.default_binary.is_some(), sp.needs_home, "{k:?}");
+            assert_eq!(sp.session_asset, sp.fixed_pins, "{k:?}");
+        }
+        let dirs: std::collections::HashSet<_> =
+            AgentKind::ALL.iter().map(|k| k.asset_dir()).collect();
+        assert_eq!(dirs.len(), AgentKind::ALL.len());
     }
 
     #[test]

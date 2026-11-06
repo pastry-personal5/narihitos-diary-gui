@@ -179,9 +179,6 @@ impl Protocol for Codex {
     fn kind(&self) -> AgentKind {
         AgentKind::Codex
     }
-    fn default_binary(&self) -> &'static str {
-        "codex"
-    }
     fn env(&self, host: &Host, exe: &Path, home: &Path, tmp: &Path) -> Vec<(OsString, OsString)> {
         host.env(
             exe,

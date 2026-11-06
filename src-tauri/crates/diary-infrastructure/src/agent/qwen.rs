@@ -252,9 +252,6 @@ impl Protocol for Qwen {
     fn kind(&self) -> AgentKind {
         AgentKind::Qwen
     }
-    fn default_binary(&self) -> &'static str {
-        "qwen"
-    }
     /// `QWEN_HOME` is always set (it also stops the CLI reading `.env` files for an override);
     /// telemetry is forced off because the environment beats settings. No key is ever passed.
     fn env(&self, host: &Host, exe: &Path, home: &Path, tmp: &Path) -> Vec<(OsString, OsString)> {

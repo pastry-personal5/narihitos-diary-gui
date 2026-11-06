@@ -215,9 +215,6 @@ impl Protocol for Claude {
     fn kind(&self) -> AgentKind {
         AgentKind::Claude
     }
-    fn default_binary(&self) -> &'static str {
-        "claude"
-    }
     /// The owner's default login is keyed to an unset `CLAUDE_CONFIG_DIR`, so the variable is
     /// omitted when `profile_home` is `$HOME/.claude` and set for any other directory.
     fn env(&self, host: &Host, exe: &Path, home: &Path, tmp: &Path) -> Vec<(OsString, OsString)> {
