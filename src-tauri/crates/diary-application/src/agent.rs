@@ -784,7 +784,10 @@ mod tests {
         let ids: std::collections::HashSet<_> = Reason::ALL.iter().map(|r| r.as_str()).collect();
         assert_eq!(ids.len(), Reason::ALL.len());
         for id in ids {
-            assert!(id.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'), "{id}");
+            assert!(
+                id.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'),
+                "{id}"
+            );
         }
     }
 

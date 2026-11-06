@@ -6,9 +6,9 @@ use diary_application::{
 use diary_domain::authentic::DiaryDate;
 mod support;
 use diary_infrastructure::agent::{
-    host::Host,
     claude::ClaudeAdapter,
     host::GENERATION_SCHEMA,
+    host::Host,
     process::Limits,
     profiles::{Entry, ProfileTable},
 };
@@ -153,10 +153,17 @@ fn claude_check_maps_each_status() {
     let r = rig();
     assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Ready);
     r.set("login", "none");
-    assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Unauthenticated);
+    assert_eq!(
+        r.adapter.check(&handle()).status,
+        ProfileStatus::Unauthenticated
+    );
     for bad in ["boom", "garbage"] {
         r.set("login", bad);
-        assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Failed, "{bad}");
+        assert_eq!(
+            r.adapter.check(&handle()).status,
+            ProfileStatus::Failed,
+            "{bad}"
+        );
     }
     r.set("login", "");
     r.set("version", "garbage");
@@ -164,7 +171,8 @@ fn claude_check_maps_each_status() {
     assert_eq!(
         rig_with(Some("/nonexistent/claude".into()), true)
             .adapter
-            .check(&handle()).status,
+            .check(&handle())
+            .status,
         ProfileStatus::Missing
     );
     assert_eq!(

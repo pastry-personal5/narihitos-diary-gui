@@ -6,8 +6,8 @@ use diary_application::{
 use diary_domain::authentic::DiaryDate;
 mod support;
 use diary_infrastructure::agent::{
-    host::Host,
     host::GENERATION_SCHEMA,
+    host::Host,
     process::Limits,
     profiles::{Entry, ProfileTable},
     qwen::QwenAdapter,
@@ -154,12 +154,17 @@ fn qwen_check_maps_each_status() {
     assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Ready);
     for bad in ["garbage", "v0.26.4"] {
         r.set("version", bad);
-        assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Failed, "{bad:?}");
+        assert_eq!(
+            r.adapter.check(&handle()).status,
+            ProfileStatus::Failed,
+            "{bad:?}"
+        );
     }
     assert_eq!(
         rig_with(Some("/nonexistent/qwen".into()), true)
             .adapter
-            .check(&handle()).status,
+            .check(&handle())
+            .status,
         ProfileStatus::Missing
     );
     assert_eq!(

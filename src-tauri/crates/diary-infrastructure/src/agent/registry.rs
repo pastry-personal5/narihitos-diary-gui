@@ -54,7 +54,10 @@ impl Agents {
         self.host.cancel_all();
     }
     fn runner(&self, kind: AgentKind) -> Option<&Runner> {
-        self.runners.iter().find(|(k, _)| *k == kind).map(|(_, r)| r)
+        self.runners
+            .iter()
+            .find(|(k, _)| *k == kind)
+            .map(|(_, r)| r)
     }
 }
 

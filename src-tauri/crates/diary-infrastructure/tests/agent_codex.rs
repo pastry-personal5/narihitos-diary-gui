@@ -6,8 +6,8 @@ use diary_application::{
 use diary_domain::authentic::DiaryDate;
 mod support;
 use diary_infrastructure::agent::{
-    host::Host,
     codex::{CodexAdapter, GENERATION_SCHEMA},
+    host::Host,
     process::Limits,
     profiles::{Entry, ProfileTable},
 };
@@ -151,7 +151,10 @@ fn check_maps_each_status() {
     let r = rig();
     assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Ready);
     r.set("login", "none");
-    assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Unauthenticated);
+    assert_eq!(
+        r.adapter.check(&handle()).status,
+        ProfileStatus::Unauthenticated
+    );
     r.set("login", "boom");
     assert_eq!(r.adapter.check(&handle()).status, ProfileStatus::Failed);
     r.set("login", "");
@@ -165,7 +168,8 @@ fn check_maps_each_status() {
     assert_eq!(
         rig_with(Some("/nonexistent/codex".into()), true)
             .adapter
-            .check(&handle()).status,
+            .check(&handle())
+            .status,
         ProfileStatus::Missing
     );
     assert_eq!(
