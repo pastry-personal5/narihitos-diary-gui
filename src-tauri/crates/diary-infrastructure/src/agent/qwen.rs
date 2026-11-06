@@ -5,7 +5,7 @@
 //! when `--model` is unknown, so the `system.init` record must report the asset's model.
 use super::{
     assets::Prompt,
-    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream},
+    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream, probe_fault},
     host::{GENERATION_SCHEMA, Host, RunDir, classify},
     process::{Exit, Outcome},
     profiles::ProfileTable,
@@ -49,6 +49,7 @@ fn qwen_classify(message: &str) -> AgentErrorCode {
 
 #[derive(Default)]
 struct QwenStream {
+    mismatched: bool,
     result: Option<Final>,
     /// `(model, version)` of the `system.init` record.
     init: Option<(String, String)>,
@@ -178,6 +179,7 @@ impl Stream for QwenStream {
     }
     fn conclude(&mut self, o: &Outcome, _: &Invocation, prompt: &Prompt) -> Result<(), AgentError> {
         if self.init_mismatch(&prompt.model) {
+            self.mismatched = true;
             return Err(AgentErrorCode::Unavailable.into());
         }
         if let Some(code) = self.failure() {
@@ -207,6 +209,9 @@ impl Stream for QwenStream {
             bytes: fin.text.into_bytes(),
             structured: Some(fin.structured),
         })
+    }
+    fn hint(&self) -> Option<Reason> {
+        self.mismatched.then_some(Reason::InitMismatch)
     }
 }
 
@@ -264,12 +269,12 @@ impl Protocol for Qwen {
             ],
         )
     }
-    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), ProfileStatus> {
+    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), Reason> {
         let (o, text) = ctx
             .probe(&["--version"], cancel)
-            .ok_or(ProfileStatus::Failed)?;
+            .ok_or(Reason::SpawnFailed)?;
         if o.exit != Exit::Success || o.stop.is_some() || o.escaped > 0 {
-            return Err(ProfileStatus::Failed);
+            return Err(probe_fault(&o));
         }
         let first = text.lines().next().unwrap_or_default().trim();
         let numeric = first.split('.').count() == 3
@@ -279,9 +284,9 @@ impl Protocol for Qwen {
         if supported_version(first) {
             Ok(())
         } else if numeric {
-            Err(ProfileStatus::UnsupportedVersion)
+            Err(Reason::VersionUnsupported)
         } else {
-            Err(ProfileStatus::Failed)
+            Err(Reason::VersionUnreadable)
         }
     }
     fn invocation(

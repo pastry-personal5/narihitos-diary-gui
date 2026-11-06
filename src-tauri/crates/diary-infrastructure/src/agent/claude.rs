@@ -3,7 +3,7 @@
 //! text reaches argv, logs or `AgentError`. Output is accepted only through the M16 validators.
 use super::{
     assets::Prompt,
-    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream},
+    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream, auth_failed, probe_fault},
     host::{GENERATION_SCHEMA, Host, RunDir, classify},
     process::{Exit, Outcome},
     profiles::ProfileTable,
@@ -231,28 +231,28 @@ impl Protocol for Claude {
         extra.extend(self.user.clone().map(|u| ("USER".into(), u)));
         host.env(exe, tmp, extra)
     }
-    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), ProfileStatus> {
+    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), Reason> {
         let (o, text) = ctx
             .probe(&["--version"], cancel)
-            .ok_or(ProfileStatus::Failed)?;
+            .ok_or(Reason::SpawnFailed)?;
         if o.exit != Exit::Success || o.stop.is_some() || o.escaped > 0 {
-            return Err(ProfileStatus::Failed);
+            return Err(probe_fault(&o));
         }
         let first = text.lines().next().unwrap_or_default();
         if supported_version(first) {
             Ok(())
         } else if first.trim().ends_with("(Claude Code)") {
-            Err(ProfileStatus::UnsupportedVersion)
+            Err(Reason::VersionUnsupported)
         } else {
-            Err(ProfileStatus::Failed)
+            Err(Reason::VersionUnreadable)
         }
     }
-    fn auth(&self, ctx: &Ctx) -> ProfileStatus {
+    fn auth(&self, ctx: &Ctx) -> ProfileCheck {
         let Some((o, text)) = ctx.probe(&["auth", "status"], &CancelToken::default()) else {
-            return ProfileStatus::Failed;
+            return auth_failed(None);
         };
         if o.stop.is_some() || o.escaped > 0 {
-            return ProfileStatus::Failed;
+            return auth_failed(Some(&o));
         }
         // shortcut: first `{` to last `}` of stdout plus stderr tail; upgrade if stderr gains braces.
         let json = text
@@ -260,9 +260,9 @@ impl Protocol for Claude {
             .zip(text.rfind('}'))
             .and_then(|(a, b)| serde_json::from_str::<Value>(text.get(a..=b)?).ok());
         match (json.as_ref().and_then(|v| v["loggedIn"].as_bool()), o.exit) {
-            (Some(true), Exit::Success) => ProfileStatus::Ready,
-            (Some(false), Exit::Status(1)) => ProfileStatus::Unauthenticated,
-            _ => ProfileStatus::Failed,
+            (Some(true), Exit::Success) => ProfileStatus::Ready.into(),
+            (Some(false), Exit::Status(1)) => ProfileStatus::Unauthenticated.into(),
+            _ => auth_failed(Some(&o)),
         }
     }
     fn invocation(

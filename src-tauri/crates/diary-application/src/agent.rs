@@ -66,6 +66,9 @@ impl AgentKind {
             },
         }
     }
+    pub fn parse(v: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|k| k.asset_dir() == v)
+    }
     /// Directory under `assets/prompts` and the config `type` name.
     pub fn asset_dir(self) -> &'static str {
         self.spec().asset_dir
@@ -184,6 +187,9 @@ impl Reason {
         Self::ResultMissing,
         Self::InitMismatch,
     ];
+    pub fn parse(v: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|r| r.as_str() == v)
+    }
     pub fn as_str(self) -> &'static str {
         match self {
             Self::ExecutableMissing => "executable_missing",
@@ -286,6 +292,9 @@ impl AgentErrorCode {
         Self::RateLimited,
         Self::Failed,
     ];
+    pub fn parse(v: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|c| c.as_str() == v)
+    }
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Busy => "busy",

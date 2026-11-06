@@ -1,6 +1,8 @@
 //! Typed diagnostic model. No free-form text can be attached to a `Record`:
 //! every field is an enum, a number or a validated opaque ID.
 
+use crate::agent::{AgentErrorCode, AgentKind, Phase, ProfileStatus, Reason};
+
 macro_rules! tag_enum {
     ($(#[$m:meta])* $name:ident { $($var:ident => $s:literal),+ $(,)? }) => {
         $(#[$m])*
@@ -44,6 +46,9 @@ tag_enum!(EventCode {
     AuthRejected => "http.auth_rejected",
     JobFinished => "job.finished",
     AgentRun => "agent.run",
+    AgentCheck => "agent.check",
+    AgentBlocked => "agent.blocked",
+    AgentHelper => "agent.helper",
     LogDropped => "log.dropped",
     UiBridgeError => "ui.bridge_error",
     UiRenderError => "ui.render_error",
@@ -90,6 +95,105 @@ tag_enum!(Component {
     Layout => "layout",
     Settings => "settings",
 });
+
+tag_enum!(ActionTag { Check => "check", Chat => "chat", Generate => "generate" });
+tag_enum!(PhaseTag {
+    PreparingContext => "preparing_context",
+    StartingAgent => "starting_agent",
+    WaitingForOutput => "waiting_for_output",
+    ReceivingOutput => "receiving_output",
+    ValidatingOutput => "validating_output",
+    BetweenCandidates => "between_candidates",
+    Stopping => "stopping",
+    Finished => "finished",
+});
+tag_enum!(StopTag {
+    Cancelled => "cancelled",
+    Inactivity => "inactivity",
+    Wall => "wall",
+    RecordTooLarge => "record_too_large",
+    OutputTooLarge => "output_too_large",
+});
+tag_enum!(ExitTag { Success => "success", Code => "code", Signal => "signal" });
+tag_enum!(StatusTag {
+    Missing => "missing",
+    UnsupportedVersion => "unsupported_version",
+    Unavailable => "unavailable",
+    AvailableAuthUnknown => "available_auth_unknown",
+    Unauthenticated => "unauthenticated",
+    Ready => "ready",
+    Busy => "busy",
+    Failed => "failed",
+});
+impl From<Phase> for PhaseTag {
+    fn from(p: Phase) -> Self {
+        match p {
+            Phase::PreparingContext => Self::PreparingContext,
+            Phase::StartingAgent => Self::StartingAgent,
+            Phase::WaitingForOutput => Self::WaitingForOutput,
+            Phase::ReceivingOutput => Self::ReceivingOutput,
+            Phase::ValidatingOutput => Self::ValidatingOutput,
+            Phase::BetweenCandidates => Self::BetweenCandidates,
+            Phase::Stopping => Self::Stopping,
+            Phase::Finished => Self::Finished,
+        }
+    }
+}
+impl From<ProfileStatus> for StatusTag {
+    fn from(s: ProfileStatus) -> Self {
+        match s {
+            ProfileStatus::Missing => Self::Missing,
+            ProfileStatus::UnsupportedVersion => Self::UnsupportedVersion,
+            ProfileStatus::Unavailable => Self::Unavailable,
+            ProfileStatus::AvailableAuthUnknown => Self::AvailableAuthUnknown,
+            ProfileStatus::Unauthenticated => Self::Unauthenticated,
+            ProfileStatus::Ready => Self::Ready,
+            ProfileStatus::Busy => Self::Busy,
+            ProfileStatus::Failed => Self::Failed,
+        }
+    }
+}
+
+/// Agent diagnostics: every field is a closed tag or a number, never text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentDetail {
+    pub kind: AgentKind,
+    pub action: Option<ActionTag>,
+    /// Last phase reached.
+    pub phase: Option<PhaseTag>,
+    pub code: Option<AgentErrorCode>,
+    pub stop: Option<StopTag>,
+    pub exit: Option<ExitTag>,
+    pub reason: Option<Reason>,
+    pub status: Option<StatusTag>,
+    /// For checks: whether the reason differs from the previous check of that profile.
+    pub changed: Option<bool>,
+    pub escaped: Option<u32>,
+    pub events: Option<u32>,
+    pub input_bytes: Option<u32>,
+    pub output_bytes: Option<u32>,
+    pub exit_number: Option<i32>,
+}
+impl AgentDetail {
+    pub fn new(kind: AgentKind) -> Self {
+        Self {
+            kind,
+            action: None,
+            phase: None,
+            code: None,
+            stop: None,
+            exit: None,
+            reason: None,
+            status: None,
+            changed: None,
+            escaped: None,
+            events: None,
+            input_bytes: None,
+            output_bytes: None,
+            exit_number: None,
+        }
+    }
+}
 
 impl EventCode {
     /// Only UI codes may be reported by the WebView.
@@ -188,6 +292,7 @@ pub struct Record {
     pub resource: Option<ResourceDetail>,
     pub error: Option<ErrorTag>,
     pub count: Option<u32>,
+    pub agent: Option<AgentDetail>,
 }
 
 impl Record {
@@ -203,6 +308,7 @@ impl Record {
             resource: None,
             error: None,
             count: None,
+            agent: None,
         }
     }
     pub fn trace(mut self, v: TraceId) -> Self {
@@ -235,6 +341,10 @@ impl Record {
     }
     pub fn count(mut self, v: u32) -> Self {
         self.count = Some(v);
+        self
+    }
+    pub fn agent(mut self, v: AgentDetail) -> Self {
+        self.agent = Some(v);
         self
     }
 }

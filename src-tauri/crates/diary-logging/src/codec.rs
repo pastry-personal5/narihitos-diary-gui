@@ -2,9 +2,10 @@
 //! line read back can never carry text that was not an allowlisted code, tag or ID.
 
 use super::clock::LocalStamp;
+use diary_application::agent::{AgentErrorCode, AgentKind, Reason};
 use diary_application::diagnostics::{
-    Component, ErrorTag, EventCode, Level, OpaqueId, PathClass, Record, ResourceDetail,
-    ResourceKind, Role, StateTag, TraceId,
+    ActionTag, AgentDetail, Component, ErrorTag, EventCode, ExitTag, Level, OpaqueId, PathClass,
+    PhaseTag, Record, ResourceDetail, ResourceKind, Role, StateTag, StatusTag, StopTag, TraceId,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -105,6 +106,38 @@ pub fn render_line(h: &Header, r: &Record) -> Option<String> {
     if let Some(v) = r.count {
         let _ = write!(s, r#","n":{v}"#);
     }
+    if let Some(a) = &r.agent {
+        let _ = write!(s, r#","agent":{{"kind":"{}""#, a.kind.asset_dir());
+        let tag = |s: &mut String, k: &str, v: Option<&str>| {
+            if let Some(v) = v {
+                let _ = write!(s, r#","{k}":"{v}""#);
+            }
+        };
+        tag(&mut s, "action", a.action.map(ActionTag::as_str));
+        tag(&mut s, "phase", a.phase.map(PhaseTag::as_str));
+        tag(&mut s, "code", a.code.map(AgentErrorCode::as_str));
+        tag(&mut s, "stop", a.stop.map(StopTag::as_str));
+        tag(&mut s, "exit", a.exit.map(ExitTag::as_str));
+        tag(&mut s, "reason", a.reason.map(Reason::as_str));
+        tag(&mut s, "status", a.status.map(StatusTag::as_str));
+        if let Some(v) = a.changed {
+            let _ = write!(s, r#","changed":{v}"#);
+        }
+        for (k, v) in [
+            ("esc", a.escaped),
+            ("ev", a.events),
+            ("in", a.input_bytes),
+            ("out", a.output_bytes),
+        ] {
+            if let Some(v) = v {
+                let _ = write!(s, r#","{k}":{v}"#);
+            }
+        }
+        if let Some(v) = a.exit_number {
+            let _ = write!(s, r#","xn":{v}"#);
+        }
+        s.push('}');
+    }
     s.push_str("}\n");
     fit(s)
 }
@@ -125,6 +158,27 @@ struct WireLine {
     res: Option<WireRes>,
     err: Option<String>,
     n: Option<u32>,
+    agent: Option<WireAgent>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WireAgent {
+    kind: String,
+    action: Option<String>,
+    phase: Option<String>,
+    code: Option<String>,
+    stop: Option<String>,
+    exit: Option<String>,
+    reason: Option<String>,
+    status: Option<String>,
+    changed: Option<bool>,
+    esc: Option<u32>,
+    ev: Option<u32>,
+    #[serde(rename = "in")]
+    input: Option<u32>,
+    out: Option<u32>,
+    xn: Option<i32>,
 }
 
 #[derive(Deserialize)]
@@ -178,6 +232,25 @@ fn convert(w: WireLine) -> Result<ParsedLine, ()> {
             path: opt(&r.path, PathClass::parse)?,
         }),
     };
+    let agent = match &w.agent {
+        None => None,
+        Some(a) => Some(AgentDetail {
+            kind: AgentKind::parse(&a.kind).ok_or(())?,
+            action: opt(&a.action, ActionTag::parse)?,
+            phase: opt(&a.phase, PhaseTag::parse)?,
+            code: opt(&a.code, AgentErrorCode::parse)?,
+            stop: opt(&a.stop, StopTag::parse)?,
+            exit: opt(&a.exit, ExitTag::parse)?,
+            reason: opt(&a.reason, Reason::parse)?,
+            status: opt(&a.status, StatusTag::parse)?,
+            changed: a.changed,
+            escaped: a.esc,
+            events: a.ev,
+            input_bytes: a.input,
+            output_bytes: a.out,
+            exit_number: a.xn,
+        }),
+    };
     let record = Record {
         code: EventCode::parse(&w.code).ok_or(())?,
         level,
@@ -189,6 +262,7 @@ fn convert(w: WireLine) -> Result<ParsedLine, ()> {
         resource,
         error: opt(&w.err, ErrorTag::parse)?,
         count: w.n,
+        agent,
     };
     Ok(ParsedLine {
         ts: w.ts,

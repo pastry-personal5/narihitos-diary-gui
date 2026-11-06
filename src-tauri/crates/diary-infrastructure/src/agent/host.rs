@@ -9,7 +9,7 @@ use super::{
 use crate::config::select_executable;
 use diary_application::{
     agent::*,
-    diagnostics::{Diagnostics, ErrorTag, EventCode, Level, Record},
+    diagnostics::{Diagnostics, ErrorTag, Record},
 };
 use std::{
     ffi::OsString,
@@ -20,7 +20,6 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
-    time::Instant,
 };
 
 /// Strict structured-output schema for schema-1 generation: closed objects, every property required.
@@ -244,20 +243,7 @@ impl Host {
         Some((o, text))
     }
 
-    /// Content-free `agent_run` record: code tag and duration only.
-    pub fn log_run<T>(&self, result: &Result<T, AgentError>, started: Instant) {
-        let mut rec = Record::new(
-            EventCode::AgentRun,
-            if result.is_ok() {
-                Level::Info
-            } else {
-                Level::Warn
-            },
-        )
-        .count(u32::try_from(started.elapsed().as_millis()).unwrap_or(u32::MAX));
-        if let Err(e) = result {
-            rec = rec.error(code_tag(e.0));
-        }
-        self.diagnostics.emit(rec);
+    pub fn emit(&self, record: Record) {
+        self.diagnostics.emit(record);
     }
 }

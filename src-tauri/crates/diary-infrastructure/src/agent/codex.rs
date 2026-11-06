@@ -3,7 +3,7 @@
 //! logs or `AgentError`. Output is accepted only through the M16 validators and `Run`.
 use super::{
     assets::Prompt,
-    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream},
+    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream, auth_failed, probe_fault},
     host::{Host, RunDir, read_bounded},
     process::{Exit, Outcome},
     profiles::ProfileTable,
@@ -187,41 +187,41 @@ impl Protocol for Codex {
         )
     }
     /// `Ok` only for the allowlisted version.
-    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), ProfileStatus> {
+    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), Reason> {
         let (o, text) = ctx
             .probe(&["--version"], cancel)
-            .ok_or(ProfileStatus::Failed)?;
+            .ok_or(Reason::SpawnFailed)?;
         if o.exit != Exit::Success || o.stop.is_some() || o.escaped > 0 {
-            return Err(ProfileStatus::Failed);
+            return Err(probe_fault(&o));
         }
         let first = text.lines().next().unwrap_or_default().trim();
         if first == SUPPORTED_VERSION {
             Ok(())
         } else if first.starts_with("codex-cli ") {
-            Err(ProfileStatus::UnsupportedVersion)
+            Err(Reason::VersionUnsupported)
         } else {
-            Err(ProfileStatus::Failed)
+            Err(Reason::VersionUnreadable)
         }
     }
-    fn auth(&self, ctx: &Ctx) -> ProfileStatus {
+    fn auth(&self, ctx: &Ctx) -> ProfileCheck {
         match ctx.probe(&["login", "status"], &CancelToken::default()) {
             Some((o, _)) if o.stop.is_none() && o.escaped == 0 && o.exit == Exit::Success => {
-                ProfileStatus::Ready
+                ProfileStatus::Ready.into()
             }
             Some((o, text))
                 if o.stop.is_none()
                     && o.exit == Exit::Status(1)
                     && text.contains("Not logged in") =>
             {
-                ProfileStatus::Unauthenticated
+                ProfileStatus::Unauthenticated.into()
             }
-            _ => ProfileStatus::Failed,
+            other => auth_failed(other.as_ref().map(|(o, _)| o)),
         }
     }
-    fn check_prompt(&self, prompt: &Prompt) -> Result<(), AgentError> {
+    fn check_prompt(&self, prompt: &Prompt) -> Result<(), Reason> {
         // The effort is spliced into a `-c key="value"` argument, so quoting characters are refused.
         if prompt.model.contains(['"', '\\']) || prompt.reasoning_effort.contains(['"', '\\']) {
-            return Err(AgentErrorCode::AssetsUnavailable.into());
+            return Err(Reason::PromptPinRejected);
         }
         Ok(())
     }

@@ -181,3 +181,78 @@ fn fingerprint_differs_by_key_and_content_and_never_contains_content() {
     assert!(!line.contains("SECRET"));
     assert!(line.contains("\"fp\":\""));
 }
+
+fn agent_record() -> Record {
+    let mut a = AgentDetail::new(AgentKind::AppleFoundationModels);
+    a.action = Some(ActionTag::Generate);
+    a.phase = Some(PhaseTag::ReceivingOutput);
+    a.code = Some(AgentErrorCode::Context);
+    a.stop = Some(StopTag::Wall);
+    a.exit = Some(ExitTag::Code);
+    a.reason = Some(Reason::ModelNotReady);
+    a.status = Some(StatusTag::Unavailable);
+    a.changed = Some(true);
+    a.escaped = Some(2);
+    a.events = Some(9);
+    a.input_bytes = Some(1234);
+    a.output_bytes = Some(56);
+    a.exit_number = Some(-1);
+    Record::new(EventCode::AgentRun, Level::Warn)
+        .count(87)
+        .agent(a)
+}
+
+fn agent_header() -> Header<'static> {
+    Header {
+        ts: TS,
+        role: Role::Server,
+        instance: None,
+    }
+}
+
+#[test]
+fn agent_detail_round_trips_and_every_tag_renders() {
+    let r = agent_record();
+    let line = render_line(&agent_header(), &r).unwrap();
+    assert_eq!(parse_line(&line).unwrap().record, r);
+    // Every closed value of every agent tag survives a render and parse.
+    for reason in Reason::ALL {
+        for code in AgentErrorCode::ALL {
+            let mut r = agent_record();
+            let a = r.agent.as_mut().unwrap();
+            a.reason = Some(reason);
+            a.code = Some(code);
+            let line = render_line(&agent_header(), &r).unwrap();
+            assert_eq!(parse_line(&line).unwrap().record, r);
+        }
+    }
+    for kind in AgentKind::ALL {
+        let mut r = agent_record();
+        r.agent.as_mut().unwrap().kind = kind;
+        let line = render_line(&agent_header(), &r).unwrap();
+        assert_eq!(parse_line(&line).unwrap().record, r);
+    }
+}
+
+#[test]
+fn agent_lines_reject_unknown_values_and_keys() {
+    let good = render_line(&agent_header(), &agent_record()).unwrap();
+    for (from, to) in [
+        ("model_not_ready", "free text here"),
+        (r#""kind":"apple-foundation-models""#, r#""kind":"gpt""#),
+        (r#""phase":"receiving_output""#, r#""phase":"somewhere""#),
+        (r#""esc":2"#, r#""esc":2,"path":"/Users/x""#),
+        (r#""changed":true"#, r#""changed":"yes""#),
+    ] {
+        assert!(good.contains(from), "{from}");
+        assert!(parse_line(&good.replace(from, to)).is_none(), "{to}");
+    }
+}
+
+#[test]
+fn old_lines_without_agent_still_parse() {
+    let (r, _) = full();
+    let line = render_line(&agent_header(), &r).unwrap();
+    assert!(!line.contains("agent"));
+    assert_eq!(parse_line(&line).unwrap().record.agent, None);
+}

@@ -21,7 +21,7 @@ const MAX_FILES_PER_ROLE: usize = 16;
 pub const LEGEND: &str = "ts=local time with offset; lvl=level; role=server|client; code=event (the message); \
 trace=request id shared by client and server; res=resource {kind,id,rev=revision,bytes,lines,\
 fp=keyed content fingerprint comparable only within one process run,state,path=path class}; \
-err=error tag; n=count. Logs hold no content, paths or credentials.";
+err=error tag; n=count (milliseconds for agent records); agent={kind,action,phase=last phase reached,code=error code,stop,exit,reason,status,changed,esc=escaped processes,ev=events,in/out=bytes,xn=exit number}. Logs hold no content, paths or credentials.";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Selector {

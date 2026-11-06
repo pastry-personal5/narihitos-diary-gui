@@ -94,6 +94,8 @@ pub struct Outcome {
     pub escaped: usize,
     /// Last bytes of stderr; for pattern classification only, never logged or returned.
     pub stderr_tail: Vec<u8>,
+    /// Bytes the child wrote to stdout and stderr (counted for the output limit).
+    pub output_bytes: usize,
 }
 
 fn spawn_failed() -> std::io::Error {
@@ -460,6 +462,7 @@ impl Supervisor {
             stop,
             escaped,
             stderr_tail: tail,
+            output_bytes: total,
         })
     }
 }
