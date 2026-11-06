@@ -282,11 +282,12 @@ impl CodexAdapter {
     }
 
     fn env(&self, exe: &Path, codex_home: &Path, tmp: &Path) -> Vec<(OsString, OsString)> {
-        let mut path = exe
-            .parent()
-            .map(|p| p.as_os_str().to_owned())
-            .unwrap_or_default();
-        path.push(":/usr/bin:/bin:/usr/sbin:/sbin");
+        // The launch PATH (absolute entries) lets a symlinked shim such as `#!/usr/bin/env node` find
+        // its interpreter; `exe` is already canonical, so its own directory alone is not enough.
+        let mut dirs: Vec<PathBuf> = exe.parent().map(Path::to_path_buf).into_iter().collect();
+        dirs.extend(std::env::split_paths(&self.launch_path).filter(|d| d.is_absolute()));
+        dirs.extend(["/usr/bin", "/bin", "/usr/sbin", "/sbin"].map(PathBuf::from));
+        let path = std::env::join_paths(dirs).unwrap_or_default();
         let mut env = vec![
             ("PATH".into(), path),
             ("TMPDIR".into(), tmp.as_os_str().to_owned()),
@@ -313,6 +314,7 @@ impl CodexAdapter {
         home: &Path,
         dir: &RunDir,
         args: &[&str],
+        cancel: &CancelToken,
     ) -> Option<(Outcome, String)> {
         let stop = self.stop_flag();
         let spec = Spec {
@@ -325,7 +327,7 @@ impl CodexAdapter {
             shutdown: Some(stop.1.clone()),
         };
         let mut text = String::new();
-        let o = Supervisor::run(spec, &CancelToken::default(), &mut |r| {
+        let o = Supervisor::run(spec, cancel, &mut |r| {
             text.push_str(&String::from_utf8_lossy(r));
             text.push('\n');
         })
@@ -335,9 +337,15 @@ impl CodexAdapter {
     }
 
     /// `Ok` only for the allowlisted version.
-    fn version(&self, exe: &Path, home: &Path, dir: &RunDir) -> Result<(), ProfileStatus> {
+    fn version(
+        &self,
+        exe: &Path,
+        home: &Path,
+        dir: &RunDir,
+        cancel: &CancelToken,
+    ) -> Result<(), ProfileStatus> {
         let (o, text) = self
-            .probe(exe, home, dir, &["--version"])
+            .probe(exe, home, dir, &["--version"], cancel)
             .ok_or(ProfileStatus::Failed)?;
         if o.exit != Exit::Success || o.stop.is_some() || o.escaped > 0 {
             return Err(ProfileStatus::Failed);
@@ -366,10 +374,10 @@ impl CodexAdapter {
         let Ok(dir) = RunDir::create(&self.runtime_root) else {
             return ProfileStatus::Failed;
         };
-        if let Err(s) = self.version(&exe, home, &dir) {
+        if let Err(s) = self.version(&exe, home, &dir, &CancelToken::default()) {
             return s;
         }
-        match self.probe(&exe, home, &dir, &["login", "status"]) {
+        match self.probe(&exe, home, &dir, &["login", "status"], &CancelToken::default()) {
             Some((o, _)) if o.stop.is_none() && o.escaped == 0 && o.exit == Exit::Success => {
                 ProfileStatus::Ready
             }
@@ -467,7 +475,13 @@ impl CodexAdapter {
         if let Some(e) = run.accept(AgentEvent::Phase(Phase::StartingAgent)) {
             events.event(e);
         }
-        self.version(&exe, home, &dir).map_err(|_| unavailable())?;
+        self.version(&exe, home, &dir, &run.token()).map_err(|_| {
+            if run.token().is_cancelled() {
+                AgentErrorCode::Cancelled.into()
+            } else {
+                unavailable()
+            }
+        })?;
 
         let last = dir.path().join("last-message.txt");
         let schema = if chat {

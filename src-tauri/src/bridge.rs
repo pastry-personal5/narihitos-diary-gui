@@ -207,6 +207,10 @@ impl Bridge {
         if let Some(payload) = payload {
             request = request.json(&payload);
         }
+        if path.ends_with("/check") {
+            // A profile check runs two probes, each bounded by the server at about 5 s plus grace.
+            request = request.timeout(std::time::Duration::from_secs(20));
+        }
         let mut response = request.send().await.map_err(|_| {
             self.note(&trace, ErrorTag::Unavailable);
             "server_unavailable"
