@@ -34,6 +34,9 @@ pub struct ProfileStatus {
     #[serde(rename = "type")]
     pub kind: String,
     pub status: String,
+    /// Closed reason behind the status; `null` when ready, unchecked or not attributed.
+    #[serde(default)]
+    pub reason: Option<String>,
     pub capabilities: Capabilities,
 }
 #[derive(Debug, Serialize, Deserialize)]
@@ -55,6 +58,9 @@ fn sound(p: &ProfileStatus) -> bool {
     valid_alias(&p.alias)
         && TYPES.contains(&p.kind.as_str())
         && STATUSES.contains(&p.status.as_str())
+        && p.reason.as_deref().is_none_or(|r| {
+            diary_application::agent::Reason::parse(r).is_some_and(|r| r.is_api_visible())
+        })
         && cap(&p.capabilities.chat)
         && cap(&p.capabilities.generate)
 }
@@ -87,7 +93,7 @@ mod tests {
     use serde_json::json;
 
     fn profile(alias: &str, status: &str) -> serde_json::Value {
-        json!({"alias":alias,"type":"codex","status":status,
+        json!({"alias":alias,"type":"codex","status":status,"reason":null,
             "capabilities":{"chat":{"available":true,"reason":null},
                             "generate":{"available":false,"reason":"assets_missing"}}})
     }
@@ -108,6 +114,33 @@ mod tests {
         let requests = task.join().unwrap();
         assert!(requests[1].starts_with("GET /api/v1/profiles HTTP/1.1"));
         assert!(requests[2].starts_with("POST /api/v1/profiles/main/check HTTP/1.1"));
+    }
+
+    #[tokio::test]
+    async fn reasons_are_checked_against_the_closed_api_set() {
+        let mut ok = profile("main", "unavailable");
+        ok["reason"] = json!("apple_intelligence_disabled");
+        let mut run_only = profile("main", "failed");
+        run_only["reason"] = json!("escaped_descendants");
+        let mut text = profile("main", "failed");
+        text["reason"] = json!("/Users/x/secret");
+        let (_t, bridge, _task) = fixture(vec![
+            http("200 OK", json!({"profiles":[ok]})),
+            http("200 OK", json!({"profiles":[run_only]})),
+            http("200 OK", json!({"profiles":[text]})),
+        ]);
+        bridge.connect().await.unwrap();
+        let list = bridge.list_profiles().await.unwrap();
+        assert_eq!(
+            list.profiles[0].reason.as_deref(),
+            Some("apple_intelligence_disabled")
+        );
+        for _ in 0..2 {
+            assert_eq!(
+                bridge.list_profiles().await.unwrap_err().code,
+                "unavailable"
+            );
+        }
     }
 
     #[tokio::test]

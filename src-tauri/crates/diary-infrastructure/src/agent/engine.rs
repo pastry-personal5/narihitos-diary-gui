@@ -74,6 +74,26 @@ pub trait Stream: Send {
 pub trait Protocol: Send + Sync + 'static {
     fn kind(&self) -> AgentKind;
     fn env(&self, host: &Host, exe: &Path, home: &Path, tmp: &Path) -> Vec<(OsString, OsString)>;
+    /// The program to launch. CLIs resolve their binary on the launch `PATH`; a native helper
+    /// verifies and returns its own extracted file.
+    fn executable(&self, host: &Host, entry: &Entry) -> Result<PathBuf, Reason> {
+        let name = self
+            .kind()
+            .spec()
+            .default_binary
+            .expect("CLI kinds have a default binary");
+        host.resolve(entry, name).ok_or(Reason::ExecutableMissing)
+    }
+    /// Builds the child's stdin from the rendered task prompt. Default: the prompt itself.
+    fn stdin(
+        &self,
+        _assets: &PromptAssets,
+        rendered: String,
+        _locale: &Locale,
+        _chat: bool,
+    ) -> Result<Vec<u8>, Reason> {
+        Ok(rendered.into_bytes())
+    }
     /// `Ok` only for a supported version; runs before every run and every check.
     fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), Reason>;
     /// Check-only login probe, after `version`. Default: nothing to probe.
@@ -189,14 +209,6 @@ impl<P: Protocol> Adapter<P> {
         &self.assets
     }
 
-    fn binary(&self) -> &'static str {
-        self.proto
-            .kind()
-            .spec()
-            .default_binary
-            .expect("CLI kinds have a default binary")
-    }
-
     fn ctx<'a>(&'a self, exe: &'a Path, home: &'a Path, dir: &'a RunDir) -> Ctx<'a> {
         Ctx {
             host: &self.host,
@@ -211,17 +223,22 @@ impl<P: Protocol> Adapter<P> {
         if self.host.is_busy() {
             return check_of(Reason::HostBusy);
         }
-        let Some(exe) = self.host.resolve(e, self.binary()) else {
-            return check_of(Reason::ExecutableMissing);
+        let exe = match self.proto.executable(&self.host, e) {
+            Ok(exe) => exe,
+            Err(r) => return check_of(r),
         };
         let home = e.home.as_ref().map(|h| self.host.launch_cwd.join(h));
-        let Some(home) = home.as_deref().filter(|h| h.is_dir()) else {
+        if self.proto.kind().spec().needs_home && !home.as_deref().is_some_and(Path::is_dir) {
             return check_of(home_reason(home.as_deref()));
-        };
+        }
         let Ok(dir) = RunDir::create(&self.host.runtime_root) else {
             return check_of(Reason::RunDirUnavailable);
         };
-        let ctx = self.ctx(&exe, home, &dir);
+        // Kinds without a profile home run from their private run directory.
+        let home = home
+            .filter(|_| self.proto.kind().spec().needs_home)
+            .unwrap_or_else(|| dir.path().to_path_buf());
+        let ctx = self.ctx(&exe, &home, &dir);
         match self.proto.version(&ctx, &CancelToken::default()) {
             Ok(()) => self.proto.auth(&ctx),
             Err(r) => check_of(r),
@@ -309,20 +326,30 @@ impl<P: Protocol> Adapter<P> {
             .map_err(|r| diag.fail(r, C::AssetsUnavailable))?;
         let data =
             encode_packet(request.mode()).map_err(|e| diag.fail(Reason::PacketTooLarge, e.0))?;
-        let stdin = prompt.render(request.locale(), Some(&data)).into_bytes();
+        let stdin = self
+            .proto
+            .stdin(
+                &self.assets,
+                prompt.render(request.locale(), Some(&data)),
+                request.locale(),
+                chat,
+            )
+            .map_err(|r| diag.fail(r, C::AssetsUnavailable))?;
         diag.input = u32::try_from(stdin.len()).unwrap_or(u32::MAX);
         let exe = self
-            .host
-            .resolve(&entry, self.binary())
-            .ok_or_else(|| diag.fail(Reason::ExecutableMissing, C::Unavailable))?;
+            .proto
+            .executable(&self.host, &entry)
+            .map_err(|r| diag.fail(r, C::Unavailable))?;
         // The child runs in its own cwd, so a relative `profile_home` must be made absolute here.
         let home = entry.home.as_deref().map(|h| self.host.launch_cwd.join(h));
-        let Some(home) = home.filter(|h| h.is_dir()) else {
-            let missing = entry.home.as_deref().map(|h| self.host.launch_cwd.join(h));
-            return Err(diag.fail(home_reason(missing.as_deref()), C::Unavailable));
-        };
+        if self.proto.kind().spec().needs_home && !home.as_deref().is_some_and(Path::is_dir) {
+            return Err(diag.fail(home_reason(home.as_deref()), C::Unavailable));
+        }
         let dir = RunDir::create(&self.host.runtime_root)
             .map_err(|_| diag.fail(Reason::RunDirUnavailable, C::Failed))?;
+        let home = home
+            .filter(|_| self.proto.kind().spec().needs_home)
+            .unwrap_or_else(|| dir.path().to_path_buf());
         phase(events, Phase::StartingAgent);
         let ctx = self.ctx(&exe, &home, &dir);
         self.proto.version(&ctx, &run.token()).map_err(|r| {

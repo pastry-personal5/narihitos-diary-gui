@@ -38,6 +38,7 @@ function profile(
     alias,
     type,
     status: state,
+    reason: null,
     capabilities: { chat: cap, generate: cap },
   };
 }
@@ -112,6 +113,17 @@ describe("Profile status in Settings", () => {
     };
     render(<App bridge={bridge({ listProfiles: async () => [claude] })} />);
     expect((await open()).textContent).toContain("no adapter yet");
+  });
+
+  it("shows the reason an Apple profile is unavailable", async () => {
+    const apple = {
+      ...profile("mac", "unavailable", "apple-foundation-models"),
+      reason: "apple_intelligence_disabled",
+    };
+    render(<App bridge={bridge({ listProfiles: async () => [apple] })} />);
+    expect((await open()).textContent).toContain(
+      "Apple Intelligence is turned off in System Settings",
+    );
   });
 
   it("checks one profile, showing progress, then the new status", async () => {

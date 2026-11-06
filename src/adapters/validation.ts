@@ -320,6 +320,34 @@ const PROFILE_REASONS = [
   "assets_invalid",
   "adapter_unimplemented",
 ];
+/** Reasons the server may report for a profile status (shared with the Rust test). */
+export const PROFILE_STATUS_REASONS: readonly string[] = [
+  "executable_missing",
+  "profile_home_missing",
+  "profile_home_not_directory",
+  "profile_unknown",
+  "kind_mismatch",
+  "version_unsupported",
+  "version_unreadable",
+  "probe_timed_out",
+  "probe_failed",
+  "spawn_failed",
+  "host_busy",
+  "run_dir_unavailable",
+  "assets_missing",
+  "assets_invalid",
+  "prompt_pin_rejected",
+  "packet_too_large",
+  "os_unsupported",
+  "device_ineligible",
+  "apple_intelligence_disabled",
+  "model_not_ready",
+  "model_unavailable_unknown",
+  "locale_unsupported",
+  "helper_missing",
+  "helper_untrusted",
+  "helper_failed",
+];
 function profileCapabilityDto(value: unknown): ProfileCapability {
   const dto = record(value);
   const reason = dto.reason ?? null;
@@ -335,6 +363,12 @@ function profileCapabilityDto(value: unknown): ProfileCapability {
     reason: reason as ProfileCapability["reason"],
   };
 }
+function profileStatusReason(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || !PROFILE_STATUS_REASONS.includes(value))
+    throw new Error("Invalid server response");
+  return value;
+}
 export function profileDto(value: unknown): ProfileInfo {
   const dto = record(value);
   const caps = record(dto.capabilities);
@@ -345,6 +379,7 @@ export function profileDto(value: unknown): ProfileInfo {
     alias: text(dto.alias, 64),
     type: text(dto.type, 32),
     status: status as ProfileInfo["status"],
+    reason: profileStatusReason(dto.reason),
     capabilities: {
       chat: profileCapabilityDto(caps.chat),
       generate: profileCapabilityDto(caps.generate),

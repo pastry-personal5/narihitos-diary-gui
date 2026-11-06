@@ -1,7 +1,12 @@
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { useState } from "react";
 import type { Bridge } from "../application/bridge";
-import { PROFILE_REASON, PROFILE_STATUS, useProfiles } from "./useProfiles";
+import {
+  PROFILE_REASON,
+  PROFILE_STATUS,
+  PROFILE_STATUS_REASON_TEXT,
+  useProfiles,
+} from "./useProfiles";
 import {
   RELOAD_MESSAGE,
   SETTINGS_MESSAGE,
@@ -141,6 +146,9 @@ export function SettingsView({
                           <li key={p.alias}>
                             {p.alias} ({p.type}):{" "}
                             {busy ? "checking…" : PROFILE_STATUS[p.status]}
+                            {!busy &&
+                              p.reason &&
+                              ` · ${PROFILE_STATUS_REASON_TEXT[p.reason] ?? ""}`}
                             {note && ` · ${PROFILE_REASON[note]}`}{" "}
                             <button
                               disabled={busy}

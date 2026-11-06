@@ -318,22 +318,20 @@ fn missing_home_or_executable_is_unavailable() {
 
 #[test]
 fn every_agent_kind_has_a_protocol() {
-    // Apple joins in stage C; until then it is the one deliberately unregistered kind.
     let r = Rig::new(AgentKind::Codex);
     for k in AgentKind::ALL {
-        assert_eq!(
-            r.agents.registered(k),
-            k != AgentKind::AppleFoundationModels,
-            "{k:?}"
-        );
+        assert!(r.agents.registered(k), "{k:?}");
     }
 }
 
 #[test]
 fn registry_rejects_unregistered_kind() {
     let r = Rig::new(AgentKind::Codex);
-    let h = r.handle(AgentKind::AppleFoundationModels);
-    assert_eq!(r.agents.check(&h).status, ProfileStatus::Unavailable);
-    let req = AgentRequest::new(h, Locale::parse("en").unwrap(), r.chat().mode().clone());
-    assert_eq!(r.code(req), AgentErrorCode::Unavailable);
+    let empty = Agents::new(r.host.clone(), Vec::new());
+    let h = r.handle(AgentKind::Codex);
+    assert!(!empty.registered(AgentKind::Codex));
+    assert_eq!(empty.check(&h).status, ProfileStatus::Unavailable);
+    let mut sink = Sink::default();
+    let res = empty.run(r.chat(), &mut sink, &CancelToken::default());
+    assert_eq!(res.unwrap_err().0, AgentErrorCode::Unavailable);
 }

@@ -244,7 +244,7 @@ impl Reason {
                 | Self::CancelledBeforeStart
                 | Self::LeaseEnded
                 | Self::HostShuttingDown
-                | Self::RunDirUnavailable
+                | Self::NativeSessionBusy
         )
     }
 }
@@ -658,6 +658,8 @@ pub struct ProfileView {
     pub alias: String,
     pub kind: AgentKind,
     pub status: Option<ProfileStatus>,
+    /// Why the status is what it is; `None` when ready, unchecked or not attributed.
+    pub reason: Option<Reason>,
     pub chat: Capability,
     pub generate: Capability,
 }
@@ -827,6 +829,23 @@ mod tests {
             run.finish(Err(AgentErrorCode::Timeout.into())),
             Err(AgentErrorCode::Timeout.into())
         );
+    }
+
+    /// The API-visible reasons are one list shared with the TypeScript client.
+    #[test]
+    fn api_visible_reasons_match_the_shared_list() {
+        let listed: Vec<String> = include_str!("../../../../src/application/profile-reasons.json")
+            .split('"')
+            .skip(1)
+            .step_by(2)
+            .map(str::to_owned)
+            .collect();
+        let visible: Vec<&str> = Reason::ALL
+            .iter()
+            .filter(|r| r.is_api_visible())
+            .map(|r| r.as_str())
+            .collect();
+        assert_eq!(listed, visible);
     }
 
     #[test]

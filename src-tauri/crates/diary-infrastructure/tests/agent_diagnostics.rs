@@ -188,17 +188,16 @@ fn refusals_before_a_process_each_emit_one_blocked_record() {
             Reason::ProfileUnknown,
             AgentErrorCode::Unavailable,
         );
-        // A kind with no registered adapter has nothing to log; the registry just refuses.
-        let wrong = AgentKind::AppleFoundationModels;
+        // A handle of another kind reaches that kind's adapter, which refuses the entry.
         let res = r.run(r.chat_for(ProfileHandle {
             alias: "main".into(),
-            kind: wrong,
+            kind: AgentKind::AppleFoundationModels,
         }));
         assert_eq!(res.unwrap_err().0, AgentErrorCode::Unavailable);
-        assert!(
-            r.logs.take().is_empty(),
-            "unregistered kind has no adapter to log"
-        );
+        let (ev, _, d) = r.logs.one();
+        assert_eq!(ev, EventCode::AgentBlocked);
+        assert_eq!(d.kind, AgentKind::AppleFoundationModels);
+        assert_eq!(d.reason, Some(Reason::KindMismatch));
         // Cancelled before start.
         let cancel = CancelToken::default();
         let run = Run::from(cancel.clone());

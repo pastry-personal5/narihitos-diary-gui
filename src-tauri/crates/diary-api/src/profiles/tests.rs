@@ -4,7 +4,7 @@ use crate::{
     tests::{request, state},
 };
 use axum::body::{Body, to_bytes};
-use diary_application::agent::{AgentKind, ProfileDirectory};
+use diary_application::agent::{AgentKind, ProfileDirectory, Reason};
 use std::sync::Mutex;
 use tower::ServiceExt;
 
@@ -22,6 +22,11 @@ impl Fake {
                 status
             } else {
                 Some(ProfileStatus::Unavailable)
+            },
+            reason: if codex {
+                None
+            } else {
+                Some(Reason::HelperMissing)
             },
             chat: if codex {
                 Capability::Ready
@@ -113,6 +118,8 @@ async fn list_reports_status_and_capabilities_without_checking() {
         json!({"available":true,"reason":null})
     );
     assert_eq!(p[1]["status"], "unavailable");
+    assert_eq!(p[1]["reason"], "helper_missing");
+    assert!(p[0]["reason"].is_null());
     assert_eq!(
         p[1]["capabilities"]["chat"]["reason"],
         "adapter_unimplemented"

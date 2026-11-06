@@ -4,6 +4,7 @@
 use crate::config::Profile;
 use diary_application::agent::{AgentKind, ProfileHandle};
 
+pub mod apple;
 pub mod assets;
 pub mod claude;
 pub mod codex;

@@ -36,6 +36,7 @@ fn capability(c: Capability) -> Value {
 }
 fn view(v: &ProfileView) -> Value {
     json!({"alias":v.alias,"type":v.kind.asset_dir(),"status":status(v.status),
+        "reason":v.reason.filter(|r| r.is_api_visible()).map(|r| r.as_str()),
         "capabilities":{"chat":capability(v.chat),"generate":capability(v.generate)}})
 }
 

@@ -1,13 +1,13 @@
 //! The one `AgentRunner` the rest of the code holds: dispatches on `profile.kind` to the registered
 //! adapters, shares one `Host` (cancel/shutdown/busy) and one set of prompt assets.
 use super::{
-    assets::PromptAssets, claude::ClaudeAdapter, codex::CodexAdapter, host::Host,
-    profiles::ProfileTable, qwen::QwenAdapter,
+    apple::AppleAdapter, assets::PromptAssets, claude::ClaudeAdapter, codex::CodexAdapter,
+    host::Host, profiles::ProfileTable, qwen::QwenAdapter,
 };
 use diary_application::agent::*;
 use std::sync::Arc;
 
-type Runner = Arc<dyn AgentRunner + Send + Sync>;
+pub type Runner = Arc<dyn AgentRunner + Send + Sync>;
 
 pub struct Agents {
     host: Arc<Host>,
@@ -19,6 +19,10 @@ impl Agents {
     /// Every adapter this build ships, in one place.
     pub fn standard(table: Arc<ProfileTable>, host: Arc<Host>) -> Self {
         let runners: Vec<(AgentKind, Runner)> = vec![
+            (
+                AgentKind::AppleFoundationModels,
+                Arc::new(AppleAdapter::new(table.clone(), host.clone())),
+            ),
             (
                 AgentKind::Codex,
                 Arc::new(CodexAdapter::new(table.clone(), host.clone())),
@@ -32,6 +36,10 @@ impl Agents {
                 Arc::new(QwenAdapter::new(table, host.clone())),
             ),
         ];
+        Self::new(host, runners)
+    }
+    /// Any set of runners; `standard` is the production set.
+    pub fn new(host: Arc<Host>, runners: Vec<(AgentKind, Runner)>) -> Self {
         Self {
             host,
             assets: PromptAssets::embedded(),

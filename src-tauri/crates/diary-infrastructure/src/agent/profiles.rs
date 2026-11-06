@@ -3,7 +3,8 @@
 use super::registry::Agents;
 use crate::config::{Config, Profile};
 use diary_application::agent::{
-    Action, AgentKind, AgentRunner, ProfileDirectory, ProfileHandle, ProfileView,
+    Action, AgentKind, AgentRunner, ProfileCheck, ProfileDirectory, ProfileHandle, ProfileStatus,
+    ProfileView,
 };
 use std::{
     collections::HashMap,
@@ -95,10 +96,7 @@ impl ProfileTable {
 pub struct ProfileService {
     table: Arc<ProfileTable>,
     agents: Arc<Agents>,
-    cache: Mutex<(
-        u64,
-        HashMap<String, diary_application::agent::ProfileStatus>,
-    )>,
+    cache: Mutex<(u64, HashMap<String, ProfileCheck>)>,
 }
 impl ProfileService {
     pub fn new(table: Arc<ProfileTable>, agents: Arc<Agents>) -> Self {
@@ -108,7 +106,7 @@ impl ProfileService {
             agents,
         }
     }
-    fn cached(&self, alias: &str) -> Option<diary_application::agent::ProfileStatus> {
+    fn cached(&self, alias: &str) -> Option<ProfileCheck> {
         let mut c = self.cache.lock().expect("profile cache poisoned");
         let generation = self.table.generation();
         if c.0 != generation {
@@ -116,20 +114,21 @@ impl ProfileService {
         }
         c.1.get(alias).copied()
     }
-    fn view(
-        &self,
-        e: &Entry,
-        status: Option<diary_application::agent::ProfileStatus>,
-    ) -> ProfileView {
+    fn view(&self, e: &Entry, check: Option<ProfileCheck>) -> ProfileView {
         let assets = self.agents.assets();
         let registered = self.agents.registered(e.kind);
         ProfileView {
             alias: e.alias.clone(),
             kind: e.kind,
             status: if registered {
-                status
+                check.map(|c| c.status)
             } else {
-                Some(diary_application::agent::ProfileStatus::Unavailable)
+                Some(ProfileStatus::Unavailable)
+            },
+            reason: if registered {
+                check.and_then(|c| c.reason)
+            } else {
+                None
             },
             chat: assets.capability(e.kind, Action::Chat, registered),
             generate: assets.capability(e.kind, Action::Generate, registered),
@@ -152,13 +151,11 @@ impl ProfileDirectory for ProfileService {
                 alias: e.alias.clone(),
                 kind: e.kind,
             };
-            let s = self.agents.check(&handle).status;
+            let s = self.agents.check(&handle);
             let mut c = self.cache.lock().expect("profile cache poisoned");
             // Busy is transient (a run was active); caching it would show a stale "busy" later.
             // A reload during the probe makes the answer stale; the cache itself may lag behind.
-            if s != diary_application::agent::ProfileStatus::Busy
-                && generation == self.table.generation()
-            {
+            if s.status != ProfileStatus::Busy && generation == self.table.generation() {
                 if c.0 != generation {
                     *c = (generation, HashMap::new());
                 }

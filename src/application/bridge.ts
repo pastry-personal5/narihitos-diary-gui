@@ -111,11 +111,15 @@ export interface ProfileCapability {
   available: boolean;
   reason: ProfileReason | null;
 }
+/** Closed reasons behind a profile status; the list lives in profile-reasons.json. */
+export type ProfileStatusReason = string;
 /** Read-only agent profile status. Nothing here can start a run. */
 export interface ProfileInfo {
   alias: string;
   type: string;
   status: ProfileState;
+  /** `null` when ready, unchecked or not attributed. */
+  reason: ProfileStatusReason | null;
   capabilities: { chat: ProfileCapability; generate: ProfileCapability };
 }
 export interface UserSettings {
