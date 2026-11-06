@@ -1,6 +1,7 @@
 mod authentic;
 mod calendar;
 mod imports;
+mod profiles;
 mod source_trash;
 use crate::delivery::{Delivery, Flow};
 use crate::diagnostics::ClientLog;
@@ -13,6 +14,7 @@ pub use calendar::{Calendar, CalendarAction};
 use diary_application::diagnostics::{Component, ErrorTag, EventCode, Level, Record, TraceId};
 use diary_logging::private_fs::PrivateDir;
 pub use imports::{ImportAck, ImportPage, ResolutionAck, SourceBody, SourceSaved, TimeAuthority};
+pub use profiles::{ProfileList, ProfileStatus};
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
 pub use source_trash::{

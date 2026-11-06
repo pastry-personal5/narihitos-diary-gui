@@ -95,6 +95,29 @@ export interface ServerSettings {
   sources: Availability[];
   profiles: Availability[];
 }
+export type ProfileState =
+  | "unchecked"
+  | "missing"
+  | "unsupported_version"
+  | "unavailable"
+  | "available_auth_unknown"
+  | "unauthenticated"
+  | "ready"
+  | "busy"
+  | "failed";
+export type ProfileReason =
+  "assets_missing" | "assets_invalid" | "adapter_unimplemented";
+export interface ProfileCapability {
+  available: boolean;
+  reason: ProfileReason | null;
+}
+/** Read-only agent profile status. Nothing here can start a run. */
+export interface ProfileInfo {
+  alias: string;
+  type: string;
+  status: ProfileState;
+  capabilities: { chat: ProfileCapability; generate: ProfileCapability };
+}
 export interface UserSettings {
   revision: string;
   read_only: boolean;
@@ -128,6 +151,9 @@ export interface Bridge extends NavigationBridge, TrashBridge {
   getSymbol?(name: string, size: number, scale: number): Promise<SymbolResult>;
   serverSettings(): Promise<ServerSettings>;
   reloadSettings(): Promise<ReloadResult>;
+  /** Absent in fakes; Settings then omits the profile status list. */
+  listProfiles?(): Promise<ProfileInfo[]>;
+  checkProfile?(alias: string): Promise<ProfileInfo>;
   getUserSettings(): Promise<UserSettings>;
   updateUserSettings(update: UserSettingsUpdate): Promise<UserSettings>;
   connect(): Promise<Status>;

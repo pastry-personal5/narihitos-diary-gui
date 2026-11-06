@@ -380,6 +380,13 @@ pub trait AgentRunner {
 pub struct Run {
     cancel: CancelToken,
 }
+/// Adapters receive a `CancelToken` through the port; this lets them route events and the result
+/// through the same commit-once guard the job owner uses.
+impl From<CancelToken> for Run {
+    fn from(cancel: CancelToken) -> Self {
+        Self { cancel }
+    }
+}
 impl Run {
     pub fn new() -> Self {
         Self::default()
@@ -439,6 +446,22 @@ pub fn capability(assets: &[AssetState], adapter_registered: bool) -> Capability
     } else {
         Capability::Ready
     }
+}
+
+/// One profile as the status API reports it. `status` is `None` until a check has run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProfileView {
+    pub alias: String,
+    pub kind: AgentKind,
+    pub status: Option<ProfileStatus>,
+    pub chat: Capability,
+    pub generate: Capability,
+}
+/// Read-only profile status; implementations never start inference.
+pub trait ProfileDirectory: Send + Sync {
+    fn list(&self) -> Vec<ProfileView>;
+    /// Runs the non-inference check; `None` for an unknown alias.
+    fn check(&self, alias: &str) -> Option<ProfileView>;
 }
 
 #[cfg(test)]
@@ -570,6 +593,15 @@ mod tests {
         assert!(run.request_cancel());
         assert!(!run.request_cancel());
         assert_eq!(run.finish(ok()), Err(AgentErrorCode::Cancelled.into()));
+    }
+
+    #[test]
+    fn run_from_token_shares_the_cancel_commit() {
+        let owner = Run::new();
+        let adapter = Run::from(owner.token());
+        assert!(adapter.finish(ok()).is_ok());
+        owner.request_cancel();
+        assert_eq!(adapter.finish(ok()), Err(AgentErrorCode::Cancelled.into()));
     }
 
     #[test]

@@ -99,6 +99,7 @@ pub struct ConfigHandle {
     launch_path: OsString,
     launch_cwd: PathBuf,
     current: Mutex<(Fixed, Guarded)>,
+    profiles: Option<std::sync::Arc<crate::agent::profiles::ProfileTable>>,
 }
 impl ConfigHandle {
     pub fn new(path: &Path, config: &Config, launch_path: OsString, launch_cwd: PathBuf) -> Self {
@@ -107,7 +108,16 @@ impl ConfigHandle {
             launch_path,
             launch_cwd,
             current: Mutex::new(fingerprints(config)),
+            profiles: None,
         }
+    }
+    /// Keep the agent profile table in step with adopted reloads.
+    pub fn with_profiles(
+        mut self,
+        table: std::sync::Arc<crate::agent::profiles::ProfileTable>,
+    ) -> Self {
+        self.profiles = Some(table);
+        self
     }
 }
 impl ConfigReloader for ConfigHandle {
@@ -149,6 +159,9 @@ impl ConfigReloader for ConfigHandle {
                     return ReloadOutcome::Busy;
                 }
                 current.1 = guarded;
+                if let Some(t) = &self.profiles {
+                    t.replace(&config);
+                }
             }
         }
         ReloadOutcome::Applied(config.observe_startup(&self.launch_path, &self.launch_cwd))

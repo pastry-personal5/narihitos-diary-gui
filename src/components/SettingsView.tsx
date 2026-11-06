@@ -1,5 +1,7 @@
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { useState } from "react";
+import type { Bridge } from "../application/bridge";
+import { PROFILE_REASON, PROFILE_STATUS, useProfiles } from "./useProfiles";
 import {
   RELOAD_MESSAGE,
   SETTINGS_MESSAGE,
@@ -18,14 +20,17 @@ type Model = ReturnType<typeof useSettings>;
 
 export function SettingsView({
   model,
+  bridge,
   connected,
   onClose,
 }: {
   model: Model;
+  bridge: Bridge;
   connected: boolean;
   onClose: () => void;
 }) {
   const { user, server, error } = model;
+  const profiles = useProfiles(bridge, connected, server?.config_generation);
   const [section, setSection] = useState<
     "Status" | "Writing Language" | "Keyboard Shortcuts"
   >("Status");
@@ -117,6 +122,41 @@ export function SettingsView({
                     </li>
                   ))}
                 </ul>
+                {profiles.supported && (
+                  <>
+                    <h3>Profile status</h3>
+                    <ul aria-label="Profile status">
+                      {profiles.profiles?.length === 0 && (
+                        <li>None configured</li>
+                      )}
+                      {profiles.profiles?.map((p) => {
+                        const busy = profiles.checking.includes(p.alias);
+                        const note = [
+                          p.capabilities.chat,
+                          p.capabilities.generate,
+                        ]
+                          .map((c) => c.reason)
+                          .find((r) => r !== null);
+                        return (
+                          <li key={p.alias}>
+                            {p.alias} ({p.type}):{" "}
+                            {busy ? "checking…" : PROFILE_STATUS[p.status]}
+                            {note && ` · ${PROFILE_REASON[note]}`}{" "}
+                            <button
+                              disabled={busy}
+                              aria-label={`Check ${p.alias}`}
+                              onClick={() => void profiles.check(p.alias)}
+                            >
+                              Check
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p>Status only. Chat and Generate are not enabled yet.</p>
+                    {profiles.error && <p role="alert">{profiles.error}</p>}
+                  </>
+                )}
                 {last && (
                   <div role="status" aria-label="Last reload">
                     <p>{RELOAD_MESSAGE[last.outcome]}</p>

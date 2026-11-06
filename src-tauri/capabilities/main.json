@@ -21,6 +21,8 @@
     "allow-log-client-event",
     "allow-get-symbol",
     "allow-get-calendar",
+    "allow-list-agents",
+    "allow-check-agent",
     "allow-read-source",
     "allow-save-source",
     "allow-preview-source-delete",

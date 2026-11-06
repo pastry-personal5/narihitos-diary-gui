@@ -1,0 +1,265 @@
+#![allow(clippy::zombie_processes)] // the scenarios deliberately orphan children
+
+//! Test double for supervised CLIs. Scenario is argv[1]; codex-shaped invocations (`--version`,
+//! `login status`, `exec ...`) read their scenario from `$CODEX_HOME/scenario`. Never shipped.
+use std::io::{Read, Write};
+use std::process::{Command, Stdio};
+use std::time::Duration;
+
+fn out(s: &str) {
+    let mut o = std::io::stdout().lock();
+    let _ = writeln!(o, "{s}");
+    let _ = o.flush();
+}
+fn sleep(s: u64) {
+    std::thread::sleep(Duration::from_secs(s));
+}
+fn me() -> std::path::PathBuf {
+    std::env::current_exe().unwrap()
+}
+fn ignore_term() {
+    // SAFETY: SIG_IGN is a valid disposition.
+    unsafe { libc::signal(libc::SIGTERM, libc::SIG_IGN) };
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let first = args.first().map(String::as_str).unwrap_or("");
+    match first {
+        "env" => {
+            for (k, v) in std::env::vars() {
+                out(&format!("env {k}={v}"));
+            }
+            // SAFETY: plain syscalls.
+            out(&format!("pgid {}", unsafe { libc::getpgrp() }));
+            out(&format!("pid {}", std::process::id()));
+            out(&format!(
+                "cwd {}",
+                std::env::current_dir().unwrap().display()
+            ));
+            let mut s = String::new();
+            std::io::stdin().read_to_string(&mut s).unwrap();
+            out(&format!("stdin {}", s.len()));
+        }
+        "echo-stdin" => {
+            let mut s = String::new();
+            std::io::stdin().read_to_string(&mut s).unwrap();
+            for l in s.lines() {
+                out(l);
+            }
+        }
+        "lines" => {
+            for l in &args[1..] {
+                out(l);
+            }
+        }
+        "flood-stderr" => {
+            let chunk = vec![b'e'; 64 * 1024];
+            let mut e = std::io::stderr().lock();
+            for _ in 0..48 {
+                let _ = e.write_all(&chunk);
+            }
+            out("done");
+        }
+        "big-record" => {
+            let _ = std::io::stdout().write_all(&vec![b'x'; 4096]);
+            sleep(30);
+        }
+        "flood-stdout" => loop {
+            if writeln!(std::io::stdout(), "{}", "y".repeat(100)).is_err() {
+                break;
+            }
+        },
+        "silent" => sleep(60),
+        "drip" => loop {
+            out("tick");
+            std::thread::sleep(Duration::from_millis(200));
+        },
+        "ignore-term" => {
+            ignore_term();
+            out(&format!("pid {}", std::process::id()));
+            out("ready");
+            sleep(60);
+        }
+        "grandchild" => {
+            let c = Command::new(me())
+                .arg("silent")
+                .stdout(Stdio::null())
+                .spawn()
+                .unwrap();
+            out(&format!("grandchild {}", c.id()));
+            if args.get(1).map(String::as_str) == Some("exit") {
+                return;
+            }
+            sleep(60);
+        }
+        "escape" => {
+            let c = Command::new(me())
+                .arg("setsid-sleep")
+                .stdout(Stdio::null())
+                .spawn()
+                .unwrap();
+            out(&format!("escapee {}", c.id()));
+            sleep(1); // stay alive so the supervisor scans while the escapee is still our child
+        }
+        "setsid-sleep" => {
+            // SAFETY: plain syscall.
+            unsafe { libc::setsid() };
+            sleep(60);
+        }
+        "late-output" => {
+            // On TERM, emit one more record and a result before dying.
+            extern "C" fn on_term(_: libc::c_int) {
+                let msg = b"{\"late\":true}\n";
+                // SAFETY: write(2) is async-signal-safe.
+                unsafe { libc::write(1, msg.as_ptr().cast(), msg.len()) };
+                unsafe { libc::_exit(0) };
+            }
+            // SAFETY: handler is async-signal-safe.
+            unsafe { libc::signal(libc::SIGTERM, on_term as *const () as usize) };
+            out("started");
+            sleep(60);
+        }
+        _ => codex(&args),
+    }
+}
+
+const GOOD: &str = r#"{"draft_markdown":"Tea was nice.","claim_support":[{"claim":"Had tea","snippet_ids":["snippet-1"]}],"warnings":[]}"#;
+
+fn arg_after(args: &[String], flag: &str) -> Option<String> {
+    args.iter()
+        .position(|a| a == flag)
+        .and_then(|i| args.get(i + 1))
+        .cloned()
+}
+
+/// Emulates the parts of `codex` the adapter uses. Scenario and recordings live in `$CODEX_HOME`.
+fn codex(args: &[String]) {
+    let home = std::path::PathBuf::from(std::env::var("CODEX_HOME").unwrap_or_default());
+    let file = |n: &str| {
+        std::fs::read_to_string(home.join(n))
+            .unwrap_or_default()
+            .trim()
+            .to_owned()
+    };
+    let a0 = args.first().map(String::as_str).unwrap_or("");
+    if a0 == "--version" {
+        let v = file("version");
+        out(if v.is_empty() {
+            "codex-cli 0.167.0"
+        } else {
+            &v
+        });
+        return;
+    }
+    if a0 == "login" {
+        match file("login").as_str() {
+            "none" => {
+                out("Not logged in");
+                std::process::exit(1);
+            }
+            "boom" => std::process::exit(2),
+            _ => out("Logged in using ChatGPT"),
+        }
+        return;
+    }
+    if a0 != "exec" {
+        std::process::exit(64);
+    }
+    let mut prompt = String::new();
+    std::io::stdin().read_to_string(&mut prompt).unwrap();
+    let _ = std::fs::write(home.join("argv"), args.join("\n"));
+    let _ = std::fs::write(home.join("stdin"), &prompt);
+    let last = arg_after(args, "--output-last-message").unwrap();
+    let chat = arg_after(args, "--output-schema").is_none();
+    let body = |good: &str| {
+        if chat {
+            "A reply.".to_owned()
+        } else {
+            good.to_owned()
+        }
+    };
+    let started = || {
+        out(r#"{"type":"thread.started","thread_id":"t"}"#);
+        out(r#"{"type":"turn.started"}"#);
+    };
+    let message = |text: &str| {
+        let v = serde_json::json!({"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":text}});
+        out(&v.to_string());
+    };
+    let done = || out(r#"{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}"#);
+    let fail = |m: &str| {
+        let v = serde_json::json!({"type":"turn.failed","error":{"message":m}});
+        out(&v.to_string());
+        std::process::exit(1);
+    };
+    match file("scenario").as_str() {
+        "malformed" => {
+            let _ = std::fs::write(&last, "not json");
+            started();
+            message("not json");
+            done();
+        }
+        "fenced" => {
+            let t = format!("```json\n{GOOD}\n```");
+            let _ = std::fs::write(&last, &t);
+            started();
+            message(&t);
+            done();
+        }
+        "split" => {
+            let _ = std::fs::write(&last, body(GOOD));
+            let line = serde_json::json!({"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":body(GOOD)}}).to_string();
+            let (a, b) = line.split_at(line.len() / 2);
+            started();
+            let mut o = std::io::stdout().lock();
+            let _ = o.write_all(a.as_bytes());
+            let _ = o.flush();
+            std::thread::sleep(Duration::from_millis(150));
+            let _ = writeln!(o, "{b}");
+            drop(o);
+            done();
+        }
+        "unauthorized" => {
+            started();
+            fail(
+                "unexpected status 401 Unauthorized: Missing bearer or basic authentication in header",
+            );
+        }
+        "ratelimit" => {
+            started();
+            fail("You have hit your usage limit");
+        }
+        "context" => {
+            started();
+            fail("Your input exceeds the context window of this model");
+        }
+        "otherfail" => {
+            started();
+            fail("something odd");
+        }
+        "silent-exec" => {
+            started();
+            sleep(60);
+        }
+        "late" => {
+            started();
+            extern "C" fn on_term(_: libc::c_int) {
+                let msg = b"{\"type\":\"turn.completed\"}\n";
+                // SAFETY: write(2) and _exit are async-signal-safe.
+                unsafe { libc::write(1, msg.as_ptr().cast(), msg.len()) };
+                unsafe { libc::_exit(0) };
+            }
+            let _ = std::fs::write(&last, GOOD);
+            // SAFETY: handler is async-signal-safe.
+            unsafe { libc::signal(libc::SIGTERM, on_term as *const () as usize) };
+            sleep(60);
+        }
+        _ => {
+            let _ = std::fs::write(&last, body(GOOD));
+            started();
+            message(&body(GOOD));
+            done();
+        }
+    }
+}

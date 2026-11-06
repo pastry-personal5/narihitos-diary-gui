@@ -51,6 +51,8 @@ See [README.md](README.md) for the overview and [docs/product-behavior.md](docs/
 
 - **P1-M11 smoke waiver (owner, 2026-11-06):** The owner skipped the packaged synthetic navigation smoke and closed P1-M11 on automated tests plus the full gate. This waives only that smoke clause; later milestones still need their own evidence. See the [completion record](docs/archive/milestones/p1-m11/milestone-11-explorer-navigation-overview.md#completion-record).
 
+- **P1-M17 approvals (owner, 2026-11-06):** Add read-only profile status (`GET /profiles`, `POST /profiles/{alias}/check`, bridge commands, Settings list) and no run-starting route, command or UI. Allowlist `codex-cli 0.167.0` only. Close on automated tests, an agent-run env-gated live Codex test and the full gate; no human test is an exit gate. No new dependency; live test uses profile `xpp8` with about 5 real turns; escaped descendants are detected by process-table ancestry; rejected Codex pins are reported to the owner, never silently changed; runs ignore user config and rules. See the [work plan](docs/phase-1/milestone-17-cli-supervision-codex-adapter-architecture.md#owner-decisions). Delivered 2026-11-06; Tauri commands are named `list_agents`/`check_agent` because the capability guard rejects names containing `file`. The live test needs `DIARY_CODEX_LIVE=1 DIARY_CODEX_LIVE_HOME=<profile_home>` and spends account usage.
+
 ## Undecided — ask before inventing
 
 The [P1-M2 owner interview](docs/phase-1/milestone-02-owner-decisions.md) resolves the earlier product choices. The maintained [architecture](docs/architecture.md) resolves delegated internal design work; do not ask again about already approved choices. Ask before changing those choices or inventing new product behavior outside the delegation.
@@ -79,6 +81,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings &
 scripts/gate.sh                                                                                                  # full gate + tsc typecheck: parallel lanes, quiet, PASS/FAIL per command
 python3 scripts/smoke/imports.py                                                                                   # Civil-date import/resolution/restart smoke on the real server binary
 python3 scripts/smoke/trash.py --enabled-server                                                                  # Synthetic native Trash faults + pinned producer catalog + real-server integration
+python3 scripts/smoke/agent.py                                                                                     # Built-binary prompt embedding + read-only profile status with a fake codex
 python3 scripts/smoke/authentic.py                                                                                 # Authentic create/save/restart/kill-recovery smoke on the real server binary
 cargo run --manifest-path src-tauri/Cargo.toml -p diary-server -- trace --config PATH --select recent:20        # redacted debugging trace of the logs
 ```

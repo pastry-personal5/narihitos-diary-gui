@@ -455,6 +455,7 @@ export function App({ bridge }: { bridge: Bridge }) {
         )}
         {settingsOpen && (
           <SettingsView
+            bridge={bridge}
             model={{
               ...settings,
               reload: async () => {

@@ -16,6 +16,8 @@ const COMMANDS: &[&str] = &[
     "log_client_event",
     "get_symbol",
     "get_calendar",
+    "list_agents",
+    "check_agent",
     "read_source",
     "save_source",
     "preview_source_delete",

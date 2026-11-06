@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Active; P1-M17–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Active; P1-M18–P1-M28 remain Planned.
 
 ### P1-M1: Research
 
@@ -126,8 +126,10 @@ Notes: Library-only; no adapter, route, command or UI. Claude and Qwen assets wa
 
 ### P1-M17: CLI supervision and Codex adapter
 
-Status: Planned
+Status: Done
 Goal: Implement bounded process-group execution, cancellation and versioned Codex compatibility through the common agent port.
+Plan: [overview](milestone-17-cli-supervision-codex-adapter-overview.md), [work plan](milestone-17-cli-supervision-codex-adapter-architecture.md).
+Notes: Allowlists `codex-cli 0.167.0` only. Adds read-only profile status (routes, bridge commands, Settings) but no run-starting surface. An automated live Codex test records evidence; no human test is an exit gate. Done 2026-11-06 ([evidence](milestone-17-cli-supervision-codex-adapter-overview.md#evidence-record)); the pins were accepted.
 
 ### P1-M18: Claude Code adapter
 

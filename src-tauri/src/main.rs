@@ -204,6 +204,23 @@ async fn get_calendar(
     state.get_calendar(anchor, action).await
 }
 #[tauri::command]
+async fn list_agents(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+) -> Result<bridge::ProfileList, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.list_profiles().await
+}
+#[tauri::command]
+async fn check_agent(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    alias: String,
+) -> Result<bridge::ProfileStatus, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.check_profile(alias).await
+}
+#[tauri::command]
 async fn read_source(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -506,6 +523,8 @@ fn main() {
             log_client_event,
             get_symbol,
             get_calendar,
+            list_agents,
+            check_agent,
             read_source,
             save_source,
             preview_source_delete,

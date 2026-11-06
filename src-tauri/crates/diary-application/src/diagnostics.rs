@@ -43,6 +43,7 @@ tag_enum!(EventCode {
     ClientBusy => "session.client_busy",
     AuthRejected => "http.auth_rejected",
     JobFinished => "job.finished",
+    AgentRun => "agent.run",
     LogDropped => "log.dropped",
     UiBridgeError => "ui.bridge_error",
     UiRenderError => "ui.render_error",

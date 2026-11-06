@@ -2,6 +2,7 @@
 mod authentic;
 mod calendar;
 mod imports;
+mod profiles;
 #[cfg(feature = "scaffold-smoke")]
 mod smoke;
 mod source_save;
@@ -51,6 +52,8 @@ pub struct ServerState {
     imports: Option<Arc<dyn diary_application::imports::ImportStore>>,
     source_writer: Option<Arc<dyn diary_application::source::SourceWriter>>,
     source_trash: Option<Arc<dyn diary_application::source_trash::SourceTrash>>,
+    profiles: Option<Arc<dyn diary_application::agent::ProfileDirectory>>,
+    lease_ended: Option<Arc<dyn Fn() + Send + Sync>>,
     source_slots: Arc<tokio::sync::Semaphore>,
     import_errors: Mutex<(String, std::collections::BTreeMap<String, &'static str>)>,
     sse_slots: Arc<tokio::sync::Semaphore>,
@@ -86,6 +89,8 @@ impl ServerState {
             imports: None,
             source_writer: None,
             source_trash: None,
+            profiles: None,
+            lease_ended: None,
             source_slots: Arc::new(tokio::sync::Semaphore::new(2)),
             import_errors: Mutex::new((String::new(), std::collections::BTreeMap::new())),
             authentic_epoch: std::sync::atomic::AtomicU64::new(0),
@@ -152,6 +157,37 @@ impl ServerState {
             .expect("startup precedes shared use")
             .source_trash = Some(service);
     }
+    /// Called when the client lease ends (expiry, close or shutdown): agent runs belong to the lease.
+    pub fn set_lease_ended(state: &mut Arc<Self>, hook: Arc<dyn Fn() + Send + Sync>) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .lease_ended = Some(hook);
+    }
+    fn lease_ended(&self) {
+        if let Some(hook) = &self.lease_ended {
+            hook();
+        }
+    }
+    /// One sweep step; the hook runs after the coordinator lock is released.
+    fn expire_leases(&self, now: u64) {
+        let expired = self
+            .coordinator
+            .lock()
+            .expect("coordinator poisoned")
+            .expire(now);
+        if expired {
+            self.lease_ended();
+        }
+    }
+    /// Enables `GET /profiles` and `POST /profiles/{alias}/check`; read-only, never starts a run.
+    pub fn set_profiles(
+        state: &mut Arc<Self>,
+        profiles: Arc<dyn diary_application::agent::ProfileDirectory>,
+    ) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .profiles = Some(profiles);
+    }
     pub fn set_startup(state: &mut Arc<Self>, summary: diary_application::StartupSummary) {
         *Arc::get_mut(state)
             .expect("startup precedes shared use")
@@ -187,17 +223,11 @@ impl ServerState {
     pub fn shutdown(&self) {
         self.stopping
             .store(true, std::sync::atomic::Ordering::Release);
-        self.coordinator
-            .lock()
-            .expect("coordinator poisoned")
-            .expire(u64::MAX);
+        self.expire_leases(u64::MAX);
     }
     pub async fn sweep(self: Arc<Self>) {
         while !self.stopping.load(std::sync::atomic::Ordering::Acquire) {
-            self.coordinator
-                .lock()
-                .expect("coordinator poisoned")
-                .expire(self.now());
+            self.expire_leases(self.now());
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
     }
@@ -219,6 +249,8 @@ pub fn router(state: Arc<ServerState>) -> Router {
             "/api/v1/imports",
             post(imports::create).layer(DefaultBodyLimit::max(4096)),
         )
+        .route("/api/v1/profiles", get(profiles::list))
+        .route("/api/v1/profiles/{alias}/check", post(profiles::check))
         .route("/api/v1/calendar", get(calendar::get_calendar))
         .route("/api/v1/sources/{id}", get(imports::read))
         .route("/api/v1/sources", get(imports::list))
@@ -526,6 +558,7 @@ async fn close_session(
         .close(&id, s.now())
     {
         Ok(()) => {
+            s.lease_ended();
             s.log(in_session(
                 traced(EventCode::SessionClosed, Level::Info, &trace),
                 &id,

@@ -1,11 +1,15 @@
-//! Agent adapters' shared infrastructure: config-to-port mapping, embedded prompt assets, packet
-//! encoding and strict generation-output validation. No adapter, process or native bridge here.
+//! Agent adapters' infrastructure: config-to-port mapping, embedded prompt assets, packet encoding,
+//! strict generation-output validation, the generic CLI supervisor, the Codex adapter and read-only
+//! profile status. No native (Apple) bridge yet.
 use crate::config::Profile;
 use diary_application::agent::{AgentKind, ProfileHandle};
 
 pub mod assets;
+pub mod codex;
 pub mod output;
 pub mod packet;
+pub mod process;
+pub mod profiles;
 
 pub fn handle(profile: &Profile) -> ProfileHandle {
     let kind = match profile {

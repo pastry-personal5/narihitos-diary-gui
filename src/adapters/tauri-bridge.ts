@@ -17,6 +17,8 @@ import {
   authenticPageDto,
   operationStateDto,
   reloadResultDto,
+  profileDto,
+  profileListDto,
   serverSettingsDto,
   settingsErrorDto,
   userSettingsDto,
@@ -113,6 +115,8 @@ export const tauriBridge: Bridge = {
     symbolDto(await invoke<unknown>("get_symbol", { name, size, scale })),
   serverSettings: () => settings("get_settings", undefined, serverSettingsDto),
   reloadSettings: () => settings("reload_settings", undefined, reloadResultDto),
+  listProfiles: () => authentic("list_agents", undefined, profileListDto),
+  checkProfile: (alias) => authentic("check_agent", { alias }, profileDto),
   getUserSettings: () =>
     settings("get_user_settings", undefined, userSettingsDto),
   updateUserSettings: (u) =>

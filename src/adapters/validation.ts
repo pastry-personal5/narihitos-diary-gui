@@ -6,6 +6,8 @@ import {
   type AuthenticFile,
   type AuthenticPage,
   type Availability,
+  type ProfileInfo,
+  type ProfileCapability,
   type ReloadResult,
   type ServerSettings,
   SettingsError,
@@ -300,4 +302,55 @@ export function settingsErrorDto(value: unknown): SettingsError {
       ? code
       : "unavailable",
   );
+}
+
+const PROFILE_STATES = [
+  "unchecked",
+  "missing",
+  "unsupported_version",
+  "unavailable",
+  "available_auth_unknown",
+  "unauthenticated",
+  "ready",
+  "busy",
+  "failed",
+];
+const PROFILE_REASONS = [
+  "assets_missing",
+  "assets_invalid",
+  "adapter_unimplemented",
+];
+function profileCapabilityDto(value: unknown): ProfileCapability {
+  const dto = record(value);
+  const reason = dto.reason ?? null;
+  if (
+    typeof dto.available !== "boolean" ||
+    (reason !== null &&
+      (typeof reason !== "string" || !PROFILE_REASONS.includes(reason))) ||
+    dto.available !== (reason === null)
+  )
+    throw new Error("Invalid server response");
+  return {
+    available: dto.available,
+    reason: reason as ProfileCapability["reason"],
+  };
+}
+export function profileDto(value: unknown): ProfileInfo {
+  const dto = record(value);
+  const caps = record(dto.capabilities);
+  const status = text(dto.status, 32);
+  if (!PROFILE_STATES.includes(status))
+    throw new Error("Invalid server response");
+  return {
+    alias: text(dto.alias, 64),
+    type: text(dto.type, 32),
+    status: status as ProfileInfo["status"],
+    capabilities: {
+      chat: profileCapabilityDto(caps.chat),
+      generate: profileCapabilityDto(caps.generate),
+    },
+  };
+}
+export function profileListDto(value: unknown): ProfileInfo[] {
+  return list(record(value).profiles, 64).map(profileDto);
 }

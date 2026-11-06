@@ -10,7 +10,7 @@ use std::{
 
 const OP: &str = "07249746-e280-4d51-a86a-cbcb198ee101";
 
-fn http(status: &str, value: serde_json::Value) -> String {
+pub(crate) fn http(status: &str, value: serde_json::Value) -> String {
     let body = value.to_string();
     format!(
         "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
@@ -18,7 +18,9 @@ fn http(status: &str, value: serde_json::Value) -> String {
     )
 }
 /// Serves the handshake, then one scripted response per later request; returns the raw requests.
-fn fixture(replies: Vec<String>) -> (tempfile::TempDir, Bridge, thread::JoinHandle<Vec<String>>) {
+pub(crate) fn fixture(
+    replies: Vec<String>,
+) -> (tempfile::TempDir, Bridge, thread::JoinHandle<Vec<String>>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let status = serde_json::json!({"instance_id":OP,"workspace_key":"b".repeat(64),"server_version":"1.0.0","api_version":1,"api_minor":0,"storage_ready":true,"capabilities":["status","sessions","jobs","events"]});

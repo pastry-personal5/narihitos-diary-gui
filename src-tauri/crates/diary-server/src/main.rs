@@ -222,14 +222,34 @@ async fn run() -> Result<(), &'static str> {
         &mut state,
         config.observe_startup(&launch_path, &launch_cwd),
     );
+    // Read-only profile status; nothing here starts a run (P1-M21/P1-M22 own that).
+    diary_infrastructure::agent::codex::sweep_stale_runs(&config.paths.runtime_root);
+    let profile_table =
+        Arc::new(diary_infrastructure::agent::profiles::ProfileTable::from_config(&config));
+    let adapter = Arc::new(diary_infrastructure::agent::codex::CodexAdapter::new(
+        profile_table.clone(),
+        config.paths.runtime_root.clone(),
+        launch_path.clone(),
+        launch_cwd.clone(),
+        diagnostics.clone(),
+    ));
+    {
+        let adapter = adapter.clone();
+        diary_api::ServerState::set_lease_ended(&mut state, Arc::new(move || adapter.cancel_all()));
+    }
+    diary_api::ServerState::set_profiles(
+        &mut state,
+        Arc::new(diary_infrastructure::agent::profiles::ProfileService::new(
+            profile_table.clone(),
+            adapter.clone(),
+        )),
+    );
     diary_api::ServerState::set_reloader(
         &mut state,
-        Arc::new(config::ConfigHandle::new(
-            &path,
-            &config,
-            launch_path.clone(),
-            launch_cwd.clone(),
-        )),
+        Arc::new(
+            config::ConfigHandle::new(&path, &config, launch_path.clone(), launch_cwd.clone())
+                .with_profiles(profile_table),
+        ),
     );
     #[cfg(feature = "scaffold-smoke")]
     diary_api::ServerState::set_smoke_folders(&mut state, native_smoke::folders(&config));
@@ -275,6 +295,7 @@ async fn run() -> Result<(), &'static str> {
         result = &mut service => { result.map_err(|_| "server transport failed")?; },
         _ = async { tokio::select! { _ = interrupt.recv() => (), _ = term.recv() => () } } => {
             diagnostics.emit(Record::new(EventCode::ServerStopping, Level::Info));
+            adapter.shutdown();
             state.shutdown();
             let _ = stop_tx.send(());
             // No durable work is implemented; stop streams and cap network drain.

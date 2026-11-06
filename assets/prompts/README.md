@@ -53,7 +53,8 @@ earlier `extract-memories`, `refine-source` and `review-paragraph` templates are
 [archived](../../docs/archive/prompts/README.md); their existence never approved memory
 extraction, AI source repair or non-deterministic paragraph review.
 
-Evidence limits: no model, CLI or native framework has run these prompts. Tests pin field
-names, placeholders and the embedded table, not output quality. The release `diary-server`
-binary does not link the loader yet, so embedding in the release artifact is checked by the
-first consumer (P1-M17).
+Evidence limits: only one live Codex generation/chat turn (P1-M17) has run these prompts, with a
+synthetic one-snippet packet; Apple and quality are unproven. Tests pin field names, placeholders
+and the embedded table, not output quality. P1-M17 links the loader into
+`diary-server` through profile status; `scripts/smoke/agent.py` checks that the built binary contains the
+embedded Codex prompts. The pins `gpt-5.6-luna`/`medium` were accepted by a live Codex 0.167.0 turn.
