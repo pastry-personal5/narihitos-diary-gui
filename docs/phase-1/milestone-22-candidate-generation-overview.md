@@ -33,7 +33,7 @@ Check only with recorded evidence. Planning does not complete these items.
 - [ ] C04 — A failed candidate does not remove earlier ones and the loop continues; the job succeeds with partial counts if at least one candidate is valid and fails if none is; the reservation spans the whole loop including the gaps. Evidence: `partial_failure_keeps_ready`, `zero_valid_is_failure`, `busy_between_candidates`.
 - [ ] C05 — Cancel keeps finished candidates, labels the interrupted candidate and unstarted slots separately, and drops late results; lease end, close and shutdown cancel the run. Evidence: `cancel_keeps_ready_and_counts_slots`, `late_result_dropped`, `lease_end_cancels_generation`.
 - [ ] C06 — The candidate store is session-owned, capped at 5 jobs and 8 MiB per session and counted in the transient byte cap; a full store refuses admission with a code that asks for explicit discard; discard removes only that transient result, leaves a content-free admission record and never reruns inference. Evidence: `store_cap_refuses_admission`, `discard_keeps_admission_record`, `retry_after_discard_is_unavailable`.
-- [ ] C07 — `generation.count` is a validated integer 1–5, default 3, saved through the guarded section write; an invalid section degrades alone and keeps its raw data. Evidence: user-settings tests for default, bounds, conflict, invalid section and newer schema.
+- [ ] C07 — `generation.count` is a validated integer 1–5, default 3, saved through the guarded section write; an invalid section degrades alone and keeps its raw data. Evidence: `generation_defaults_and_bounds`, `generation_write_conflicts`, `generation_invalid_section_preserved`, `generation_newer_schema_untouched`.
 
 ### Stage B — routes and bridge
 
@@ -60,9 +60,9 @@ Check only with recorded evidence. Planning does not complete these items.
 
 ## Plan-review checklist
 
-- [ ] R01 — Compare the plan with the maintained contracts and the M16–M21 code; record findings in the work plan.
-- [ ] R02 — Map each finding to a C item and a named test.
-- [ ] R03 — Format the changed plans, check local links and whitespace, and review the scoped diff.
+- [x] R01 — Compare the plan with the maintained contracts and the M16–M21 code; record findings in the work plan.
+- [x] R02 — Map each finding to a C item and a named test.
+- [x] R03 — Format the changed plans, check local links and whitespace, and review the scoped diff.
 
 ## Implementation gate
 
