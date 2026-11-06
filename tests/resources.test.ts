@@ -404,6 +404,7 @@ describe("retained editor resources", () => {
         read: true,
         save: false,
         trash: false,
+        trash_reason: "trash_unverified",
         reason: "writer_unverified",
       },
     } as Source;
@@ -433,6 +434,7 @@ describe("retained editor resources", () => {
       read: true,
       save: false,
       trash: false,
+      trash_reason: "trash_unverified",
       reason: "writer_unverified",
     } as const;
     const source = {
@@ -478,6 +480,7 @@ describe("retained editor resources", () => {
       read: true,
       save: false,
       trash: false,
+      trash_reason: "trash_unverified",
       reason: "writer_unverified",
     } as const;
     const original = {

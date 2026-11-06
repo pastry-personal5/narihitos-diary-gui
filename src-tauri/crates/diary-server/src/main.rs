@@ -200,7 +200,16 @@ async fn run() -> Result<(), &'static str> {
     if let Some(store) = workspace.open_imports(config.sources.clone()) {
         diary_api::ServerState::set_imports(&mut state, store);
     }
-    if let Some(Ok(writer)) = workspace.open_source_writer(config.sources.clone()) {
+    let mut source_ready = true;
+    if let Some(service) = workspace.source_trash(config.sources.clone()) {
+        source_ready = service.recover().is_ok();
+        if !source_ready {
+            diary_api::ServerState::set_storage_ready(&mut state, false);
+            diagnostics.emit(Record::new(EventCode::OperationBlocked, Level::Error));
+        }
+        diary_api::ServerState::set_source_trash(&mut state, service);
+    }
+    if source_ready && let Some(Ok(writer)) = workspace.open_source_writer(config.sources.clone()) {
         diary_api::ServerState::set_source_writer(&mut state, writer);
     }
     let watched_store = authentic.clone();

@@ -5,6 +5,7 @@ mod imports;
 #[cfg(feature = "scaffold-smoke")]
 mod smoke;
 mod source_save;
+mod source_trash;
 use axum::{
     Extension, Json, Router,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, Request, State},
@@ -49,6 +50,7 @@ pub struct ServerState {
     authentic: Option<Arc<dyn diary_application::authentic::AuthenticStore>>,
     imports: Option<Arc<dyn diary_application::imports::ImportStore>>,
     source_writer: Option<Arc<dyn diary_application::source::SourceWriter>>,
+    source_trash: Option<Arc<dyn diary_application::source_trash::SourceTrash>>,
     source_slots: Arc<tokio::sync::Semaphore>,
     import_errors: Mutex<(String, std::collections::BTreeMap<String, &'static str>)>,
     sse_slots: Arc<tokio::sync::Semaphore>,
@@ -83,6 +85,7 @@ impl ServerState {
             authentic: None,
             imports: None,
             source_writer: None,
+            source_trash: None,
             source_slots: Arc::new(tokio::sync::Semaphore::new(2)),
             import_errors: Mutex::new((String::new(), std::collections::BTreeMap::new())),
             authentic_epoch: std::sync::atomic::AtomicU64::new(0),
@@ -140,6 +143,14 @@ impl ServerState {
         Arc::get_mut(state)
             .expect("startup precedes shared use")
             .source_writer = Some(writer);
+    }
+    pub fn set_source_trash(
+        state: &mut Arc<Self>,
+        service: Arc<dyn diary_application::source_trash::SourceTrash>,
+    ) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .source_trash = Some(service);
     }
     pub fn set_startup(state: &mut Arc<Self>, summary: diary_application::StartupSummary) {
         *Arc::get_mut(state)
@@ -212,6 +223,15 @@ pub fn router(state: Arc<ServerState>) -> Router {
         .route("/api/v1/sources/{id}", get(imports::read))
         .route("/api/v1/sources", get(imports::list))
         .route("/api/v1/sources/{id}/body", put(source_save::save))
+        .route(
+            "/api/v1/sources/{id}/trash-preview",
+            post(source_trash::preview).layer(DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/api/v1/sources/{id}/trash",
+            post(source_trash::confirm).layer(DefaultBodyLimit::max(4096)),
+        )
+        .route("/api/v1/operations", get(source_trash::unfinished))
         .route(
             "/api/v1/sources/{id}/time-resolution",
             post(imports::resolve).layer(DefaultBodyLimit::max(4096)),
@@ -343,6 +363,8 @@ async fn authenticate(
                 !imports::valid_read_query(query)
             } else if request.uri().path() == "/api/v1/sources" {
                 !imports::valid_query(query)
+            } else if request.uri().path() == "/api/v1/operations" {
+                !source_trash::valid_query(query)
             } else {
                 !matches!(request.uri().path(), "/api/v1/jobs" | "/api/v1/authentic")
                     || !query.strip_prefix("cursor=").is_some_and(|cursor| {

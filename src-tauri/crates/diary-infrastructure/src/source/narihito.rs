@@ -1,6 +1,6 @@
 use super::adapter::{SourceAdapter, scalar};
 use super::{narihito_write::check, write::WRITE_BODY_VERIFIED};
-use diary_application::source::{UnsupportedReason, WriteReason};
+use diary_application::source::{TrashReason, UnsupportedReason, WriteReason};
 use diary_domain::source::{
     front_matter::Parsed,
     stamp::{self, Instant, StampError},
@@ -39,6 +39,14 @@ impl SourceAdapter for Narihito {
         match body.strip_prefix('\n') {
             Some(text) => text.to_owned(),
             None => body,
+        }
+    }
+    fn trash_policy(&self, bytes: &[u8], rel: &str) -> Result<(), TrashReason> {
+        check(bytes, rel).map_err(|_| TrashReason::UnsupportedFormat)?;
+        if super::trash::TRASH_PAIR_VERIFIED {
+            Ok(())
+        } else {
+            Err(TrashReason::TrashUnverified)
         }
     }
 }

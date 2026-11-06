@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16–P1-M28 remain Planned.
 
 ### P1-M1: Research
 
@@ -112,8 +112,10 @@ Notes: Narihito mobile schema 1 only; Ayumi stays disabled without a producer co
 
 ### P1-M15: Source and audio Trash
 
-Status: Planned
+Status: Done
 Goal: Add confirmed snippet/audio Trash with exact ownership previews, durable per-member outcomes and safe partial-operation reconciliation and retry.
+Plan: [overview](../archive/milestones/p1-m15/milestone-15-source-audio-trash-overview.md), [work plan](../archive/milestones/p1-m15/milestone-15-source-audio-trash-architecture.md).
+Notes: Narihito schema 1 Trash is enabled after native process-fault/receipt/restart and pinned producer catalog/audio/reopen evidence, ordinary server integration and the full gate. Ayumi stays disabled. Retained empty assets directories produce a producer recovery row; phone/live-iCloud remains unverified without a manual exit gate.
 
 ### P1-M16: Agent contracts and prompt assets
 

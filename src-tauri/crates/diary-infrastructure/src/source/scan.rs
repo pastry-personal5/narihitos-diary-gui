@@ -34,6 +34,7 @@ struct Walker<'a> {
     candidate_limit: usize,
     directories: Option<&'a BTreeSet<String>>,
     cancelled: &'a dyn Fn() -> bool,
+    ownership: bool,
 }
 
 pub fn scan(root: &ResolvedRoot, kind: &SourceKind, generation: u64) -> ScanReport {
@@ -66,6 +67,50 @@ pub fn scan_selected(
     directories: Option<&BTreeSet<String>>,
     cancelled: &dyn Fn() -> bool,
 ) -> ScanReport {
+    scan_options(
+        root,
+        kind,
+        generation,
+        entry_limit,
+        candidate_limit,
+        directories,
+        cancelled,
+        false,
+    )
+}
+
+/// Whole-namespace ownership assessment: no hydration side effects and no silently
+/// skipped links, volumes or assets directories. Bounds are shared by the caller.
+pub(super) fn scan_ownership(
+    root: &ResolvedRoot,
+    kind: &SourceKind,
+    entry_limit: usize,
+    candidate_limit: usize,
+    cancelled: &dyn Fn() -> bool,
+) -> ScanReport {
+    scan_options(
+        root,
+        kind,
+        0,
+        entry_limit,
+        candidate_limit,
+        None,
+        cancelled,
+        true,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn scan_options(
+    root: &ResolvedRoot,
+    kind: &SourceKind,
+    generation: u64,
+    entry_limit: usize,
+    candidate_limit: usize,
+    directories: Option<&BTreeSet<String>>,
+    cancelled: &dyn Fn() -> bool,
+    ownership: bool,
+) -> ScanReport {
     let mut w = Walker {
         root,
         kind,
@@ -80,6 +125,7 @@ pub fn scan_selected(
         candidate_limit,
         directories,
         cancelled,
+        ownership,
     };
     match validated_root(root) {
         Ok(fd) => w.walk(fd, "", 0),
@@ -112,6 +158,9 @@ impl Walker<'_> {
     /// Best-effort: reading an evicted iCloud file makes macOS materialise it; a later import sees it.
     /// shortcut: one detached thread per file, unbounded by anything but the candidate limit.
     fn hydrate(&self, rel: &str) {
+        if self.ownership {
+            return;
+        }
         let path = self.root.canonical.join(rel);
         std::thread::spawn(move || {
             let _ = std::fs::read(path);
@@ -244,7 +293,7 @@ impl Walker<'_> {
                 Err(e) => {
                     if name.ends_with(".md") {
                         self.candidate_failure(rel, e);
-                    } else if matches!(e, Unavailable::Denied | Unavailable::Io) {
+                    } else if self.ownership || matches!(e, Unavailable::Denied | Unavailable::Io) {
                         // Possibly an unreadable directory: never claim a complete scan.
                         self.report.incomplete = true;
                     }
@@ -259,6 +308,9 @@ impl Walker<'_> {
                 }
             };
             if m.dev() != self.root.dev {
+                if self.ownership {
+                    self.report.incomplete = true;
+                }
                 continue;
             }
             if m.is_dir() {
@@ -266,7 +318,7 @@ impl Walker<'_> {
                     self.failure(rel, Unavailable::NotDownloaded);
                     continue;
                 }
-                if name.ends_with(".assets") {
+                if name.ends_with(".assets") && !self.ownership {
                     continue;
                 }
                 if depth >= 8 {

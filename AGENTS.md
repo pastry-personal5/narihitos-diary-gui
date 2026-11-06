@@ -45,6 +45,8 @@ See [README.md](README.md) for the overview and [docs/product-behavior.md](docs/
 
 - **P1-M14 approvals (owner, 2026-11-06):** Narihito mobile schema 1 body saves copy `title` and `title_origin` unchanged; Ayumi saves stay disabled. Approved the `scripts/smoke/producer.py` evidence harness (a Swift program built with the installed `swiftc` from the pinned mobile codec files, run outside the gate, no dependency) and enabling `write_body` once it passes, with phone-app and live-iCloud proof carried to P1-M28. Unresolved iCloud conflict versions are a recorded known gap (no `NSFileVersion` feature). See the [work plan](docs/phase-1/milestone-14-producer-compatible-source-saves-architecture.md#owner-decisions).
 
+- **P1-M15 approvals (owner, 2026-11-06):** Approved enabling only the `NSFileManager` feature on the existing pinned macOS `objc2-foundation` 0.3.2 dependency in `diary-infrastructure`, with license-notice review. P1-M15 acceptance and enablement require automated tests/harnesses plus the full gate only; no human testing or human sign-off is an exit gate, and P1-M15 manual proof must not become a deferred P1-M28 requirement. Native Trash and producer catalog/reopen coverage remain automated requirements; phone/live-iCloud behavior remains an evidence limit. See the [owner decisions](docs/archive/milestones/p1-m15/milestone-15-source-audio-trash-architecture.md#owner-decisions).
+
 - **P1-M11 smoke waiver (owner, 2026-11-06):** The owner skipped the packaged synthetic navigation smoke and closed P1-M11 on automated tests plus the full gate. This waives only that smoke clause; later milestones still need their own evidence. See the [completion record](docs/archive/milestones/p1-m11/milestone-11-explorer-navigation-overview.md#completion-record).
 
 ## Undecided — ask before inventing
@@ -74,6 +76,7 @@ cargo fmt --manifest-path src-tauri/Cargo.toml && npx prettier --write .        
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && npx eslint . --max-warnings 0  # lint
 scripts/gate.sh                                                                                                  # full gate + tsc typecheck: parallel lanes, quiet, PASS/FAIL per command
 python3 scripts/smoke/imports.py                                                                                   # Civil-date import/resolution/restart smoke on the real server binary
+python3 scripts/smoke/trash.py --enabled-server                                                                  # Synthetic native Trash faults + pinned producer catalog + real-server integration
 python3 scripts/smoke/authentic.py                                                                                 # Authentic create/save/restart/kill-recovery smoke on the real server binary
 cargo run --manifest-path src-tauri/Cargo.toml -p diary-server -- trace --config PATH --select recent:20        # redacted debugging trace of the logs
 ```

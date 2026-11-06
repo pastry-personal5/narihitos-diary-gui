@@ -32,7 +32,7 @@ use std::{
     io::{self, Write},
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 pub const KIND_SOURCE_SAVE: &str = "source_save";
@@ -138,11 +138,10 @@ pub struct Writer {
     db: Arc<Db>,
     identity: Identity,
     sources: Vec<Source>,
-    lock: Mutex<()>,
     enabled: bool,
     now: Box<dyn Fn() -> u64 + Send + Sync>,
     #[cfg(test)]
-    fault: Mutex<Option<crate::authentic::Fault>>,
+    fault: std::sync::Mutex<Option<crate::authentic::Fault>>,
 }
 
 impl Writer {
@@ -151,7 +150,6 @@ impl Writer {
             db,
             identity,
             sources,
-            lock: Mutex::new(()),
             enabled: WRITE_BODY_VERIFIED,
             now: Box::new(|| {
                 std::time::SystemTime::now()
@@ -159,7 +157,7 @@ impl Writer {
                     .map_or(0, |d| d.as_secs())
             }),
             #[cfg(test)]
-            fault: Mutex::new(None),
+            fault: std::sync::Mutex::new(None),
         }
     }
 
@@ -244,7 +242,11 @@ impl Writer {
                 ("body", &sha_hex(req.body.as_bytes())),
             ],
         );
-        let _guard = self.lock.lock().map_err(|_| SaveError::Storage)?;
+        let _guard = self
+            .db
+            .source_mutations
+            .lock()
+            .map_err(|_| SaveError::Storage)?;
         if let Some(record) = self.db.get(&req.operation_id).map_err(ledger)? {
             if record.kind != KIND_SOURCE_SAVE
                 || record.hash_version != 1
@@ -625,7 +627,11 @@ impl Writer {
 
     /// Startup: finish what a crash left behind. Returns how many operations were examined.
     pub fn recover(&self, resume: &[OperationId]) -> Result<usize, SaveError> {
-        let _guard = self.lock.lock().map_err(|_| SaveError::Storage)?;
+        let _guard = self
+            .db
+            .source_mutations
+            .lock()
+            .map_err(|_| SaveError::Storage)?;
         let mut n = 0;
         for record in self.db.unfinished().map_err(ledger)? {
             if record.kind == KIND_SOURCE_SAVE && resume.contains(&record.id) {

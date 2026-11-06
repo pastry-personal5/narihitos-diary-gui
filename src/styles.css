@@ -8,6 +8,7 @@
   --surface: #fff;
   --muted: #536158;
   --accent: #285a46;
+  --danger: #8b2222;
 }
 * {
   box-sizing: border-box;
@@ -262,6 +263,7 @@ footer {
   display: flex;
   align-items: baseline;
   gap: 4px;
+  flex-wrap: wrap;
 }
 .snippet-row button {
   min-width: 0;
@@ -340,4 +342,59 @@ footer {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(20 30 24 / 55%);
+}
+.modal-dialog {
+  width: min(600px, 100%);
+  max-height: 85vh;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 12px 48px rgb(0 0 0 / 25%);
+}
+.dialog-actions,
+.trash-activity-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.dialog-actions {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.destructive:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.trash-members {
+  padding-left: 20px;
+}
+.trash-members li {
+  display: grid;
+  gap: 6px;
+  margin-block: 16px;
+}
+.trash-label {
+  overflow-wrap: anywhere;
+}
+.trash-activity {
+  border-bottom: 1px solid var(--line);
+  padding-block: 8px;
+}
+.trash-activity ul {
+  padding-left: 20px;
+}
+.trash-activity li {
+  margin-block: 8px;
 }

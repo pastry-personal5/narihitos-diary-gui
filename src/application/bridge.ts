@@ -1,4 +1,5 @@
 import type { NavigationBridge } from "./navigation/contracts";
+import type { TrashBridge, TrashResult } from "./trash/contracts";
 import type { StreamEvent } from "./events";
 /** Only redacted DTOs belong here. Discovery paths and credentials stay in Rust. */
 export interface AppMetadata {
@@ -48,10 +49,13 @@ export interface RefreshReport {
 }
 export interface OperationState {
   operation_id: string;
+  kind?: string;
+  checkpoint?: number;
   state: string;
   terminal: boolean;
   succeeded: boolean;
   result: string | null;
+  trash?: TrashResult;
 }
 export interface SaveRequest {
   date: string;
@@ -118,7 +122,7 @@ export class SettingsError extends Error {
 /** Result of the native SF Symbol lookup; `png_base64` is a template image to tint with CSS. */
 export type SymbolResult =
   { status: "ok"; png_base64: string } | { status: "unsupported" };
-export interface Bridge extends NavigationBridge {
+export interface Bridge extends NavigationBridge, TrashBridge {
   metadata(): Promise<AppMetadata>;
   /** Absent in fakes; symbols then fall back to their text labels. */
   getSymbol?(name: string, size: number, scale: number): Promise<SymbolResult>;

@@ -16,6 +16,8 @@ pub(crate) enum Unwritable {
 }
 
 pub(crate) struct Checked {
+    pub id: String,
+    pub audio_sha256: Option<String>,
     pub updated_at: String,
     /// The editor view: the text after the producer's blank separator line.
     pub body: String,
@@ -325,6 +327,11 @@ pub(crate) fn check(bytes: &[u8], rel: &str) -> Result<Checked, Unwritable> {
         return Err(F);
     }
     Ok(Checked {
+        id: id.to_owned(),
+        audio_sha256: get("audio_sha256").and_then(|v| match v {
+            Scalar::Str(s) => Some(s.clone()),
+            _ => None,
+        }),
         updated_at: updated.to_owned(),
         body: body.to_owned(),
     })

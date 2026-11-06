@@ -17,6 +17,9 @@ pub(super) trait SourceAdapter {
     fn unsupported(&self, parsed: &Parsed) -> Option<UnsupportedReason>;
     /// Whether these exact bytes may be saved.
     fn write_policy(&self, bytes: &[u8], rel: &str) -> Result<(), WriteReason>;
+    fn trash_policy(&self, _bytes: &[u8], _rel: &str) -> Result<(), TrashReason> {
+        Err(TrashReason::ProducerUnverified)
+    }
     /// The editor text for a parsed body.
     fn view_body(&self, body: String) -> String {
         body
@@ -159,6 +162,11 @@ pub fn read_view(
     Ok(SourceView {
         listing,
         write: adapter.write_policy(&obs.bytes, &rel.spelling),
+        trash: if obs.nlink == 1 {
+            adapter.trash_policy(&obs.bytes, &rel.spelling)
+        } else {
+            Err(TrashReason::UnsupportedFormat)
+        },
         body: adapter.view_body(p.body),
         raw_front_matter: p.raw_front_matter,
         fields: p.fields,

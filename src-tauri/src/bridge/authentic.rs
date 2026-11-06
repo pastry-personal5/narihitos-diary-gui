@@ -48,10 +48,16 @@ pub struct RefreshReport {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OperationState {
     pub operation_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkpoint: Option<u64>,
     pub state: String,
     pub terminal: bool,
     pub succeeded: bool,
     pub result: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trash: Option<super::source_trash::TrashResult>,
 }
 /// `current_revision` is part of the contract but P1-M6 conflicts do not carry it, so clients
 /// reload after a conflict.
@@ -100,6 +106,13 @@ const SERVER_CODES: &[&str] = &[
     "fix_filename_directory_externally",
     "cancelled",
     "request_mismatch",
+    "trash_unsupported",
+    "preview_expired",
+    "preview_stale",
+    "member_changed",
+    "ownership_ambiguous",
+    "checkpoint_mismatch",
+    "partial_trash",
 ];
 const LOCAL_CODES: &[&str] = &[
     "permission_denied",
@@ -290,8 +303,20 @@ impl Bridge {
         if !valid_id(&operation_id) {
             return Err(invalid());
         }
-        self.authentic(Method::GET, &format!("/operations/{operation_id}"), None)
-            .await
+        let result: OperationState = self
+            .authentic(Method::GET, &format!("/operations/{operation_id}"), None)
+            .await?;
+        if result.operation_id != operation_id
+            || (result.kind.as_deref() == Some("source_trash")) != result.trash.is_some()
+            || result.trash.as_ref().is_some_and(|r| {
+                !r.valid()
+                    || r.operation_id != operation_id
+                    || Some(r.checkpoint) != result.checkpoint
+            })
+        {
+            return Err(AuthenticError::new("invalid_response"));
+        }
+        Ok(result)
     }
 }
 

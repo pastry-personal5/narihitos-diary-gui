@@ -51,10 +51,19 @@ export interface SourceDisplay {
 export interface SourceCapabilities {
   read: boolean;
   save: boolean;
-  trash: false;
+  trash: boolean;
+  /** Adapter readiness; a fresh preview must still prove exact member ownership. */
+  trash_reason: SourceTrashReason;
   /** `ready` exactly when `save` is true. */
   reason: SourceSaveReason;
 }
+export type SourceTrashReason =
+  | "ready"
+  | "producer_unverified"
+  | "trash_unverified"
+  | "unsupported_format"
+  | "checked_on_preview"
+  | "reimport_required";
 export type SourceSaveReason =
   | "ready"
   | "producer_unverified"

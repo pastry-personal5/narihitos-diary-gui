@@ -36,6 +36,10 @@ export interface ImportContextView {
   resolutionSaved: boolean;
 }
 interface Context {
+  invalidatedAll: boolean;
+  pendingInvalidatedAll: boolean;
+  moved: Set<string>;
+  pendingMoved: Set<string>;
   view: ImportContextView;
   requestId: string;
   importId?: string;
@@ -154,6 +158,7 @@ export class ImportController {
       ) {
         this.contexts.delete(date);
         this.budget.release(this.key(date));
+        this.budget.release(`import-moved:${date}`);
         return true;
       }
     }
@@ -176,6 +181,10 @@ export class ImportController {
       if (!this.evict()) return null;
     }
     const c: Context = {
+      invalidatedAll: false,
+      pendingInvalidatedAll: false,
+      moved: new Set(),
+      pendingMoved: new Set(),
       view: idle(date),
       requestId: this.newId(),
       serial: 0,
@@ -214,6 +223,8 @@ export class ImportController {
     if (this.disposed || !this.scope) return;
     const c = this.context(date);
     if (!c || this.busy(c) || c.view.resolving) return;
+    c.pendingMoved = new Set();
+    c.pendingInvalidatedAll = false;
     c.previous = new Set(
       c.view.items
         .map(sourceOf)
@@ -371,7 +382,11 @@ export class ImportController {
       )
         throw new AuthenticError("invalid_response", false);
       const seen = new Set(c.firstPage ? [] : c.seen),
-        choices = new Map(this.choices);
+        choices = new Map(this.choices),
+        moved = c.firstPage ? c.pendingMoved : c.moved,
+        invalidatedAll = c.firstPage
+          ? c.pendingInvalidatedAll
+          : c.invalidatedAll;
       for (const item of page.items) {
         const s = sourceOf(item);
         if (!s) continue;
@@ -381,16 +396,19 @@ export class ImportController {
         const before = choices.get(s.id);
         choices.set(s.id, {
           digest: s.digest,
-          checked: before
-            ? before.digest === s.digest &&
-              (s.eligible && !before.eligibleSeen ? true : before.checked)
-            : s.eligible,
+          checked: moved.has(s.id)
+            ? false
+            : before
+              ? before.digest === s.digest &&
+                (s.eligible && !before.eligibleSeen ? true : before.checked)
+              : s.eligible,
           eligibleSeen:
             before?.digest === s.digest
               ? before.eligibleSeen || s.eligible
               : s.eligible,
-          invalidated:
-            before && before.digest !== s.digest
+          invalidated: moved.has(s.id)
+            ? "missing"
+            : before && before.digest !== s.digest
               ? "changed"
               : (before?.invalidated ?? null),
         });
@@ -422,6 +440,12 @@ export class ImportController {
         if (!this.evict()) throw new AuthenticError("session_limit", false);
       }
       this.choices = choices;
+      c.moved = moved;
+      c.invalidatedAll = invalidatedAll;
+      this.budget.reserve(
+        `import-moved:${c.view.date}`,
+        (c.moved.size + c.pendingMoved.size) * 80,
+      );
       c.seen = seen;
       c.firstPage = false;
       c.cursor = page.next_cursor ?? undefined;
@@ -430,9 +454,9 @@ export class ImportController {
         page,
         items,
         phase: "ready",
-        stale: false,
+        stale: invalidatedAll,
         partial: page.next_cursor !== null,
-        error: null,
+        error: invalidatedAll ? "session_limit" : null,
       };
       this.emit();
     } catch (e) {
@@ -447,13 +471,48 @@ export class ImportController {
   setIncluded(date: string, id: string, checked: boolean) {
     const c = this.contexts.get(date),
       source = c?.view.items.map(sourceOf).find((s) => s?.id === id);
-    if (!c || c.view.stale || !source?.eligible) return;
+    if (!c || c.view.stale || !source?.eligible || this.sourceDisabled(source))
+      return;
     this.choices.set(id, {
       digest: source.digest,
       checked,
       eligibleSeen: true,
       invalidated: null,
     });
+    this.emit();
+  }
+  sourceDisabled(source: Source) {
+    return [...this.contexts.values()].some(
+      (c) =>
+        c.view.page?.import_id === source.import_id &&
+        (c.invalidatedAll || c.moved.has(source.id)),
+    );
+  }
+  /** An overlay, never a rewrite of an immutable page. Include not-yet-loaded rows
+   * of an existing import, and any import already in flight when the move is seen. */
+  sourceMoved(sourceId: string) {
+    for (const c of this.contexts.values()) {
+      if (
+        !this.budget.reserve(
+          `import-moved:${c.view.date}`,
+          (c.moved.size + c.pendingMoved.size + 2) * 80,
+        )
+      ) {
+        c.invalidatedAll = true;
+        if (this.busy(c)) c.pendingInvalidatedAll = true;
+        c.view = { ...c.view, stale: true, error: "session_limit" };
+        continue;
+      }
+      c.moved.add(sourceId);
+      if (this.busy(c)) c.pendingMoved.add(sourceId);
+    }
+    const choice = this.choices.get(sourceId);
+    if (choice)
+      this.choices.set(sourceId, {
+        ...choice,
+        checked: false,
+        invalidated: "missing",
+      });
     this.emit();
   }
   eligible(date: string): Source[] {
@@ -465,6 +524,7 @@ export class ImportController {
         (s): s is Source =>
           !!s &&
           s.eligible &&
+          !this.sourceDisabled(s) &&
           this.choices.get(s.id)?.checked === true &&
           this.choices.get(s.id)?.digest === s.digest,
       );
@@ -476,6 +536,7 @@ export class ImportController {
       c.view.stale ||
       this.busy(c) ||
       c.view.resolving ||
+      this.sourceDisabled(source) ||
       source.import_id !== c.importId
     )
       return;
@@ -552,6 +613,8 @@ export class ImportController {
           void this.poll(c);
   }
   dispose() {
+    for (const date of this.contexts.keys())
+      this.budget.release(`import-moved:${date}`);
     this.disposed = true;
     this.epoch++;
     for (const [date, c] of this.contexts) {

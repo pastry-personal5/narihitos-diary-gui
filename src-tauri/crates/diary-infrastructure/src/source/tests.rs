@@ -337,6 +337,7 @@ fn ayumi_never_writable_and_body_unchanged() {
     let (_, l) = adapter::observe(&tree.root, &SourceKind::Ayumi, &rel, 0).unwrap();
     let view = adapter::read_view(&tree.root, &SourceKind::Ayumi, &rel, 0, &l.token).unwrap();
     assert_eq!(view.write, Err(WriteReason::ProducerUnverified));
+    assert_eq!(view.trash, Err(TrashReason::ProducerUnverified));
     assert!(view.body.starts_with("\nBODY_SECRET"));
 }
 #[test]
@@ -352,9 +353,11 @@ fn narihito_save_true_when_enabled_and_view_drops_separator() {
     let v = view(&tree);
     assert_eq!(v.body, "hello\n");
     assert_eq!(v.write, Ok(()));
+    assert_eq!(v.trash, Ok(()));
     let text = String::from_utf8(golden("2024-02-29T01:02:03Z", "hello\n"))
         .unwrap()
         .replace("favorite: false", "favorite: maybe");
     tree.write(REL, text.as_bytes());
     assert_eq!(view(&tree).write, Err(WriteReason::UnsupportedFormat));
+    assert_eq!(view(&tree).trash, Err(TrashReason::UnsupportedFormat));
 }

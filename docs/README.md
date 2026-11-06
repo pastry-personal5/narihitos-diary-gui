@@ -76,3 +76,7 @@ This index lists the design and process docs, one line each. Read only the doc y
 - [P1-M11 Explorer and editor navigation overview](archive/milestones/p1-m11/milestone-11-explorer-navigation-overview.md): completed scope, N01–N12 completion checklist and implementation gate.
 
 - [P1-M11 Explorer and editor navigation work plan](archive/milestones/p1-m11/milestone-11-explorer-navigation-architecture.md): review findings, server calendar/source DTOs, immutable import UI, resource guards, bounded caches and packaged smoke procedure.
+
+- [P1-M15 Source and audio Trash overview](archive/milestones/p1-m15/milestone-15-source-audio-trash-overview.md): archived completion record, native/producer evidence, enabled Narihito scope, verifiable checklist and passing gate.
+
+- [P1-M15 Source and audio Trash work plan](archive/milestones/p1-m15/milestone-15-source-audio-trash-architecture.md): archived implementation plan, ownership/recovery contracts and owner decisions.

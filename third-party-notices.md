@@ -12,6 +12,8 @@ MPL-covered sources remain unmodified; exact source-archive links are provided p
 
 [Supplement provenance](assets/third-party/supplemental-notices.json) identifies exact-commit upstream URLs, same-version official native-binary wrapper notices, standard-license text sources and original source/README sections. The upstream objc2 repository notice documents its SDK-derived-source licensing caveat; this record preserves that notice and does not claim independent Apple SDK/license clearance. The chosen personal macOS/Tauri scope and pending broader platform/release qualification remain as recorded in the project architecture.
 
+P1-M15 enables `NSFileManager` on the existing pinned `objc2-foundation` 0.3.2 dependency. The MIT selection and preserved upstream SDK-derived-source notice were reviewed; this feature change adds no package or version and does not establish independent Apple SDK license clearance.
+
 Regenerate with the existing Python/Cargo tools:
 
 ```sh

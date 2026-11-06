@@ -11,6 +11,7 @@ import type {
   SourceCapabilities,
   SourceSaved,
   SourceSaveReason,
+  SourceTrashReason,
   SourceItem,
   SourceFailure,
   SourceGroup,
@@ -207,8 +208,18 @@ export function sourceSaved(v: unknown): SourceSaved {
 function caps(v: unknown): SourceCapabilities {
   const d = obj(v);
   const save = bool(d.save);
+  const trash = bool(d.trash);
   if (
-    d.trash !== false ||
+    typeof d.trash_reason !== "string" ||
+    ![
+      "ready",
+      "producer_unverified",
+      "trash_unverified",
+      "unsupported_format",
+      "checked_on_preview",
+      "reimport_required",
+    ].includes(d.trash_reason) ||
+    trash !== (d.trash_reason === "ready") ||
     typeof d.reason !== "string" ||
     !SAVE_REASONS.includes(d.reason as SourceSaveReason) ||
     save !== (d.reason === "ready")
@@ -217,7 +228,8 @@ function caps(v: unknown): SourceCapabilities {
   return {
     read: bool(d.read),
     save,
-    trash: false,
+    trash,
+    trash_reason: d.trash_reason as SourceTrashReason,
     reason: d.reason as SourceSaveReason,
   };
 }

@@ -43,7 +43,13 @@ const sourceItem = {
     header_invalid: null,
     filename_invalid: null,
     eligible: true,
-    capabilities: { read: true, save: false, trash: false, reason: "x" },
+    capabilities: {
+      read: true,
+      save: false,
+      trash: false,
+      trash_reason: "trash_unverified",
+      reason: "x",
+    },
     navigation: {
       group_id: "group",
       header: local,

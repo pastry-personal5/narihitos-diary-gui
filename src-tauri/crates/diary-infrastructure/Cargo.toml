@@ -21,7 +21,7 @@ jiff = { version = "=0.2.39", default-features = false, features = ["std", "tzdb
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "=0.6.5"
-objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "block2", "NSError", "NSString", "NSURL", "NSFileCoordinator", "NSArray", "NSObject"] }
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "block2", "NSError", "NSString", "NSURL", "NSFileCoordinator", "NSFileManager", "NSArray", "NSObject"] }
 block2 = "=0.6.2"
 
 [dev-dependencies]

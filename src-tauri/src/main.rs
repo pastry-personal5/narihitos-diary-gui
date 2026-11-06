@@ -228,6 +228,36 @@ async fn save_source(
         .await
 }
 #[tauri::command]
+async fn preview_source_delete(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    source_id: String,
+    request: bridge::TrashPreviewRequest,
+) -> Result<bridge::TrashPreview, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.preview_source_delete(source_id, request).await
+}
+#[tauri::command]
+async fn confirm_source_delete(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    source_id: String,
+    request: bridge::TrashConfirmRequest,
+) -> Result<bridge::TrashAcknowledged, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.confirm_source_delete(source_id, request).await
+}
+#[tauri::command]
+async fn list_source_deletions(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    cursor: Option<String>,
+    limit: Option<u16>,
+) -> Result<bridge::TrashPage, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.list_source_deletions(cursor, limit).await
+}
+#[tauri::command]
 async fn import_date(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -478,6 +508,9 @@ fn main() {
             get_calendar,
             read_source,
             save_source,
+            preview_source_delete,
+            confirm_source_delete,
+            list_source_deletions,
             import_date,
             list_sources,
             resolve_source_time,

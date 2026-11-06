@@ -55,7 +55,7 @@ pub(super) fn cancelled(s: &ServerState, session: &str) -> bool {
 }
 /// Polls `f` on the first call and every 64th after; a `true` is latched.
 /// Scans call the predicate per directory entry, and `f` takes the coordinator lock.
-fn throttled(f: impl Fn() -> bool) -> impl Fn() -> bool {
+pub(super) fn throttled(f: impl Fn() -> bool) -> impl Fn() -> bool {
     let calls = std::cell::Cell::new(0u32);
     let hit = std::cell::Cell::new(false);
     move || {
@@ -266,7 +266,7 @@ pub(super) fn failure_code(outcome: &diary_application::source::SourceOutcome) -
         _ => "conflict",
     }
 }
-fn page(r: ImportListing, cursor: usize) -> Result<Value, ImportError> {
+fn page(r: ImportListing, cursor: usize, trash_available: bool) -> Result<Value, ImportError> {
     let total =
         r.included.len() + r.warnings.len() + r.scan.failures.len() + r.scan.collisions.len();
     if cursor > total {
@@ -285,12 +285,12 @@ fn page(r: ImportListing, cursor: usize) -> Result<Value, ImportError> {
         .chain(r.scan.failures.iter().enumerate().map(|(i, (key, outcome))| Item::Failure(i, key, outcome)))
         .chain(r.scan.collisions.iter().enumerate().map(|(i,keys)| Item::Collision(i,keys)))
         .skip(cursor).take(100).map(|item| match item {
-            Item::Included(s) => json!({"kind":"included","source":enhanced_source(&s.source,&r,true),"instant":instant(s.instant),"misplaced":misplaced.contains(&s.source.id)}),
-            Item::Warning(s) => json!({"kind":"warning","source":enhanced_source(s,&r,false),"misplaced":misplaced.contains(&s.id)}),
+            Item::Included(s) => json!({"kind":"included","source":enhanced_source(&s.source,&r,true,trash_available),"instant":instant(s.instant),"misplaced":misplaced.contains(&s.source.id)}),
+            Item::Warning(s) => json!({"kind":"warning","source":enhanced_source(s,&r,false,trash_available),"misplaced":misplaced.contains(&s.id)}),
             Item::Failure(i, key, outcome) => {
                 let group = r.navigation.as_ref().and_then(|n|n.failure_groups.get(i));
                 let readable = r.scan.readable.iter().find(|s| s.rel == key && r.navigation.as_ref().and_then(|n|n.sources.get(&s.id)).is_some_and(|d| Some(&d.group_id)==group));
-                json!({"kind":"failure","relative_key":key,"code":failure_code(outcome),"group_id":group,"source":readable.map(|s|enhanced_source(s,&r,false))})
+                json!({"kind":"failure","relative_key":key,"code":failure_code(outcome),"group_id":group,"source":readable.map(|s|enhanced_source(s,&r,false,trash_available))})
             },
             Item::Collision(i, keys) => json!({"kind":"path_collision","relative_keys":keys,"group_id":r.navigation.as_ref().and_then(|n|n.collision_groups.get(i))}),
         }).collect();
@@ -322,7 +322,11 @@ pub(super) async fn list(
         if r.context.config_generation != s.config_generation.load(Ordering::SeqCst) {
             return Err(ImportError::Stale);
         }
-        page(r, q.cursor.unwrap_or(0))
+        page(
+            r,
+            q.cursor.unwrap_or(0),
+            s.source_trash.as_ref().is_some_and(|t| t.available()),
+        )
     })
     .await;
     match result {
@@ -438,7 +442,7 @@ pub(super) async fn read(
         let view = st.read(&q.snapshot_id, &id, generation, &|| cancelled(&s, &session)).map_err(|e| match e { ViewError::Stale => "source_stale", ViewError::Outcome(o) => failure_code(&o) })?;
         if generation != s.config_generation.load(Ordering::SeqCst) || cancelled(&s, &session) { return Err("source_stale"); }
         if view.body.len() > diary_domain::authentic::MAX_BODY_BYTES { return Err("too_large"); }
-        let value = json!({"source":enhanced_source(&view.listing,&snapshot,false),"snapshot_id":q.snapshot_id,"body":view.body,"capabilities":write_capabilities(view.write)});
+        let value = json!({"source":enhanced_source(&view.listing,&snapshot,false,s.source_trash.as_ref().is_some_and(|t|t.available())),"snapshot_id":q.snapshot_id,"body":view.body,"capabilities":source_capabilities(view.write, view.trash, s.source_trash.as_ref().is_some_and(|t|t.available()))});
         let bytes = serde_json::to_vec(&value).map_err(|_|"internal")?;
         if bytes.len() > 10 * 1024 * 1024 { return Err("too_large"); }
         Ok(bytes)
@@ -448,16 +452,35 @@ pub(super) async fn read(
     }
 }
 
-fn write_capabilities(write: Result<(), diary_application::source::WriteReason>) -> Value {
-    use diary_application::source::WriteReason::*;
+fn source_capabilities(
+    write: Result<(), diary_application::source::WriteReason>,
+    trash: Result<(), diary_application::source::TrashReason>,
+    trash_available: bool,
+) -> Value {
+    use diary_application::source::{TrashReason, WriteReason};
     let reason = match write {
-        Ok(()) => return json!({"read":true,"save":true,"trash":false,"reason":"ready"}),
-        Err(ProducerUnverified) => "producer_unverified",
-        Err(WriterUnverified) => "writer_unverified",
-        Err(UnsupportedFormat) => "unsupported_format",
+        Ok(()) => "ready",
+        Err(WriteReason::ProducerUnverified) => "producer_unverified",
+        Err(WriteReason::WriterUnverified) => "writer_unverified",
+        Err(WriteReason::UnsupportedFormat) => "unsupported_format",
     };
-    json!({"read":true,"save":false,"trash":false,"reason":reason})
+    // Adapter policy alone is not readiness: an unrecovered or absent service cannot preview.
+    let trash = trash.and_then(|()| {
+        if trash_available {
+            Ok(())
+        } else {
+            Err(TrashReason::TrashUnverified)
+        }
+    });
+    let trash_reason = match trash {
+        Ok(()) => "ready",
+        Err(TrashReason::ProducerUnverified) => "producer_unverified",
+        Err(TrashReason::TrashUnverified) => "trash_unverified",
+        Err(TrashReason::UnsupportedFormat) => "unsupported_format",
+    };
+    json!({"read":true,"save":write.is_ok(),"trash":trash.is_ok(),"reason":reason,"trash_reason":trash_reason})
 }
+
 fn local(t: &diary_application::imports::LocalTime) -> Value {
     json!({"date":t.date.to_string(),"datetime":t.datetime,"offset_seconds":t.offset_seconds})
 }
@@ -470,7 +493,12 @@ fn stamp_error(e: diary_domain::source::stamp::StampError) -> &'static str {
         DirMismatch => "directory_mismatch",
     }
 }
-fn enhanced_source(s: &SourceListing, r: &ImportListing, eligible: bool) -> Value {
+fn enhanced_source(
+    s: &SourceListing,
+    r: &ImportListing,
+    eligible: bool,
+    trash_available: bool,
+) -> Value {
     let mut v = source(s);
     let (header_error, filename_error) = match s.dating {
         Dating::HeaderOnly { filename, .. } => (None, Some(stamp_error(filename))),
@@ -485,6 +513,20 @@ fn enhanced_source(s: &SourceListing, r: &ImportListing, eligible: bool) -> Valu
     let display = r.navigation.as_ref().and_then(|n| n.sources.get(&s.id));
     v["navigation"] = display.map(|d|json!({"group_id":d.group_id,"header":d.header.as_ref().map(local),"filename":d.filename.as_ref().map(local),"included":d.included.as_ref().map(local),"authority":d.authority.map(|a|match a {Authority::Header=>"header",Authority::Filename=>"filename"})})).unwrap_or(Value::Null);
     v["eligible"] = json!(eligible && display.is_some());
-    v["capabilities"] = json!({"read":display.is_some(),"save":false,"trash":false,"reason":if display.is_some(){"checked_on_open"}else{"reimport_required"}});
+    let producer = r
+        .navigation
+        .as_ref()
+        .and_then(|n| display.and_then(|d| n.groups.iter().find(|g| g.id == d.group_id)))
+        .map(|g| g.kind.as_str());
+    let trash_reason = if display.is_none() {
+        "reimport_required"
+    } else if producer != Some("narihito") {
+        "producer_unverified"
+    } else if trash_available {
+        "checked_on_preview"
+    } else {
+        "trash_unverified"
+    };
+    v["capabilities"] = json!({"read":display.is_some(),"save":false,"trash":false,"trash_reason":trash_reason,"reason":if display.is_some(){"checked_on_open"}else{"reimport_required"}});
     v
 }

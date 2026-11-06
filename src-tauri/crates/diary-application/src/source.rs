@@ -28,6 +28,13 @@ pub enum WriteReason {
     WriterUnverified,
     UnsupportedFormat,
 }
+/// Independent Trash readiness; a writable file is not evidence of safe deletion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrashReason {
+    ProducerUnverified,
+    TrashUnverified,
+    UnsupportedFormat,
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConflictKind {
     IdMismatch,
@@ -82,6 +89,8 @@ pub struct SourceView {
     pub bom: bool,
     /// Whether a body save is allowed for these exact bytes.
     pub write: Result<(), WriteReason>,
+    /// Per-file adapter policy only; exact ownership must be proven by a fresh preview.
+    pub trash: Result<(), TrashReason>,
 }
 impl fmt::Debug for SourceView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

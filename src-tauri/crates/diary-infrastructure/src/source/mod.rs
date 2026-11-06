@@ -10,4 +10,5 @@ mod tests;
 mod ayumi;
 mod narihito;
 pub(crate) mod narihito_write;
+pub mod trash;
 pub mod write;

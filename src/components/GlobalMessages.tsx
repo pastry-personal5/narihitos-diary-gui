@@ -1,11 +1,15 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Messages } from "../application/navigation/messages";
+import type { TrashCoordinator } from "../application/trash/coordinator";
+import { TrashActivity } from "./TrashActivity";
 export function GlobalMessages({
   messages,
   height,
+  trash,
 }: {
   messages: Messages;
   height: number;
+  trash?: TrashCoordinator;
 }) {
   const log = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
@@ -44,6 +48,7 @@ export function GlobalMessages({
           setAway(!atBottom);
         }}
       >
+        {trash && <TrashActivity coordinator={trash} />}
         {messages.items.map((message) => (
           <p key={message.id} className={`message-${message.severity}`}>
             <time>{message.time}</time>{" "}

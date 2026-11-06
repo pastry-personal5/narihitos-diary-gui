@@ -40,6 +40,7 @@ function source(
       read: true,
       save: false,
       trash: false,
+      trash_reason: "trash_unverified",
       reason: "writer_unverified",
     },
     navigation: {
@@ -169,6 +170,7 @@ describe("navigation response boundary", () => {
         read: true,
         save: true,
         trash: false,
+        trash_reason: "trash_unverified",
         reason: "writer_unverified",
       },
     };

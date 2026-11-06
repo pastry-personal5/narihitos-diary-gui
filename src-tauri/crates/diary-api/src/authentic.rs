@@ -381,6 +381,9 @@ pub(super) async fn operation(
         Ok(id) => id,
         Err(r) => return r,
     };
+    if let Some(response) = super::source_trash::operation(&s, &id).await {
+        return response;
+    }
     let store = match store(&s) {
         Ok(store) => store,
         Err(r) => return r,

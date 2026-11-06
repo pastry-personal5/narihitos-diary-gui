@@ -18,6 +18,8 @@ import { saveOff } from "../application/navigation/resources";
 import { useSettings } from "./useSettings";
 import { sourceImportAdvice } from "../application/sourceAdvice";
 import { CommandPalette } from "./CommandPalette";
+import { TrashDialog } from "./TrashDialog";
+import { ModalDialog } from "./ModalDialog";
 import { SymbolLabel, SymbolProvider, type SymbolHost } from "./Symbol";
 import {
   ACTIONS,
@@ -113,7 +115,9 @@ export function App({ bridge }: { bridge: Bridge }) {
   // Connect in the background after launch and after any drop: 0.5s, 1s, 2s … capped at 30s.
   const attempts = useRef(0);
   const latestConnect = useRef(() => {});
-  latestConnect.current = () => void connect();
+  useEffect(() => {
+    latestConnect.current = () => void connect();
+  });
   useEffect(() => {
     if (connection.kind === "connected") attempts.current = 0;
     if (connection.kind !== "disconnected") return;
@@ -239,14 +243,22 @@ export function App({ bridge }: { bridge: Bridge }) {
                 "Save an empty file for this date.");
   const bindings = settings.user?.effective_keybindings ?? DEFAULT_BINDINGS;
   const later = (what: string) => `${what} is not available yet.`;
+  const trashTarget = model.focusedSnippet ?? active?.source?.source ?? null;
+  const sourceReserved = active?.source
+    ? model.resources.sourceReserved(active.source.source.id)
+    : false;
   const handlers: Handlers = {
     "palette.open": { reason: null, run: () => setPaletteOpen(true) },
     "editor.save": {
       reason:
         active?.kind === "source"
-          ? active.source?.capabilities.save
-            ? null
-            : saveOff(active.source?.capabilities.reason ?? "")
+          ? active.detached
+            ? "The original source moved to Trash; this copy is read-only."
+            : sourceReserved
+              ? "This source is reserved by an unfinished Move to Trash operation."
+              : active.source?.capabilities.save
+                ? null
+                : saveOff(active.source?.capabilities.reason ?? "")
           : activeView
             ? null
             : "No file is open.",
@@ -263,13 +275,18 @@ export function App({ bridge }: { bridge: Bridge }) {
       reason:
         active?.kind !== "source"
           ? "Open a source snippet first."
-          : active.loading || model.resources.transitioning
-            ? "Wait for the source to finish loading."
-            : null,
+          : active.detached || sourceReserved
+            ? "This source cannot be refreshed while its Trash operation is unfinished."
+            : active.loading || model.resources.transitioning
+              ? "Wait for the source to finish loading."
+              : null,
       run: () => model.refreshActiveSource(),
     },
     "settings.open": { reason: null, run: () => setSettingsOpen(true) },
-    "source.trash": { reason: later("Move to Trash"), run: () => {} },
+    "source.trash": {
+      reason: model.trashReason(trashTarget),
+      run: () => (trashTarget ? model.trashSource(trashTarget) : undefined),
+    },
     "generate.start": { reason: later("Generation"), run: () => {} },
     "ai.activity.open": { reason: later("AI activity"), run: () => {} },
     "ai.run.cancel": { reason: later("AI cancellation"), run: () => {} },
@@ -336,17 +353,19 @@ export function App({ bridge }: { bridge: Bridge }) {
               {activeView
                 ? SAVE_LABEL[activeView.queue.state]
                 : active?.kind === "source"
-                  ? !active.source?.capabilities.save
-                    ? "Source is read-only"
-                    : active.saving
-                      ? "Saving…"
-                      : active.saveError === "external_change"
-                        ? "Changed on disk"
-                        : active.saveError
-                          ? "Save failed"
-                          : active.dirty
-                            ? "Unsaved changes"
-                            : "Saved"
+                  ? active.detached
+                    ? "Detached copy · read-only"
+                    : !active.source?.capabilities.save
+                      ? "Source is read-only"
+                      : active.saving
+                        ? "Saving…"
+                        : active.saveError === "external_change"
+                          ? "Changed on disk"
+                          : active.saveError
+                            ? "Save failed"
+                            : active.dirty
+                              ? "Unsaved changes"
+                              : "Saved"
                   : "No file open"}
             </span>
             <button
@@ -385,22 +404,38 @@ export function App({ bridge }: { bridge: Bridge }) {
           </p>
         )}
         {model.sourceGuard && (
-          <div role="dialog" aria-label="Unsaved source">
+          <ModalDialog
+            label="Unsaved source"
+            onDismiss={() => model.sourceGuard?.finish("cancel")}
+          >
             <p>
               Save or discard local changes to{" "}
               {model.sourceGuard.resource.label}?
             </p>
-            <button onClick={() => model.sourceGuard?.finish("save")}>
+            {model.sourceGuard.resource.detached && (
+              <p>
+                The original moved to Trash. Copy any text you need before
+                discarding this detached copy.
+              </p>
+            )}
+            <button
+              disabled={!!model.sourceGuard.resource.detached}
+              onClick={() => model.sourceGuard?.finish("save")}
+            >
               Save
             </button>
             <button onClick={() => model.sourceGuard?.finish("discard")}>
               Discard changes
             </button>
-            <button onClick={() => model.sourceGuard?.finish("cancel")}>
+            <button
+              data-initial-focus
+              onClick={() => model.sourceGuard?.finish("cancel")}
+            >
               Cancel
             </button>
-          </div>
+          </ModalDialog>
         )}
+        {!model.sourceGuard && <TrashDialog coordinator={model.trash} />}
         {paletteOpen && (
           <CommandPalette
             entries={ACTIONS.map((a) => ({
@@ -513,7 +548,7 @@ export function App({ bridge }: { bridge: Bridge }) {
             </div>
             {active?.kind === "source" && (
               <button
-                disabled={active.loading || model.resources.transitioning}
+                disabled={!!handlers["source.refresh"].reason}
                 onClick={() => void handlers["source.refresh"].run()}
               >
                 <SymbolLabel name="arrow.clockwise" label="Refresh source" />
@@ -533,14 +568,20 @@ export function App({ bridge }: { bridge: Bridge }) {
               view={activeView ?? null}
               error={active?.error ?? activeView?.loadError ?? null}
               notice={
-                active?.stale ? "This source requires a fresh import." : null
+                active?.detached
+                  ? "The original moved to Trash. This detached copy retains your unsaved text and cannot be saved to the original."
+                  : active?.stale
+                    ? "This source requires a fresh import."
+                    : null
               }
               dispatch={(action) => model.resources.dispatch(action)}
               readOnlyReason={
                 active?.kind === "source"
-                  ? active.source?.capabilities.save
-                    ? null
-                    : saveOff(active.source?.capabilities.reason ?? "")
+                  ? active.detached
+                    ? "Detached copy · read-only"
+                    : active.source?.capabilities.save
+                      ? null
+                      : saveOff(active.source?.capabilities.reason ?? "")
                   : !connected
                     ? "Connect to the server to open this date."
                     : !storage
@@ -557,7 +598,11 @@ export function App({ bridge }: { bridge: Bridge }) {
               change={setMessageHeight}
               reverse
             />
-            <GlobalMessages messages={model.messages} height={messageHeight} />
+            <GlobalMessages
+              messages={model.messages}
+              height={messageHeight}
+              trash={model.trash}
+            />
           </div>
           <PaneSeparator
             label="Resize AI Chat"

@@ -12,6 +12,8 @@ import {
 } from "../../editor/resource-buffer";
 
 export interface EditorResource {
+  instance: number;
+  editGeneration: number;
   key: string;
   label: string;
   kind: "authentic" | "source";
@@ -31,6 +33,12 @@ export interface EditorResource {
   saveOp?: { id: string; text: string };
   saving?: Promise<boolean>;
   saveError?: string | null;
+  detached?: boolean;
+}
+export interface DeleteBufferBaseline {
+  instance: number;
+  generation: number;
+  discarded: boolean;
 }
 export const REASON_TEXT: Record<string, string> = {
   producer_unverified: "no verified writer exists for this producer yet",
@@ -59,6 +67,9 @@ export class ResourceCoordinator {
   private writable = false;
   private disposed = false;
   private connectionEpoch = 0;
+  private resourceSerial = 0;
+  private readonly sourceReservations = new Map<string, string>();
+  private sourceReservationsBlocked = false;
   selectedDate: string | null = null;
   activeKey: string | null = null;
   transitioning = false;
@@ -80,6 +91,9 @@ export class ResourceCoordinator {
   }
   get active() {
     return this.activeKey ? this.resources.get(this.activeKey) : undefined;
+  }
+  get mutationReady() {
+    return this.online && this.writable;
   }
   get authentic() {
     return this.selectedDate
@@ -114,12 +128,14 @@ export class ResourceCoordinator {
     }
     let resource: EditorResource;
     try {
+      const instance = ++this.resourceSerial;
       const buffer = new ResourceBuffer(
-        key,
+        `${key}:buffer:${instance}`,
         kind === "authentic" ? "Authentic Markdown" : "Source Markdown",
         this.pool,
         {
           edit: () => {
+            resource.editGeneration++;
             if (resource.session) resource.session.dispatch({ kind: "edit" });
             else {
               resource.dirty = true;
@@ -134,7 +150,7 @@ export class ResourceCoordinator {
           },
           save: () => {
             if (resource.session) resource.session.dispatch({ kind: "flush" });
-            else void this.saveSource(key);
+            else void this.saveSource(resource.key);
           },
           limit: () =>
             this.events.notice(
@@ -143,6 +159,8 @@ export class ResourceCoordinator {
         },
       );
       resource = {
+        instance,
+        editGeneration: 0,
         key,
         label,
         kind,
@@ -261,7 +279,9 @@ export class ResourceCoordinator {
       if (r.kind === "source") {
         // The digest check makes a save safe on a stale-flagged tab, so Save comes back.
         r.stale = true;
-        r.buffer.setEditable(writable && !!r.source?.capabilities.save);
+        r.buffer.setEditable(
+          !r.detached && writable && !!r.source?.capabilities.save,
+        );
         continue;
       }
       if (r.session) {
@@ -305,6 +325,14 @@ export class ResourceCoordinator {
   async saveSource(key?: string): Promise<boolean> {
     const r = key ? this.resources.get(key) : this.active;
     if (!r || r.kind !== "source" || !r.source) return false;
+    if (r.detached || this.sourceReserved(r.source.source.id)) {
+      this.events.notice(
+        r.detached
+          ? "The original source moved to Trash. This detached copy cannot be saved to it."
+          : "This source is reserved by an unfinished Move to Trash operation.",
+      );
+      return false;
+    }
     if (r.saving) return r.saving;
     if (!r.source.capabilities.save) {
       this.events.notice(saveOff(r.source.capabilities.reason));
@@ -353,12 +381,142 @@ export class ResourceCoordinator {
     this.emit();
     return r.saving;
   }
+  /** Settle explicit saves and ask about dirty text without discarding it yet. A
+   * cancelled/failed preview must leave that text available. */
+  async prepareSourceDelete(
+    sourceId: string,
+    previous?: DeleteBufferBaseline,
+  ): Promise<DeleteBufferBaseline | null | false> {
+    let baseline: DeleteBufferBaseline | null = null;
+    const proceed = await this.transition(async () => {
+      const r = this.resources.get(`source:${sourceId}`);
+      if (!r) return true;
+      if (r.detached || r.buffer.composing) return false;
+      await r.pending;
+      await r.saving;
+      if (this.disposed || !this.online || r.buffer.composing || r.detached)
+        return false;
+      let discarded = false;
+      if (r.dirty) {
+        if (
+          previous?.instance === r.instance &&
+          previous.generation === r.editGeneration &&
+          previous.discarded
+        )
+          discarded = true;
+        else {
+          const choice = await this.events.sourceGuard(r);
+          if (choice === "cancel") return false;
+          if (choice === "save") {
+            if (!(await this.saveSource(r.key)) || r.dirty) return false;
+          } else discarded = true;
+        }
+      }
+      baseline = {
+        instance: r.instance,
+        generation: r.editGeneration,
+        discarded,
+      };
+      return true;
+    });
+    return proceed ? baseline : false;
+  }
+  sourceReserved(sourceId: string) {
+    return (
+      this.sourceReservationsBlocked || this.sourceReservations.has(sourceId)
+    );
+  }
+  reserveSourceDelete(sourceId: string, operationId: string) {
+    // Polling re-reports the same unfinished operation; do not recount or re-render.
+    if (this.sourceReservations.get(sourceId) === operationId) return;
+    if (
+      !this.budget.reserve(
+        "source-reservations",
+        (this.sourceReservations.size + 1) * 100,
+      )
+    ) {
+      this.sourceReservationsBlocked = true;
+      this.events.notice(
+        "Source recovery reached the session limit. Close unused tabs and check unfinished moves again.",
+      );
+      this.emit();
+      return;
+    }
+    this.sourceReservations.set(sourceId, operationId);
+    this.emit();
+  }
+  releaseSourceDelete(sourceId: string, operationId: string) {
+    if (this.sourceReservations.get(sourceId) === operationId)
+      this.sourceReservations.delete(sourceId);
+    this.budget.reserve(
+      "source-reservations",
+      this.sourceReservations.size * 100,
+    );
+    this.emit();
+  }
+  reconcileSourceReservations(unfinished: ReadonlySet<string>) {
+    for (const [source, operation] of this.sourceReservations)
+      if (!unfinished.has(operation)) this.sourceReservations.delete(source);
+    this.sourceReservationsBlocked = false;
+    this.budget.reserve(
+      "source-reservations",
+      this.sourceReservations.size * 100,
+    );
+    this.emit();
+  }
+  /** Never modify an Authentic buffer or an immutable source observation. */
+  sourceMoved(sourceId: string, baseline?: DeleteBufferBaseline | null) {
+    const r = this.resources.get(`source:${sourceId}`);
+    if (!r || r.detached) return;
+    r.epoch++; // a late source read cannot resurrect moved bytes
+    const keep =
+      r.dirty &&
+      !(
+        baseline?.discarded &&
+        baseline.instance === r.instance &&
+        baseline.generation === r.editGeneration
+      );
+    if (keep) {
+      const oldKey = r.key;
+      r.key = `detached:${r.instance}`;
+      this.resources.delete(oldKey);
+      this.resources.set(r.key, r);
+      this.budget.reserveMany([
+        [`source-metadata:${oldKey}`, 0],
+        [`source-metadata:${r.key}`, payloadBytes(r.source)],
+      ]);
+      if (this.activeKey === oldKey) this.activeKey = r.key;
+      r.detached = true;
+      r.label += " (detached copy)";
+      r.stale = true;
+      r.loading = false;
+      r.pending = undefined;
+      r.baseDigest = undefined;
+      r.saveOp = undefined;
+      r.saveError = null;
+      r.buffer.setEditable(false);
+      this.events.notice(
+        "The source moved to Trash. Your unsaved text is retained in a detached, read-only copy; copy it before closing the tab.",
+      );
+    } else {
+      r.buffer.dispose();
+      this.budget.release(`source-metadata:${r.key}`);
+      this.resources.delete(r.key);
+      if (this.activeKey === r.key) {
+        this.activeKey = null;
+        const next = this.authentic ?? [...this.resources.values()].at(-1);
+        if (next) this.activate(next);
+      }
+    }
+    this.emit();
+  }
   private async settle(r: EditorResource): Promise<boolean> {
     await r.pending;
     await r.saving;
     if (r.buffer.composing) return false;
     if (r.session) return (await r.session.settle()) === "proceed";
     if (!r.dirty) return true;
+    if (r.detached) return (await this.events.sourceGuard(r)) === "discard";
     const choice = await this.events.sourceGuard(r);
     // A failed save keeps the text and blocks the transition.
     if (choice === "save") return this.saveSource(r.key);
@@ -422,6 +580,13 @@ export class ResourceCoordinator {
       this.selectedDate ?? undefined,
     );
     if (!r) return false;
+    if (r.detached) {
+      this.events.notice(
+        "Close the detached copy before opening a replacement source from a fresh import.",
+      );
+      this.activate(r);
+      return false;
+    }
     if (r.source) {
       if (
         r.source.snapshot_id !== source.import_id &&
@@ -476,6 +641,12 @@ export class ResourceCoordinator {
         }
         r.source = metadata;
         r.baseDigest = body.source.digest;
+        r.buffer.setEditable(
+          this.online &&
+            this.writable &&
+            !!body.capabilities.save &&
+            !r.detached,
+        );
         r.stale = false;
         r.error = null;
       } catch (e) {
@@ -520,7 +691,14 @@ export class ResourceCoordinator {
       const r = this.resources.get(`source:${source.id}`);
       if (!r?.source || !this.online || !source.capabilities.read || r.pending)
         return false;
+      if (r.detached || this.sourceReserved(source.id)) return false;
       if (!(await this.settle(r))) return false;
+      if (
+        r.detached ||
+        this.sourceReserved(source.id) ||
+        this.resources.get(r.key) !== r
+      )
+        return false;
       const epoch = ++r.epoch,
         connection = this.connectionEpoch,
         key = `load:${r.key}:${epoch}`;
@@ -561,6 +739,12 @@ export class ResourceCoordinator {
         }
         r.source = metadata;
         r.baseDigest = body.source.digest;
+        r.buffer.setEditable(
+          this.online &&
+            this.writable &&
+            !!body.capabilities.save &&
+            !r.detached,
+        );
         r.saveOp = undefined;
         r.saveError = null;
         r.dirty = false;
@@ -599,12 +783,14 @@ export class ResourceCoordinator {
         );
         return false;
       }
+      if (this.resources.get(r.key) !== r) return true;
+      const closingKey = r.key;
       r.epoch++;
       r.session?.dispose();
       r.buffer.dispose();
       this.budget.release(`source-metadata:${r.key}`);
-      this.resources.delete(key);
-      if (this.activeKey === key) {
+      this.resources.delete(closingKey);
+      if (this.activeKey === closingKey) {
         this.activeKey = null;
         const next = [...this.resources.values()].at(-1);
         if (next) this.activate(next);
@@ -615,7 +801,7 @@ export class ResourceCoordinator {
   }
   async closeApp() {
     return this.transition(async () => {
-      for (const r of this.resources.values())
+      for (const r of [...this.resources.values()])
         if (!(await this.settle(r))) {
           this.events.notice("Resolve the save problem before closing.");
           return false;
@@ -667,6 +853,7 @@ export class ResourceCoordinator {
     } else if (event.kind === "disconnected") void this.connect(false, false);
   }
   dispose() {
+    this.budget.release("source-reservations");
     this.disposed = true;
     for (const r of this.resources.values()) {
       r.epoch++;

@@ -8,6 +8,7 @@ import {
   resolutionDto,
 } from "./navigation-validation";
 import { streamEvent } from "../application/events";
+import { trashAckDto, trashPageDto, trashPreviewDto } from "./trash-validation";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type { Bridge, ClientEvent } from "../application/bridge";
 import {
@@ -71,6 +72,16 @@ export async function logClientEvent(event: ClientEvent): Promise<void> {
   await invoke("log_client_event", { event: payload }).catch(() => {});
 }
 export const tauriBridge: Bridge = {
+  previewSourceDelete: (sourceId, request) =>
+    authentic("preview_source_delete", { sourceId, request }, trashPreviewDto),
+  confirmSourceDelete: (sourceId, request) =>
+    authentic("confirm_source_delete", { sourceId, request }, trashAckDto),
+  listSourceDeletions: (cursor, limit) =>
+    authentic(
+      "list_source_deletions",
+      { cursor: cursor ?? null, limit: limit ?? 50 },
+      trashPageDto,
+    ),
   getCalendar: (anchor, action = "month") =>
     authentic("get_calendar", { anchor: anchor ?? null, action }, calendarDto),
   importDate: (date, requestId) =>

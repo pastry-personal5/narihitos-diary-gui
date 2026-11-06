@@ -300,7 +300,7 @@ fn source_pages_are_bounded_and_do_not_expose_diagnostics_or_content() {
             ),
         ));
     }
-    let first = page(r, 0).unwrap();
+    let first = page(r, 0, true).unwrap();
     assert_eq!(first["items"].as_array().unwrap().len(), 100);
     assert_eq!(first["next_cursor"], 100);
     assert_eq!(first["items"][0]["code"], "missing");
@@ -407,21 +407,21 @@ fn page_crosses_category_boundaries_and_handles_end_cursors() {
         r.scan.collisions = vec![vec!["a.md".into(), "A.md".into()]];
         r
     };
-    let first = page(make(), 0).unwrap();
+    let first = page(make(), 0, true).unwrap();
     assert_eq!(first["items"].as_array().unwrap().len(), 100);
     assert_eq!(first["next_cursor"], 100);
-    let last = page(make(), 100).unwrap();
+    let last = page(make(), 100, true).unwrap();
     assert_eq!(last["items"].as_array().unwrap().len(), 6);
     assert_eq!(last["items"][0]["relative_key"], "100.md");
     assert_eq!(last["items"][5]["kind"], "path_collision");
     assert!(last["next_cursor"].is_null());
     assert!(
-        page(make(), 106).unwrap()["items"]
+        page(make(), 106, true).unwrap()["items"]
             .as_array()
             .unwrap()
             .is_empty()
     );
-    assert_eq!(page(make(), 107), Err(ImportError::NotFound));
+    assert_eq!(page(make(), 107, true), Err(ImportError::NotFound));
 }
 
 #[tokio::test]
@@ -580,6 +580,7 @@ impl ImportStore for ReadFake {
             newline: diary_domain::source::front_matter::Newline::Lf,
             bom: false,
             write: Err(diary_application::source::WriteReason::WriterUnverified),
+            trash: Err(diary_application::source::TrashReason::TrashUnverified),
         })
     }
 }
@@ -608,6 +609,8 @@ async fn selected_read_redacts_metadata_and_refuses_reload_during_work() {
     assert_eq!(dto["body"], "visible body");
     assert_eq!(dto["capabilities"]["save"], false);
     assert_eq!(dto["capabilities"]["reason"], "writer_unverified");
+    assert_eq!(dto["capabilities"]["trash"], false);
+    assert_eq!(dto["capabilities"]["trash_reason"], "trash_unverified");
     for private in [
         "PRIVATE_SECRET",
         "root_namespace",
@@ -633,5 +636,27 @@ async fn selected_read_redacts_metadata_and_refuses_reload_during_work() {
     assert_eq!(
         value(task.await.unwrap().unwrap()).await["error"]["code"],
         "source_stale"
+    );
+}
+
+#[test]
+fn listing_trash_readiness_respects_producer_and_independent_evidence_without_claiming_ownership() {
+    let mut listing = readable_listing("import");
+    let source = listing.scan.listings[0].clone();
+    assert_eq!(
+        enhanced_source(&source, &listing, false, true)["capabilities"]["trash_reason"],
+        "producer_unverified"
+    );
+    listing.navigation.as_mut().unwrap().groups[0].kind = "narihito".into();
+    for (available, reason) in [(false, "trash_unverified"), (true, "checked_on_preview")] {
+        let value = enhanced_source(&source, &listing, false, available);
+        assert_eq!(value["capabilities"]["trash"], false);
+        assert_eq!(value["capabilities"]["trash_reason"], reason);
+        assert!(value.get("members").is_none());
+    }
+    listing.navigation = None;
+    assert_eq!(
+        enhanced_source(&source, &listing, false, true)["capabilities"]["trash_reason"],
+        "reimport_required"
     );
 }

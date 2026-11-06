@@ -1,3 +1,4 @@
+import { trashResultDto } from "./trash-validation";
 import {
   AuthenticError,
   type AppMetadata,
@@ -154,12 +155,30 @@ export function operationStateDto(value: unknown): OperationState {
   const dto = record(value);
   if (typeof dto.terminal !== "boolean" || typeof dto.succeeded !== "boolean")
     throw new Error("Invalid server response");
+  const trash = dto.trash == null ? undefined : trashResultDto(dto.trash);
+  if (
+    (dto.kind === "source_trash") !== !!trash ||
+    (trash && dto.checkpoint !== trash.checkpoint)
+  )
+    throw new Error("Invalid server response");
+  if (
+    trash &&
+    (trash.operation_id !== dto.operation_id ||
+      dto.terminal !== (trash.state === "succeeded") ||
+      dto.succeeded !== (trash.state === "succeeded") ||
+      dto.state !==
+        (trash.state === "needs_confirmation" ? "paused" : trash.state))
+  )
+    throw new Error("Invalid server response");
   return {
     operation_id: text(dto.operation_id, 64),
+    ...(dto.kind == null ? {} : { kind: text(dto.kind, 64) }),
+    ...(dto.checkpoint == null ? {} : { checkpoint: count(dto.checkpoint) }),
     state: text(dto.state, 32),
     terminal: dto.terminal,
     succeeded: dto.succeeded,
     result: dto.result == null ? null : text(dto.result, 256),
+    ...(trash ? { trash } : {}),
   };
 }
 /** Anything that is not the bridge's allowlisted error becomes `unavailable`. */

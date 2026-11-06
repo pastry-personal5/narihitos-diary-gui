@@ -83,27 +83,40 @@ export function Explorer({ model }: { model: NavigationModel }) {
       item.kind !== "included" ||
       source.dating.state !== "agreed" ||
       source.duplicate_producer_id;
+    const moved = model.imports.sourceDisabled(source);
+    const trashReason = model.trashReason(source);
     return (
-      <li key={source.id}>
+      <li key={source.id} onFocusCapture={() => model.focusSnippet(source)}>
         <div className="snippet-row">
           <input
             type="checkbox"
             aria-label={`Include ${labels.get(source.id) ?? source.relative_key}`}
-            checked={!!inclusion?.checked && source.eligible}
-            disabled={!source.eligible || !!context?.stale}
+            checked={!!inclusion?.checked && source.eligible && !moved}
+            disabled={!source.eligible || !!context?.stale || moved}
             onChange={(e) =>
               date &&
               model.imports.setIncluded(date, source.id, e.target.checked)
             }
           />
           <button
-            disabled={!source.capabilities.read || !!context?.stale}
+            disabled={!source.capabilities.read || !!context?.stale || moved}
             title={source.relative_key}
             onClick={() => void model.openSource(source)}
           >
             {labels.get(source.id) ?? source.relative_key}
           </button>
+          <button
+            disabled={!!trashReason}
+            title={trashReason ?? "Preview this snippet and its related audio"}
+            aria-label={`Move ${labels.get(source.id) ?? source.relative_key} to Trash`}
+            onClick={() => void model.trashSource(source)}
+          >
+            Move to Trash
+          </button>
         </div>
+        {moved && (
+          <p>Moved to Trash. Refresh snippets before using this row again.</p>
+        )}
         {inclusion?.invalidated && (
           <p>Selection invalidated: {inclusion.invalidated}.</p>
         )}
@@ -136,6 +149,7 @@ export function Explorer({ model }: { model: NavigationModel }) {
                 disabled={
                   !source.navigation?.[authority] ||
                   !!context?.stale ||
+                  moved ||
                   !!context?.resolving
                 }
                 onClick={() => setChoice({ source, authority })}
@@ -143,7 +157,7 @@ export function Explorer({ model }: { model: NavigationModel }) {
                 Use {authority} time
               </button>
             ))}
-            {choice?.source.id === source.id && (
+            {!moved && choice?.source.id === source.id && (
               <p>
                 Use {choice.authority} time for a new import?{" "}
                 <button

@@ -7,6 +7,7 @@
 pub mod authentic;
 pub mod diagnostics;
 pub mod operations;
+pub mod source_trash;
 use std::collections::{BTreeMap, VecDeque};
 
 pub const HEARTBEAT_INTERVAL_MS: u64 = 5_000;

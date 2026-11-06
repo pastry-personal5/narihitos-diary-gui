@@ -13,6 +13,7 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
     (2, include_str!("sqlite/0002_catalog.sql")),
     (3, include_str!("sqlite/0003_imports.sql")),
     (4, include_str!("sqlite/0004_import_snapshots.sql")),
+    (5, include_str!("sqlite/0005_source_trash.sql")),
 ];
 const REQUIRED_TABLES: &[&str] = &[
     "schema_migrations",
@@ -25,6 +26,9 @@ const REQUIRED_TABLES: &[&str] = &[
     "import_contexts",
     "time_resolutions",
     "import_snapshots",
+    "trash_plans",
+    "trash_members",
+    "trash_authorizations",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +44,9 @@ pub enum DbError {
 
 pub struct Db {
     conn: Mutex<Connection>,
+    /// Source saves and confirmed Trash share this application resource coordinator.
+    /// No database transaction is held while waiting or accessing the filesystem.
+    pub(crate) source_mutations: Mutex<()>,
 }
 
 fn checksum(sql: &str) -> String {
@@ -110,6 +117,7 @@ impl Db {
         }
         Ok(Self {
             conn: Mutex::new(conn),
+            source_mutations: Mutex::new(()),
         })
     }
 

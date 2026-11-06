@@ -163,6 +163,7 @@ pub struct Capabilities {
     pub read: bool,
     pub save: bool,
     pub trash: bool,
+    pub trash_reason: String,
     pub reason: String,
 }
 #[derive(Debug, Serialize, Deserialize)]

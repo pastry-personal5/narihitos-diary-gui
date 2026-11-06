@@ -1,6 +1,7 @@
 mod authentic;
 mod calendar;
 mod imports;
+mod source_trash;
 use crate::delivery::{Delivery, Flow};
 use crate::diagnostics::ClientLog;
 use crate::discovery::{self, Discovery};
@@ -14,6 +15,9 @@ use diary_logging::private_fs::PrivateDir;
 pub use imports::{ImportAck, ImportPage, ResolutionAck, SourceBody, SourceSaved, TimeAuthority};
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
+pub use source_trash::{
+    TrashAcknowledged, TrashConfirmRequest, TrashPage, TrashPreview, TrashPreviewRequest,
+};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;

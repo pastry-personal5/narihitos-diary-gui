@@ -1,4 +1,4 @@
-//! `NSFileCoordinator` access. The only module with Objective-C FFI: every Authentic read
+//! `NSFileCoordinator` access: every Authentic read
 //! before a write and every publication runs inside a coordinated accessor, so cooperating
 //! writers (Finder, iCloud, other coordinating apps) are serialized with us. A coordination
 //! failure means the closure did not run and nothing may be written.
@@ -35,6 +35,19 @@ pub fn write<T>(path: &Path, f: impl FnOnce() -> T) -> Result<T, CoordError> {
         coordinator.coordinateWritingItemAtURL_options_error_byAccessor(
             url,
             NSFileCoordinatorWritingOptions::ForReplacing,
+            error,
+            block,
+        )
+    })
+}
+
+/// Runs deletion inside a dedicated accessor. Replacement coordination is not a
+/// deletion contract; every member must be revalidated within this closure.
+pub fn delete<T>(path: &Path, f: impl FnOnce() -> T) -> Result<T, CoordError> {
+    access(path, f, |coordinator, url, error, block| {
+        coordinator.coordinateWritingItemAtURL_options_error_byAccessor(
+            url,
+            NSFileCoordinatorWritingOptions::ForDeleting,
             error,
             block,
         )

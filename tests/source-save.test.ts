@@ -22,6 +22,7 @@ const ready: SourceCapabilities = {
   read: true,
   save: true,
   trash: false,
+  trash_reason: "trash_unverified",
   reason: "ready",
 };
 const coordinators: ResourceCoordinator[] = [];
@@ -209,6 +210,7 @@ describe("source save", () => {
       read: true,
       save: false,
       trash: false,
+      trash_reason: "trash_unverified",
       reason: "writer_unverified",
     });
     expect(await c.saveSource()).toBe(false);
@@ -269,7 +271,13 @@ describe("source save contract", () => {
   });
   it("validates_capabilities_shape", () => {
     const ok = sourceBodyDto(
-      body({ read: true, save: true, trash: false, reason: "ready" }),
+      body({
+        read: true,
+        save: true,
+        trash: false,
+        trash_reason: "trash_unverified",
+        reason: "ready",
+      }),
     ) as SourceBody;
     expect(ok.capabilities.save).toBe(true);
     for (const reason of [
@@ -280,21 +288,58 @@ describe("source save contract", () => {
       "reimport_required",
     ])
       expect(
-        sourceBodyDto(body({ read: true, save: false, trash: false, reason }))
-          .capabilities.reason,
+        sourceBodyDto(
+          body({
+            read: true,
+            save: false,
+            trash: false,
+            trash_reason: "trash_unverified",
+            reason,
+          }),
+        ).capabilities.reason,
       ).toBe(reason);
   });
-  it("rejects_unknown_reason_and_trash_true", () => {
+  it("validates Trash readiness independently from source saving", () => {
+    const caps = {
+      read: true,
+      save: false,
+      reason: "writer_unverified",
+      trash: true,
+      trash_reason: "ready",
+    };
+    expect(sourceBodyDto(body(caps)).capabilities.trash).toBe(true);
+    for (const invalid of [
+      { ...caps, trash_reason: "trash_unverified" },
+      { ...caps, trash: false },
+      { ...caps, trash_reason: "private_native_error" },
+      { ...caps, trash_reason: undefined },
+    ])
+      expect(() => sourceBodyDto(body(invalid))).toThrow();
+  });
+  it("rejects_unknown_reason_and_inconsistent_capabilities", () => {
     for (const caps of [
       {
         read: true,
         save: false,
         trash: false,
+        trash_reason: "trash_unverified",
         reason: "source_writer_unavailable",
       },
       { read: true, save: false, trash: true, reason: "writer_unverified" },
-      { read: true, save: true, trash: false, reason: "writer_unverified" },
-      { read: true, save: false, trash: false, reason: "ready" },
+      {
+        read: true,
+        save: true,
+        trash: false,
+        trash_reason: "trash_unverified",
+        reason: "writer_unverified",
+      },
+      {
+        read: true,
+        save: false,
+        trash: false,
+        trash_reason: "trash_unverified",
+        reason: "ready",
+      },
     ])
       expect(() => sourceBodyDto(body(caps))).toThrow();
   });

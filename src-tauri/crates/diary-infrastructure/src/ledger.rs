@@ -69,7 +69,7 @@ fn record(row: &Row) -> rusqlite::Result<Record> {
         },
     })
 }
-fn fetch(tx: &Connection, id: &OperationId) -> Result<Option<Record>, DbError> {
+pub(crate) fn fetch(tx: &Connection, id: &OperationId) -> Result<Option<Record>, DbError> {
     tx.query_row(
         &format!("SELECT {COLUMNS} FROM operations WHERE operation_id = ?1"),
         [id.as_str()],
@@ -137,49 +137,53 @@ pub(crate) fn finish_tx(
     Ok(Ok(()))
 }
 
-impl OperationLedger for Db {
-    fn admit(&self, op: NewOperation) -> Result<Admission, LedgerError> {
-        let mut keys: Vec<&ResourceKey> = op.resources.iter().collect();
-        keys.sort();
-        keys.dedup();
-        let kind_ok = !op.kind.is_empty()
-            && op.kind.len() <= 64
-            && op.kind.starts_with(|c: char| c.is_ascii_lowercase())
-            && op
-                .kind
-                .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
-        if !kind_ok
-            || !lower_hex64(&op.input_hash)
-            || keys.len() > MAX_RESOURCES
-            || op
-                .first_step
-                .as_ref()
-                .is_some_and(|s| !valid_step(s) || s.expected_checkpoint != 0)
-        {
-            return Err(LedgerError::Invalid);
+/// Admission inside a caller-owned transaction, allowing a member plan and consumed
+/// authorization to commit atomically with the ledger intent and reservations.
+pub(crate) fn admit_tx(tx: &Transaction, op: &NewOperation) -> Tx<Admission> {
+    let mut keys: Vec<&ResourceKey> = op.resources.iter().collect();
+    keys.sort();
+    keys.dedup();
+    let kind_ok = !op.kind.is_empty()
+        && op.kind.len() <= 64
+        && op.kind.starts_with(|c: char| c.is_ascii_lowercase())
+        && op
+            .kind
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
+    if !kind_ok
+        || !lower_hex64(&op.input_hash)
+        || keys.len() > MAX_RESOURCES
+        || op
+            .first_step
+            .as_ref()
+            .is_some_and(|s| !valid_step(s) || s.expected_checkpoint != 0)
+    {
+        return Ok(Err(LedgerError::Invalid));
+    }
+
+    // The recorded outcome of a retry wins over every new-action precondition.
+    if let Some(existing) = fetch(tx, &op.id)? {
+        let same = existing.hash_version == op.hash_version && existing.input_hash == op.input_hash;
+        return Ok(Ok(if same {
+            Admission::Existing(existing)
+        } else {
+            Admission::Mismatch
+        }));
+    }
+    for key in &keys {
+        let holder: Option<String> = tx
+            .query_row(
+                "SELECT operation_id FROM operation_resources WHERE resource_key = ?1 LIMIT 1",
+                [key.as_str()],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(storage)?;
+        if let Some(holder) = holder.and_then(|h| OperationId::parse(&h)) {
+            return Ok(Err(LedgerError::Reserved(holder)));
         }
-        self.transact(|tx| -> Tx<Admission> {
-            // The recorded outcome of a retry wins over every new-action precondition.
-            if let Some(existing) = fetch(tx, &op.id)? {
-                let same = existing.hash_version == op.hash_version
-                    && existing.input_hash == op.input_hash;
-                return Ok(Ok(if same { Admission::Existing(existing) } else { Admission::Mismatch }));
-            }
-            for key in &keys {
-                let holder: Option<String> = tx
-                    .query_row(
-                        "SELECT operation_id FROM operation_resources WHERE resource_key = ?1 LIMIT 1",
-                        [key.as_str()],
-                        |r| r.get(0),
-                    )
-                    .optional()
-                    .map_err(storage)?;
-                if let Some(holder) = holder.and_then(|h| OperationId::parse(&h)) {
-                    return Ok(Err(LedgerError::Reserved(holder)));
-                }
-            }
-            tx.execute(
+    }
+    tx.execute(
                 &format!("INSERT INTO operations ({COLUMNS}) VALUES (?1, ?2, ?3, ?4, 'running', 0, NULL, ?5, ?6, ?7, ?8)"),
                 params![
                     op.id.as_str(), op.kind, op.hash_version, op.input_hash,
@@ -188,15 +192,67 @@ impl OperationLedger for Db {
                 ],
             )
             .map_err(storage)?;
-            for key in &keys {
-                tx.execute("INSERT INTO operation_resources VALUES (?1, ?2)", [op.id.as_str(), key.as_str()])
-                    .map_err(storage)?;
-            }
-            if let Some(step) = &op.first_step {
-                apply_step(tx, &op.id, step)?;
-            }
-            Ok(Ok(Admission::New(fetch(tx, &op.id)?.ok_or(DbError::Storage)?)))
-        })?
+    for key in &keys {
+        tx.execute(
+            "INSERT INTO operation_resources VALUES (?1, ?2)",
+            [op.id.as_str(), key.as_str()],
+        )
+        .map_err(storage)?;
+    }
+    if let Some(step) = &op.first_step {
+        apply_step(tx, &op.id, step)?;
+    }
+    Ok(Ok(Admission::New(
+        fetch(tx, &op.id)?.ok_or(DbError::Storage)?,
+    )))
+}
+
+/// Step/checkpoint transition inside a caller-owned authorization transaction.
+pub(crate) fn advance_tx(tx: &Transaction, id: &OperationId, step: &NewStep) -> Tx<StepOutcome> {
+    if !valid_step(step) {
+        return Ok(Err(LedgerError::Invalid));
+    }
+
+    let Some(op) = fetch(tx, id)? else {
+        return Ok(Err(LedgerError::NotFound));
+    };
+    let prior: Option<(String, String, i64)> = tx
+        .query_row(
+            "SELECT input_hash, outcome, new_checkpoint FROM operation_steps \
+                     WHERE operation_id = ?1 AND step_id = ?2",
+            [id.as_str(), step.step_id.as_str()],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .optional()
+        .map_err(storage)?;
+    // A duplicate answers before any token, terminal or checkpoint check.
+    if let Some((hash, outcome, checkpoint)) = prior {
+        return Ok(if hash == step.input_hash {
+            Ok(StepOutcome::Recorded {
+                outcome,
+                checkpoint: checkpoint as u64,
+            })
+        } else {
+            Err(LedgerError::StepMismatch)
+        });
+    }
+    if op.state.is_terminal() {
+        return Ok(Err(LedgerError::Terminal));
+    }
+    if op.checkpoint != step.expected_checkpoint {
+        return Ok(Err(LedgerError::CheckpointMismatch {
+            current: op.checkpoint,
+        }));
+    }
+    apply_step(tx, id, step)?;
+    Ok(Ok(StepOutcome::Applied(
+        fetch(tx, id)?.ok_or(DbError::Storage)?,
+    )))
+}
+
+impl OperationLedger for Db {
+    fn admit(&self, op: NewOperation) -> Result<Admission, LedgerError> {
+        self.transact(|tx| admit_tx(tx, &op))?
     }
 
     fn get(&self, id: &OperationId) -> Result<Option<Record>, LedgerError> {
@@ -204,46 +260,7 @@ impl OperationLedger for Db {
     }
 
     fn advance(&self, id: &OperationId, step: NewStep) -> Result<StepOutcome, LedgerError> {
-        if !valid_step(&step) {
-            return Err(LedgerError::Invalid);
-        }
-        self.transact(|tx| -> Tx<StepOutcome> {
-            let Some(op) = fetch(tx, id)? else {
-                return Ok(Err(LedgerError::NotFound));
-            };
-            let prior: Option<(String, String, i64)> = tx
-                .query_row(
-                    "SELECT input_hash, outcome, new_checkpoint FROM operation_steps \
-                     WHERE operation_id = ?1 AND step_id = ?2",
-                    [id.as_str(), step.step_id.as_str()],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-                )
-                .optional()
-                .map_err(storage)?;
-            // A duplicate answers before any token, terminal or checkpoint check.
-            if let Some((hash, outcome, checkpoint)) = prior {
-                return Ok(if hash == step.input_hash {
-                    Ok(StepOutcome::Recorded {
-                        outcome,
-                        checkpoint: checkpoint as u64,
-                    })
-                } else {
-                    Err(LedgerError::StepMismatch)
-                });
-            }
-            if op.state.is_terminal() {
-                return Ok(Err(LedgerError::Terminal));
-            }
-            if op.checkpoint != step.expected_checkpoint {
-                return Ok(Err(LedgerError::CheckpointMismatch {
-                    current: op.checkpoint,
-                }));
-            }
-            apply_step(tx, id, &step)?;
-            Ok(Ok(StepOutcome::Applied(
-                fetch(tx, id)?.ok_or(DbError::Storage)?,
-            )))
-        })?
+        self.transact(|tx| advance_tx(tx, id, &step))?
     }
 
     fn finish(

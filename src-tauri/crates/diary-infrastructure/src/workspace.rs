@@ -108,6 +108,21 @@ impl Workspace {
                 .map_err(|_| LedgerError::Storage)
         }))
     }
+    /// The Trash service is recovered before a source writer is exposed. Recovery
+    /// failure leaves the service readable but mutation-disabled for inspection.
+    pub fn source_trash(
+        &self,
+        sources: Vec<crate::config::Source>,
+    ) -> Option<Arc<crate::source::trash::service::Service>> {
+        let (Some(db), Readiness::Ready) = (&self.db, self.readiness) else {
+            return None;
+        };
+        Some(Arc::new(crate::source::trash::service::Service::new(
+            db.clone(),
+            self.identity.clone(),
+            sources,
+        )))
+    }
     /// The lock proves exclusivity; recovery and inspection modes expose no ledger.
     pub fn open(lock: &WorkspaceLock) -> Result<Self, WorkspaceError> {
         open_with(lock, None)
@@ -136,7 +151,7 @@ impl Workspace {
                 .into_iter()
                 .filter(|c| {
                     c.class == diary_application::operations::Class::Resume
-                        && c.kind != KIND_SOURCE_SAVE
+                        && matches!(c.kind.as_str(), KIND_SAVE | KIND_CREATE)
                 })
                 .map(|c| c.id)
                 .collect();
@@ -163,7 +178,7 @@ impl Workspace {
         Ok(classify(
             &self.ledger()?.unfinished()?,
             &self.identity,
-            &[KIND_SAVE, KIND_CREATE, KIND_SOURCE_SAVE],
+            &[KIND_SAVE, KIND_CREATE, KIND_SOURCE_SAVE, "source_trash"],
         ))
     }
 }
