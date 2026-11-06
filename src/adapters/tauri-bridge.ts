@@ -19,6 +19,9 @@ import {
   reloadResultDto,
   profileDto,
   profileListDto,
+  chatDto,
+  chatOpenedDto,
+  turnAcceptedDto,
   serverSettingsDto,
   settingsErrorDto,
   userSettingsDto,
@@ -117,6 +120,16 @@ export const tauriBridge: Bridge = {
   reloadSettings: () => settings("reload_settings", undefined, reloadResultDto),
   listProfiles: () => authentic("list_agents", undefined, profileListDto),
   checkProfile: (alias) => authentic("check_agent", { alias }, profileDto),
+  openChat: (profile, locale) =>
+    authentic("open_chat", { profile, locale }, chatOpenedDto),
+  sendChat: (chatId, requestId, message, document) =>
+    authentic(
+      "send_chat",
+      { chatId, requestId, message, document },
+      turnAcceptedDto,
+    ),
+  getChat: (chatId) => authentic("get_chat", { chatId }, chatDto),
+  closeChat: (chatId) => authentic("close_chat", { chatId }, () => undefined),
   getUserSettings: () =>
     settings("get_user_settings", undefined, userSettingsDto),
   updateUserSettings: (u) =>

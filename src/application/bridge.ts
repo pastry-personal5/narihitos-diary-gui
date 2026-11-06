@@ -122,6 +122,36 @@ export interface ProfileInfo {
   reason: ProfileStatusReason | null;
   capabilities: { chat: ProfileCapability; generate: ProfileCapability };
 }
+/** The active editor snapshot sent with one chat message. */
+export interface ChatDocumentSnapshot {
+  kind: "authentic" | "source";
+  date: string;
+  unsaved: boolean;
+  body: string;
+}
+export type ChatTurnState = "running" | "done" | "failed" | "cancelled";
+export interface ChatTurn {
+  job_id: string;
+  state: ChatTurnState;
+  /** Closed agent error code; never model text. */
+  error_code: string | null;
+  stage: string | null;
+  revision: number;
+  /** Provisional text while running; replaced by the validated reply in the transcript. */
+  provisional: string | null;
+}
+export interface ChatMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+export interface ChatSnapshot {
+  chat_id: string;
+  profile: string;
+  type: string;
+  locale: string;
+  transcript: ChatMessage[];
+  turn: ChatTurn | null;
+}
 export interface UserSettings {
   revision: string;
   read_only: boolean;
@@ -158,6 +188,16 @@ export interface Bridge extends NavigationBridge, TrashBridge {
   /** Absent in fakes; Settings then omits the profile status list. */
   listProfiles?(): Promise<ProfileInfo[]>;
   checkProfile?(alias: string): Promise<ProfileInfo>;
+  /** Absent in fakes; AI Chat then stays disabled. */
+  openChat?(profile: string, locale: string): Promise<{ chat_id: string }>;
+  sendChat?(
+    chatId: string,
+    requestId: string,
+    message: string,
+    document: ChatDocumentSnapshot | null,
+  ): Promise<{ job_id: string }>;
+  getChat?(chatId: string): Promise<ChatSnapshot>;
+  closeChat?(chatId: string): Promise<void>;
   getUserSettings(): Promise<UserSettings>;
   updateUserSettings(update: UserSettingsUpdate): Promise<UserSettings>;
   connect(): Promise<Status>;

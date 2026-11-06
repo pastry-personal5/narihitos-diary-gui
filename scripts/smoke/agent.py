@@ -71,11 +71,11 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
         assert record, 'server readiness timeout'
         auth = {'Authorization': 'Bearer ' + record['token']}
 
-        def call(path, method='GET', session=None, headers=None):
+        def call(path, method='GET', session=None, headers=None, body=None):
             h = dict(auth, **(headers or {}))
             if session:
                 h['X-Diary-Session'] = session
-            request = urllib.request.Request(record['origin'] + '/api/v1' + path, data=b'{}' if method == 'POST' else None, headers=dict(h, **{'Content-Type': 'application/json'}), method=method)
+            request = urllib.request.Request(record['origin'] + '/api/v1' + path, data=(json.dumps(body).encode() if body is not None else b'{}') if method in ('POST', 'DELETE') else None, headers=dict(h, **{'Content-Type': 'application/json'}), method=method)
             try:
                 with opener.open(request, timeout=10) as response:
                     return response.status, json.loads(response.read() or b'null')
@@ -130,7 +130,18 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
         assert str(base) not in traced and 'no-such-codex' not in traced, 'a path leaked into the trace'
         assert call('/profiles/nope/check', 'POST', session)[0] == 404
         code, settings = call('/settings', session=session)
-        assert settings['agents_available'] is False, settings
+        assert settings['agents_available'] is True, settings  # a runner is wired and a profile is configured
+        # Chat routes (P1-M21): refusals and open/close only; no turn is sent, so no model runs.
+        code, refused = call('/chats', 'POST', session, body={'profile': 'gone', 'locale': 'en-US'})
+        assert code == 409 and refused['error']['code'] == 'profile_not_ready', (code, refused)
+        assert call('/chats', 'POST', session, body={'profile': 'nope', 'locale': 'en-US'})[0] == 404
+        assert call('/chats', 'POST', session, body={'profile': 'main', 'locale': 'not a locale'})[0] == 400
+        code, opened_chat = call('/chats', 'POST', session, body={'profile': 'main', 'locale': 'en-US'})
+        assert code == 201 and opened_chat['locale'] == 'en-US', (code, opened_chat)
+        code, chat_view = call('/chats/' + opened_chat['chat_id'], session=session)
+        assert code == 200 and chat_view['transcript'] == [] and chat_view['turn'] is None, chat_view
+        assert call('/chats/' + opened_chat['chat_id'], 'DELETE', session)[0] == 200
+        assert call('/chats/' + opened_chat['chat_id'], session=session)[0] == 404
         text = json.dumps(listing) + json.dumps(checked_apple) + json.dumps(checked) + json.dumps(checked_claude) + json.dumps(checked_qwen)
         assert str(base) not in text and 'codex-home' not in text, 'a path leaked into the profile response'
         assert not list((runtime).glob('agent-runs/*')), 'a probe left its run directory behind'

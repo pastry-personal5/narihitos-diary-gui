@@ -1,6 +1,6 @@
 # P1-M21: Transient AI Chat work plan
 
-Status: Active (plan approved 2026-11-06, O1–O3 accepted; stage A delivered, B–D open)
+Status: Done 2026-11-06
 
 This plan adds the job layer and the memory-only chat on top of the four adapters. Scope and checklist are in the [overview](milestone-21-transient-ai-chat-overview.md); the contracts are [context, output and limits](../architecture/editing-and-agents.md#context-output-and-limits), the [background AI contract](../architecture/ai-job-experience.md), the [API](../architecture/api-and-processes.md) (`open_chat`, `send_chat`, `close_chat`, jobs, SSE), [trust and process lifecycle](../architecture/editing-and-agents.md#trust-and-process-lifecycle) and handoff E5/E11/E13. It follows the [M20 work plan](milestone-20-apple-foundation-models-adapter-architecture.md) and repeats none of it.
 
@@ -96,3 +96,7 @@ Run affected tests while iterating and the full gate at each stage end. Live tes
 ## Stage A record (2026-11-06)
 
 Delivered: `Coordinator::admit_agent` (busy gate after the idempotent lookup, `Error::Busy` → 409 `busy`), `Coordinator::touch` (progress bumps a job's sequence), and `diary-application::run` (`execute` with a batched pump: 50 ms / 16 KiB, `Replace`, phase flush, cancel-wins via `Run::finish`). Tests: `second_run_is_busy`, `retry_returns_same_job`, `changed_payload_is_mismatch`, `touch_bumps_sequence_until_terminal`, `delta_batching_bounds`, `replace_supersedes`, `phase_flushes_pending_text_and_is_recorded`, `cancel_wins_over_late_success`. Gate G01–G07 passed. Design change from D1: provisional text is not carried in SSE; events only bump the job sequence and the client queries the snapshot (matches the contract's rule to rebuild from queries). Still open: C01 wiring, lease/shutdown cancel (C04), `slow_consumer_resyncs` (C03) — all in stage B with the routes.
+
+## Completion
+
+Stages B–D are recorded in the [evidence record](milestone-21-transient-ai-chat-overview.md#evidence-record). Deviation from D1: `agents_available` uses the profile directory's chat capability, not the startup availability list.

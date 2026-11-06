@@ -8,6 +8,8 @@ import {
   type Availability,
   type ProfileInfo,
   type ProfileCapability,
+  type ChatSnapshot,
+  type ChatTurn,
   type ReloadResult,
   type ServerSettings,
   SettingsError,
@@ -388,4 +390,81 @@ export function profileDto(value: unknown): ProfileInfo {
 }
 export function profileListDto(value: unknown): ProfileInfo[] {
   return list(record(value).profiles, 64).map(profileDto);
+}
+
+const CHAT_STATES = ["running", "done", "failed", "cancelled"];
+const CHAT_STAGES = [
+  "preparing_context",
+  "starting_agent",
+  "waiting_for_output",
+  "receiving_output",
+  "validating_output",
+  "between_candidates",
+  "stopping",
+  "finished",
+];
+const AGENT_ERRORS = [
+  "busy",
+  "cancelled",
+  "timeout",
+  "context",
+  "invalid_output",
+  "unavailable",
+  "assets_unavailable",
+  "unsupported_language",
+  "refusal",
+  "rate_limited",
+  "failed",
+];
+const MAX_REPLY = 1024 * 1024;
+export function chatOpenedDto(value: unknown): { chat_id: string } {
+  return { chat_id: text(record(value).chat_id, 64) };
+}
+export function turnAcceptedDto(value: unknown): { job_id: string } {
+  return { job_id: text(record(record(value).job).id, 64) };
+}
+function chatTurnDto(value: unknown): ChatTurn | null {
+  if (value === null || value === undefined) return null;
+  const dto = record(value);
+  const state = text(dto.state, 16);
+  const stage = dto.stage == null ? null : text(dto.stage, 32);
+  const code = dto.error_code == null ? null : text(dto.error_code, 32);
+  if (
+    !CHAT_STATES.includes(state) ||
+    (stage !== null && !CHAT_STAGES.includes(stage)) ||
+    (code !== null && !AGENT_ERRORS.includes(code)) ||
+    !Number.isSafeInteger(dto.revision) ||
+    (dto.revision as number) < 0 ||
+    (dto.provisional != null &&
+      (typeof dto.provisional !== "string" ||
+        dto.provisional.length > MAX_REPLY))
+  )
+    throw new Error("Invalid server response");
+  return {
+    job_id: text(dto.job_id, 64),
+    state: state as ChatTurn["state"],
+    error_code: code,
+    stage,
+    revision: dto.revision as number,
+    provisional: (dto.provisional as string | null | undefined) ?? null,
+  };
+}
+export function chatDto(value: unknown): ChatSnapshot {
+  const dto = record(value);
+  const transcript = list(dto.transcript, 102).map((item) => {
+    const m = record(item);
+    if (m.role !== "user" && m.role !== "assistant")
+      throw new Error("Invalid server response");
+    if (typeof m.text !== "string" || m.text.length > MAX_REPLY)
+      throw new Error("Invalid server response");
+    return { role: m.role as "user" | "assistant", text: m.text };
+  });
+  return {
+    chat_id: text(dto.chat_id, 64),
+    profile: text(dto.profile, 64),
+    type: text(dto.type, 32),
+    locale: text(dto.locale, 35),
+    transcript,
+    turn: chatTurnDto(dto.turn),
+  };
 }

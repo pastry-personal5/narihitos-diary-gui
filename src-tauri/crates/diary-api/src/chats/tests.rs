@@ -15,7 +15,7 @@ const SESSION: &str = "07249746-e280-4d51-a86a-cbcb198ee101";
 struct Profiles;
 impl ProfileDirectory for Profiles {
     fn list(&self) -> Vec<ProfileView> {
-        vec![]
+        self.check("main").into_iter().collect()
     }
     fn check(&self, alias: &str) -> Option<ProfileView> {
         let ready = alias != "off";
@@ -304,4 +304,20 @@ async fn without_a_runner_chat_is_unavailable() {
     )
     .await;
     assert_eq!(st, StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn agents_available_needs_a_runner_and_a_chat_capable_profile() {
+    let s = setup(Mode_::Reply);
+    let (_, v) = call(&s, "GET", "/api/v1/settings", None).await;
+    assert_eq!(v["agents_available"], true, "{v}");
+    let mut bare = state();
+    ServerState::set_profiles(&mut bare, Arc::new(Profiles));
+    bare.coordinator
+        .lock()
+        .unwrap()
+        .open(SESSION, bare.now())
+        .unwrap();
+    let (_, v) = call(&bare, "GET", "/api/v1/settings", None).await;
+    assert_eq!(v["agents_available"], false);
 }

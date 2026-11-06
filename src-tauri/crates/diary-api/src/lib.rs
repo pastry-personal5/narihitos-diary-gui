@@ -615,7 +615,7 @@ async fn settings(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Resp
     {
         Ok(_) => {
             let startup = s.startup.lock().expect("startup state poisoned").clone();
-            let value = json!({"config_schema_version":1,"config_generation":s.config_generation.load(std::sync::atomic::Ordering::SeqCst),"last_reload":s.last_reload.lock().expect("reload state poisoned").clone(),"storage_ready":s.storage_ready,"sources_available":startup.sources.iter().any(|s|s.reason.is_none()),"agents_available":s.agent_runner.is_some() && startup.profiles.iter().any(|p|p.reason.is_none()),"exports_available":false,"sources":availability_dto(&startup.sources),"profiles":availability_dto(&startup.profiles)});
+            let value = json!({"config_schema_version":1,"config_generation":s.config_generation.load(std::sync::atomic::Ordering::SeqCst),"last_reload":s.last_reload.lock().expect("reload state poisoned").clone(),"storage_ready":s.storage_ready,"sources_available":startup.sources.iter().any(|s|s.reason.is_none()),"agents_available":s.agent_runner.is_some() && s.profiles.as_ref().is_some_and(|p|p.list().iter().any(|v|v.chat==diary_application::agent::Capability::Ready)),"exports_available":false,"sources":availability_dto(&startup.sources),"profiles":availability_dto(&startup.profiles)});
             #[cfg(feature = "scaffold-smoke")]
             let value = {
                 let mut value = value;

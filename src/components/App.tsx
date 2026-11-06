@@ -13,6 +13,9 @@ import { SAVE_LABEL } from "./useAuthentic";
 import { Explorer } from "./Explorer";
 import { GlobalMessages } from "./GlobalMessages";
 import { PaneSeparator } from "./PaneSeparator";
+import { ChatPane } from "./ChatPane";
+import { activitySummary, useChat, useTick } from "./useChat";
+import { ChatController, rememberedChat } from "../application/chat";
 import { NavigationModel } from "../application/navigation/model";
 import { saveOff } from "../application/navigation/resources";
 import { useSettings } from "./useSettings";
@@ -46,6 +49,24 @@ export function App({ bridge }: { bridge: Bridge }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const settings = useSettings(bridge, connected);
   const model = useMemo(() => new NavigationModel(bridge), [bridge]);
+  const chat = useMemo(() => new ChatController(bridge), [bridge]);
+  const chatState = useChat(chat);
+  const chatNow = useTick(chat.running);
+  const chatContext = useCallback(() => {
+    const r = model.resources.active;
+    const date = r?.date ?? model.resources.selectedDate;
+    if (!r || !date) return { document: null, chip: "No document" };
+    const what = r.kind === "authentic" ? `Entry ${date}` : `Source ${r.label}`;
+    return {
+      document: {
+        kind: r.kind,
+        date,
+        unsaved: r.dirty,
+        body: r.buffer.getText(),
+      },
+      chip: r.dirty ? `${what}, unsaved edits included` : what,
+    };
+  }, [model]);
   const editorHost = useCallback(
     (element: HTMLDivElement | null) => model.resources.attach(element),
     [model],
@@ -149,6 +170,7 @@ export function App({ bridge }: { bridge: Bridge }) {
       const stop = await bridge.watch((event) => {
         if (!current()) return;
         model.onEvent(event);
+        chat.onEvent(event);
         if (event.kind === "disconnected") {
           connectionEpoch.current++;
           void dispose.current?.();
@@ -192,6 +214,10 @@ export function App({ bridge }: { bridge: Bridge }) {
           return;
         }
         setConnection({ kind: "connected", status });
+        void chat.loadProfiles().then(() => {
+          const id = rememberedChat();
+          if (id && current()) void chat.adopt(id);
+        });
         activeGeneration.current = server.config_generation;
         adviseSources(server.sources);
         await model.connect(
@@ -323,6 +349,11 @@ export function App({ bridge }: { bridge: Bridge }) {
               {version ? `Version v${version}` : "Version unavailable"}
             </span>
           </div>
+          <p role="status" className="ai-activity">
+            {chatState.chat || chat.running
+              ? activitySummary(chat, chatNow)
+              : ""}
+          </p>
           <div className="toolbar-actions">
             <button
               disabled={!canCreate}
@@ -614,22 +645,15 @@ export function App({ bridge }: { bridge: Bridge }) {
             change={setChatWidth}
             reverse
           />
-          <aside aria-label="AI Chat" className="chat">
-            <h2>AI Chat</h2>
-            <p>No agent is active.</p>
-            <p>Chat and generation are unavailable in the scaffold.</p>
-            <label htmlFor="chat-message">Message</label>
-            <textarea
-              id="chat-message"
-              disabled
-              aria-describedby="chat-reason"
-            />
-            <p id="chat-reason">Agent integration is pending.</p>
-            <button disabled>Send</button>
-          </aside>
+          <ChatPane
+            controller={chat}
+            connected={connected}
+            locale={settings.user?.writing_locale ?? null}
+            context={chatContext}
+          />
         </div>
         <footer>
-          Authentic files save automatically · AI and exports are unavailable.
+          Authentic files save automatically · Exports are unavailable.
         </footer>
       </main>
     </SymbolProvider>
