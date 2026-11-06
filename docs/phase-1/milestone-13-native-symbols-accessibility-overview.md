@@ -14,7 +14,7 @@ Add allowlisted AppKit SF Symbols to the existing icon controls through a `get_s
 
 Included: the `get_symbol` command (allowlist, bounded PNG, in-memory cache, unsupported-symbol result); the React `Symbol` component with a text fallback; symbols on the Create Empty, Command palette, Settings, Generate, Close-tab and Refresh controls; an accessible-name, tab-order, focus-restore and live-region audit with tests; keyboard resize and IME checks for Pane separators and the save debounce.
 
-Not included: SF Symbols application, template exports, font or raster assets; a new theme or component library; native VoiceOver proof and Japanese IME proof (the owner does not require either); WKWebView key delivery, Korean IME and packaged resize proof (carried to P1-M28 as a known gap, see below); license clearance for Apple's symbols; new product behavior.
+Not included: SF Symbols application, template exports, font or raster assets; a new theme or component library; native VoiceOver proof (the owner does not require it); WKWebView key delivery, Korean IME and packaged resize proof (carried to P1-M28 as a known gap, see below); license clearance for Apple's symbols; new product behavior.
 
 ## Completion checklist
 
@@ -29,7 +29,7 @@ Check only with recorded evidence. Planning does not complete these items.
 - [x] S07 — Dialogs and the palette restore focus to their invoker; Editor tab changes keep focus; snippet focus stays independent of inclusion.
 - [x] S08 — Pane separators resize by arrow keys, clamp to limits, and ignore keys during composition; Global Messages stays a polite log region.
 - [x] S09 — The save debounce does not fire during composition and flushes once after `compositionend` (existing queue behavior pinned by test).
-- [x] S10 — Affected docs, README, handoff (E9/E12), phase plan, roadmap and changelog state actual behavior and the evidence limit: no native key, Korean IME or resize proof, and no VoiceOver or Japanese IME proof (not required); the dependency notices are updated.
+- [x] S10 — Affected docs, README, handoff (E9/E12), phase plan, roadmap and changelog state actual behavior and the evidence limit: no native key, Korean IME or resize proof, and no VoiceOver proof (not required); the dependency notices are updated.
 
 ## Plan-review checklist
 
@@ -57,6 +57,6 @@ Implemented 2026-11-06. `scripts/gate.sh` passed (G01–G07; 142 vitest tests). 
 
 S04: the cache is pinned by `shares one native call between simultaneous and repeat mounts`; following text and disabled color is pinned only as a CSS rule (`symbol styling` test: `background-color: currentColor` under a mask), because jsdom cannot compute a masked color, so the visible effect is unproven until P1-M28. S01/S02 also reject an all-transparent render as unsupported, but the real rendering of the six symbols is unverified.\n\nS07: dialog and palette focus restore is the P1-M12 palette test; `resources.test.ts` `moves focus into the restored editor on a tab change and keeps it there` pins Editor tab focus (jsdom, so native WebView focus remains unproven); `accessibility.test.tsx` `keeps focus on the Include checkbox when it is toggled` pins snippet focus independence.
 
-Not required by the owner (2026-11-06): native VoiceOver proof and Japanese IME proof. Accessible names and order are covered by automated role/name tests only.
+Not required by the owner (2026-11-06): native VoiceOver proof. Accessible names and order are covered by automated role/name tests only.
 
 Known gap carried to P1-M28: native WebView focus, WKWebView key delivery, Korean IME, Pane separator dragging, and real SF Symbol rendering. The owner chose automated tests only for closing this milestone, so mocks and unit tests are not native proof.

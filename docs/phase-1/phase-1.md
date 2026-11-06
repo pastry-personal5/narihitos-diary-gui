@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Active; P1-M21–P1-M28 remain Planned.
 
 ### P1-M1: Research
 
@@ -99,7 +99,7 @@ Plan: [overview](milestone-12-command-palette-shortcuts-overview.md), [work plan
 ### P1-M13: Native symbols and accessible interaction
 
 Status: Done
-Goal: Add allowlisted AppKit SF Symbols and close the keyboard, focus, pane-resizing and IME-safe-save gaps that automated tests can reach; packaged key, resize and Korean IME proof is carried to P1-M28; native VoiceOver and Japanese IME proof are not required.
+Goal: Add allowlisted AppKit SF Symbols and close the keyboard, focus, pane-resizing and IME-safe-save gaps that automated tests can reach; packaged key, resize and Korean IME proof is carried to P1-M28; native VoiceOver proof are not required.
 Plan: [overview](milestone-13-native-symbols-accessibility-overview.md), [work plan](milestone-13-native-symbols-accessibility-architecture.md).
 Notes: Owner closes on automated tests only; native proof moves to P1-M28.
 
@@ -145,10 +145,12 @@ Goal: Add independently verified Qwen Code profile checks, one-shot streaming/sc
 Plan: [overview](milestone-19-qwen-code-adapter-overview.md), [work plan](milestone-19-qwen-code-adapter-architecture.md).
 Notes: Allowlists the `0.26.x` family; `ready` after `--version` only (no auth probe exists); pins `qwen3.6:35b-a3b` with no effort pin; agent-run live test on the local endpoint, no human gate; isolation by `--safe-mode` (`--bare` was tested and drops the endpoint); the model pin is checked against the init record because the CLI silently falls back. No run-starting surface. Done 2026-11-06 ([evidence](milestone-19-qwen-code-adapter-overview.md#evidence-record)).
 
-### P1-M20: Apple Foundation Models adapter
+### P1-M20: Agent abstraction, diagnostics and Apple Foundation Models adapter
 
-Status: Planned
-Goal: Integrate the optional on-device system model with explicit availability, fresh native sessions, guided-output validation and verified cancellation.
+Status: Active
+Goal: Give all four agents one engine, registry and typed diagnostic vocabulary, then integrate the optional on-device system model with explicit detailed availability reasons, fresh native sessions, guided-output validation and verified cancellation.
+Plan: [overview](milestone-20-apple-foundation-models-adapter-overview.md), [work plan](milestone-20-apple-foundation-models-adapter-architecture.md).
+Notes: Staged A abstractions (generic engine and registry; Codex, Claude and Qwen ported with no behavior change), B typed content-free diagnostics for every failure, blocked and locked state, C Apple adapter. Swift helper process; `build.rs` compiles it with `swiftc` and skips softly (`helper_missing`); closed reason set shown in Settings; agent-run live test, no human gate; no run-starting surface.
 
 ### P1-M21: Transient AI Chat
 

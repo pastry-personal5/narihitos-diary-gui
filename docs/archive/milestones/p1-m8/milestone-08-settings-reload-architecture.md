@@ -56,7 +56,7 @@ Re-read and re-hash the file under the check, compare with `expected`, merge int
 
 Files: `user_settings/locale.rs`, tests.
 
-`pub fn canonical_tag(input: &str) -> Option<String>` accepting a bounded BCP-47 shape (language, optional script/region/variants, no private-use or extensions beyond the contract); `pub fn init_writing(dir, preferred: &[String]) -> Result<Snapshot, InitError>` stores the first valid tag through Task 2's write, only when the section is missing and the file is valid and writable. Tests: S06, including `ja_JP` canonicalising to `ja-JP`, garbage rejected, an invalid or newer file untouched, a saved choice never replaced.
+`pub fn canonical_tag(input: &str) -> Option<String>` accepting a bounded BCP-47 shape (language, optional script/region/variants, no private-use or extensions beyond the contract); `pub fn init_writing(dir, preferred: &[String]) -> Result<Snapshot, InitError>` stores the first valid tag through Task 2's write, only when the section is missing and the file is valid and writable. Tests: S06, including `en_US` canonicalising to `en-US`, garbage rejected, an invalid or newer file untouched, a saved choice never replaced.
 
 ### Task 4: Client commands and bridge
 

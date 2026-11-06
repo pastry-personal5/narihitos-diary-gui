@@ -59,7 +59,7 @@ Inputs the contract implies but the tasks would not otherwise pin. Each has a te
 ## Risks and limits
 
 - AppKit calls off the main thread crash; every call goes through `run_on_main_thread`, with a timeout that returns `unsupported`.
-- Symbol names and rendering are verified only by unit tests and, on macOS CI-less local runs, the PNG test; real Retina output is unverified until P1-M28; native VoiceOver and Japanese IME proof are not required in Phase 1.
+- Symbol names and rendering are verified only by unit tests and, on macOS CI-less local runs, the PNG test; real Retina output is unverified until P1-M28; native VoiceOver proof are not required in Phase 1.
 - Using Apple's symbols is not license clearance; the owner proceeds despite that concern, as already recorded in AGENTS.md.
 
 ## Plan review findings and corrections

@@ -23,7 +23,7 @@ This plan implements the [keyboard shortcuts contract](../architecture/keyboard-
 Inputs the contract implies but the task tests above would not otherwise pin, most likely first. Each has a test in the named task.
 
 - Backspace/ForwardDelete in the Tabbed Editor while the Snippet tree is not focused must still delete text (task 3, `editor_delete_unaffected_outside_tree`).
-- A Korean/Japanese composition-ending keydown with `isComposing === false` must not trigger Command+S or a palette action (task 3, `ignores_composition_and_229`).
+- A Korean composition-ending keydown with `isComposing === false` must not trigger Command+S or a palette action (task 3, `ignores_composition_and_229`).
 - A settings file already holding an unknown action id or a malformed shortcut must survive editing a different action (task 2).
 - Rapid Command+S while an Authentic save is in flight must flush through the existing save queue, not start a second write (task 4, `save_flushes_queue_once`).
 - Pressing a shortcut while the unsaved-source dialog, recovery dialog or Reset-all confirmation is open must do nothing (task 3, `suspended_during_capture_and_dialogs`).

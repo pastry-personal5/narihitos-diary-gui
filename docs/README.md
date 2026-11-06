@@ -89,3 +89,6 @@ This index lists the design and process docs, one line each. Read only the doc y
 - [P1-M15 Source and audio Trash overview](archive/milestones/p1-m15/milestone-15-source-audio-trash-overview.md): archived completion record, native/producer evidence, enabled Narihito scope, verifiable checklist and passing gate.
 
 - [P1-M15 Source and audio Trash work plan](archive/milestones/p1-m15/milestone-15-source-audio-trash-architecture.md): archived implementation plan, ownership/recovery contracts and owner decisions.
+
+| [phase-1/milestone-20-apple-foundation-models-adapter-overview.md](phase-1/milestone-20-apple-foundation-models-adapter-overview.md) | P1-M20 scope, C01–C20 checklist, gate and evidence record |
+| [phase-1/milestone-20-apple-foundation-models-adapter-architecture.md](phase-1/milestone-20-apple-foundation-models-adapter-architecture.md) | P1-M20 work plan: abstraction, diagnostics and Apple adapter findings, decisions, tests |
