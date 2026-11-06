@@ -4,6 +4,7 @@
 //! No state in this module survives restart and no job implies a durable content operation;
 //! durable operations live in [`operations`].
 
+pub mod agent;
 pub mod authentic;
 pub mod diagnostics;
 pub mod operations;

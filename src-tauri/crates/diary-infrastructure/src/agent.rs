@@ -1,0 +1,56 @@
+//! Agent adapters' shared infrastructure: config-to-port mapping, embedded prompt assets, packet
+//! encoding and strict generation-output validation. No adapter, process or native bridge here.
+use crate::config::Profile;
+use diary_application::agent::{AgentKind, ProfileHandle};
+
+pub mod assets;
+pub mod output;
+pub mod packet;
+
+pub fn handle(profile: &Profile) -> ProfileHandle {
+    let kind = match profile {
+        Profile::Codex { .. } => AgentKind::Codex,
+        Profile::Claude { .. } => AgentKind::Claude,
+        Profile::Qwen { .. } => AgentKind::Qwen,
+        Profile::AppleFoundationModels { .. } => AgentKind::AppleFoundationModels,
+    };
+    ProfileHandle {
+        alias: profile.alias().to_owned(),
+        kind,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn agent_kind_maps_every_config_profile() {
+        let cli = |a: &str| (a.to_owned(), PathBuf::from("/h"), None);
+        let (a, h, e) = cli("a");
+        let profiles = [
+            Profile::Codex {
+                alias: a.clone(),
+                profile_home: h.clone(),
+                executable: e.clone(),
+            },
+            Profile::Claude {
+                alias: a.clone(),
+                profile_home: h.clone(),
+                executable: e.clone(),
+            },
+            Profile::Qwen {
+                alias: a.clone(),
+                profile_home: h,
+                executable: e,
+            },
+            Profile::AppleFoundationModels { alias: a },
+        ];
+        let kinds: Vec<_> = profiles.iter().map(|p| handle(p).kind).collect();
+        assert_eq!(kinds, AgentKind::ALL);
+        let dirs: Vec<_> = kinds.iter().map(|k| k.asset_dir()).collect();
+        assert_eq!(dirs, ["codex", "claude", "qwen", "apple-foundation-models"]);
+        assert_eq!(handle(&profiles[3]).alias, "a");
+    }
+}

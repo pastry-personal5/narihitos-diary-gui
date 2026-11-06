@@ -26,26 +26,34 @@ File format: a `---` front matter block with `provider`, `model`, and
   and retry/repair prompts follow this rule. User messages and captured source
   data are request data. Code may define schemas, validate data, load templates,
   and substitute placeholders; it must not contain instruction prose or fallback prompts.
-- Planned loading belongs in the server's infrastructure adapters, outside the pure
-  domain/application layers. Bundle or embed these files in release artifacts so
-  shell launch does not depend on the current directory. A future native bridge
-  receives the same asset-derived instructions; no helper or loader exists yet.
-- Validate front matter, allowed placeholders and action/schema compatibility
-  before enabling an action. Missing or malformed assets produce a visible
-  capability error, never a hard-coded prompt or another agent's template.
+- Loading lives in `diary-infrastructure` (`agent::assets`). The files are embedded with
+  `include_str!`, so shell launch never depends on the current directory and the loader reads
+  no path. Each asset parses on its own; one bad file disables only its action.
+  A future native bridge receives the same asset-derived instructions.
+- Front matter has exactly `provider`, `model` and `reasoning_effort`; unknown or duplicate keys
+  are malformed. CLI types pass `model` and `reasoning_effort` through unchanged; Apple requires
+  `default` / `not-applicable`. Only `{{locale}}` and `{{data}}` are valid. `generate-candidate`
+  and `chat` contain `{{data}}` exactly once and `{{locale}}` at least once;
+  `session-instructions` (Apple only) contains `{{locale}}` and no `{{data}}`.
+- Missing or malformed assets produce a typed per-action capability reason
+  (`assets_missing`, `assets_invalid`), never a hard-coded prompt or another agent's template.
 
-## Existing inventory and acceptance gaps
+## Inventory and acceptance gaps
 
-| Agent type                | Existing files                                                                                                                                                                                                                                                                                                                             | Outstanding coverage                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| `apple-foundation-models` | [session-instructions.md](apple-foundation-models/session-instructions.md), [draft-entry.md](apple-foundation-models/draft-entry.md), [extract-memories.md](apple-foundation-models/extract-memories.md), [refine-source.md](apple-foundation-models/refine-source.md), [review-paragraph.md](apple-foundation-models/review-paragraph.md) | Validate native guided output and reconcile with the approved generation/chat contract |
-| `codex`                   | [draft-entry.md](codex/draft-entry.md), [extract-memories.md](codex/extract-memories.md), [refine-source.md](codex/refine-source.md), [review-paragraph.md](codex/review-paragraph.md)                                                                                                                                                     | Validate configured model/effort, generation schema and chat instructions              |
-| `claude`, `qwen`          | None yet                                                                                                                                                                                                                                                                                                                                   | Add agent-specific assets before enabling their actions                                |
+| Agent type                | Files                                                                                                                                                                                          | Outstanding coverage                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `apple-foundation-models` | [generate-candidate.md](apple-foundation-models/generate-candidate.md), [chat.md](apple-foundation-models/chat.md), [session-instructions.md](apple-foundation-models/session-instructions.md) | Native guided output and runtime proof (P1-M20)                                                           |
+| `codex`                   | [generate-candidate.md](codex/generate-candidate.md), [chat.md](codex/chat.md)                                                                                                                 | P1-M17 must verify the `gpt-5.6-luna` / `medium` pins before sending anything                             |
+| `claude`, `qwen`          | None yet                                                                                                                                                                                       | Authored with and tested against their adapters (P1-M18, P1-M19); actions are `assets_missing` until then |
 
-These supplied templates are preserved inputs to future integration. Their
-`reviewed_memory` and reflection-range fields do not yet match the generation
-schema in [editing and agents](../../docs/architecture/editing-and-agents.md#context-output-and-limits).
-Their existence does not approve memory extraction, AI source repair, or a change
-from deterministic paragraph review. Resolve prompt/schema compatibility and
-provide every required instruction asset before enabling the corresponding action.
-No runtime prompt loading, packaging, model invocation or output validation has run yet.
+`generate-candidate` targets the schema-1 object `{draft_markdown, claim_support, warnings}` and
+the generation packet; the five style wordings live in its body and the style identifier travels
+in `{{data}}`. `chat` answers from the supplied document and transcript with plain text. The
+earlier `extract-memories`, `refine-source` and `review-paragraph` templates are
+[archived](../../docs/archive/prompts/README.md); their existence never approved memory
+extraction, AI source repair or non-deterministic paragraph review.
+
+Evidence limits: no model, CLI or native framework has run these prompts. Tests pin field
+names, placeholders and the embedded table, not output quality. The release `diary-server`
+binary does not link the loader yet, so embedding in the release artifact is checked by the
+first consumer (P1-M17).
