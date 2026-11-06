@@ -517,3 +517,118 @@ fn stale_revision_conflicts() {
         Some(Error::Conflict)
     );
 }
+
+#[test]
+fn generation_defaults_and_bounds() {
+    let f = fx();
+    assert_eq!(f.store.snapshot().generation_count, 3);
+    assert!(!f.dir.exists());
+    for count in 1..=5 {
+        let before = f.store.snapshot();
+        let saved = f
+            .store
+            .update(&before.revision, Change::Generation(count))
+            .unwrap();
+        assert_eq!(saved.generation_count, count);
+        assert_eq!(Store::new(f.dir.clone()).snapshot().generation_count, count);
+        assert_eq!(on_disk(&f)["generation"], json!({"count": count}));
+        assert_eq!(on_disk(&f)["schema_version"], 1);
+    }
+    let before = fs::read(f.dir.join(FILE)).unwrap();
+    for count in [0, 6, u8::MAX] {
+        assert_eq!(
+            f.store
+                .update(&f.store.snapshot().revision, Change::Generation(count))
+                .err(),
+            Some(Error::Invalid)
+        );
+    }
+    for bad in [
+        json!(null),
+        json!(3),
+        json!({}),
+        json!({"count": 0}),
+        json!({"count": 6}),
+        json!({"count": -1}),
+        json!({"count": 1.5}),
+        json!({"count": 3.0}),
+        json!({"count": "3"}),
+        json!({"count": true}),
+        json!({"count": 3, "extra": 1}),
+        json!({"count": u64::MAX}),
+    ] {
+        assert_eq!(generation_count(&bad), None, "{bad}");
+    }
+    assert_eq!(fs::read(f.dir.join(FILE)).unwrap(), before);
+}
+
+#[test]
+fn generation_invalid_section_preserved() {
+    let f = fx();
+    for bad in [
+        json!(null),
+        json!("bad"),
+        json!({"count": 9}),
+        json!({"count": 2, "future": true}),
+    ] {
+        put(
+            &f,
+            &json!({"schema_version": 1, "generation": bad, "writing": {"locale":"ko-KR"}})
+                .to_string(),
+        );
+        let s = f.store.snapshot();
+        assert_eq!(s.generation_count, 3);
+        assert_eq!(s.writing_locale.as_deref(), Some("ko-KR"));
+        assert_eq!(codes(&s), [("generation", "section_invalid")]);
+        let s = f
+            .store
+            .update(&s.revision, Change::Writing("en-US".into()))
+            .unwrap();
+        assert_eq!(on_disk(&f)["generation"], bad);
+        let s = f.store.update(&s.revision, Change::Generation(2)).unwrap();
+        assert_eq!(s.generation_count, 2);
+        assert!(s.warnings.is_empty());
+    }
+    put(
+        &f,
+        r#"{"schema_version":1,"keybindings":"bad","writing":null}"#,
+    );
+    let s = f
+        .store
+        .update(&f.store.snapshot().revision, Change::Generation(4))
+        .unwrap();
+    assert_eq!(s.generation_count, 4);
+    assert_eq!(on_disk(&f)["keybindings"], "bad");
+    assert_eq!(on_disk(&f)["writing"], Value::Null);
+}
+
+#[test]
+fn generation_write_conflicts() {
+    let f = fx();
+    let first = f.store.snapshot();
+    f.store
+        .update(&first.revision, Change::Generation(1))
+        .unwrap();
+    let second_writer = Store::new(f.dir.clone());
+    assert_eq!(
+        second_writer
+            .update(&first.revision, Change::Generation(5))
+            .err(),
+        Some(Error::Conflict)
+    );
+    assert_eq!(second_writer.snapshot().generation_count, 1);
+}
+
+#[test]
+fn generation_newer_schema_untouched() {
+    let f = fx();
+    let text = r#"{"schema_version":2,"generation":{"count":5}}"#;
+    put(&f, text);
+    let s = f.store.snapshot();
+    assert_eq!(s.generation_count, 3);
+    assert_eq!(
+        f.store.update(&s.revision, Change::Generation(2)).err(),
+        Some(Error::ReadOnly)
+    );
+    assert_eq!(fs::read_to_string(f.dir.join(FILE)).unwrap(), text);
+}

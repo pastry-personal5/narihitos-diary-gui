@@ -176,6 +176,9 @@ async fn update_user_settings(
             .map(|v| v.as_str().map(str::to_owned).ok_or(Error::Invalid))
             .collect::<Result<_, _>>()
             .map(Change::InitWriting),
+        (_, "generation", v) => user_settings::generation_count(&v)
+            .map(Change::Generation)
+            .ok_or(Error::Invalid),
         (_, "keybindings", v) => Ok(Change::Keybindings(v)),
         _ => Err(Error::Invalid),
     }

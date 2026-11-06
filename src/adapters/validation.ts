@@ -259,6 +259,9 @@ export function userSettingsDto(value: unknown): UserSettings {
   if (
     typeof dto.read_only !== "boolean" ||
     typeof dto.recoverable !== "boolean" ||
+    !Number.isInteger(dto.generation_count) ||
+    (dto.generation_count as number) < 1 ||
+    (dto.generation_count as number) > 5 ||
     (dto.writing_locale != null && typeof dto.writing_locale !== "string")
   )
     throw new Error("Invalid settings response");
@@ -275,6 +278,7 @@ export function userSettingsDto(value: unknown): UserSettings {
     }),
     writing_locale:
       dto.writing_locale == null ? null : text(dto.writing_locale, 35),
+    generation_count: dto.generation_count as number,
     keybindings: dto.keybindings ?? {},
     effective_keybindings: Object.fromEntries(
       Object.entries(record(dto.effective_keybindings)).map(([id, keys]) => [

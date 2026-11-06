@@ -182,3 +182,23 @@ fn touch_bumps_sequence_until_terminal() {
     c.cancel("client", 0, "j1").unwrap();
     assert_eq!(c.touch("client", 0, "j1"), Err(Error::InvalidTransition));
 }
+
+#[test]
+fn replace_preview_bound_is_utf8_bytes() {
+    let (_, snap, _) = go(
+        script(vec![(0, AgentEvent::Replace("한".repeat(MAX_TEXT_BYTES)))]),
+        &Run::new(),
+    );
+    assert!(snap.text.len() <= MAX_TEXT_BYTES);
+    assert_eq!(snap.text.len() % 3, 0);
+}
+#[test]
+fn pending_preview_is_not_published_after_cancel() {
+    let run = Run::new();
+    let mut s = script(vec![(0, d("pending")), (0, d("late"))]);
+    s.cancel_after = Some(1);
+    s.run = Some(Run::from(run.token()));
+    let (result, snap, _) = go(s, &run);
+    assert_eq!(result, Err(AgentErrorCode::Cancelled.into()));
+    assert!(snap.text.is_empty());
+}

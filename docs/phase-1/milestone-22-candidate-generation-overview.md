@@ -1,6 +1,6 @@
 # P1-M22: Candidate generation overview
 
-Status: Planned (plan approved by the owner 2026-11-06; implementation not started)
+Status: Active (plan reviewed; Stage A started 2026-11-06)
 
 Add Generate: one to five sequential, independently validated candidates from eligible selected source snapshots, bound to an immutable date, locale, profile and saved Authentic baseline. It reuses the P1-M21 job layer (`Coordinator::admit_agent`, `run::execute`, the chat service pattern). The [work plan](milestone-22-candidate-generation-architecture.md) defines findings, owner decisions, design, files, sequencing and tests.
 
@@ -27,13 +27,13 @@ Check only with recorded evidence. Planning does not complete these items.
 
 ### Stage A — service and setting
 
-- [ ] C01 — Admission rejects an empty or fully ineligible selection before any inference; timestamp-conflict or unknown-date snippets are ineligible; the server re-checks that each selected source's bytes are current at capture. Evidence: `empty_selection_rejected`, `ineligible_snippets_excluded`, `changed_source_refused`.
-- [ ] C02 — The job freezes date, locale, profile, count, snapshots and baseline (`absent` or `{sequence, sha256}`); later checkbox, re-import, setting or other-date edits never retarget it. Evidence: `context_is_frozen`, `absent_baseline_allowed`.
-- [ ] C03 — Packets order snippets deterministically, label them `snippet-N`, omit paths, front matter, location and audio, and use the styles standard, concise, reflective, chronological, thematic in order; one model call per candidate, no hidden retry or fallback. Evidence: `packet_order_and_labels`, `styles_in_order`, `one_call_per_candidate`.
-- [ ] C04 — A failed candidate does not remove earlier ones and the loop continues; the job succeeds with partial counts if at least one candidate is valid and fails if none is; the reservation spans the whole loop including the gaps. Evidence: `partial_failure_keeps_ready`, `zero_valid_is_failure`, `busy_between_candidates`.
-- [ ] C05 — Cancel keeps finished candidates, labels the interrupted candidate and unstarted slots separately, and drops late results; lease end, close and shutdown cancel the run. Evidence: `cancel_keeps_ready_and_counts_slots`, `late_result_dropped`, `lease_end_cancels_generation`.
-- [ ] C06 — The candidate store is session-owned, capped at 5 jobs and 8 MiB per session and counted in the transient byte cap; a full store refuses admission with a code that asks for explicit discard; discard removes only that transient result, leaves a content-free admission record and never reruns inference. Evidence: `store_cap_refuses_admission`, `discard_keeps_admission_record`, `retry_after_discard_is_unavailable`.
-- [ ] C07 — `generation.count` is a validated integer 1–5, default 3, saved through the guarded section write; an invalid section degrades alone and keeps its raw data. Evidence: `generation_defaults_and_bounds`, `generation_write_conflicts`, `generation_invalid_section_preserved`, `generation_newer_schema_untouched`.
+- [x] C01 — Admission rejects an empty or fully ineligible selection before any inference; timestamp-conflict or unknown-date snippets are ineligible; the server re-checks that each selected source's bytes are current at capture. Evidence: `empty_selection_rejected`, `ineligible_snippets_excluded`, `changed_source_refused`.
+- [x] C02 — The job freezes date, locale, profile, count, snapshots and baseline (`absent` or `{sequence, sha256}`); later checkbox, re-import, setting or other-date edits never retarget it. Evidence: `context_is_frozen`, `absent_baseline_allowed`.
+- [x] C03 — Packets order snippets deterministically, label them `snippet-N`, omit paths, front matter, location and audio, and use the styles standard, concise, reflective, chronological, thematic in order; one model call per candidate, no hidden retry or fallback. Evidence: `packet_order_and_labels`, `styles_in_order`, `one_call_per_candidate`.
+- [x] C04 — A failed candidate does not remove earlier ones and the loop continues; the job succeeds with partial counts if at least one candidate is valid and fails if none is; the reservation spans the whole loop including the gaps. Evidence: `partial_failure_keeps_ready`, `zero_valid_is_failure`, `busy_between_candidates`.
+- [x] C05 — Cancel keeps finished candidates, labels the interrupted candidate and unstarted slots separately, and drops late results; lease end, close and shutdown cancel the run. Evidence: `cancel_keeps_ready_and_counts_slots`, `late_result_dropped`, `lease_end_cancels_generation`.
+- [x] C06 — The candidate store is session-owned, capped at 5 jobs and 8 MiB per session and counted in the transient byte cap; a full store refuses admission with a code that asks for explicit discard; discard removes only that transient result, leaves a content-free admission record and never reruns inference. Evidence: `store_cap_refuses_admission`, `discard_keeps_admission_record`, `retry_after_discard_is_unavailable`.
+- [x] C07 — `generation.count` is a validated integer 1–5, default 3, saved through the guarded section write; an invalid section degrades alone and keeps its raw data. Evidence: `generation_defaults_and_bounds`, `generation_write_conflicts`, `generation_invalid_section_preserved`, `generation_newer_schema_untouched`.
 
 ### Stage B — routes and bridge
 
@@ -66,22 +66,28 @@ Check only with recorded evidence. Planning does not complete these items.
 
 ## Implementation gate
 
-Run at the end of each stage; a stage does not start while the previous gate is red.
+Run G01–G07 at the end of each stage; a stage does not start while the previous gate is red. G08 is the final integration gate after the generation routes and smoke extension exist (Stage D).
 
-- [ ] G01 — `cargo fmt --manifest-path src-tauri/Cargo.toml --check`
-- [ ] G02 — `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
-- [ ] G03 — `cargo test --manifest-path src-tauri/Cargo.toml`
-- [ ] G04 — `npx prettier --check .`
-- [ ] G05 — `npx eslint . --max-warnings 0`
-- [ ] G06 — `npx vitest run`
-- [ ] G07 — `npx tsc --noEmit`
+- [x] G01 — `cargo fmt --manifest-path src-tauri/Cargo.toml --check`
+- [x] G02 — `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
+- [x] G03 — `cargo test --manifest-path src-tauri/Cargo.toml`
+- [x] G04 — `npx prettier --check .`
+- [x] G05 — `npx eslint . --max-warnings 0`
+- [x] G06 — `npx vitest run`
+- [x] G07 — `npx tsc --noEmit`
 - [ ] G08 — `python3 scripts/smoke/agent.py` extended for generation with fake CLIs
 
 If a command cannot run, leave its item unchecked and record the blocker. No human test is an exit gate.
 
 ## Evidence record
 
-Empty until implementation.
+2026-11-06 — Plan review R01–R03 committed as `205291d`. Stage A started with C07: the client loader accepts `generation: {count}` in schema 1, supplies default 3 without writing an absent file, validates integers 1–5, and exposes `generation_count` through the typed settings snapshot. The existing guarded settings command accepts an explicit generation section update. No count control or generation action is enabled yet.
+
+Evidence: test-runner subagent passed all 27 client `user_settings` tests (including the four named C07 tests) and all 19 adapter tests. Tests cover fresh-store persistence, bounds and malformed payloads, stale writers, invalid-section preservation/replacement, newer-schema refusal and response validation. G01–G07 passed on this slice: the Rust suite needed an unsandboxed rerun for localhost socket fixtures (595 passed, 16 ignored; `/tmp/p1-m22-g03.log`). G08 remains unchecked because generation smoke coverage does not exist yet. Changed-doc local files/anchors and `git diff --check` passed. This was the initial C07 slice; the Stage A service evidence below supersedes its incomplete-service status.
+
+2026-11-06 — Stage A service implemented in `diary-application::generation`: fresh import-bound capture, frozen context, deterministic packets, sequential slots under one coordinator job, shared cancellation across gaps, independent outcomes and a session-owned store. The store reserves remaining capacity before inference, keeps at most five jobs/8 MiB, shrinks reservations after terminal acknowledgement and releases content charges on explicit discard while retaining request/job metadata. The API/lease hooks follow in Stage B; no run-starting generation surface exists yet.
+
+Affected evidence: 58 application tests and workspace Clippy passed via the test runner. Named generation tests group the C01–C06 scenarios: `empty_selection_rejected_and_ineligible_snippets_excluded`, `changed_source_refused_wrong_import_date_refused_stale_config_refused`, `packet_order_and_labels_context_is_frozen_absent_baseline_allowed`, `styles_in_order_and_one_call_per_candidate`, `partial_failure_keeps_ready_and_zero_valid_is_failure`, `cancel_keeps_ready_and_counts_slots_late_result_dropped`, `busy_between_candidates_and_cancel_between_candidates`, `lease_end_cancels_generation`, `store_cap_refuses_admission_and_discard_keeps_admission_record`, `discard_releases_content_bytes`, `output_budget_failure_keeps_ready`, and `shared_transient_cap_charges_generation_and_preserves_metadata`. Pump tests additionally bound a multibyte replacement by UTF-8 bytes and suppress a pending preview after cancellation. Stage A G01–G07 passed (609 Rust tests, 16 ignored; 228 Vitest tests across 29 files; logs `/tmp/p1-m22-stage-a/`). Stage A is complete; Stage B follows.
 
 ### Limits
 

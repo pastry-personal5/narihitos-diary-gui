@@ -158,6 +158,7 @@ export interface UserSettings {
   recoverable: boolean;
   warnings: { section: string; code: string }[];
   writing_locale: string | null;
+  generation_count: number;
   keybindings: unknown;
   /** Defaults merged with valid, conflict-free overrides, one list per action. */
   effective_keybindings: Record<string, string[]>;
@@ -165,7 +166,7 @@ export interface UserSettings {
 }
 export interface UserSettingsUpdate {
   /** `writing_init` takes the system's preferred tags and only fills an empty choice. */
-  section: "writing" | "writing_init" | "keybindings";
+  section: "writing" | "writing_init" | "keybindings" | "generation";
   value: unknown;
   expectedRevision: string;
   recover: boolean;

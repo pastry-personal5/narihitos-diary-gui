@@ -284,6 +284,7 @@ describe("settings commands", () => {
     recoverable: false,
     warnings: [],
     writing_locale: "ja-JP",
+    generation_count: 3,
     keybindings: {},
     effective_keybindings: { "editor.save": ["Command+S"] },
     keybinding_issues: [],
@@ -305,6 +306,28 @@ describe("settings commands", () => {
     });
     expect(got.writing_locale).toBe("ja-JP");
     expect(JSON.stringify(got)).not.toContain("secret");
+  });
+  it("round trips generation count and rejects invalid count responses", async () => {
+    mocks.invoke.mockResolvedValueOnce({ ...user, generation_count: 5 });
+    const got = await tauriBridge.updateUserSettings({
+      section: "generation",
+      value: { count: 5 },
+      expectedRevision: "missing",
+      recover: false,
+    });
+    expect(got.generation_count).toBe(5);
+    expect(mocks.invoke).toHaveBeenCalledWith("update_user_settings", {
+      section: "generation",
+      value: { count: 5 },
+      expectedRevision: "missing",
+      recover: false,
+    });
+    for (const generation_count of [undefined, null, 0, 6, 1.5, "3", true]) {
+      mocks.invoke.mockResolvedValueOnce({ ...user, generation_count });
+      await expect(tauriBridge.getUserSettings()).rejects.toMatchObject({
+        code: "invalid_response",
+      });
+    }
   });
   it("turns rejections into allowlisted codes and never forwards raw text", async () => {
     mocks.invoke.mockRejectedValueOnce({ code: "conflict" });

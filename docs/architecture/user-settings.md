@@ -12,7 +12,7 @@ This contract defines persistent, GUI-editable user settings. They are stored ap
 | Location  | Chosen by the owner at server launch                        | Tauri app config directory for the app identifier (`~/Library/Application Support/<identifier>/`), never inside `entries_root`, `runtime_root`, sources, exports or the config's directory |
 | Owner     | Server, loaded at launch, explicit `reload_settings`        | Tauri client bridge                                                                                                                                                                        |
 | Edited by | Owner in a text editor                                      | The user in Settings                                                                                                                                                                       |
-| Content   | Paths, sources, profiles, credentials                       | User preferences: key bindings and AI writing language                                                                                                                                     |
+| Content   | Paths, sources, profiles, credentials                       | User preferences: key bindings, AI writing language and generation count                                                                                                                   |
 
 User settings never hold credentials, tokens, paths, source or agent profiles, or diary content, and the server neither reads nor writes their file. The chosen writing locale is sent as validated request data for each AI run. Because settings are per-user and per-machine, they are not part of the workspace and are not exported or synced.
 
@@ -24,7 +24,8 @@ Strict JSON, at most 256 KiB, duplicate and unknown top-level keys rejected:
 {
   "schema_version": 1,
   "keybindings": { "palette.open": ["Shift+Command+P"] },
-  "writing": { "locale": "en-US" }
+  "writing": { "locale": "en-US" },
+  "generation": { "count": 3 }
 }
 ```
 
@@ -35,11 +36,13 @@ Each feature owns one top-level section with its own validation. Key bindings st
 - **Schema:** version 1 is fixed; no silent migration, and a newer version is read-only. A migration needs a backup copy first.
 - **Logs:** log that a load or save happened and any error code, never section contents.
 
+`generation.count` is an integer 1–5, default 3 when absent or invalid. Invalid section contents remain on disk when another section changes; only an explicit generation section update replaces them. This is a schema-1 section, not a schema migration. P1-M22 Stage A implements its storage and bridge snapshot (`generation_count`); the Settings control and use by Generate follow in Stage C.
+
 ## Commands
 
 Client-only Tauri commands, not forwarded to the server: `get_user_settings` returns the validated effective snapshot, settings revision, read-only status and load warnings; `update_user_settings` takes one section and its expected revision and returns the new snapshot/revision. The WebView never receives the file path or filesystem access. These are distinct from `get_settings`/`reload_settings`, which concern the redacted server config. The command manifest and capability grants cover exactly these commands. Recovery/reset is an explicit mode of the typed update, never an arbitrary file operation.
 
-Typed update contract: `update_user_settings(section, value, expected_revision, recover)` with sections `writing` (a tag), `writing_init` (the system's preferred tags; fills only an absent choice) and `keybindings`; `recover: true` backs the original up (0600, `user_settings.json.bak-<seconds>-<n>`) and installs defaults. Error codes: `conflict`, `read_only`, `file_invalid`, `invalid_input`, `language_unresolved`, `uncertain`, `unavailable`. A settings directory that exists with another mode is `location_unsafe` and read-only. `reload_settings` also reports `restart_required`, `rejected` and `busy` outcomes with coarse area/code issues.
+Typed update contract: `update_user_settings(section, value, expected_revision, recover)` with sections `writing` (a tag), `writing_init` (the system's preferred tags; fills only an absent choice) `keybindings`, and `generation` (`{count}`); `recover: true` backs the original up (0600, `user_settings.json.bak-<seconds>-<n>`) and installs defaults. Error codes: `conflict`, `read_only`, `file_invalid`, `invalid_input`, `language_unresolved`, `uncertain`, `unavailable`. A settings directory that exists with another mode is `location_unsafe` and read-only. `reload_settings` also reports `restart_required`, `rejected` and `busy` outcomes with coarse area/code issues.
 
 ## Required evidence
 

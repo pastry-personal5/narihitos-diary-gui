@@ -31,6 +31,10 @@ struct Pump<'a> {
 }
 impl Pump<'_> {
     fn flush(&mut self) {
+        if self.run.token().is_cancelled() {
+            self.pending.clear();
+            return;
+        }
         if self.pending.is_empty() {
             return;
         }
@@ -76,7 +80,11 @@ impl EventSink for Pump<'_> {
             AgentEvent::Replace(t) => {
                 self.pending.clear();
                 let mut s = self.shared.lock().expect("snapshot poisoned");
-                s.text = t.chars().take(MAX_TEXT_BYTES).collect();
+                let mut end = t.len().min(MAX_TEXT_BYTES);
+                while !t.is_char_boundary(end) {
+                    end -= 1;
+                }
+                s.text = t[..end].to_owned();
                 s.revision += 1;
                 drop(s);
                 self.last_flush = (self.clock)();

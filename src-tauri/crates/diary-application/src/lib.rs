@@ -8,6 +8,7 @@ pub mod agent;
 pub mod authentic;
 pub mod chat;
 pub mod diagnostics;
+pub mod generation;
 pub mod operations;
 pub mod run;
 pub mod source_trash;
@@ -107,6 +108,7 @@ struct Session {
     requests: BTreeMap<String, Request>,
     published: BTreeMap<String, Event>,
     retained_bytes: usize,
+    result_bytes: BTreeMap<String, usize>,
     events: VecDeque<(Event, usize)>,
     replay_bytes: usize,
     /// The last event no longer available, even if its gap notification was lost.
@@ -164,6 +166,7 @@ impl Coordinator {
                     requests: BTreeMap::new(),
                     published: BTreeMap::new(),
                     retained_bytes: 0,
+                    result_bytes: BTreeMap::new(),
                     events: VecDeque::new(),
                     replay_bytes: 0,
                     replay_floor: self.event_id,
@@ -287,6 +290,7 @@ impl Coordinator {
             state: JobState::Queued,
         };
         session.retained_bytes = total;
+        session.result_bytes.insert(job_id.into(), reserved_bytes);
         session.requests.insert(
             request_id.into(),
             Request {
@@ -299,6 +303,49 @@ impl Coordinator {
             session.agent_job = Some(job_id.into());
         }
         Ok(job)
+    }
+
+    /// Retry lookup before fresh source/profile/capacity checks. Authorizes before inspecting IDs.
+    pub fn lookup_request(
+        &mut self,
+        id: &str,
+        now: u64,
+        request_id: &str,
+        digest: &str,
+    ) -> Result<Option<Job>, Error> {
+        let session = self.authorized(id, now)?;
+        let Some(request) = session.requests.get(request_id) else {
+            return Ok(None);
+        };
+        if request.digest != digest {
+            return Err(Error::RequestMismatch);
+        }
+        Ok(session.jobs.get(&request.job_id).cloned())
+    }
+
+    /// Shrinks a terminal result reservation, preserving admission metadata and retry identity.
+    pub fn settle_result(
+        &mut self,
+        id: &str,
+        now: u64,
+        job_id: &str,
+        bytes: usize,
+    ) -> Result<(), Error> {
+        let session = self.authorized(id, now)?;
+        let job = session.jobs.get(job_id).ok_or(Error::NotFound)?;
+        if !job.state.is_terminal() {
+            return Err(Error::InvalidTransition);
+        }
+        let reserved = session
+            .result_bytes
+            .get_mut(job_id)
+            .ok_or(Error::NotFound)?;
+        if bytes > *reserved {
+            return Err(Error::Limit);
+        }
+        session.retained_bytes -= *reserved - bytes;
+        *reserved = bytes;
+        Ok(())
     }
 
     pub fn get(&mut self, id: &str, now: u64, job_id: &str) -> Result<Job, Error> {

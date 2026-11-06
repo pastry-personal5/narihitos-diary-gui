@@ -18,7 +18,7 @@ pub use locale::canonical_tag;
 const FILE: &str = "user_settings.json";
 const TEMP: &str = "user_settings.json.tmp";
 const MAX_BYTES: usize = 256 * 1024;
-const SECTIONS: [&str; 2] = ["keybindings", "writing"];
+const SECTIONS: [&str; 3] = ["keybindings", "writing", "generation"];
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Warning {
@@ -33,6 +33,7 @@ pub struct Snapshot {
     pub recoverable: bool,
     pub warnings: Vec<Warning>,
     pub writing_locale: Option<String>,
+    pub generation_count: u8,
     /// Stored overrides, verbatim (unknown and invalid entries included).
     pub keybindings: Value,
     /// Defaults merged with valid, conflict-free overrides, one list per registry action.
@@ -42,6 +43,8 @@ pub struct Snapshot {
 pub enum Change {
     /// A user-chosen language tag (validated and canonicalised here).
     Writing(String),
+    /// Explicit replacement of the generation section, including an invalid saved section.
+    Generation(u8),
     /// First run: store the first valid tag of the system's preferred list, only if none is saved.
     InitWriting(Vec<String>),
     /// `{"set": {id: [shortcut..] | null}}` or `{"reset_all": true}`; see `keybindings::apply`.
@@ -140,6 +143,11 @@ fn valid_writing(v: &Value) -> Option<String> {
     let object = v.as_object().filter(|o| o.len() == 1)?;
     canonical_tag(object.get("locale")?.as_str()?)
 }
+pub fn generation_count(v: &Value) -> Option<u8> {
+    let object = v.as_object().filter(|o| o.len() == 1)?;
+    let count = object.get("count")?.as_u64()?;
+    (1..=5).contains(&count).then_some(count as u8)
+}
 fn valid_keybindings(v: &Value) -> Option<&Map<String, Value>> {
     v.as_object().filter(|o| o.len() <= 512)
 }
@@ -157,6 +165,7 @@ fn snapshot_of(r: &Observed) -> Snapshot {
         recoverable: false,
         warnings: Vec::new(),
         writing_locale: None,
+        generation_count: 3,
         keybindings: json!({}),
         effective_keybindings: Value::Null,
         keybinding_issues: Vec::new(),
@@ -182,6 +191,12 @@ fn snapshot_of(r: &Observed) -> Snapshot {
                 match valid_writing(v) {
                     Some(tag) => s.writing_locale = Some(tag),
                     None => s.warnings.push(warn("writing", "section_invalid")),
+                }
+            }
+            if let Some(v) = map.get("generation") {
+                match generation_count(v) {
+                    Some(count) => s.generation_count = count,
+                    None => s.warnings.push(warn("generation", "section_invalid")),
                 }
             }
             if let Some(v) = map.get("keybindings") {
@@ -302,6 +317,12 @@ impl Store {
         };
         match change {
             Change::Recover => {}
+            Change::Generation(count) => {
+                if !(1..=5).contains(&count) {
+                    return Err(Error::Invalid);
+                }
+                map.insert("generation".into(), json!({ "count": count }));
+            }
             Change::Writing(raw) => {
                 let tag = canonical_tag(&raw).ok_or(Error::Invalid)?;
                 map.insert("writing".into(), json!({ "locale": tag }));

@@ -1,6 +1,6 @@
 # P1-M22: Candidate generation work plan
 
-Status: Planned (plan approved by the owner 2026-11-06; implementation not started)
+Status: Active (plan reviewed; Stage A started 2026-11-06)
 
 This plan adds Generate on top of the P1-M21 job layer. Scope and checklist are in the [overview](milestone-22-candidate-generation-overview.md); the contracts are [context, output and limits](../architecture/editing-and-agents.md#context-output-and-limits), the [background AI contract](../architecture/ai-job-experience.md), the [API](../architecture/api-and-processes.md), [user settings](../architecture/user-settings.md) and handoff E3/E5/E11/E13. It follows the [M21 work plan](milestone-21-transient-ai-chat-architecture.md) and repeats none of it.
 
@@ -63,7 +63,7 @@ Interview 2026-11-06.
 
 **D3 Loop.** For index i in 1..count, build a `GenerationPacket` with the i-th style and call `run::execute`. On a valid result, store the candidate and publish `candidate_ready`; on failure, record a typed outcome and continue. Between candidates the phase is `between_candidates` and the reservation is held. Cancel stops the loop; the interrupted candidate is `cancelled`, later slots `not_started`. Terminal rule: at least one valid candidate is success with counts; none is failure with the last error code.
 
-**D4 Candidate store.** Session-owned map `job -> {frozen header, outcomes[], candidates[]}`. Reads are one candidate at a time (bounded body). Discard works only on a terminal job owned by the live session, waits for nothing in M22 (review does not exist yet) and leaves the content-free admission record, so a retry reports unavailable and never reruns inference. Session close, lease end and exit cancel the job token (including gaps) and erase everything. The store reserves frozen input, one provisional buffer and bounded candidate output before inference. The 8 MiB per-session store budget bounds cumulative retained results, not each candidate independently: if a validated result cannot fit the reserved space it becomes a typed `context` failure; never truncate or evict another candidate. Release content reservations on discard while retaining coordinator admission metadata. The coordinator currently has no release API; Stage A adds one with checked accounting.
+**D4 Candidate store.** Session-owned map `job -> {frozen header, outcomes[], candidates[]}`. Reads are one candidate at a time (bounded body). Discard works only on a terminal job owned by the live session, waits for nothing in M22 (review does not exist yet) and leaves the content-free admission record, so a retry reports unavailable and never reruns inference. Session close, lease end and exit cancel the job token (including gaps) and erase everything. The store reserves all currently free store capacity before inference, including frozen input, a request clone, one provisional buffer and bounded candidate output. Admission needs room for the input/request and at least one preview and draft; terminal acknowledgement shrinks the reservation to retained content so other completed jobs can coexist. The 8 MiB per-session store budget bounds cumulative retained results, not each candidate independently: if a validated result cannot fit the reserved space it becomes a typed `context` failure; never truncate or evict another candidate. Release content reservations on discard while retaining coordinator admission metadata. The coordinator currently has no release API; Stage A adds one with checked accounting.
 
 **D5 Staleness.** `GET /generations/{job}` compares the frozen baseline with the current saved revision and returns `stale_baseline: bool`. The client shows the label; M24 enforces it before review.
 
@@ -91,7 +91,7 @@ Interview 2026-11-06.
 
 ## Sequencing and tests
 
-1. **Stage A** — service, loop, store, settings section. Gate.
+1. **Stage A** — service, loop, store, settings section. G01–G07 gate; G08 follows the Stage D smoke extension.
 2. **Stage B** — routes, bridge, diagnostics. Gate.
 3. **Stage C** — UI and Vitest. Gate.
 4. **Stage D** — conformance, live tests, smoke, docs, final gate.

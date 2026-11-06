@@ -32,6 +32,7 @@ export function settingsFake(
       recoverable: false,
       warnings: [],
       writing_locale: null,
+      generation_count: 3,
       keybindings: {},
       effective_keybindings: { ...DEFAULT_BINDINGS },
       keybinding_issues: [],
