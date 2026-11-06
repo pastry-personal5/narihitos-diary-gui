@@ -243,6 +243,17 @@ fn codex(args: &[String]) {
             started();
             fail("something odd");
         }
+        "escaped" => {
+            started();
+            let _ = Command::new(me())
+                .arg("setsid-sleep")
+                .stdout(Stdio::null())
+                .spawn()
+                .unwrap();
+            sleep(1); // stay alive so the supervisor scans while the escapee is still our child
+            let _ = std::fs::write(&last, GOOD);
+            done();
+        }
         "silent-exec" => {
             started();
             sleep(60);

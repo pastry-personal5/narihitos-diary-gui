@@ -52,6 +52,7 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
         f'    - {{alias: other, type: claude, profile_home: {home}, executable: {fake_claude}}}\n'
         f'    - {{alias: third, type: qwen, profile_home: {home}, executable: {fake_qwen}}}\n'
         f'    - {{alias: mac, type: apple-foundation-models}}\n'
+        f'    - {{alias: gone, type: codex, profile_home: {home}, executable: {base}/no-such-codex}}\n'
     )
     config.chmod(0o600)
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -114,6 +115,19 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
             assert (checked_apple['reason'] == 'helper_missing') == (not helper_built), (helper_built, checked_apple)
         for p in (checked, checked_claude, checked_qwen):
             assert p['reason'] is None, p
+        # A check that finds the command missing is a warning: it must reach the log, and `trace` must
+        # show it as a typed agent.check line without any path.
+        code, gone = call('/profiles/gone/check', 'POST', session)
+        assert code == 200 and gone['status'] == 'missing' and gone['reason'] == 'executable_missing', (code, gone)
+        traced = ''
+        for _ in range(100):
+            result = subprocess.run([str(binary), 'trace', '--config', str(config), '--select', 'recent:20'], capture_output=True, text=True)
+            traced = result.stdout
+            if '"code":"agent.check"' in traced and 'executable_missing' in traced:
+                break
+            time.sleep(0.05)
+        assert '"code":"agent.check"' in traced and '"reason":"executable_missing"' in traced, traced
+        assert str(base) not in traced and 'no-such-codex' not in traced, 'a path leaked into the trace'
         assert call('/profiles/nope/check', 'POST', session)[0] == 404
         code, settings = call('/settings', session=session)
         assert settings['agents_available'] is False, settings

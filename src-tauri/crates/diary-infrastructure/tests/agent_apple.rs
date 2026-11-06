@@ -60,6 +60,7 @@ run)
     noresult) :;;
     exit1) exit 1;;
     slow) sleep 30 & sleep 30;;
+    chatreset) echo '{{"type":"delta","text":"Draft one"}}'; echo '{{"type":"reset","text":"Better start"}}'; echo '{{"type":"delta","text":" and more."}}'; echo '{{"type":"result","text":"Better start and more."}}';;
     chat) echo '{{"type":"delta","text":"A "}}'; echo '{{"type":"delta","text":"reply."}}'; echo '{{"type":"result","text":"A reply."}}';;
     *) if grep -q '"mode":"chat"' "{r}/stdin.log"; then echo '{{"type":"result","text":"A reply."}}'; else echo '{{"type":"result","text":"{GOOD}"}}'; fi;;
   esac;;
@@ -553,4 +554,57 @@ fn apple_helper_deleted_after_extraction_is_extracted_again() {
     std::fs::remove_file(&file).unwrap();
     assert_eq!(r.check().status, ProfileStatus::Ready);
     assert!(file.exists());
+}
+
+#[test]
+fn apple_loose_native_directory_is_tightened_to_0700() {
+    use std::os::unix::fs::PermissionsExt;
+    let r = rig();
+    let dir = r.path().join("runtime/native");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o777)).unwrap();
+    assert_eq!(r.check().status, ProfileStatus::Ready);
+    assert_eq!(
+        std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+    // Loosened again later: the next launch tightens it again.
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o775)).unwrap();
+    assert_eq!(r.check().status, ProfileStatus::Ready);
+    assert_eq!(
+        std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+}
+
+#[test]
+fn apple_revised_stream_text_is_sent_as_a_replace_event() {
+    let r = rig();
+    r.set("chatreset");
+    let mut sink = Sink::default();
+    let out = r
+        .adapter
+        .run(chat(), &mut sink, &CancelToken::default())
+        .unwrap();
+    assert!(matches!(out, AgentOutput::Reply(t) if t == "Better start and more."));
+    let text: Vec<_> = sink
+        .0
+        .iter()
+        .filter_map(|e| match e {
+            AgentEvent::Delta(t) => Some(format!("+{t}")),
+            AgentEvent::Replace(t) => Some(format!("={t}")),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(text, ["+Draft one", "=Better start", "+ and more."]);
+    // A consumer applying the events ends with the final reply.
+    let mut shown = String::new();
+    for e in &sink.0 {
+        match e {
+            AgentEvent::Delta(t) => shown.push_str(t),
+            AgentEvent::Replace(t) => shown = t.clone(),
+            _ => {}
+        }
+    }
+    assert_eq!(shown, "Better start and more.");
 }

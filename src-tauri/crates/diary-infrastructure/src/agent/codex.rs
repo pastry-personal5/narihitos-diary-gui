@@ -131,6 +131,13 @@ impl CodexAdapter {
     pub fn new(table: Arc<ProfileTable>, host: Arc<Host>) -> Self {
         Adapter::with_protocol(table, host, Codex)
     }
+    pub fn with_prompt_assets(
+        table: Arc<ProfileTable>,
+        host: Arc<Host>,
+        assets: super::assets::PromptAssets,
+    ) -> Self {
+        Adapter::with_assets(table, host, Codex, assets)
+    }
 }
 
 impl Codex {

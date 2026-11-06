@@ -537,6 +537,9 @@ pub enum AgentEvent {
     Phase(Phase),
     /// Provisional text; never an `AgentOutput`.
     Delta(String),
+    /// The provisional text so far, replacing everything streamed before: the source revised text
+    /// it had already emitted, so appending the next delta would show something that was retracted.
+    Replace(String),
 }
 pub trait EventSink {
     fn event(&mut self, event: AgentEvent);

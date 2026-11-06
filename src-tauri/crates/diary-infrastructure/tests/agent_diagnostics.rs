@@ -10,6 +10,8 @@ use diary_application::{
 };
 use diary_domain::authentic::DiaryDate;
 use diary_infrastructure::agent::{
+    assets::{EMBEDDED, PromptAssets},
+    codex::CodexAdapter,
     host::Host,
     process::Limits,
     profiles::{Entry, ProfileTable},
@@ -294,6 +296,12 @@ fn runs_that_start_a_process_emit_one_run_record() {
             );
             assert_eq!(d.code, Some(code));
             assert_eq!(d.action, Some(ActionTag::Chat));
+            // The child failed after starting: either it exited non-zero or its result record was bad.
+            assert!(
+                matches!(d.reason, Some(Reason::ExitNonzero | Reason::ResultMissing)),
+                "{scenario}: {:?}",
+                d.reason
+            );
         }
         // Inactivity.
         r.set("scenario", "silent-exec");
@@ -402,4 +410,319 @@ fn no_record_carries_content_paths_or_names() {
             assert!(!dump.contains(needle), "{:?} leaked {needle}", r.kind);
         }
     });
+}
+
+// ---- Remaining reasons, limits and statuses -------------------------------------------------
+
+/// A Codex adapter with chosen limits and prompt assets, logging into the returned sink.
+fn codex_with(
+    limits: Limits,
+    assets: Option<PromptAssets>,
+    runtime_is_a_file: bool,
+) -> (tempfile::TempDir, CodexAdapter, Arc<Logs>) {
+    let root = tempfile::tempdir().unwrap();
+    let home = root.path().join("home");
+    std::fs::create_dir(&home).unwrap();
+    if runtime_is_a_file {
+        std::fs::write(root.path().join("runtime"), b"x").unwrap();
+    } else {
+        std::fs::create_dir(root.path().join("runtime")).unwrap();
+    }
+    let table = Arc::new(ProfileTable::from_entries(vec![Entry {
+        alias: "main".into(),
+        kind: AgentKind::Codex,
+        home: Some(home),
+        executable: Some(fake()),
+    }]));
+    let logs = Arc::new(Logs::default());
+    // Probes keep ordinary limits so a tiny run limit cannot break the version check.
+    let host = support::host_with_probe(root.path(), logs.clone(), limits, self::limits());
+    let adapter = match assets {
+        Some(a) => CodexAdapter::with_prompt_assets(table, host, a),
+        None => CodexAdapter::new(table, host),
+    };
+    (root, adapter, logs)
+}
+fn codex_chat() -> AgentRequest {
+    AgentRequest::new(
+        ProfileHandle {
+            alias: "main".into(),
+            kind: AgentKind::Codex,
+        },
+        Locale::parse("en").unwrap(),
+        Mode::Chat(ChatPacket::new(None, vec![], SECRET.into()).unwrap()),
+    )
+}
+fn run_codex(a: &CodexAdapter, req: AgentRequest) -> Result<AgentOutput, AgentError> {
+    a.run(req, &mut Sink, &CancelToken::default())
+}
+fn only(logs: &Logs) -> (EventCode, Level, AgentDetail) {
+    logs.one()
+}
+/// The embedded table with every Codex asset passed through `f`.
+fn codex_assets(f: impl Fn(&'static str, &str) -> Option<String>) -> PromptAssets {
+    let table: Vec<(AgentKind, &str, String)> = EMBEDDED
+        .iter()
+        .filter_map(|(k, n, t)| {
+            if *k == AgentKind::Codex {
+                f(n, t).map(|t| (*k, *n, t))
+            } else {
+                Some((*k, *n, (*t).to_owned()))
+            }
+        })
+        .collect();
+    let refs: Vec<(AgentKind, &str, &str)> =
+        table.iter().map(|(k, n, t)| (*k, *n, t.as_str())).collect();
+    PromptAssets::from_table(&refs)
+}
+
+#[test]
+fn asset_and_pin_problems_are_blocked_with_their_reason() {
+    for (assets, reason) in [
+        (codex_assets(|_, _| None), Reason::AssetsMissing),
+        (
+            codex_assets(|n, t| {
+                Some(if n == "chat" {
+                    "garbage".into()
+                } else {
+                    t.to_owned()
+                })
+            }),
+            Reason::AssetsInvalid,
+        ),
+        (
+            codex_assets(|n, t| {
+                Some(if n == "chat" {
+                    t.replacen("model: ", "model: bad\"", 1)
+                } else {
+                    t.to_owned()
+                })
+            }),
+            Reason::PromptPinRejected,
+        ),
+    ] {
+        let (_root, a, logs) = codex_with(limits(), Some(assets), false);
+        assert_eq!(
+            run_codex(&a, codex_chat()).unwrap_err().0,
+            AgentErrorCode::AssetsUnavailable,
+            "{reason:?}"
+        );
+        let (ev, _, d) = only(&logs);
+        assert_eq!((ev, d.reason), (EventCode::AgentBlocked, Some(reason)));
+        assert_eq!(d.exit, None);
+    }
+}
+
+#[test]
+fn an_oversized_packet_is_blocked_before_any_process() {
+    let (_root, a, logs) = codex_with(limits(), None, false);
+    let doc = ChatDocument {
+        kind: DocumentKind::Authentic,
+        date: DiaryDate::from_ymd(2026, 11, 6).unwrap(),
+        unsaved: false,
+        body: "x".repeat(MAX_PACKET_BYTES + 1),
+    };
+    let req = AgentRequest::new(
+        ProfileHandle {
+            alias: "main".into(),
+            kind: AgentKind::Codex,
+        },
+        Locale::parse("en").unwrap(),
+        Mode::Chat(ChatPacket::new(Some(doc), vec![], "hi".into()).unwrap()),
+    );
+    assert!(run_codex(&a, req).is_err());
+    let (ev, _, d) = only(&logs);
+    assert_eq!(
+        (ev, d.reason),
+        (EventCode::AgentBlocked, Some(Reason::PacketTooLarge))
+    );
+    assert!(d.input_bytes.is_none() || d.input_bytes == Some(0));
+}
+
+#[test]
+fn an_unusable_runtime_directory_is_blocked() {
+    let (_root, a, logs) = codex_with(limits(), None, true);
+    assert_eq!(
+        run_codex(&a, codex_chat()).unwrap_err().0,
+        AgentErrorCode::Failed
+    );
+    let (ev, _, d) = only(&logs);
+    assert_eq!(
+        (ev, d.reason),
+        (EventCode::AgentBlocked, Some(Reason::RunDirUnavailable))
+    );
+    let c = a.check(&ProfileHandle {
+        alias: "main".into(),
+        kind: AgentKind::Codex,
+    });
+    assert_eq!(
+        (c.status, c.reason),
+        (ProfileStatus::Failed, Some(Reason::RunDirUnavailable))
+    );
+}
+
+#[test]
+fn process_limits_and_escapees_are_recorded_as_stop_causes() {
+    let write = |root: &tempfile::TempDir, s: &str| {
+        std::fs::write(root.path().join("home/scenario"), s).unwrap()
+    };
+    // Wall clock.
+    let (root, a, logs) = codex_with(
+        Limits {
+            inactivity: Duration::from_secs(20),
+            wall: Duration::from_millis(400),
+            ..limits()
+        },
+        None,
+        false,
+    );
+    write(&root, "silent-exec");
+    assert_eq!(
+        run_codex(&a, codex_chat()).unwrap_err().0,
+        AgentErrorCode::Timeout
+    );
+    let (_, _, d) = only(&logs);
+    assert_eq!(
+        (d.stop, d.code),
+        (Some(StopTag::Wall), Some(AgentErrorCode::Timeout))
+    );
+    // One record longer than the record limit, then a total over the output limit.
+    for (l, stop, reason) in [
+        (
+            Limits {
+                record: 8,
+                ..limits()
+            },
+            StopTag::RecordTooLarge,
+            Reason::RecordTooLarge,
+        ),
+        (
+            Limits {
+                total: 20,
+                ..limits()
+            },
+            StopTag::OutputTooLarge,
+            Reason::OutputTooLarge,
+        ),
+    ] {
+        let (root, a, logs) = codex_with(l, None, false);
+        write(&root, "");
+        assert_eq!(
+            run_codex(&a, codex_chat()).unwrap_err().0,
+            AgentErrorCode::InvalidOutput
+        );
+        let (_, _, d) = only(&logs);
+        assert_eq!((d.stop, d.reason), (Some(stop), Some(reason)));
+    }
+    // A descendant that left the process group.
+    let (root, a, logs) = codex_with(limits(), None, false);
+    write(&root, "escaped");
+    assert_eq!(
+        run_codex(&a, codex_chat()).unwrap_err().0,
+        AgentErrorCode::Failed
+    );
+    let (_, level, d) = only(&logs);
+    assert_eq!(level, Level::Error);
+    assert_eq!(
+        (d.reason, d.escaped),
+        (Some(Reason::EscapedDescendants), Some(1))
+    );
+}
+
+#[test]
+fn qwen_reporting_another_model_is_recorded_as_init_mismatch() {
+    let r = Rig::new(AgentKind::Qwen);
+    r.set("scenario", "model-mismatch");
+    assert_eq!(r.run(r.chat()).unwrap_err().0, AgentErrorCode::Unavailable);
+    let (_, _, d) = r.logs.one();
+    assert_eq!(d.reason, Some(Reason::InitMismatch));
+}
+
+#[test]
+fn every_profile_status_is_logged_with_its_tag() {
+    // One check per reachable status, on Codex. `available_auth_unknown` is a vocabulary value no
+    // adapter produces today.
+    let r = Rig::new(AgentKind::Codex);
+    let tag = |r: &Rig| {
+        r.agents.check(&r.handle());
+        r.logs.one().2.status.unwrap()
+    };
+    assert_eq!(tag(&r), StatusTag::Ready);
+    r.set("login", "none");
+    assert_eq!(tag(&r), StatusTag::Unauthenticated);
+    r.set("login", "boom");
+    assert_eq!(tag(&r), StatusTag::Failed);
+    r.set("login", "");
+    r.set("version", "codex-cli 9.0.0");
+    assert_eq!(tag(&r), StatusTag::UnsupportedVersion);
+    let gone = Rig::with(AgentKind::Codex, true, Some("/nonexistent/agent".into()));
+    gone.agents.check(&gone.handle());
+    assert_eq!(gone.logs.one().2.status, Some(StatusTag::Missing));
+    let nohome = Rig::with(AgentKind::Codex, false, Some(fake()));
+    nohome.agents.check(&nohome.handle());
+    assert_eq!(nohome.logs.one().2.status, Some(StatusTag::Unavailable));
+    // Busy: a check made while a run is active.
+    let busy = Rig::new(AgentKind::Codex);
+    busy.set("scenario", "silent-exec");
+    let status = std::thread::scope(|s| {
+        s.spawn(|| {
+            let _ = busy.run(busy.chat());
+        });
+        std::thread::sleep(Duration::from_millis(400));
+        let c = busy.agents.check(&busy.handle());
+        busy.host.cancel_all();
+        c
+    });
+    assert_eq!(
+        (status.status, status.reason),
+        (ProfileStatus::Busy, Some(Reason::HostBusy))
+    );
+}
+
+/// Adding a `Reason` fails to compile here until the new value names the test that proves its
+/// record, so no reason can be added without log coverage.
+fn proven_by(r: Reason) -> &'static str {
+    use Reason::*;
+    match r {
+        ProfileUnknown | KindMismatch | CancelledBeforeStart | HostShuttingDown
+        | VersionUnsupported | VersionUnreadable => {
+            "refusals_before_a_process_each_emit_one_blocked_record"
+        }
+        ProfileHomeMissing | ProfileHomeNotDirectory | ExecutableMissing => {
+            "missing_home_directory_executable_are_blocked_with_their_reason"
+        }
+        HostBusy => "every_profile_status_is_logged_with_its_tag",
+        LeaseEnded => "cancel_and_lease_end_are_distinguished",
+        RunDirUnavailable => "an_unusable_runtime_directory_is_blocked",
+        AssetsMissing | AssetsInvalid | PromptPinRejected => {
+            "asset_and_pin_problems_are_blocked_with_their_reason"
+        }
+        PacketTooLarge => "an_oversized_packet_is_blocked_before_any_process",
+        RecordTooLarge | OutputTooLarge | EscapedDescendants => {
+            "process_limits_and_escapees_are_recorded_as_stop_causes"
+        }
+        InitMismatch => "qwen_reporting_another_model_is_recorded_as_init_mismatch",
+        ProbeTimedOut
+        | ProbeFailed
+        | SpawnFailed
+        | OsUnsupported
+        | DeviceIneligible
+        | AppleIntelligenceDisabled
+        | ModelNotReady
+        | ModelUnavailableUnknown
+        | LocaleUnsupported
+        | NativeSessionBusy
+        | NativeErrorUnmapped
+        | HelperMissing
+        | HelperUntrusted
+        | HelperFailed => "agent_apple.rs (Apple helper and availability paths)",
+        ExitNonzero | ResultMissing => "runs_that_start_a_process_emit_one_run_record",
+    }
+}
+
+#[test]
+fn every_reason_names_the_test_that_proves_its_record() {
+    for r in Reason::ALL {
+        assert!(!proven_by(r).is_empty(), "{r:?}");
+    }
 }

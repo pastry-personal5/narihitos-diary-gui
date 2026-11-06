@@ -197,9 +197,18 @@ pub struct Adapter<P: Protocol> {
 
 impl<P: Protocol> Adapter<P> {
     pub fn with_protocol(table: Arc<ProfileTable>, host: Arc<Host>, proto: P) -> Self {
+        Self::with_assets(table, host, proto, PromptAssets::embedded())
+    }
+    /// For tests that need missing, malformed or odd prompt assets.
+    pub fn with_assets(
+        table: Arc<ProfileTable>,
+        host: Arc<Host>,
+        proto: P,
+        assets: PromptAssets,
+    ) -> Self {
         Self {
             table,
-            assets: PromptAssets::embedded(),
+            assets,
             host,
             proto,
             last: Mutex::new(HashMap::new()),

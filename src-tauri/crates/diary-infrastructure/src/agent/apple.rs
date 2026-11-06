@@ -89,6 +89,7 @@ impl Apple {
                     .mode(0o700)
                     .create(&dir)
                     .map_err(|_| Reason::HelperFailed)?;
+                secure_dir(host, &dir)?;
                 let hex: String = want[..8].iter().map(|b| format!("{b:02x}")).collect();
                 let path = dir.join(format!("apple-fm-{hex}"));
                 let tmp = dir.join(format!("apple-fm-{hex}.tmp"));
@@ -126,8 +127,29 @@ impl Apple {
             Self::log_helper(host, Reason::HelperUntrusted);
             return Err(Reason::HelperUntrusted);
         }
+        if let Some(dir) = path.parent() {
+            secure_dir(host, dir)?;
+        }
         Ok(path)
     }
+}
+
+/// The directory holding the helper must be ours and closed to others: a looser one is tightened to
+/// 0700, and one owned by someone else is untrusted (it could be swapped between hash and launch).
+fn secure_dir(host: &Host, dir: &Path) -> Result<(), Reason> {
+    use std::os::unix::fs::MetadataExt;
+    let meta = std::fs::symlink_metadata(dir).map_err(|_| Reason::HelperFailed)?;
+    // SAFETY: geteuid has no preconditions.
+    let ours = meta.is_dir() && meta.uid() == unsafe { libc::geteuid() };
+    if !ours {
+        Apple::log_helper(host, Reason::HelperUntrusted);
+        return Err(Reason::HelperUntrusted);
+    }
+    if meta.mode() & 0o077 != 0 {
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
+            .map_err(|_| Reason::HelperFailed)?;
+    }
+    Ok(())
 }
 
 /// Major macOS version from the kernel; 0 when unknown (treated as unsupported).
@@ -252,6 +274,15 @@ impl Stream for AppleStream {
                         emit(AgentEvent::Phase(Phase::ReceivingOutput));
                     }
                     emit(AgentEvent::Delta(t.to_owned()));
+                }
+            }
+            Some("reset") => {
+                if let Some(t) = v["text"].as_str().filter(|_| chat) {
+                    if !self.receiving {
+                        self.receiving = true;
+                        emit(AgentEvent::Phase(Phase::ReceivingOutput));
+                    }
+                    emit(AgentEvent::Replace(t.to_owned()));
                 }
             }
             Some("result") => match v["text"].as_str() {

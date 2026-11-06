@@ -1,6 +1,6 @@
 # P1-M20: Agent abstraction, diagnostics and Apple Foundation Models adapter work plan
 
-Status: Active
+Status: Done 2026-11-06
 
 This plan makes the four agents share one engine, one registry and one diagnostic vocabulary, then adds the Apple adapter. Scope and checklist are in the [overview](milestone-20-apple-foundation-models-adapter-overview.md); the contracts are the [Apple adapter](../architecture/editing-and-agents.md#apple-foundation-models-adapter), [trust and process lifecycle](../architecture/editing-and-agents.md#trust-and-process-lifecycle), [required evidence](../architecture/editing-and-agents.md#required-evidence), the [logging contract](../architecture/logging.md) and handoff E5/E11. It follows the [M19 work plan](milestone-19-qwen-code-adapter-architecture.md) and repeats none of it.
 

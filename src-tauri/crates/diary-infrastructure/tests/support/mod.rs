@@ -31,3 +31,20 @@ pub fn live_host(runtime_root: &Path) -> Arc<Host> {
         Limits::probe(),
     ))
 }
+
+/// Like `host`, but the status probes keep their own limits (a run-limit test must not break them).
+pub fn host_with_probe(
+    root: &Path,
+    diag: Arc<dyn Diagnostics>,
+    limits: Limits,
+    probe: Limits,
+) -> Arc<Host> {
+    Arc::new(Host::new(
+        root.join("runtime"),
+        "/usr/bin:/bin".into(),
+        root.to_path_buf(),
+        diag,
+        limits,
+        probe,
+    ))
+}

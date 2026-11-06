@@ -55,6 +55,22 @@ func availability() {
 
 func mapError(_ error: Error) -> String {
     if error is CancellationError { return "cancelled" }
+    // OS 27 error family (names taken from the SDK interface; not exercisable on OS 26).
+    if #available(macOS 27.0, *) {
+        if let e = error as? LanguageModelError {
+            switch e {
+            case .contextSizeExceeded: return "context"
+            case .rateLimited: return "rate_limited"
+            case .guardrailViolation, .refusal: return "refusal"
+            case .unsupportedLanguageOrLocale: return "unsupported_language"
+            case .timeout: return "timeout"
+            default: return "native_error_unmapped"
+            }
+        }
+        if let e = error as? SystemLanguageModel.Error, case .assetsUnavailable = e {
+            return "unavailable"
+        }
+    }
     if let e = error as? LanguageModelSession.GenerationError {
         switch e {
         case .exceededContextWindowSize: return "context"
@@ -114,10 +130,16 @@ func run() async {
             var last = ""
             for try await snapshot in session.streamResponse(to: req.prompt) {
                 last = snapshot.content
-                if last.hasPrefix(sent), last.count > sent.count {
-                    emit(["type": "delta", "text": String(last.dropFirst(sent.count))])
-                    sent = last
+                if last.hasPrefix(sent) {
+                    if last.count > sent.count {
+                        emit(["type": "delta", "text": String(last.dropFirst(sent.count))])
+                    }
+                } else {
+                    // The model revised or shortened text already sent: a delta would be wrong, so
+                    // send the whole current text once and continue from it.
+                    emit(["type": "reset", "text": last])
                 }
+                sent = last
             }
             emit(["type": "result", "text": last])
         }
