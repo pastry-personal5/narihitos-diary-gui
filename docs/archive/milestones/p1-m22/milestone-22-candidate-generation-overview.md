@@ -1,13 +1,13 @@
 # P1-M22: Candidate generation overview
 
-Status: Active (plan reviewed; Stage A started 2026-11-06)
+Status: Done (2026-11-06; Qwen live proof exempt: GPU throttling)
 
 Add Generate: one to five sequential, independently validated candidates from eligible selected source snapshots, bound to an immutable date, locale, profile and saved Authentic baseline. It reuses the P1-M21 job layer (`Coordinator::admit_agent`, `run::execute`, the chat service pattern). The [work plan](milestone-22-candidate-generation-architecture.md) defines findings, owner decisions, design, files, sequencing and tests.
 
 ## Entry conditions
 
 - P1-M16 (`GenerationPacket`, `Style`, generation validator, `generate-candidate` assets), P1-M17–P1-M20 (four adapters, one registry) and P1-M21 (job layer, chat, AI Chat pane) are Done.
-- Follow [context, output and limits](../architecture/editing-and-agents.md#context-output-and-limits), the [background AI contract](../architecture/ai-job-experience.md), the [API](../architecture/api-and-processes.md) (`generate_candidates`, `read_candidate`) and handoff E3/E5/E11/E13.
+- Follow [context, output and limits](../../../architecture/editing-and-agents.md#context-output-and-limits), the [background AI contract](../../../architecture/ai-job-experience.md), the [API](../../../architecture/api-and-processes.md) (`generate_candidates`, `read_candidate`) and handoff E3/E5/E11/E13.
 - [Owner decisions](milestone-22-candidate-generation-architecture.md#owner-decisions) Q1–Q5 and O1–O2 of 2026-11-06 are recorded.
 
 ## Scope
@@ -31,7 +31,7 @@ Check only with recorded evidence. Planning does not complete these items.
 - [x] C02 — The job freezes date, locale, profile, count, snapshots and baseline (`absent` or `{sequence, sha256}`); later checkbox, re-import, setting or other-date edits never retarget it. Evidence: `context_is_frozen`, `absent_baseline_allowed`.
 - [x] C03 — Packets order snippets deterministically, label them `snippet-N`, omit paths, front matter, location and audio, and use the styles standard, concise, reflective, chronological, thematic in order; one model call per candidate, no hidden retry or fallback. Evidence: `packet_order_and_labels`, `styles_in_order`, `one_call_per_candidate`.
 - [x] C04 — A failed candidate does not remove earlier ones and the loop continues; the job succeeds with partial counts if at least one candidate is valid and fails if none is; the reservation spans the whole loop including the gaps. Evidence: `partial_failure_keeps_ready`, `zero_valid_is_failure`, `busy_between_candidates`.
-- [x] C05 — Cancel keeps finished candidates, labels the interrupted candidate and unstarted slots separately, and drops late results; lease end, close and shutdown cancel the run. Evidence: `cancel_keeps_ready_and_counts_slots`, `late_result_dropped`, `lease_end_cancels_generation`.
+- [x] C05 — Cancel keeps finished candidates, labels the interrupted candidate and unstarted slots separately, and drops late results; lease end, close and shutdown cancel the run. Deliberate close waits for worker acknowledgement before releasing the lease and refuses new admissions during that wait. Evidence: `close_waits_for_ack_and_blocks_new_admissions`, `close_failure_keeps_window_available`, `cancel_keeps_ready_and_counts_slots`, `late_result_dropped`, `lease_end_cancels_generation`.
 - [x] C06 — The candidate store is session-owned, capped at 5 jobs and 8 MiB per session and counted in the transient byte cap; a full store refuses admission with a code that asks for explicit discard; discard removes only that transient result, leaves a content-free admission record and never reruns inference. Evidence: `store_cap_refuses_admission`, `discard_keeps_admission_record`, `retry_after_discard_is_unavailable`.
 - [x] C07 — `generation.count` is a validated integer 1–5, default 3, saved through the guarded section write; an invalid section degrades alone and keeps its raw data. Evidence: `generation_defaults_and_bounds`, `generation_write_conflicts`, `generation_invalid_section_preserved`, `generation_newer_schema_untouched`.
 
@@ -53,10 +53,10 @@ Check only with recorded evidence. Planning does not complete these items.
 
 ### Stage D — proof and docs
 
-- [ ] C18 — A generation conformance matrix runs over all four kinds with fake children: success, partial failure, cancel mid-candidate, timeout, flood, late result, retry without rerun, stale baseline, changed source, no content in errors. Evidence: `diary-api` generation tests and the M20 matrix in generation mode.
-- [ ] C19 — Env-gated, agent-run live tests produce one real candidate and one cancel per adapter through the built server with synthetic snippets, recording versions and timing. No human gate. A kind unavailable here stays unchecked with the exact reason.
-- [ ] C20 — `scripts/smoke/agent.py` covers generation refusals, admission, manifest, candidate read and discard with fake CLIs; no review route or UI exists; no `Cargo.lock` or `package*.json` change.
-- [ ] C21 — Affected docs state actual behavior and evidence limits: editing-and-agents, api-and-processes, ai-job-experience, user-settings, logging, handoff E3/E5/E11/E13 and the M22 row, phase plan, roadmap, changelog, docs index, README, AGENTS.md.
+- [x] C18 — A generation conformance matrix runs over all four kinds with fake children: success, partial failure, cancel mid-candidate, timeout, flood, late result, retry without rerun, stale baseline, changed source, no content in errors. Evidence: `diary-api` generation tests and the M20 matrix in generation mode.
+- [x] C19 — Env-gated, agent-run live tests produce one real candidate and one cancel per non-exempt adapter through the built server with synthetic snippets, recording versions and timing. Qwen is exempt: GPU throttling (owner instruction); no real Qwen test is run. No human gate. A non-exempt kind unavailable here stays unchecked with the exact reason.
+- [x] C20 — `scripts/smoke/agent.py` covers generation refusals, admission, manifest, candidate read and discard with fake CLIs; no review route or UI exists; no `Cargo.lock` or `package*.json` change.
+- [x] C21 — Affected docs state actual behavior and evidence limits: editing-and-agents, api-and-processes, ai-job-experience, user-settings, logging, handoff E3/E5/E11/E13 and the M22 row, phase plan, roadmap, changelog, docs index, README, AGENTS.md.
 
 ## Plan-review checklist
 
@@ -75,7 +75,7 @@ Run G01–G07 at the end of each stage; a stage does not start while the previou
 - [x] G05 — `npx eslint . --max-warnings 0`
 - [x] G06 — `npx vitest run`
 - [x] G07 — `npx tsc --noEmit`
-- [ ] G08 — `python3 scripts/smoke/agent.py` extended for generation with fake CLIs
+- [x] G08 — `python3 scripts/smoke/agent.py` extended for generation with fake CLIs
 
 If a command cannot run, leave its item unchecked and record the blocker. No human test is an exit gate.
 
@@ -97,6 +97,19 @@ Affected checks before final review: 73 API tests, four native bridge generation
 
 Targeted evidence: 30 controller/navigation/UI/settings tests, TypeScript and ESLint passed. Tests exercise one-frame submission state, duplicate activation, dirty choices, changed-source guards, flush ordering, cancellation during preparation, lost-reply retry, client memory refusal, read-only provisional/final text with selection/focus preservation, scroll/New output, date changes, terminal/stale feedback, count persistence and a full App request using the saved count and Include state. No dependency was added for DOM assertions. Stage C G01–G07 passed (621 Rust tests, 16 ignored; 251 Vitest tests across 33 files; logs `/tmp/p1-m22-stage-c/`). The old symbol tooltip test was updated to require the actual unavailable/unsupported reason in its fake without generation support. Changed-doc local files/anchors and whitespace review passed. Native WKWebView timing/VoiceOver/IME proof is not claimed.
 
+2026-11-06 — Stage D and P1-M22 completed after interruption recovery. The test-runner verified the final tree: G01–G07 all passed (623 Rust tests passed, 16 ignored; 254 Vitest tests across 33 files; logs in the system temporary directory under `narihito-gate/`) outside the sandbox (localhost fixtures require socket access), and G08 `python3 scripts/smoke/agent.py` passed. The eight targeted generation API tests passed. `generation_mode_lifecycle_matrix_all_four_kinds` covers success, context/rate/auth/failed/malformed/flood/timeout outcomes, cancellation, late output suppression, scratch cleanup and content-free records with fake children. API tests run all four kinds through partial outcomes, idempotent retry, changed-source refusal, stale baselines and cancellation acknowledgement. No new dependency, prompt or adapter argv change was made; no review surface exists.
+
+Live built-server proof used `scripts/smoke/generation-live.py`, synthetic snippets and exactly one candidate plus one observed-child cancel per non-exempt adapter. All three passed with binary SHA-256 `c2552b16cc1b5670415b253fb630d259d51924949e8ff1ed5756c9fc6ffe6fab`, macOS 26.7.1 / SDK 27.2, captured zone Asia/Seoul:
+
+| Adapter                 | Profile / locale                                          | Candidate seconds | Cancel acknowledgement seconds |
+| ----------------------- | --------------------------------------------------------- | ----------------- | ------------------------------ |
+| Codex 0.167.0           | `xtt7` profile home `/Users/user1/.codex-totonani`; en-US | 12.707            | 0.107                          |
+| Claude Code 2.1.319     | default login; en-US                                      | 14.066            | 0.863                          |
+| Apple Foundation Models | system model; ko-KR                                       | 6.974             | 0.110                          |
+| Qwen                    | exempt: GPU throttling                                    | not run           | not run                        |
+
+The initial interrupted Codex proof failed its post-cancel descendant assertion; the final run above passed with no remaining child or run directory. Live checks verified immutable source bytes, no Entry writes, body-less manifests, individual candidate reads, discard, two supervised runs and no source/candidate/path leakage into diagnostics. Deliberate close now refuses new admission and awaits worker acknowledgement; a failed close keeps the window available. Automated API/client tests cover that path. Maintained contracts, README, handoff E3/E5/E11/E13, phase plan, roadmap, changelog and index reflect delivery. No packaged or human test is claimed.
+
 ### Limits
 
-No packaged-app proof; candidates are not recoverable after a server restart by design; provider retention follows each CLI or Apple policy; Apple's 4096-token context refuses long selections as `context`; Qwen candidates are slow (about a minute each).
+No packaged-app proof; candidates are not recoverable after a server restart by design; provider retention follows each CLI or Apple policy; Apple's 4096-token context refuses long selections as `context`; Qwen live proof is exempt: GPU throttling. Fake Qwen coverage remains required.

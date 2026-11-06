@@ -212,7 +212,10 @@ export interface Bridge
   refreshAuthentic(): Promise<RefreshReport>;
   getOperation(operationId: string): Promise<OperationState>;
   /** The handler resolves true when the window may close (pending saves are settled). */
-  onCloseRequested?(handler: () => Promise<boolean>): Promise<() => void>;
+  onCloseRequested?(
+    handler: () => Promise<boolean>,
+    failed?: () => void,
+  ): Promise<() => void>;
   watch(observer: (event: StreamEvent) => void): Promise<() => Promise<void>>;
 }
 export type Connection =

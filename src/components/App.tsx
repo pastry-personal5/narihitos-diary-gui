@@ -54,6 +54,7 @@ export function App({ bridge }: { bridge: Bridge }) {
   const [chatWidth, setChatWidth] = useState(240);
   const [messageHeight, setMessageHeight] = useState(160);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [closePending, setClosePending] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const settings = useSettings(bridge, connected);
   const model = useMemo(() => new NavigationModel(bridge), [bridge]);
@@ -126,16 +127,28 @@ export function App({ bridge }: { bridge: Bridge }) {
     let off: (() => void) | undefined;
     let disposed = false;
     void bridge
-      .onCloseRequested?.(async () => {
-        if (
-          generator.state.dirty ||
-          (generator.state.submitting &&
-            !generator.state.activeJob &&
-            !generator.state.uncertain)
-        )
-          await generator.cancel();
-        return model.resources.closeApp();
-      })
+      .onCloseRequested?.(
+        async () => {
+          if (
+            generator.state.dirty ||
+            (generator.state.submitting &&
+              !generator.state.activeJob &&
+              !generator.state.uncertain)
+          )
+            await generator.cancel();
+          const proceed = await model.resources.closeApp();
+          if (proceed) setClosePending(true);
+          return proceed;
+        },
+        () => {
+          setClosePending(false);
+          model.messages.add(
+            "The server could not confirm closing. The window stayed open; retry closing or reconnect.",
+            "error",
+            true,
+          );
+        },
+      )
       .then((stop) => {
         if (disposed) stop();
         else off = stop;
@@ -171,11 +184,11 @@ export function App({ bridge }: { bridge: Bridge }) {
   });
   useEffect(() => {
     if (connection.kind === "connected") attempts.current = 0;
-    if (connection.kind !== "disconnected") return;
+    if (closePending || connection.kind !== "disconnected") return;
     const delay = Math.min(30_000, 500 * 2 ** attempts.current++);
     const timer = setTimeout(() => latestConnect.current(), delay);
     return () => clearTimeout(timer);
-  }, [connection]);
+  }, [connection, closePending]);
   useEffect(() => {
     if (!connected) return;
     const focus = () => {
@@ -403,7 +416,16 @@ export function App({ bridge }: { bridge: Bridge }) {
     bindings[id]?.length ? `${base} (${bindings[id].join(", ")})` : base;
   return (
     <SymbolProvider value={symbols}>
-      <main aria-label="Standard Layout" className="standard-layout">
+      {closePending && (
+        <p className="close-status" role="status">
+          Closing… waiting for the server.
+        </p>
+      )}
+      <main
+        inert={closePending}
+        aria-label="Standard Layout"
+        className="standard-layout"
+      >
         <header aria-label="Main Toolbar Strip" className="toolbar">
           <div>
             <h1>Narihito’s Diary</h1>

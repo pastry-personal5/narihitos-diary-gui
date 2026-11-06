@@ -2,6 +2,7 @@ import { navigationFake } from "./navigation-fake";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -408,4 +409,35 @@ it("persists generation count and reloads the saved value", async () => {
       "5",
     ),
   );
+});
+
+it("close_failure_keeps_window_available and reports the server failure", async () => {
+  const fake = settingsFake({ writing_locale: "en-US" });
+  const b = bridge(fake);
+  let close: () => Promise<boolean> = async () => false,
+    failed = () => {};
+  b.onCloseRequested = async (handler, onFailure) => {
+    close = handler;
+    failed = onFailure ?? (() => {});
+    return () => {};
+  };
+  render(<App bridge={b} />);
+  await waitFor(() =>
+    expect(screen.getByText(/Connected to the Diary server/u)).toBeTruthy(),
+  );
+  let proceed = false;
+  await act(async () => {
+    proceed = await close();
+  });
+  expect(proceed).toBe(true);
+  expect(screen.getByRole("main", { hidden: true }).hasAttribute("inert")).toBe(
+    true,
+  );
+  await act(async () => {
+    failed();
+  });
+  expect(screen.getByRole("main").hasAttribute("inert")).toBe(false);
+  expect(
+    screen.getByText(/The server could not confirm closing/u),
+  ).toBeTruthy();
 });

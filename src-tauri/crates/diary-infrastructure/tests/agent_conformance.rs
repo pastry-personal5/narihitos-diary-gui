@@ -2,14 +2,20 @@
 //! registry. A new agent needs a fake scenario set and one registry entry, nothing here.
 mod support;
 use diary_application::agent::*;
+use diary_application::diagnostics::{Diagnostics, Record};
 use diary_domain::authentic::DiaryDate;
 use diary_infrastructure::agent::{
+    apple::AppleAdapter,
     host::Host,
     process::Limits,
     profiles::{Entry, ProfileTable},
     registry::Agents,
 };
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 const SECRET: &str = "SECRET-DIARY-TEXT";
 /// Kinds the fake CLI can stand in for. Apple joins in stage C with its own fake helper.
@@ -35,11 +41,19 @@ fn limits() -> Limits {
     }
 }
 
+#[derive(Default)]
+struct MatrixLogs(Mutex<Vec<Record>>);
+impl Diagnostics for MatrixLogs {
+    fn emit(&self, r: Record) {
+        self.0.lock().unwrap().push(r)
+    }
+}
 struct Rig {
     kind: AgentKind,
     root: tempfile::TempDir,
     host: Arc<Host>,
     agents: Agents,
+    logs: Arc<MatrixLogs>,
 }
 impl Rig {
     fn new(kind: AgentKind) -> Self {
@@ -50,20 +64,29 @@ impl Rig {
         let table = Arc::new(ProfileTable::from_entries(vec![Entry {
             alias: "main".into(),
             kind,
-            home: Some(home),
-            executable: Some(fake()),
+            home: (kind != AgentKind::AppleFoundationModels).then_some(home),
+            executable: (kind != AgentKind::AppleFoundationModels).then(fake),
         }]));
-        let host = support::host(
-            root.path(),
-            Arc::new(diary_application::diagnostics::NullDiagnostics),
-            limits(),
-        );
-        let agents = Agents::standard(table, host.clone());
+        let logs = Arc::new(MatrixLogs::default());
+        let host = support::host(root.path(), logs.clone(), limits());
+        let agents = if kind == AgentKind::AppleFoundationModels {
+            let helper = apple_helper(&root.path().canonicalize().unwrap());
+            Agents::new(
+                host.clone(),
+                vec![(
+                    kind,
+                    Arc::new(AppleAdapter::with_helper(table, host.clone(), helper, 26)),
+                )],
+            )
+        } else {
+            Agents::standard(table, host.clone())
+        };
         Self {
             kind,
             root,
             host,
             agents,
+            logs,
         }
     }
     fn set(&self, scenario: &str) {
@@ -100,7 +123,7 @@ impl Rig {
             self.handle(self.kind),
             Locale::parse("en").unwrap(),
             Mode::Candidate {
-                index: 0,
+                index: 1,
                 count: 1,
                 packet,
             },
@@ -334,4 +357,76 @@ fn registry_rejects_unregistered_kind() {
     let mut sink = Sink::default();
     let res = empty.run(r.chat(), &mut sink, &CancelToken::default());
     assert_eq!(res.unwrap_err().0, AgentErrorCode::Unavailable);
+}
+
+// Synthetic native helper: actual Apple inference remains env-gated and recorded separately.
+fn apple_helper(root: &std::path::Path) -> Vec<u8> {
+    let path = root.display();
+    format!(r#"#!/bin/sh
+case "$1" in
+availability) echo '{{"state":"available","os":"Version 26.0","context":4096,"languages":["en","ko"]}}';;
+run)
+cat > "{path}/home/input"
+case "$(cat "{path}/home/scenario" 2>/dev/null)" in
+context) echo '{{"type":"error","code":"context"}}';;
+ratelimit) echo '{{"type":"error","code":"rate_limited"}}';;
+unauthorized) echo '{{"type":"error","code":"unavailable"}}';;
+otherfail) echo '{{"type":"error","code":"unrecognized"}}';;
+malformed|fenced) echo '{{"type":"result","text":"{{}}"}}';;
+flood) while :; do printf '%04096d\n' 1; done;;
+silent-exec) sleep 30 & wait;;
+late) trap 'echo "{{\"type\":\"result\",\"text\":\"late\"}}"; exit 0' TERM; sleep 30 & wait;;
+*) echo '{{"type":"result","text":"{{\"draft_markdown\":\"Tea was nice.\",\"claim_support\":[{{\"claim\":\"Had tea\",\"snippet_ids\":[\"snippet-1\"]}}],\"warnings\":[]}}"}}';;
+esac;;
+esac
+"#).into_bytes()
+}
+#[test]
+fn generation_mode_lifecycle_matrix_all_four_kinds() {
+    for kind in AgentKind::ALL {
+        let r = Rig::new(kind);
+        r.set("");
+        assert!(
+            matches!(r.run(r.generate()).0, Ok(AgentOutput::Candidate(_))),
+            "{kind:?}"
+        );
+        for (scenario, want) in [
+            ("context", AgentErrorCode::Context),
+            ("ratelimit", AgentErrorCode::RateLimited),
+            ("unauthorized", AgentErrorCode::Unavailable),
+            ("otherfail", AgentErrorCode::Failed),
+            ("malformed", AgentErrorCode::InvalidOutput),
+            ("flood", AgentErrorCode::InvalidOutput),
+            ("silent-exec", AgentErrorCode::Timeout),
+        ] {
+            r.set(scenario);
+            let (result, _) = r.run(r.generate());
+            assert_eq!(result.unwrap_err().0, want, "{kind:?} {scenario}");
+        }
+        r.set("late");
+        let owner = Run::new();
+        let token = owner.token();
+        let result = std::thread::scope(|scope| {
+            scope.spawn(|| {
+                std::thread::sleep(Duration::from_millis(300));
+                owner.request_cancel();
+            });
+            r.agents.run(r.generate(), &mut Sink::default(), &token)
+        });
+        assert_eq!(result.unwrap_err().0, AgentErrorCode::Cancelled, "{kind:?}");
+        assert_eq!(r.leftover_run_dirs(), 0, "{kind:?}");
+        let logs = r.logs.0.lock().unwrap();
+        let dump = format!("{logs:?}");
+        assert!(
+            !dump.contains(SECRET)
+                && !dump.contains("Tea was nice")
+                && !dump.contains(&r.root.path().display().to_string())
+        );
+        assert!(
+            logs.iter()
+                .filter_map(|r| r.agent.as_ref())
+                .any(|a| a.candidate_index == Some(1) && a.style == Some(Style::Standard)),
+            "{kind:?}"
+        );
+    }
 }

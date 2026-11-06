@@ -4,6 +4,8 @@ Status: Active
 
 This index lists the design and process docs, one line each. Read only the doc you need. The rules for writing docs are in [AGENTS.md](../AGENTS.md) under "Documentation".
 
+- [P1-M22 code review](archive/milestones/p1-m22/milestone-22-review-overview.md): follow-up findings, fixes, regression tests and validation.
+
 | Doc                                                                                                                                                                      | What it covers                                                                                                                        |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
 | [roadmap.md](roadmap.md)                                                                                                                                                 | Active phase and milestone order; Phase 1 targets Diary v1.0.0.                                                                       |
@@ -94,5 +96,5 @@ This index lists the design and process docs, one line each. Read only the doc y
 | [phase-1/milestone-20-apple-foundation-models-adapter-architecture.md](phase-1/milestone-20-apple-foundation-models-adapter-architecture.md) | P1-M20 work plan: abstraction, diagnostics and Apple adapter findings, decisions, tests |
 | [phase-1/milestone-21-transient-ai-chat-overview.md](phase-1/milestone-21-transient-ai-chat-overview.md) | P1-M21 scope, C01–C17 checklist and gate |
 | [phase-1/milestone-21-transient-ai-chat-architecture.md](phase-1/milestone-21-transient-ai-chat-architecture.md) | P1-M21 work plan: job layer, chat service, UI findings, decisions, tests |
-| [phase-1/milestone-22-candidate-generation-overview.md](phase-1/milestone-22-candidate-generation-overview.md) | P1-M22 scope, completed plan review, Stage A–C evidence, C01–C21 checklist and gate |
-| [phase-1/milestone-22-candidate-generation-architecture.md](phase-1/milestone-22-candidate-generation-architecture.md) | P1-M22 work plan: generation service, candidate store, routes, UI findings, decisions, tests |
+| [phase-1/milestone-22-candidate-generation-overview.md](archive/milestones/p1-m22/milestone-22-candidate-generation-overview.md) | P1-M22 completed checklist, final gate, fake-child and live evidence; Qwen exempt |
+| [phase-1/milestone-22-candidate-generation-architecture.md](archive/milestones/p1-m22/milestone-22-candidate-generation-architecture.md) | P1-M22 work plan: generation service, candidate store, routes, UI findings, decisions, tests |

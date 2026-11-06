@@ -4,6 +4,13 @@ import { GenerationController } from "../src/application/generation/controller";
 import { SessionBudget } from "../src/application/navigation/budget";
 import { generationServer } from "./generation-fake";
 const controllers: GenerationController[] = [];
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 export async function readyGeneration() {
   const server = generationServer();
   const budget = new SessionBudget();
@@ -154,6 +161,164 @@ describe("generation preparation and session controller", () => {
     vi.mocked(server.preparation.chatRunning).mockReturnValue(false);
     controller.selectProfile("missing");
     expect(controller.reason("2026-11-06", "ko-KR")).toMatch(/No ready/);
+  });
+  it("reads candidates independently and retries missing terminal bodies without inference", async () => {
+    const { server, controller } = await readyGeneration();
+    await controller.start("2026-11-06", "ko-KR", 3);
+    vi.mocked(server.bridge.readCandidate!).mockRejectedValueOnce(
+      new AuthenticError("unavailable", false),
+    );
+    const output = vi.fn();
+    controller.subscribeOutput(output);
+    server.finish();
+    await controller.refresh();
+    expect(controller.candidate("j-1")).toBeUndefined();
+    expect(controller.candidate("j-3")).toBeDefined();
+    expect(output).toHaveBeenCalled();
+    expect(controller.state.error).toBe("unavailable");
+    expect(controller.state.activeJob).toBeNull();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(controller.candidate("j-1")).toBeDefined();
+    expect(controller.state.error).toBeNull();
+    expect(server.bridge.readCandidate).toHaveBeenCalledTimes(3);
+    expect(server.inference()).toBe(1);
+  });
+  it("does not resurrect discarded results from a delayed manifest", async () => {
+    const { server, controller, budget } = await readyGeneration();
+    await controller.start("2026-11-06", "ko-KR", 3);
+    server.finish();
+    await controller.refresh();
+    const reply = deferred<ReturnType<typeof server.snapshot>>();
+    vi.mocked(server.bridge.getGeneration!).mockReturnValueOnce(reply.promise);
+    const refresh = controller.refresh(true);
+    await controller.discard("j");
+    reply.resolve(structuredClone(server.snapshot()));
+    await refresh;
+    expect(controller.state.jobs.size).toBe(0);
+    expect(controller.candidate("j-1")).toBeUndefined();
+    expect(budget.used).toBe(0);
+  });
+  it("drops a candidate read that completes after discard", async () => {
+    const { server, controller, budget } = await readyGeneration();
+    await controller.start("2026-11-06", "ko-KR", 3);
+    const candidate = await server.bridge.readCandidate!("j-1");
+    const reply = deferred<typeof candidate>();
+    vi.mocked(server.bridge.readCandidate!)
+      .mockClear()
+      .mockReturnValueOnce(reply.promise);
+    server.finish();
+    const refresh = controller.refresh();
+    await Promise.resolve();
+    expect(server.bridge.readCandidate).toHaveBeenCalledTimes(1);
+    await controller.discard("j");
+    reply.resolve(candidate);
+    await refresh;
+    expect(controller.state.jobs.size).toBe(0);
+    expect(controller.candidate("j-1")).toBeUndefined();
+    expect(server.bridge.readCandidate).toHaveBeenCalledTimes(1);
+    expect(budget.used).toBe(0);
+  });
+  it("ignores an old session's discard acknowledgement", async () => {
+    const { server, controller, budget } = await readyGeneration();
+    await controller.start("2026-11-06", "ko-KR", 3);
+    server.finish();
+    await controller.refresh();
+    const reply = deferred<void>();
+    vi.mocked(server.bridge.discardGeneration!).mockReturnValueOnce(
+      reply.promise,
+    );
+    const discard = controller.discard("j");
+    controller.clear();
+    await controller.start("2026-11-06", "ko-KR", 3);
+    server.finish();
+    await controller.refresh();
+    const used = budget.used;
+    reply.resolve();
+    await discard;
+    expect(controller.state.jobs.has("j")).toBe(true);
+    expect(controller.candidate("j-1")).toBeDefined();
+    expect(budget.used).toBe(used);
+  });
+  it("refuses unaccounted serialized candidate payloads and can retry after capacity is freed", async () => {
+    const server = generationServer();
+    const budget = new SessionBudget(16 * 1024 * 1024);
+    budget.reserve("editor", 8 * 1024 * 1024);
+    const controller = new GenerationController(
+      server.bridge,
+      server.preparation,
+      budget,
+    );
+    controllers.push(controller);
+    controller.connect(true);
+    await controller.loadProfiles();
+    await controller.start("2026-11-06", "ko-KR", 3);
+    const read = vi
+      .mocked(server.bridge.readCandidate!)
+      .getMockImplementation()!;
+    vi.mocked(server.bridge.readCandidate!).mockImplementation(async (id) => ({
+      ...(await read(id)),
+      draft_markdown: "\u0001".repeat(1024 * 1024),
+    }));
+    server.finish();
+    await controller.refresh();
+    expect(controller.candidate("j-1")).toBeDefined();
+    expect(controller.candidate("j-3")).toBeUndefined();
+    expect(controller.state.error).toBe("session_limit");
+    expect(budget.used).toBeLessThanOrEqual(budget.limit);
+    budget.release("editor");
+    await controller.refresh(true);
+    expect(controller.candidate("j-3")).toBeDefined();
+    expect(controller.state.error).toBeNull();
+    expect(server.inference()).toBe(1);
+  });
+  it("accounts for a growing preview alongside finished candidates", async () => {
+    const server = generationServer();
+    const budget = new SessionBudget(16 * 1024 * 1024);
+    budget.reserve("editor", 8 * 1024 * 1024);
+    const controller = new GenerationController(
+      server.bridge,
+      server.preparation,
+      budget,
+    );
+    controllers.push(controller);
+    controller.connect(true);
+    await controller.loadProfiles();
+    await controller.start("2026-11-06", "ko-KR", 3);
+    const read = vi
+      .mocked(server.bridge.readCandidate!)
+      .getMockImplementation()!;
+    const large = "\u0001".repeat(1024 * 1024);
+    vi.mocked(server.bridge.readCandidate!).mockImplementation(async (id) => ({
+      ...(await read(id)),
+      draft_markdown: large,
+    }));
+    const view = server.snapshot();
+    view.candidates[0] = {
+      index: 1,
+      id: "j-1",
+      status: "ready",
+      error_code: null,
+    };
+    view.candidates[1].status = "running";
+    Object.assign(view.progress, {
+      ready_count: 1,
+      finished_count: 1,
+      not_started_count: 1,
+      candidate_ids: ["j-1"],
+      candidate_index: 2,
+    });
+    view.provisional = null;
+    await controller.refresh();
+    expect(controller.candidate("j-1")).toBeDefined();
+    view.provisional = large;
+    await controller.refresh();
+    expect(controller.state.error).toBe("session_limit");
+    expect(controller.preview("j")).toBe("");
+    expect(budget.used).toBeLessThanOrEqual(budget.limit);
+    budget.release("editor");
+    await controller.refresh();
+    expect(controller.preview("j")).toBe(large);
+    expect(controller.state.error).toBeNull();
   });
   it("reserves client output capacity before inference and never silently evicts results", async () => {
     const server = generationServer();

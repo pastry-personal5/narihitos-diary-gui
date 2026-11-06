@@ -355,3 +355,35 @@ describe("source save contract", () => {
     expect(() => sourceSaved({ ...ok, unchanged: "no" })).toThrow();
   });
 });
+
+it("keeps close blocked if the source is edited while its guarded Save is in flight", async () => {
+  const { c, bridge, events, type } = await setup();
+  type(" first");
+  vi.mocked(events.sourceGuard).mockResolvedValue("save");
+  let finish = () => {};
+  vi.mocked(bridge.saveSource).mockImplementation(
+    (_source, operation_id, _base, body) =>
+      new Promise((resolve) => {
+        finish = () =>
+          resolve({
+            operation_id,
+            digest: d("b"),
+            size: body.length,
+            unchanged: false,
+          });
+      }),
+  );
+  const closing = c.closeApp();
+  for (
+    let i = 0;
+    i < 20 && !vi.mocked(bridge.saveSource).mock.calls.length;
+    i++
+  )
+    await Promise.resolve();
+  expect(bridge.saveSource).toHaveBeenCalledTimes(1);
+  type(" later");
+  finish();
+  expect(await closing).toBe(false);
+  expect(c.active!.dirty).toBe(true);
+  expect(c.active!.buffer.getText()).toContain(" later");
+});

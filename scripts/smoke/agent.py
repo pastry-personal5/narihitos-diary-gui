@@ -1,9 +1,11 @@
-"""P1-M17..P1-M20 smoke: the built diary-server contains the embedded prompt assets and reports read-only
-profile status through the real API with a fake `codex`, `claude` and `qwen`. Nothing here starts a run; synthetic only."""
+"""P1-M17..P1-M22: embedded assets, profile status and generation on the built server.
+Only fake CLIs run inference-shaped fixtures; Apple is checked without inference."""
 import json
 import os
 from pathlib import Path
 import signal
+import shlex
+import uuid
 import stat
 import subprocess
 import tempfile
@@ -14,6 +16,10 @@ import urllib.request
 root = Path(__file__).resolve().parents[2]
 subprocess.run(['cargo', 'build', '--quiet', '--manifest-path', str(root / 'src-tauri/Cargo.toml'), '-p', 'diary-server'], check=True)
 binary = Path(os.environ.get('CARGO_TARGET_DIR', root / 'src-tauri/target')) / 'debug/diary-server'
+subprocess.run(['cargo', 'build', '--quiet', '--manifest-path', str(root / 'src-tauri/Cargo.toml'), '-p', 'diary-infrastructure', '--example', 'fake_cli'], check=True)
+fake_binary = binary.parent / 'examples/fake_cli'
+SOURCE_SECRET = 'SYNTHETIC_GENERATION_SOURCE_SENTINEL'
+DATE = '2026-11-06'
 
 # Embedding proof: Codex and Claude share their body text, so each phrase appears at least twice,
 # and each Claude asset carries its own front matter.
@@ -31,26 +37,37 @@ helper_built = b'FoundationModels.framework' in data
 with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
     base = Path(temporary).resolve()
     workspace, runtime, source, home = base / 'workspace', base / 'runtime', base / 'source', base / 'codex-home'
-    for folder in [base, workspace, runtime, source, home]:
+    claude_home, qwen_home = base / 'claude-home', base / 'qwen-home'
+    for folder in [base, workspace, runtime, source, home, claude_home, qwen_home]:
         folder.mkdir(exist_ok=True, mode=0o700)
         folder.chmod(0o700)
-    fake = base / 'codex'
-    fake.write_text('#!/bin/sh\ncase "$1" in\n  --version) echo "codex-cli 0.167.0";;\n  login) echo "Logged in using ChatGPT";;\n  *) exit 64;;\nesac\n')
-    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
-    fake_claude = base / 'claude'
-    fake_claude.write_text('#!/bin/sh\ncase "$1" in\n  --version) echo "2.1.319 (Claude Code)";;\n  auth) echo "{\\"loggedIn\\": true}";;\n  *) exit 64;;\nesac\n')
-    fake_claude.chmod(fake_claude.stat().st_mode | stat.S_IXUSR)
-    fake_qwen = base / 'qwen'
-    fake_qwen.write_text('#!/bin/sh\ncase "$1" in\n  --version) echo "0.26.4";;\n  *) exit 64;;\nesac\n')
-    fake_qwen.chmod(fake_qwen.stat().st_mode | stat.S_IXUSR)
+    # Counts actual fake child runs and optionally fails only the second candidate.
+    wrapper = '#!/bin/sh\n' + r'''case "$1" in
+--version|login|auth) ;;
+*)
+  H="${CODEX_HOME:-${CLAUDE_CONFIG_DIR:-$QWEN_HOME}}"
+  printf . >> "$H/runs"
+  if test -f "$H/partial"; then
+    N=$(wc -c < "$H/runs" | tr -d ' ')
+    if test "$N" = 2; then echo malformed > "$H/scenario"; else : > "$H/scenario"; fi
+  fi;;
+esac
+''' + 'exec ' + shlex.quote(str(fake_binary)) + ' "$@"\n'
+    fake, fake_claude, fake_qwen = base / 'codex', base / 'claude', base / 'qwen'
+    for executable in [fake, fake_claude, fake_qwen]:
+        executable.write_text(wrapper)
+        executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
+    file = source / '2026/11/06/2026-11-06_00-00-00-123.md'
+    file.parent.mkdir(parents=True)
+    file.write_text('---\nid: "2026-11-06_00-00-00-123"\ncreated_at: "2026-11-06T00:00:00.123Z"\ntags: []\n---\n' + SOURCE_SECRET + '. I had tea.\n')
     config = base / 'config.yaml'
     config.write_text(
         f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\n'
-        f'sources:\n  - {{alias: smoke-readable, type: narihito, root: {source}}}\n'
+        f'sources:\n  - {{alias: smoke-readable, type: ayumi, root: {source}}}\n'
         f'agents:\n  profiles:\n'
         f'    - {{alias: main, type: codex, profile_home: {home}, executable: {fake}}}\n'
-        f'    - {{alias: other, type: claude, profile_home: {home}, executable: {fake_claude}}}\n'
-        f'    - {{alias: third, type: qwen, profile_home: {home}, executable: {fake_qwen}}}\n'
+        f'    - {{alias: other, type: claude, profile_home: {claude_home}, executable: {fake_claude}}}\n'
+        f'    - {{alias: third, type: qwen, profile_home: {qwen_home}, executable: {fake_qwen}}}\n'
         f'    - {{alias: mac, type: apple-foundation-models}}\n'
         f'    - {{alias: gone, type: codex, profile_home: {home}, executable: {base}/no-such-codex}}\n'
     )
@@ -142,6 +159,94 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
         assert code == 200 and chat_view['transcript'] == [] and chat_view['turn'] is None, chat_view
         assert call('/chats/' + opened_chat['chat_id'], 'DELETE', session)[0] == 200
         assert call('/chats/' + opened_chat['chat_id'], session=session)[0] == 404
+        # Generation refusals, immutable import capture, partial outcomes, stale baseline,
+        # individual reads, retry/discard and cancellation over real HTTP/process supervision.
+        code, imported = call('/imports', 'POST', session, body={'date': DATE, 'request_id': 'generation-import'})
+        assert code == 202, (code, imported)
+        import_id = imported['import_id']
+        def wait_job(job_id, limit=20):
+            end = time.monotonic() + limit
+            while time.monotonic() < end:
+                code, job = call('/jobs/' + job_id, session=session)
+                assert code == 200, (code, job)
+                if job['state'] in ('succeeded', 'failed', 'cancelled'):
+                    return job
+                call('/sessions/' + session + '/heartbeat', 'POST', session)
+                time.sleep(0.02)
+            raise AssertionError('generation/import timeout')
+        assert wait_job(import_id)['state'] == 'succeeded'
+        code, page = call('/sources?import_id=' + import_id, session=session)
+        assert code == 200, (code, page)
+        selected = [{'import_id': import_id, 'source_id': row['source']['id']} for row in page['items'] if row['kind'] == 'included']
+        assert len(selected) == 1, page
+        def generation_input(request_id, profile='main', count=1):
+            return {'request_id': request_id, 'date': DATE, 'profile': profile, 'locale': 'en-US', 'count': count, 'selections': selected}
+        empty = generation_input('empty')
+        empty['selections'] = []
+        code, refused = call('/generations', 'POST', session, body=empty)
+        assert code == 422 and refused['error']['code'] == 'empty_selection', (code, refused)
+        assert call('/generations', 'POST', session, body=generation_input('off', 'gone'))[0] == 409
+        for alias, profile_home in [('main', home), ('other', claude_home), ('third', qwen_home)]:
+            payload = generation_input('generation-' + alias, alias)
+            code, accepted = call('/generations', 'POST', session, body=payload)
+            assert code == 202, (code, accepted)
+            job_id = accepted['job']['id']
+            assert wait_job(job_id)['state'] == 'succeeded'
+            code, manifest = call('/generations/' + job_id, session=session)
+            assert code == 200 and manifest['progress']['ready_count'] == 1, (code, manifest)
+            assert SOURCE_SECRET not in json.dumps(manifest) and 'Tea was nice' not in json.dumps(manifest)
+            assert 'provisional' not in manifest and manifest['stale_baseline'] is False
+            candidate_id = manifest['candidates'][0]['id']
+            code, candidate = call('/candidates/' + candidate_id, session=session)
+            assert code == 200 and candidate['draft_markdown'] == 'Tea was nice.', (code, candidate)
+            assert call('/generations', 'POST', session, body=payload)[1]['job']['id'] == job_id
+            assert (profile_home / 'runs').read_text() == '.', 'a retry ran inference again'
+            assert call('/generations/' + job_id, 'DELETE', session)[0] == 200
+            code, refused = call('/generations', 'POST', session, body=payload)
+            assert code == 404 and refused['error']['code'] == 'result_unavailable', (code, refused)
+            assert (profile_home / 'runs').read_text() == '.'
+            assert call('/candidates/' + candidate_id, session=session)[0] == 404
+        (home / 'runs').write_text('')
+        (home / 'partial').touch()
+        code, accepted = call('/generations', 'POST', session, body=generation_input('partial', count=3))
+        assert code == 202, (code, accepted)
+        job_id = accepted['job']['id']
+        assert wait_job(job_id)['state'] == 'succeeded'
+        code, manifest = call('/generations/' + job_id, session=session)
+        assert code == 200 and (manifest['progress']['ready_count'], manifest['progress']['failed_count']) == (2, 1), (code, manifest)
+        assert (home / 'runs').read_text() == '...'
+        assert call('/authentic/' + DATE + '/empty', 'POST', session, body={'operation_id': str(uuid.uuid4())})[0] == 200
+        assert call('/generations/' + job_id, session=session)[1]['stale_baseline'] is True
+        assert call('/candidates/' + manifest['candidates'][0]['id'], session=session)[0] == 200
+        assert call('/jobs/' + job_id + '/result', 'DELETE', session)[0] == 200
+        (home / 'partial').unlink()
+        (home / 'scenario').write_text('late')
+        code, accepted = call('/generations', 'POST', session, body=generation_input('cancel', count=2))
+        assert code == 202, (code, accepted)
+        job_id = accepted['job']['id']
+        for _ in range(300):
+            _, progress = call('/jobs/' + job_id, session=session)
+            if progress['phase'] == 'waiting_for_output':
+                break
+            time.sleep(0.01)
+        else:
+            raise AssertionError('fake child did not start')
+        assert call('/jobs/' + job_id + '/cancel', 'POST', session)[0] == 200
+        assert wait_job(job_id)['state'] == 'cancelled'
+        manifest = call('/generations/' + job_id, session=session)[1]
+        assert (manifest['progress']['ready_count'], manifest['progress']['cancelled_count'], manifest['progress']['not_started_count']) == (0, 1, 1), manifest
+        assert call('/generations/' + job_id, 'DELETE', session)[0] == 200
+        runs_before = (home / 'runs').read_text()
+        file.write_text(file.read_text() + 'changed\n')
+        code, refused = call('/generations', 'POST', session, body=generation_input('changed-source'))
+        assert code == 409 and refused['error']['code'] == 'reimport_required', (code, refused)
+        assert (home / 'runs').read_text() == runs_before
+        assert call('/reviews', 'POST', session)[0] == 404
+        assert call('/candidates/not-a-candidate/accept', 'POST', session)[0] == 404
+        traced = subprocess.run([str(binary), 'trace', '--config', str(config), '--select', 'recent:50'], capture_output=True, text=True, check=True).stdout
+        for secret in [SOURCE_SECRET, 'Tea was nice.', str(base)]:
+            assert secret not in traced, 'generation content/path leaked into diagnostics'
+        assert '"action":"generate"' in traced and '"candidate_index":' in traced, traced
         text = json.dumps(listing) + json.dumps(checked_apple) + json.dumps(checked) + json.dumps(checked_claude) + json.dumps(checked_qwen)
         assert str(base) not in text and 'codex-home' not in text, 'a path leaked into the profile response'
         assert not list((runtime).glob('agent-runs/*')), 'a probe left its run directory behind'

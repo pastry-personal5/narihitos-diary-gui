@@ -178,7 +178,7 @@ export const tauriBridge: Bridge = {
     authentic("refresh_authentic", undefined, refreshReportDto),
   getOperation: (operationId) =>
     authentic("get_operation", { operationId }, operationStateDto),
-  onCloseRequested: async (handler) => {
+  onCloseRequested: async (handler, failed) => {
     const channel = new Channel<unknown>();
     let busy = false;
     // After dispose the Rust side still holds the channel, so a late close must still go through.
@@ -188,7 +188,7 @@ export const tauriBridge: Bridge = {
       busy = true;
       void current()
         .then((proceed) => (proceed ? invoke("finish_close") : undefined))
-        .catch(() => {})
+        .catch(() => failed?.())
         .finally(() => {
           busy = false;
         });

@@ -405,122 +405,130 @@ async fn manifest_has_no_bodies_progress_has_no_bodies_and_partial_candidates_su
 }
 #[tokio::test]
 async fn retry_after_source_change_returns_same_job_and_retry_after_discard_is_unavailable() {
-    let f = setup(AgentKind::Codex, false, false, false);
-    let id = start(&f, "r", 1).await;
-    terminal(&f, &id).await;
-    let checks = f.profiles.checks.load(Ordering::SeqCst);
-    f.sources.changed.store(true, Ordering::SeqCst);
-    assert_eq!(start(&f, "r", 1).await, id);
-    assert_eq!(f.runner.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(f.profiles.checks.load(Ordering::SeqCst), checks);
-    let mut b = input("r", 1);
-    b["locale"] = json!("en-US");
-    assert_eq!(
-        call(&f.s, "POST", "/api/v1/generations", Some(b)).await.1["error"]["code"],
-        "request_mismatch"
-    );
-    assert_eq!(
-        call(&f.s, "DELETE", &format!("/api/v1/jobs/{id}/result"), None)
-            .await
-            .0,
-        StatusCode::OK
-    );
-    let (st, v) = call(&f.s, "POST", "/api/v1/generations", Some(input("r", 1))).await;
-    assert_eq!(st, StatusCode::NOT_FOUND);
-    assert_eq!(v["error"]["code"], "result_unavailable");
-    assert_eq!(f.runner.calls.load(Ordering::SeqCst), 1);
+    for kind in AgentKind::ALL {
+        let f = setup(kind, false, false, false);
+        let id = start(&f, "r", 1).await;
+        terminal(&f, &id).await;
+        let checks = f.profiles.checks.load(Ordering::SeqCst);
+        f.sources.changed.store(true, Ordering::SeqCst);
+        assert_eq!(start(&f, "r", 1).await, id);
+        assert_eq!(f.runner.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(f.profiles.checks.load(Ordering::SeqCst), checks);
+        let mut b = input("r", 1);
+        b["locale"] = json!("en-US");
+        assert_eq!(
+            call(&f.s, "POST", "/api/v1/generations", Some(b)).await.1["error"]["code"],
+            "request_mismatch"
+        );
+        assert_eq!(
+            call(&f.s, "DELETE", &format!("/api/v1/jobs/{id}/result"), None)
+                .await
+                .0,
+            StatusCode::OK
+        );
+        let (st, v) = call(&f.s, "POST", "/api/v1/generations", Some(input("r", 1))).await;
+        assert_eq!(st, StatusCode::NOT_FOUND);
+        assert_eq!(v["error"]["code"], "result_unavailable");
+        assert_eq!(f.runner.calls.load(Ordering::SeqCst), 1);
+    }
 }
 #[tokio::test]
 async fn stale_baseline_reported_and_final_candidates_stay_readable() {
-    let f = setup(AgentKind::Codex, false, false, false);
-    let id = start(&f, "r", 1).await;
-    let v = terminal(&f, &id).await;
-    assert_eq!(v["stale_baseline"], false);
-    f.entry.present.store(true, Ordering::SeqCst);
-    let (_, v) = call(&f.s, "GET", &format!("/api/v1/generations/{id}"), None).await;
-    assert_eq!(v["stale_baseline"], true);
-    let cid = v["candidates"][0]["id"].as_str().unwrap();
-    assert_eq!(
-        call(&f.s, "GET", &format!("/api/v1/candidates/{cid}"), None)
-            .await
-            .0,
-        StatusCode::OK
-    );
+    for kind in AgentKind::ALL {
+        let f = setup(kind, false, false, false);
+        let id = start(&f, "r", 1).await;
+        let v = terminal(&f, &id).await;
+        assert_eq!(v["stale_baseline"], false);
+        f.entry.present.store(true, Ordering::SeqCst);
+        let (_, v) = call(&f.s, "GET", &format!("/api/v1/generations/{id}"), None).await;
+        assert_eq!(v["stale_baseline"], true);
+        let cid = v["candidates"][0]["id"].as_str().unwrap();
+        assert_eq!(
+            call(&f.s, "GET", &format!("/api/v1/candidates/{cid}"), None)
+                .await
+                .0,
+            StatusCode::OK
+        );
+    }
 }
 #[tokio::test]
 async fn refusals_and_failure_reports_a_code_and_no_text() {
-    let f = setup(AgentKind::Codex, false, false, true);
-    for (key, value, code) in [
-        ("selections", json!([]), "empty_selection"),
-        (
-            "selections",
-            json!([{"import_id":"import","source_id":"unknown"}]),
-            "empty_selection",
-        ),
-        (
-            "selections",
-            json!([{"import_id":"import","source_id":"source"},{"import_id":"import","source_id":"source"}]),
-            "invalid_input",
-        ),
-        ("profile", json!("off"), "profile_not_ready"),
-        ("count", json!(0), "invalid_input"),
-        ("extra", json!("PRIVATE_ERROR"), "invalid_input"),
-    ] {
-        let mut b = input("r", 1);
-        b[key] = value;
-        let (_, v) = call(&f.s, "POST", "/api/v1/generations", Some(b)).await;
-        assert_eq!(v["error"]["code"], code, "{v}");
+    for kind in AgentKind::ALL {
+        let f = setup(kind, false, false, true);
+        for (key, value, code) in [
+            ("selections", json!([]), "empty_selection"),
+            (
+                "selections",
+                json!([{"import_id":"import","source_id":"unknown"}]),
+                "empty_selection",
+            ),
+            (
+                "selections",
+                json!([{"import_id":"import","source_id":"source"},{"import_id":"import","source_id":"source"}]),
+                "invalid_input",
+            ),
+            ("profile", json!("off"), "profile_not_ready"),
+            ("count", json!(0), "invalid_input"),
+            ("extra", json!("PRIVATE_ERROR"), "invalid_input"),
+        ] {
+            let mut b = input("r", 1);
+            b[key] = value;
+            let (_, v) = call(&f.s, "POST", "/api/v1/generations", Some(b)).await;
+            assert_eq!(v["error"]["code"], code, "{v}");
+            assert!(!v.to_string().contains("PRIVATE"));
+        }
+        f.sources.changed.store(true, Ordering::SeqCst);
+        assert_eq!(
+            call(&f.s, "POST", "/api/v1/generations", Some(input("r", 1)))
+                .await
+                .1["error"]["code"],
+            "reimport_required"
+        );
+        assert_eq!(f.runner.calls.load(Ordering::SeqCst), 0);
+        f.sources.changed.store(false, Ordering::SeqCst);
+        let id = start(&f, "r", 1).await;
+        let v = terminal(&f, &id).await;
+        assert_eq!(v["job"]["state"], "failed");
+        assert_eq!(v["progress"]["error_code"], "timeout");
         assert!(!v.to_string().contains("PRIVATE"));
     }
-    f.sources.changed.store(true, Ordering::SeqCst);
-    assert_eq!(
-        call(&f.s, "POST", "/api/v1/generations", Some(input("r", 1)))
-            .await
-            .1["error"]["code"],
-        "reimport_required"
-    );
-    assert_eq!(f.runner.calls.load(Ordering::SeqCst), 0);
-    f.sources.changed.store(false, Ordering::SeqCst);
-    let id = start(&f, "r", 1).await;
-    let v = terminal(&f, &id).await;
-    assert_eq!(v["job"]["state"], "failed");
-    assert_eq!(v["progress"]["error_code"], "timeout");
-    assert!(!v.to_string().contains("PRIVATE"));
 }
 #[tokio::test]
 async fn cancel_preserves_busy_until_acknowledged_and_drops_late_success() {
-    let f = setup(AgentKind::Codex, true, false, false);
-    f.runner.ack.store(false, Ordering::SeqCst);
-    let id = start(&f, "r", 3).await;
-    for _ in 0..300 {
-        if f.runner.calls.load(Ordering::SeqCst) > 0 {
-            break;
+    for kind in AgentKind::ALL {
+        let f = setup(kind, true, false, false);
+        f.runner.ack.store(false, Ordering::SeqCst);
+        let id = start(&f, "r", 3).await;
+        for _ in 0..300 {
+            if f.runner.calls.load(Ordering::SeqCst) > 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
         }
-        tokio::time::sleep(Duration::from_millis(2)).await;
+        let (_, p) = call(&f.s, "GET", &format!("/api/v1/jobs/{id}/result"), None).await;
+        assert_eq!(p["provisional"], "PRIVATE_PREVIEW");
+        let (_, v) = call(&f.s, "POST", &format!("/api/v1/jobs/{id}/cancel"), None).await;
+        assert_eq!(v["state"], "running");
+        assert_eq!(v["cancellation_requested"], true);
+        assert_eq!(
+            call(&f.s, "POST", "/api/v1/generations", Some(input("other", 1)))
+                .await
+                .1["error"]["code"],
+            "busy"
+        );
+        assert_eq!(
+            call(&f.s, "DELETE", &format!("/api/v1/generations/{id}"), None)
+                .await
+                .1["error"]["code"],
+            "busy"
+        );
+        f.runner.ack.store(true, Ordering::SeqCst);
+        let v = terminal(&f, &id).await;
+        assert_eq!(v["job"]["state"], "cancelled");
+        assert_eq!(v["progress"]["cancelled_count"], 1);
+        assert_eq!(v["progress"]["not_started_count"], 2);
+        assert_eq!(v["progress"]["ready_count"], 0);
     }
-    let (_, p) = call(&f.s, "GET", &format!("/api/v1/jobs/{id}/result"), None).await;
-    assert_eq!(p["provisional"], "PRIVATE_PREVIEW");
-    let (_, v) = call(&f.s, "POST", &format!("/api/v1/jobs/{id}/cancel"), None).await;
-    assert_eq!(v["state"], "running");
-    assert_eq!(v["cancellation_requested"], true);
-    assert_eq!(
-        call(&f.s, "POST", "/api/v1/generations", Some(input("other", 1)))
-            .await
-            .1["error"]["code"],
-        "busy"
-    );
-    assert_eq!(
-        call(&f.s, "DELETE", &format!("/api/v1/generations/{id}"), None)
-            .await
-            .1["error"]["code"],
-        "busy"
-    );
-    f.runner.ack.store(true, Ordering::SeqCst);
-    let v = terminal(&f, &id).await;
-    assert_eq!(v["job"]["state"], "cancelled");
-    assert_eq!(v["progress"]["cancelled_count"], 1);
-    assert_eq!(v["progress"]["not_started_count"], 2);
-    assert_eq!(v["progress"]["ready_count"], 0);
 }
 #[tokio::test]
 async fn close_expiry_shutdown_clear_transient_generations() {
@@ -574,44 +582,93 @@ async fn close_expiry_shutdown_clear_transient_generations() {
 
 #[tokio::test]
 async fn result_ownership_and_store_limit_require_explicit_discard() {
-    let f = setup(AgentKind::Codex, false, false, false);
-    let mut first = String::new();
-    for i in 0..5 {
-        let id = start(&f, &format!("r{i}"), 1).await;
-        terminal(&f, &id).await;
-        if i == 0 {
-            first = id;
+    for kind in AgentKind::ALL {
+        let f = setup(kind, false, false, false);
+        let mut first = String::new();
+        for i in 0..5 {
+            let id = start(&f, &format!("r{i}"), 1).await;
+            terminal(&f, &id).await;
+            if i == 0 {
+                first = id;
+            }
         }
-    }
-    let (st, v) = call(
-        &f.s,
-        "POST",
-        "/api/v1/generations",
-        Some(input("overflow", 1)),
-    )
-    .await;
-    assert_eq!(st, StatusCode::CONFLICT);
-    assert_eq!(v["error"]["code"], "discard_required");
-    assert_eq!(f.runner.calls.load(Ordering::SeqCst), 5);
-    let mut r = request("GET", &format!("/api/v1/candidates/{first}-1"));
-    r.headers_mut().insert(
-        "x-diary-session",
-        "07249746-e280-4d51-a86a-cbcb198ee102".parse().unwrap(),
-    );
-    let response = router(f.s.clone()).oneshot(r).await.unwrap();
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    assert_eq!(
-        call(
+        let (st, v) = call(
             &f.s,
-            "DELETE",
-            &format!("/api/v1/generations/{first}"),
-            None
+            "POST",
+            "/api/v1/generations",
+            Some(input("overflow", 1)),
         )
-        .await
-        .0,
-        StatusCode::OK
+        .await;
+        assert_eq!(st, StatusCode::CONFLICT);
+        assert_eq!(v["error"]["code"], "discard_required");
+        assert_eq!(f.runner.calls.load(Ordering::SeqCst), 5);
+        let mut r = request("GET", &format!("/api/v1/candidates/{first}-1"));
+        r.headers_mut().insert(
+            "x-diary-session",
+            "07249746-e280-4d51-a86a-cbcb198ee102".parse().unwrap(),
+        );
+        let response = router(f.s.clone()).oneshot(r).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            call(
+                &f.s,
+                "DELETE",
+                &format!("/api/v1/generations/{first}"),
+                None
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        let id = start(&f, "overflow", 1).await;
+        terminal(&f, &id).await;
+        assert_eq!(f.runner.calls.load(Ordering::SeqCst), 6);
+    }
+}
+
+#[tokio::test]
+async fn close_waits_for_ack_and_blocks_new_admissions() {
+    let f = setup(AgentKind::Codex, true, false, false);
+    f.runner.ack.store(false, Ordering::SeqCst);
+    let id = start(&f, "r", 1).await;
+    for _ in 0..300 {
+        if f.runner.calls.load(Ordering::SeqCst) > 0 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    let s = f.s.clone();
+    let closing = tokio::spawn(async move {
+        call(&s, "DELETE", &format!("/api/v1/sessions/{SESSION}"), None).await
+    });
+    for _ in 0..300 {
+        if f.s
+            .coordinator
+            .lock()
+            .unwrap()
+            .closing(SESSION, f.s.now())
+            .unwrap_or(false)
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    assert!(!closing.is_finished());
+    assert!(f.s.generations.lock().unwrap().get(SESSION, &id).is_some());
+    assert_eq!(
+        call(&f.s, "POST", "/api/v1/generations", Some(input("new", 1)))
+            .await
+            .1["error"]["code"],
+        "busy"
     );
-    let id = start(&f, "overflow", 1).await;
-    terminal(&f, &id).await;
-    assert_eq!(f.runner.calls.load(Ordering::SeqCst), 6);
+    assert_eq!(
+        call(&f.s, "POST", "/api/v1/sessions", Some(json!({})))
+            .await
+            .1["error"]["code"],
+        "client_busy"
+    );
+    assert_eq!(f.runner.calls.load(Ordering::SeqCst), 1);
+    f.runner.ack.store(true, Ordering::SeqCst);
+    assert_eq!(closing.await.unwrap().0, StatusCode::NO_CONTENT);
+    assert!(f.s.generations.lock().unwrap().is_empty());
 }

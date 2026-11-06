@@ -136,7 +136,9 @@ pub(super) async fn start(
             Err(e) => return app_error(e),
             Ok(None) => {}
         }
-        if c.active_agent(&session, s.now()).is_ok_and(|j| j.is_some()) {
+        if c.closing(&session, s.now()).unwrap_or(true)
+            || c.active_agent(&session, s.now()).is_ok_and(|j| j.is_some())
+        {
             return failure(StatusCode::CONFLICT, "busy");
         }
     }

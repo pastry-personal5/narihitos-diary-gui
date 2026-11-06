@@ -18,15 +18,16 @@ use tauri::{Manager, State, WebviewWindow, ipc::Channel};
 #[derive(Default)]
 struct CloseGate(Mutex<Option<Channel<()>>>);
 
-async fn release_and_close(app: tauri::AppHandle, window: tauri::Window) {
-    let _result = app.state::<Bridge>().close().await;
+async fn release_and_close(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+) -> Result<(), &'static str> {
+    app.state::<Bridge>().close().await?;
     app.state::<Arc<ClientLog>>()
         .shutdown(std::time::Duration::from_millis(500));
     #[cfg(feature = "scaffold-smoke")]
-    if _result.is_ok() {
-        eprintln!("SMOKE main_window_close_released");
-    }
-    let _ = window.destroy();
+    eprintln!("SMOKE main_window_close_released");
+    window.destroy().map_err(|_| "window_close_failed")
 }
 #[tauri::command]
 fn watch_close(
@@ -41,8 +42,7 @@ fn watch_close(
 #[tauri::command]
 async fn finish_close(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), &'static str> {
     main_window(&window)?;
-    release_and_close(app, window.as_ref().window()).await;
-    Ok(())
+    release_and_close(app, window.as_ref().window()).await
 }
 fn main_window(window: &WebviewWindow) -> Result<(), &'static str> {
     if window.label() == "main" {

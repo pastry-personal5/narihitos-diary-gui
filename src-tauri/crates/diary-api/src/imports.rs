@@ -50,8 +50,8 @@ pub(super) fn cancelled(s: &ServerState, session: &str) -> bool {
         || s.coordinator
             .lock()
             .expect("coordinator poisoned")
-            .list(session, s.now(), None, 1)
-            .is_err()
+            .closing(session, s.now())
+            .unwrap_or(true)
 }
 /// Polls `f` on the first call and every 64th after; a `true` is latched.
 /// Scans call the predicate per directory entry, and `f` takes the coordinator lock.

@@ -534,6 +534,22 @@ fn empty_selection_rejected_and_ineligible_snippets_excluded() {
     assert_eq!(f.items.len(), 1);
 }
 #[test]
+fn duplicate_source_rejected_within_and_across_import_snapshots() {
+    let a = Authentic {
+        present: AtomicBool::new(false),
+    };
+    for second_import in ["import", "another-import"] {
+        let i = Imports::new();
+        let mut request = input(&["a", "a"]);
+        request.selections[1].import_id = second_import.into();
+        assert!(matches!(
+            capture(request, &i, &a, &|| false),
+            Err(Error::InvalidInput)
+        ));
+        assert_eq!(i.reads.load(Ordering::SeqCst), 1);
+    }
+}
+#[test]
 fn changed_source_refused_wrong_import_date_refused_stale_config_refused() {
     let a = Authentic {
         present: AtomicBool::new(false),

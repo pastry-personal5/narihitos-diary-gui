@@ -117,6 +117,7 @@ struct Request {
 struct Session {
     id: String,
     last_heartbeat: u64,
+    closing: bool,
     jobs: BTreeMap<String, Job>,
     /// The latest agent job; chat and generation share one run slot per client.
     agent_job: Option<String>,
@@ -171,7 +172,7 @@ impl Coordinator {
         validate_id(proposed_id)?;
         self.expire(now);
         match self.session.as_mut() {
-            Some(session) if session.id == proposed_id => {
+            Some(session) if session.id == proposed_id && !session.closing => {
                 session.last_heartbeat = now;
                 Ok(())
             }
@@ -180,6 +181,7 @@ impl Coordinator {
                 self.session = Some(Session {
                     id: proposed_id.into(),
                     last_heartbeat: now,
+                    closing: false,
                     jobs: BTreeMap::new(),
                     agent_job: None,
                     requests: BTreeMap::new(),
@@ -201,6 +203,14 @@ impl Coordinator {
             .as_mut()
             .filter(|s| s.id == id)
             .ok_or(Error::SessionExpired)
+    }
+
+    pub fn begin_close(&mut self, id: &str, now: u64) -> Result<Option<Job>, Error> {
+        self.authorized(id, now)?.closing = true;
+        self.active_agent(id, now)
+    }
+    pub fn closing(&mut self, id: &str, now: u64) -> Result<bool, Error> {
+        Ok(self.authorized(id, now)?.closing)
     }
 
     pub fn heartbeat(&mut self, id: &str, now: u64) -> Result<(), Error> {
@@ -271,6 +281,9 @@ impl Coordinator {
             } else {
                 Err(Error::RequestMismatch)
             };
+        }
+        if session.closing {
+            return Err(Error::Busy);
         }
         if session.jobs.contains_key(job_id) {
             return Err(Error::InvalidInput);

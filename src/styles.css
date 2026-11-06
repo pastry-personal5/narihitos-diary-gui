@@ -450,3 +450,14 @@ footer {
   overflow-wrap: anywhere;
   user-select: text;
 }
+
+.close-status {
+  position: fixed;
+  z-index: 120;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}

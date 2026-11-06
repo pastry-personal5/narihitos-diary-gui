@@ -91,6 +91,9 @@ export class GenerationController {
   outputRevision = 0;
   private previews = new Map<string, string>();
   private candidates = new Map<string, CandidateView>();
+  private candidateSizes = new Map<string, number>();
+  private pendingReads = new Set<string>();
+  private discarded = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | undefined;
   private refreshWork: Promise<void> | null = null;
   private again = false;
@@ -359,21 +362,24 @@ export class GenerationController {
   }
   async retry() {
     if (!this.pending || this.state.submitting || !this.online) return;
+    const epoch = this.epoch;
     this.set({ submitting: true, error: null });
     try {
       await this.admit();
     } finally {
-      this.set({ submitting: false });
+      if (epoch === this.epoch) this.set({ submitting: false });
     }
   }
   async cancel() {
+    const epoch = this.epoch;
     const id = this.state.activeJob;
     if (id) {
       try {
         await this.bridge.cancelJob(id);
+        if (epoch !== this.epoch) return;
         await this.refresh();
       } catch (e) {
-        this.set({ error: code(e) });
+        if (epoch === this.epoch) this.set({ error: code(e) });
       }
       return;
     }
@@ -416,7 +422,10 @@ export class GenerationController {
     const epoch = this.epoch;
     const work = this.fetch(epoch).finally(() => {
       if (this.refreshWork === work) this.refreshWork = null;
-      if (epoch === this.epoch && (this.state.activeJob || this.again)) {
+      if (
+        epoch === this.epoch &&
+        (this.state.activeJob || this.pendingReads.size || this.again)
+      ) {
         this.again = false;
         this.schedule();
       }
@@ -425,14 +434,17 @@ export class GenerationController {
     return work;
   }
   private async fetch(epoch: number) {
-    const ids = new Set(this.refreshAll ? this.state.jobs.keys() : []);
+    const ids = new Set([
+      ...this.pendingReads,
+      ...(this.refreshAll ? this.state.jobs.keys() : []),
+    ]);
     this.refreshAll = false;
     if (this.state.activeJob) ids.add(this.state.activeJob);
     for (const id of ids) {
+      const current = () => epoch === this.epoch && !this.discarded.has(id);
       try {
         const view = await this.bridge.getGeneration!(id);
-        if (epoch !== this.epoch) return;
-        this.previews.set(id, view.provisional ?? "");
+        if (!current()) continue;
         const metadata: GenerationView = {
           ...view,
           provisional: null,
@@ -441,6 +453,24 @@ export class GenerationController {
             elapsed_ms: Math.floor(view.progress.elapsed_ms / 1000) * 1000,
           },
         };
+        const retainedBytes =
+          payloadBytes(metadata) +
+          payloadBytes(view.provisional) +
+          view.candidates.reduce(
+            (n, s) => n + (s.id ? (this.candidateSizes.get(s.id) ?? 0) : 0),
+            0,
+          );
+        const needsRoom =
+          !terminal(view) ||
+          view.candidates.some((s) => s.id && !this.candidates.has(s.id));
+        if (
+          !this.budget.reserve(
+            `generation:${id}`,
+            needsRoom ? Math.max(RESERVATION, retainedBytes) : retainedBytes,
+          )
+        )
+          throw new AuthenticError("session_limit", false);
+        this.previews.set(id, view.provisional ?? "");
         const old = this.state.jobs.get(id),
           jobs = new Map(this.state.jobs);
         jobs.set(id, metadata);
@@ -459,38 +489,75 @@ export class GenerationController {
             error: null,
           });
         }
+        let readError: string | null = null;
+        this.pendingReads.add(id);
         for (const slot of view.candidates) {
           if (slot.id && !this.candidates.has(slot.id)) {
-            const candidate = await this.bridge.readCandidate!(slot.id);
-            if (epoch !== this.epoch) return;
-            this.candidates.set(slot.id, candidate);
+            try {
+              const candidate = await this.bridge.readCandidate!(slot.id);
+              if (!current()) break;
+              const candidateBytes = payloadBytes(candidate);
+              const bytes =
+                payloadBytes(metadata) +
+                payloadBytes(view.provisional) +
+                candidateBytes +
+                view.candidates.reduce(
+                  (n, s) =>
+                    n + (s.id ? (this.candidateSizes.get(s.id) ?? 0) : 0),
+                  0,
+                );
+              // Serialized text can exceed the server's raw-text accounting (e.g. escapes).
+              if (
+                !this.budget.reserve(
+                  `generation:${id}`,
+                  Math.max(RESERVATION, bytes),
+                )
+              )
+                throw new AuthenticError("session_limit", false);
+              this.candidates.set(slot.id, candidate);
+              this.candidateSizes.set(slot.id, candidateBytes);
+            } catch (e) {
+              if (!current()) break;
+              readError = code(e);
+            }
           }
         }
+        if (!current()) continue;
+        const missing = view.candidates.some(
+          (s) => s.id && !this.candidates.has(s.id),
+        );
+        if (!missing || readError === "session_limit")
+          this.pendingReads.delete(id);
+        if (this.state.error !== readError) this.set({ error: readError });
         if (done) {
           const bytes =
             payloadBytes(metadata) +
             view.candidates.reduce(
-              (n, s) =>
-                n +
-                (s.id && this.candidates.has(s.id)
-                  ? payloadBytes(this.candidates.get(s.id))
-                  : 0),
+              (n, s) => n + (s.id ? (this.candidateSizes.get(s.id) ?? 0) : 0),
               0,
             );
-          this.budget.reserve(`generation:${id}`, bytes);
+          if (!missing) this.budget.reserve(`generation:${id}`, bytes);
         }
         this.output();
       } catch (e) {
-        if (epoch === this.epoch) this.set({ error: code(e) });
+        if (current()) this.set({ error: code(e) });
       }
     }
   }
   async discard(id: string) {
     const v = this.state.jobs.get(id);
     if (!v || !terminal(v)) return;
+    const epoch = this.epoch;
     try {
       await this.bridge.discardGeneration!(id);
-      for (const c of v.candidates) if (c.id) this.candidates.delete(c.id);
+      if (epoch !== this.epoch) return;
+      this.discarded.add(id);
+      this.pendingReads.delete(id);
+      for (const c of v.candidates)
+        if (c.id) {
+          this.candidates.delete(c.id);
+          this.candidateSizes.delete(c.id);
+        }
       this.previews.delete(id);
       this.budget.release(`generation:${id}`);
       const jobs = new Map(this.state.jobs);
@@ -498,7 +565,7 @@ export class GenerationController {
       this.set({ jobs, error: null });
       this.output();
     } catch (e) {
-      this.set({ error: code(e) });
+      if (epoch === this.epoch) this.set({ error: code(e) });
     }
   }
   onEvent(e: StreamEvent) {
@@ -541,6 +608,9 @@ export class GenerationController {
     this.refreshWork = null;
     this.previews.clear();
     this.candidates.clear();
+    this.candidateSizes.clear();
+    this.pendingReads.clear();
+    this.discarded.clear();
     this.set({
       jobs: new Map(),
       submitting: false,

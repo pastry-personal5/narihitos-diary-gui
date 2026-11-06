@@ -399,3 +399,21 @@ describe("generation commands", () => {
     });
   });
 });
+
+describe("close acknowledgement", () => {
+  it("reports a failed native close and permits an explicit retry", async () => {
+    const failed = vi.fn();
+    await tauriBridge.onCloseRequested!(async () => true, failed);
+    mocks.invoke.mockRejectedValueOnce("server_unavailable");
+    mocks.channels[0].onmessage({});
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(failed).toHaveBeenCalledTimes(1);
+    expect(mocks.invoke).toHaveBeenLastCalledWith("finish_close");
+    mocks.invoke.mockResolvedValueOnce(undefined);
+    mocks.channels[0].onmessage({});
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(
+      mocks.invoke.mock.calls.filter(([name]) => name === "finish_close"),
+    ).toHaveLength(2);
+  });
+});

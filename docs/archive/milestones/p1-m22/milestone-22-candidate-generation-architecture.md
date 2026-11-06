@@ -1,8 +1,8 @@
 # P1-M22: Candidate generation work plan
 
-Status: Active (plan reviewed; Stage A started 2026-11-06)
+Status: Done (2026-11-06; Qwen live proof exempt: GPU throttling)
 
-This plan adds Generate on top of the P1-M21 job layer. Scope and checklist are in the [overview](milestone-22-candidate-generation-overview.md); the contracts are [context, output and limits](../architecture/editing-and-agents.md#context-output-and-limits), the [background AI contract](../architecture/ai-job-experience.md), the [API](../architecture/api-and-processes.md), [user settings](../architecture/user-settings.md) and handoff E3/E5/E11/E13. It follows the [M21 work plan](milestone-21-transient-ai-chat-architecture.md) and repeats none of it.
+This plan adds Generate on top of the P1-M21 job layer. Scope and checklist are in the [overview](milestone-22-candidate-generation-overview.md); the contracts are [context, output and limits](../../../architecture/editing-and-agents.md#context-output-and-limits), the [background AI contract](../../../architecture/ai-job-experience.md), the [API](../../../architecture/api-and-processes.md), [user settings](../../../architecture/user-settings.md) and handoff E3/E5/E11/E13. It follows the [M21 work plan](../../../phase-1/milestone-21-transient-ai-chat-architecture.md) and repeats none of it.
 
 ## Findings that shaped the plan
 
@@ -50,7 +50,7 @@ Interview 2026-11-06.
 - **Q2 — No Authentic file. Decided: allow; baseline is `absent`.** A file created before review makes candidates stale.
 - **Q3 — Count. Decided: persisted user setting**, default 3, range 1–5, as a new `generation` settings section.
 - **Q4 — Dirty sources. Decided: block with a choice** (Save, Exclude, Cancel).
-- **Q5 — Live proof. Decided: one candidate and one cancel per adapter**, env-gated and agent-run, no human gate.
+- **Q5 — Live proof. Decided: one candidate and one cancel per adapter**, env-gated and agent-run, no human gate. Owner update: Qwen live proof is exempt: GPU throttling; never run the real Qwen leg while this exemption holds.
 - **O1 — Candidate store cap. Approved:** 5 jobs and 8 MiB per session; explicit discard required when full.
 - **O2 — Ineligible snippets. Approved:** timestamp-conflict or unknown-date snippets are excluded and shown as ineligible; no override.
 - **O3 — `GET /generations/{job}` manifest route. Included in the approved plan:** a workflow-specific manifest read, alongside the generic transient-result contract. Stage B documents the concrete route and discard alias together.
@@ -67,13 +67,15 @@ Interview 2026-11-06.
 
 **D5 Staleness.** `GET /generations/{job}` compares the frozen baseline with the current saved revision and returns `stale_baseline: bool`. The client shows the label; M24 enforces it before review.
 
-**D6 Progress.** Extend the existing snapshot with the fields in the [job contract](../architecture/ai-job-experience.md); events keep carrying job state only and the client refetches. `GET /generations/{job}` is the body-less manifest. `GET /jobs/{job}/result` returns that manifest plus one bounded provisional preview for the active slot; `get_generation` uses this content-bearing result route. Both manifest and result alias support explicit terminal discard through `DELETE`. Individual final candidates remain `GET /candidates/{id}`. This keeps text out of job/progress snapshots while supporting the approved provisional UI.
+**D6 Progress.** Extend the existing snapshot with the fields in the [job contract](../../../architecture/ai-job-experience.md); events keep carrying job state only and the client refetches. `GET /generations/{job}` is the body-less manifest. `GET /jobs/{job}/result` returns that manifest plus one bounded provisional preview for the active slot; `get_generation` uses this content-bearing result route. Both manifest and result alias support explicit terminal discard through `DELETE`. Individual final candidates remain `GET /candidates/{id}`. This keeps text out of job/progress snapshots while supporting the approved provisional UI.
 
 **D7 Diagnostics.** Content-free `generate` records in the existing typed vocabulary (job, candidate index, style id, counts, outcome code); no new event code unless the codec requires one.
 
 **D8 Bridge.** `start_generation`, `get_generation`, `read_candidate`, `discard_generation` with TypeScript validation in `src/adapters`; cancel reuses the job command.
 
 **D9 UI.** A generation controller in `src/application` outside editor components (reducer plus fake-bridge tests) reading Include state from the import model and the buffer's dirty state from the editor resource model. The Authentic pane gets the Generate button, a disabled-reason line and the cards; Settings gets the count control. Streamed text stays in a bounded per-run buffer, not global React state.
+
+**D10 Close acknowledgement.** Final workflow proof verifies the maintained close contract, including the case where admission lost its reply. The server marks the lease closing before querying/cancelling the active agent, refuses fresh admissions, waits for its terminal acknowledgement without holding a content/coordinator lock, then releases the lease and erases results. A bounded failed close keeps the window available with a content-free error instead of destroying it. This completes the existing close rule; it does not change save/discard guards.
 
 ## Files
 

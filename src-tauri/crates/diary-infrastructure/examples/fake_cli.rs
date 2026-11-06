@@ -14,6 +14,12 @@ fn out(s: &str) {
     let _ = writeln!(o, "{s}");
     let _ = o.flush();
 }
+fn flood() {
+    let record = serde_json::json!({"type":"mystery","unused":"x".repeat(4096)}).to_string();
+    for _ in 0..4096 {
+        out(&record);
+    }
+}
 fn sleep(s: u64) {
     std::thread::sleep(Duration::from_secs(s));
 }
@@ -199,6 +205,7 @@ fn codex(args: &[String]) {
         std::process::exit(1);
     };
     match file("scenario").as_str() {
+        "flood" => flood(),
         "malformed" => {
             let _ = std::fs::write(&last, "not json");
             started();
@@ -350,6 +357,7 @@ fn claude(args: &[String]) {
         std::process::exit(1);
     };
     match file("scenario").as_str() {
+        "flood" => flood(),
         "malformed" => {
             started();
             result(false, "not json", false, None);
@@ -478,6 +486,7 @@ fn qwen(args: &[String]) {
         std::process::exit(1);
     };
     match file("scenario").as_str() {
+        "flood" => flood(),
         "malformed" => {
             started();
             result("not json", false);

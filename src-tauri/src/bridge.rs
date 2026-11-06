@@ -367,8 +367,13 @@ impl Bridge {
     }
     pub async fn close(&self) -> Result<(), &'static str> {
         let _lifecycle = self.lifecycle.lock().await;
+        // With no lease there is no client run to cancel (including closing before connection).
+        if self.connection.lock().await.session.is_none() {
+            return Ok(());
+        }
+        self.session_action(true).await?;
         self.stop_events().await;
-        self.session_action(true).await
+        Ok(())
     }
     pub fn acknowledge(&self, id: &str, delivery: u64) -> Result<(), &'static str> {
         match self.flow.lock().expect("flow poisoned").as_ref() {
@@ -515,7 +520,9 @@ impl Bridge {
             .send()
             .await
             .map_err(|_| "server_unavailable")?;
-        if !response.status().is_success() {
+        if !response.status().is_success()
+            && !(close && response.status() == reqwest::StatusCode::UNAUTHORIZED)
+        {
             return Err("server_rejected_request");
         }
         if close {

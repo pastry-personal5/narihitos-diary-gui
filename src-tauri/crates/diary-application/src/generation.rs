@@ -119,7 +119,8 @@ pub fn capture(
     let mut rows = Vec::new();
     let mut bytes = HEADER_BYTES;
     for selection in input.selections {
-        if !seen.insert(selection.clone()) {
+        // Imports are observations, not separate sources: stable IDs may recur across scans.
+        if !seen.insert(selection.source_id.clone()) {
             return Err(Error::InvalidInput);
         }
         if cancelled() {

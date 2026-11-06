@@ -605,6 +605,44 @@ async fn close_session(
     if session(&headers).ok() != Some(id.as_str()) {
         return failure(StatusCode::UNAUTHORIZED, "session_expired");
     }
+    let active = {
+        let mut c = s.coordinator.lock().expect("coordinator poisoned");
+        let active = match c.begin_close(&id, s.now()) {
+            Ok(job) => job,
+            Err(e) => return app_error(e),
+        };
+        if let Some(job) = &active {
+            s.generations
+                .lock()
+                .expect("generations poisoned")
+                .cancel_job(&id, &job.id);
+            if let Some(chat) = s.chat.lock().expect("chat poisoned").as_ref() {
+                chat.cancel_job(&job.id);
+            }
+        }
+        active
+    };
+    if let Some(job) = active {
+        let acknowledgement = tokio::time::timeout(Duration::from_secs(30), async {
+            loop {
+                let state =
+                    s.coordinator
+                        .lock()
+                        .expect("coordinator poisoned")
+                        .get(&id, s.now(), &job.id);
+                match state {
+                    Ok(job) if job.state.is_terminal() => break,
+                    Err(_) => break,
+                    _ => {}
+                }
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+        })
+        .await;
+        if acknowledgement.is_err() {
+            return failure(StatusCode::SERVICE_UNAVAILABLE, "busy");
+        }
+    }
     match s
         .coordinator
         .lock()
@@ -622,6 +660,7 @@ async fn close_session(
         Err(e) => app_error(e),
     }
 }
+
 fn availability_dto(items: &[diary_application::Availability]) -> Vec<Value> {
     use diary_application::UnavailableReason as Reason;
     items.iter().map(|item|json!({"alias":item.alias,"available":item.reason.is_none(),"reason":match item.reason {

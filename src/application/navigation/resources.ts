@@ -519,7 +519,7 @@ export class ResourceCoordinator {
     if (r.detached) return (await this.events.sourceGuard(r)) === "discard";
     const choice = await this.events.sourceGuard(r);
     // A failed save keeps the text and blocks the transition.
-    if (choice === "save") return this.saveSource(r.key);
+    if (choice === "save") return (await this.saveSource(r.key)) && !r.dirty;
     return choice === "discard";
   }
   async changeDate(date: string): Promise<boolean> {
