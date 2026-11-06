@@ -5,6 +5,7 @@ use diary_infrastructure::agent::{
     claude::ClaudeAdapter,
     codex::CodexAdapter,
     profiles::{Entry, ProfileService, ProfileTable},
+    qwen::QwenAdapter,
 };
 use std::sync::Arc;
 
@@ -31,7 +32,8 @@ fn service(home: &std::path::Path, login: &str) -> ProfileService {
         Arc::new(NullDiagnostics),
     ));
     let claude = Arc::new(ClaudeAdapter::new(table.clone(), codex.host()));
-    ProfileService::new(table, codex, claude)
+    let qwen = Arc::new(QwenAdapter::new(table.clone(), codex.host()));
+    ProfileService::new(table, codex, claude, qwen)
 }
 
 #[test]

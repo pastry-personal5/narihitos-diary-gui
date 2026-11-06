@@ -1,5 +1,5 @@
 """P1-M17/P1-M18 smoke: the built diary-server contains the embedded prompt assets and reports read-only
-profile status through the real API with a fake `codex` and a fake `claude`. Nothing here starts a run; synthetic only."""
+profile status through the real API with a fake `codex`, `claude` and `qwen`. Nothing here starts a run; synthetic only."""
 import json
 import os
 from pathlib import Path
@@ -21,6 +21,7 @@ data = binary.read_bytes()
 for phrase in [b'celebrated, award-winning novelist', b'careful writing companion for a private diary']:
     assert data.count(phrase) >= 2, f'embedded prompt asset missing from the binary: {phrase!r}'
 assert data.count(b'provider: claude\nmodel: claude-sonnet-4-6') >= 2, 'embedded Claude assets missing'
+assert data.count(b'provider: qwen\nmodel: qwen3.6:35b-a3b') >= 2, 'embedded Qwen assets missing'
 
 with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
     base = Path(temporary).resolve()
@@ -34,6 +35,9 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
     fake_claude = base / 'claude'
     fake_claude.write_text('#!/bin/sh\ncase "$1" in\n  --version) echo "2.1.319 (Claude Code)";;\n  auth) echo "{\\"loggedIn\\": true}";;\n  *) exit 64;;\nesac\n')
     fake_claude.chmod(fake_claude.stat().st_mode | stat.S_IXUSR)
+    fake_qwen = base / 'qwen'
+    fake_qwen.write_text('#!/bin/sh\ncase "$1" in\n  --version) echo "0.26.4";;\n  *) exit 64;;\nesac\n')
+    fake_qwen.chmod(fake_qwen.stat().st_mode | stat.S_IXUSR)
     config = base / 'config.yaml'
     config.write_text(
         f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\n'
@@ -41,6 +45,7 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
         f'agents:\n  profiles:\n'
         f'    - {{alias: main, type: codex, profile_home: {home}, executable: {fake}}}\n'
         f'    - {{alias: other, type: claude, profile_home: {home}, executable: {fake_claude}}}\n'
+        f'    - {{alias: third, type: qwen, profile_home: {home}, executable: {fake_qwen}}}\n'
     )
     config.chmod(0o600)
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -80,15 +85,20 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
         assert by['other']['status'] == 'unchecked' and by['other']['type'] == 'claude', listing
         assert by['other']['capabilities']['chat'] == {'available': True, 'reason': None}, by['other']
         assert by['other']['capabilities']['generate'] == {'available': True, 'reason': None}, by['other']
+        assert by['third']['status'] == 'unchecked' and by['third']['type'] == 'qwen', listing
+        assert by['third']['capabilities']['chat'] == {'available': True, 'reason': None}, by['third']
+        assert by['third']['capabilities']['generate'] == {'available': True, 'reason': None}, by['third']
         code, checked = call('/profiles/main/check', 'POST', session)
         assert code == 200 and checked['status'] == 'ready', (code, checked)
         assert call('/profiles', session=session)[1]['profiles'][0]['status'] == 'ready'
         code, checked_claude = call('/profiles/other/check', 'POST', session)
         assert code == 200 and checked_claude['status'] == 'ready', (code, checked_claude)
+        code, checked_qwen = call('/profiles/third/check', 'POST', session)
+        assert code == 200 and checked_qwen['status'] == 'ready', (code, checked_qwen)
         assert call('/profiles/nope/check', 'POST', session)[0] == 404
         code, settings = call('/settings', session=session)
         assert settings['agents_available'] is False, settings
-        text = json.dumps(listing) + json.dumps(checked) + json.dumps(checked_claude)
+        text = json.dumps(listing) + json.dumps(checked) + json.dumps(checked_claude) + json.dumps(checked_qwen)
         assert str(base) not in text and 'codex-home' not in text, 'a path leaked into the profile response'
         assert not list((runtime).glob('agent-runs/*')), 'a probe left its run directory behind'
     finally:

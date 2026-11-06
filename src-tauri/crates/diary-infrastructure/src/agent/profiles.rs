@@ -1,6 +1,6 @@
 //! Profile table (config → port mapping, updated on reload) and the read-only status service behind
 //! `GET /profiles`. Listing never spawns anything; only an explicit check does, and never inference.
-use super::{assets::PromptAssets, claude::ClaudeAdapter, codex::CodexAdapter};
+use super::{assets::PromptAssets, claude::ClaudeAdapter, codex::CodexAdapter, qwen::QwenAdapter};
 use crate::config::{Config, Profile};
 use diary_application::agent::{
     Action, AgentKind, AgentRunner, ProfileDirectory, ProfileHandle, ProfileView,
@@ -96,6 +96,7 @@ pub struct ProfileService {
     table: Arc<ProfileTable>,
     adapter: Arc<CodexAdapter>,
     claude: Arc<ClaudeAdapter>,
+    qwen: Arc<QwenAdapter>,
     cache: Mutex<(
         u64,
         HashMap<String, diary_application::agent::ProfileStatus>,
@@ -106,12 +107,14 @@ impl ProfileService {
         table: Arc<ProfileTable>,
         adapter: Arc<CodexAdapter>,
         claude: Arc<ClaudeAdapter>,
+        qwen: Arc<QwenAdapter>,
     ) -> Self {
         Self {
             cache: Mutex::new((table.generation(), HashMap::new())),
             table,
             adapter,
             claude,
+            qwen,
         }
     }
     fn cached(&self, alias: &str) -> Option<diary_application::agent::ProfileStatus> {
@@ -128,7 +131,10 @@ impl ProfileService {
         status: Option<diary_application::agent::ProfileStatus>,
     ) -> ProfileView {
         let assets: &PromptAssets = self.adapter.assets();
-        let registered = matches!(e.kind, AgentKind::Codex | AgentKind::Claude);
+        let registered = matches!(
+            e.kind,
+            AgentKind::Codex | AgentKind::Claude | AgentKind::Qwen
+        );
         ProfileView {
             alias: e.alias.clone(),
             kind: e.kind,
@@ -156,6 +162,7 @@ impl ProfileDirectory for ProfileService {
         let runner: Option<&dyn AgentRunner> = match e.kind {
             AgentKind::Codex => Some(&*self.adapter),
             AgentKind::Claude => Some(&*self.claude),
+            AgentKind::Qwen => Some(&*self.qwen),
             _ => None,
         };
         let status = runner.map(|runner| {

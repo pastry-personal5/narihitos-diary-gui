@@ -26,6 +26,8 @@ pub const EMBEDDED: &Table<'static> = &[
     asset!(AgentKind::Codex, "codex", "chat"),
     asset!(AgentKind::Claude, "claude", "generate-candidate"),
     asset!(AgentKind::Claude, "claude", "chat"),
+    asset!(AgentKind::Qwen, "qwen", "generate-candidate"),
+    asset!(AgentKind::Qwen, "qwen", "chat"),
     asset!(
         AgentKind::AppleFoundationModels,
         "apple-foundation-models",
@@ -374,13 +376,10 @@ mod tests {
     fn capabilities_follow_assets_and_adapter() {
         let a = PromptAssets::embedded();
         for action in [Action::Chat, Action::Generate] {
-            assert_eq!(
-                a.capability(AgentKind::Qwen, action, false),
-                Capability::Unavailable(AssetsMissing)
-            );
             for k in [
                 AgentKind::Codex,
                 AgentKind::Claude,
+                AgentKind::Qwen,
                 AgentKind::AppleFoundationModels,
             ] {
                 assert_eq!(
@@ -432,6 +431,7 @@ mod tests {
         for k in [
             AgentKind::Codex,
             AgentKind::Claude,
+            AgentKind::Qwen,
             AgentKind::AppleFoundationModels,
         ] {
             let b = real(k, GENERATE).body;
@@ -468,6 +468,13 @@ mod tests {
             (c.model.as_str(), c.reasoning_effort.as_str()),
             ("claude-sonnet-4-6", "low")
         );
+        let c = real(AgentKind::Qwen, GENERATE);
+        // Qwen's --json-schema errors on plain-text answers; the asset must name its tool.
+        assert!(c.body.contains("`structured_output`"));
+        assert_eq!(
+            (c.model.as_str(), c.reasoning_effort.as_str()),
+            ("qwen3.6:35b-a3b", "not-applicable")
+        );
     }
 
     #[test]
@@ -475,6 +482,7 @@ mod tests {
         for k in [
             AgentKind::Codex,
             AgentKind::Claude,
+            AgentKind::Qwen,
             AgentKind::AppleFoundationModels,
         ] {
             let b = real(k, GENERATE).body;
@@ -489,6 +497,7 @@ mod tests {
         for k in [
             AgentKind::Codex,
             AgentKind::Claude,
+            AgentKind::Qwen,
             AgentKind::AppleFoundationModels,
         ] {
             let b = real(k, CHAT).body;

@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Active; P1-M19–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20–P1-M28 remain Planned.
 
 ### P1-M1: Research
 
@@ -140,8 +140,10 @@ Notes: Allowlists the `2.1.x` family (fixtures from the single captured patch); 
 
 ### P1-M19: Qwen Code adapter
 
-Status: Planned
+Status: Done 2026-11-06
 Goal: Add independently verified Qwen Code profile checks, one-shot streaming/schema conversion and supervised lifecycle behavior.
+Plan: [overview](milestone-19-qwen-code-adapter-overview.md), [work plan](milestone-19-qwen-code-adapter-architecture.md).
+Notes: Allowlists the `0.26.x` family; `ready` after `--version` only (no auth probe exists); pins `qwen3.6:35b-a3b` with no effort pin; agent-run live test on the local endpoint, no human gate; isolation by `--safe-mode` (`--bare` was tested and drops the endpoint); the model pin is checked against the init record because the CLI silently falls back. No run-starting surface. Done 2026-11-06 ([evidence](milestone-19-qwen-code-adapter-overview.md#evidence-record)).
 
 ### P1-M20: Apple Foundation Models adapter
 

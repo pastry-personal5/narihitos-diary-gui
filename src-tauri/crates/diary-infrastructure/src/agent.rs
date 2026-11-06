@@ -12,6 +12,7 @@ pub mod output;
 pub mod packet;
 pub mod process;
 pub mod profiles;
+pub mod qwen;
 
 pub fn handle(profile: &Profile) -> ProfileHandle {
     let kind = match profile {

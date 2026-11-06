@@ -237,8 +237,12 @@ async fn run() -> Result<(), &'static str> {
         profile_table.clone(),
         adapter.host(),
     ));
+    let qwen = Arc::new(diary_infrastructure::agent::qwen::QwenAdapter::new(
+        profile_table.clone(),
+        adapter.host(),
+    ));
     {
-        // One shared host: a single cancel/shutdown covers Codex and Claude runs.
+        // One shared host: a single cancel/shutdown covers Codex, Claude and Qwen runs.
         let adapter = adapter.clone();
         diary_api::ServerState::set_lease_ended(&mut state, Arc::new(move || adapter.cancel_all()));
     }
@@ -248,6 +252,7 @@ async fn run() -> Result<(), &'static str> {
             profile_table.clone(),
             adapter.clone(),
             claude,
+            qwen,
         )),
     );
     diary_api::ServerState::set_reloader(
