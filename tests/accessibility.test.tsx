@@ -166,7 +166,7 @@ describe("accessible interaction", () => {
     fireEvent.click(screen.getByRole("button", { name: "Snippet tab" }));
     fireEvent.click(screen.getByRole("button", { name: "Refresh snippets" }));
     const box = await screen.findByRole("checkbox", {
-      name: "Include 2024/02/29/one.md",
+      name: "Include 00:00",
     });
     box.focus();
     const before = (box as HTMLInputElement).checked;

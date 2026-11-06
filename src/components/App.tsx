@@ -110,6 +110,17 @@ export function App({ bridge }: { bridge: Bridge }) {
       dispose.current = undefined;
     };
   }, [bridge]);
+  // Connect in the background after launch and after any drop: 0.5s, 1s, 2s … capped at 30s.
+  const attempts = useRef(0);
+  const latestConnect = useRef(() => {});
+  latestConnect.current = () => void connect();
+  useEffect(() => {
+    if (connection.kind === "connected") attempts.current = 0;
+    if (connection.kind !== "disconnected") return;
+    const delay = Math.min(30_000, 500 * 2 ** attempts.current++);
+    const timer = setTimeout(() => latestConnect.current(), delay);
+    return () => clearTimeout(timer);
+  }, [connection]);
   useEffect(() => {
     if (!connected) return;
     const focus = () => {

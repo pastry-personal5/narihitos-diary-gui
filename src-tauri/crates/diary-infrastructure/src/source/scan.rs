@@ -109,7 +109,18 @@ pub fn scan_selected(
     w.report
 }
 impl Walker<'_> {
+    /// Best-effort: reading an evicted iCloud file makes macOS materialise it; a later import sees it.
+    /// shortcut: one detached thread per file, unbounded by anything but the candidate limit.
+    fn hydrate(&self, rel: &str) {
+        let path = self.root.canonical.join(rel);
+        std::thread::spawn(move || {
+            let _ = std::fs::read(path);
+        });
+    }
     fn failure(&mut self, rel: String, e: Unavailable) {
+        if e == Unavailable::NotDownloaded {
+            self.hydrate(&rel);
+        }
         self.report
             .failures
             .push((rel, SourceOutcome::Unavailable(e)));
@@ -310,6 +321,12 @@ impl Walker<'_> {
                     ) && let Some(listing) = observed
                     {
                         self.report.readable.push(listing);
+                    }
+                    if matches!(
+                        failure,
+                        SourceOutcome::Unavailable(Unavailable::NotDownloaded)
+                    ) {
+                        self.hydrate(&rel);
                     }
                     self.report.failures.push((rel, failure));
                 }

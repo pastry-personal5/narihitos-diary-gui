@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { CalendarAction } from "../application/navigation/contracts";
+import { snippetLabels } from "../application/navigation/snippet-label";
 import { SymbolLabel } from "./Symbol";
 import type { NavigationModel } from "../application/navigation/model";
 import type {
@@ -37,6 +38,7 @@ export function Explorer({ model }: { model: NavigationModel }) {
     item.kind === "included" || item.kind === "warning"
       ? item.source.navigation?.group_id
       : item.group_id;
+  const labels = snippetLabels(context?.page?.items ?? []);
   const groups = context?.page?.groups ?? [];
   const localDateOf = (item: SourceItem) => {
     const source = "source" in item ? item.source : null;
@@ -86,7 +88,7 @@ export function Explorer({ model }: { model: NavigationModel }) {
         <div className="snippet-row">
           <input
             type="checkbox"
-            aria-label={`Include ${source.relative_key}`}
+            aria-label={`Include ${labels.get(source.id) ?? source.relative_key}`}
             checked={!!inclusion?.checked && source.eligible}
             disabled={!source.eligible || !!context?.stale}
             onChange={(e) =>
@@ -96,9 +98,10 @@ export function Explorer({ model }: { model: NavigationModel }) {
           />
           <button
             disabled={!source.capabilities.read || !!context?.stale}
+            title={source.relative_key}
             onClick={() => void model.openSource(source)}
           >
-            {source.relative_key}
+            {labels.get(source.id) ?? source.relative_key}
           </button>
         </div>
         {inclusion?.invalidated && (
