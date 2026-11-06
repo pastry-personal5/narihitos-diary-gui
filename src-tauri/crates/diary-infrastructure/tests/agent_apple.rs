@@ -538,3 +538,19 @@ fn apple_inactivity_becomes_timeout_and_lease_end_cancels_without_poisoning() {
     );
     assert_eq!(r.leftovers(), 0);
 }
+
+#[test]
+fn apple_helper_deleted_after_extraction_is_extracted_again() {
+    let r = rig();
+    assert_eq!(r.check().status, ProfileStatus::Ready);
+    let dir = r.path().join("runtime/native");
+    let file = std::fs::read_dir(&dir)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    std::fs::remove_file(&file).unwrap();
+    assert_eq!(r.check().status, ProfileStatus::Ready);
+    assert!(file.exists());
+}

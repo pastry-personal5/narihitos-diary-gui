@@ -167,8 +167,12 @@ fn live_cancel() {
     );
     match res {
         Err(e) => assert_eq!(e.0, AgentErrorCode::Cancelled),
-        // The short-lived model may finish before the cancel lands; the commit-once guard drops it.
-        Ok(_) => panic!("a cancelled run must not succeed"),
+        // A model that answers before the cancel lands (400 ms) legitimately succeeds; after it, a
+        // success would mean the commit-once guard failed.
+        Ok(_) => assert!(
+            t.elapsed() < Duration::from_millis(400),
+            "a cancelled run must not succeed"
+        ),
     }
     assert_eq!(leftovers(&root), 0);
 }

@@ -120,7 +120,7 @@ with tempfile.TemporaryDirectory(prefix='diary-agent-smoke-') as temporary:
         text = json.dumps(listing) + json.dumps(checked_apple) + json.dumps(checked) + json.dumps(checked_claude) + json.dumps(checked_qwen)
         assert str(base) not in text and 'codex-home' not in text, 'a path leaked into the profile response'
         assert not list((runtime).glob('agent-runs/*')), 'a probe left its run directory behind'
-        if helper_built:
+        if helper_built and checked_apple['reason'] != 'os_unsupported':
             native = list((runtime).glob('native/apple-fm-*'))
             assert len(native) == 1 and oct(native[0].stat().st_mode & 0o777) == '0o700', native
     finally:

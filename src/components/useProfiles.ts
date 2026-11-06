@@ -49,7 +49,7 @@ export const PROFILE_STATUS_REASON_TEXT: Record<string, string> = {
   locale_unsupported: "Apple Intelligence does not support this language",
   helper_missing: "the Apple helper was not built into this app",
   helper_untrusted: "the Apple helper failed its integrity check",
-  helper_failed: "the Apple helper could not report availability",
+  helper_failed: "the Apple helper could not be set up or did not answer",
 };
 /** Distinct wording for a status reason; falls back to nothing for an unknown id. */
 export const PROFILE_ERROR = "The profile status could not be read.";

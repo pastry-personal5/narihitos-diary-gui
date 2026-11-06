@@ -32,6 +32,7 @@ const MIN_OS_MAJOR: u32 = 26;
 
 pub struct Apple {
     helper: Vec<u8>,
+    digest: [u8; 32],
     /// Hash of the file extracted by this process; later launches must still match it.
     extracted: Mutex<Option<(PathBuf, [u8; 32])>>,
     os_major: u32,
@@ -56,6 +57,7 @@ impl AppleAdapter {
 impl Apple {
     fn new(helper: Vec<u8>, os_major: u32) -> Self {
         Self {
+            digest: Sha256::digest(&helper).into(),
             helper,
             extracted: Mutex::new(None),
             os_major,
@@ -70,10 +72,13 @@ impl Apple {
 
     /// Extracts once per process (fresh, atomic), then verifies before every launch.
     fn helper_path(&self, host: &Host) -> Result<PathBuf, Reason> {
+        self.helper_path_inner(host, false)
+    }
+    fn helper_path_inner(&self, host: &Host, retried: bool) -> Result<PathBuf, Reason> {
         if self.helper.is_empty() {
             return Err(Reason::HelperMissing);
         }
-        let want: [u8; 32] = Sha256::digest(&self.helper).into();
+        let want = self.digest;
         let mut state = self.extracted.lock().expect("helper state poisoned");
         let path = match state.as_ref() {
             Some((p, h)) if *h == want => p.clone(),
@@ -104,7 +109,16 @@ impl Apple {
             }
         };
         // Verify what is on disk now, not what was written: a swapped or edited file is untrusted.
-        let meta = std::fs::symlink_metadata(&path).map_err(|_| Reason::HelperUntrusted)?;
+        // A file that vanished (a cleaner, the user) is not tampering: extract it again, once.
+        let meta = match std::fs::symlink_metadata(&path) {
+            Ok(m) => m,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound && !retried => {
+                *state = None;
+                drop(state);
+                return self.helper_path_inner(host, true);
+            }
+            Err(_) => return Err(Reason::HelperUntrusted),
+        };
         let intact = meta.is_file()
             && meta.permissions().mode() & 0o022 == 0
             && std::fs::read(&path).is_ok_and(|b| Sha256::digest(&b)[..] == want[..]);
