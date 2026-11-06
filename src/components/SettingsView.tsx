@@ -37,7 +37,7 @@ export function SettingsView({
   const { user, server, error } = model;
   const profiles = useProfiles(bridge, connected, server?.config_generation);
   const [section, setSection] = useState<
-    "Status" | "Writing Language" | "Keyboard Shortcuts"
+    "Status" | "Writing Language" | "Keyboard Shortcuts" | "Generation"
   >("Status");
   const [draft, setDraft] = useState("");
   const [confirmRecover, setConfirmRecover] = useState(false);
@@ -46,17 +46,22 @@ export function SettingsView({
   return (
     <section aria-label="Settings" className="settings">
       <nav aria-label="Settings sections">
-        {(["Status", "Writing Language", "Keyboard Shortcuts"] as const).map(
-          (name) => (
-            <button
-              key={name}
-              aria-pressed={section === name}
-              onClick={() => setSection(name)}
-            >
-              {name}
-            </button>
-          ),
-        )}
+        {(
+          [
+            "Status",
+            "Writing Language",
+            "Keyboard Shortcuts",
+            "Generation",
+          ] as const
+        ).map((name) => (
+          <button
+            key={name}
+            aria-pressed={section === name}
+            onClick={() => setSection(name)}
+          >
+            {name}
+          </button>
+        ))}
         <button onClick={onClose}>Close Settings</button>
       </nav>
       <div className="settings-body">
@@ -187,6 +192,29 @@ export function SettingsView({
                 </button>
               </>
             )}
+          </div>
+        ) : section === "Generation" ? (
+          <div aria-label="Generation settings">
+            <h2>Generation</h2>
+            <label htmlFor="generation-count">Candidates per generation</label>
+            <select
+              id="generation-count"
+              value={user?.generation_count ?? 3}
+              disabled={!user || user.read_only}
+              onChange={(e) =>
+                void model.setGenerationCount(Number(e.target.value))
+              }
+            >
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            <p>
+              Saved for new requests. Candidates run sequentially with the
+              selected profile.
+            </p>
           </div>
         ) : section === "Keyboard Shortcuts" ? (
           <KeyboardShortcuts user={user} save={model.setKeybindings} />

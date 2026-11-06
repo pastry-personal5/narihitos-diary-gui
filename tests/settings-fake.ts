@@ -91,6 +91,16 @@ export function settingsFake(
         }
         fake.user.keybindings = stored;
         fake.user.effective_keybindings = { ...DEFAULT_BINDINGS, ...stored };
+      } else if (u.section === "generation") {
+        const count = (u.value as { count?: unknown }).count;
+        if (
+          typeof count !== "number" ||
+          !Number.isInteger(count) ||
+          count < 1 ||
+          count > 5
+        )
+          throw new SettingsError("invalid_input");
+        fake.user.generation_count = count;
       } else if (u.section === "writing") {
         if (typeof u.value !== "string" || !tag.test(u.value))
           throw new SettingsError("invalid_input");

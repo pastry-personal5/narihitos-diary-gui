@@ -14,6 +14,14 @@ import { Explorer } from "./Explorer";
 import { GlobalMessages } from "./GlobalMessages";
 import { PaneSeparator } from "./PaneSeparator";
 import { ChatPane } from "./ChatPane";
+import {
+  CandidateCards,
+  GenerationControls,
+  GenerationDialog,
+} from "./GenerationPane";
+import { useGeneration } from "./useGeneration";
+import { GenerationController } from "../application/generation/controller";
+import { generationPreparation } from "../application/generation/navigation";
 import { activitySummary, useChat, useTick } from "./useChat";
 import { ChatController, rememberedChat } from "../application/chat";
 import { NavigationModel } from "../application/navigation/model";
@@ -51,6 +59,16 @@ export function App({ bridge }: { bridge: Bridge }) {
   const model = useMemo(() => new NavigationModel(bridge), [bridge]);
   const chat = useMemo(() => new ChatController(bridge), [bridge]);
   const chatState = useChat(chat);
+  const generator = useMemo(
+    () =>
+      new GenerationController(
+        bridge,
+        generationPreparation(model, () => chat.running),
+        model.budget,
+      ),
+    [bridge, model, chat],
+  );
+  const generationState = useGeneration(generator);
   const chatNow = useTick(chat.running);
   const chatContext = useCallback(() => {
     const r = model.resources.active;
@@ -97,15 +115,27 @@ export function App({ bridge }: { bridge: Bridge }) {
       off();
       model.resources.attach(null);
       queueMicrotask(() => {
-        if (counter.current === generation) model.dispose();
+        if (counter.current === generation) {
+          model.dispose();
+          generator.dispose();
+        }
       });
     };
-  }, [model]);
+  }, [model, generator]);
   useEffect(() => {
     let off: (() => void) | undefined;
     let disposed = false;
     void bridge
-      .onCloseRequested?.(() => model.resources.closeApp())
+      .onCloseRequested?.(async () => {
+        if (
+          generator.state.dirty ||
+          (generator.state.submitting &&
+            !generator.state.activeJob &&
+            !generator.state.uncertain)
+        )
+          await generator.cancel();
+        return model.resources.closeApp();
+      })
       .then((stop) => {
         if (disposed) stop();
         else off = stop;
@@ -114,7 +144,7 @@ export function App({ bridge }: { bridge: Bridge }) {
       disposed = true;
       off?.();
     };
-  }, [bridge, model]);
+  }, [bridge, model, generator]);
   useEffect(() => {
     let disposed = false;
     const epoch = connectionEpoch;
@@ -171,6 +201,7 @@ export function App({ bridge }: { bridge: Bridge }) {
         if (!current()) return;
         model.onEvent(event);
         chat.onEvent(event);
+        generator.onEvent(event);
         if (event.kind === "disconnected") {
           connectionEpoch.current++;
           void dispose.current?.();
@@ -214,6 +245,8 @@ export function App({ bridge }: { bridge: Bridge }) {
           return;
         }
         setConnection({ kind: "connected", status });
+        generator.connect(true);
+        void generator.loadProfiles();
         void chat.loadProfiles().then(() => {
           const id = rememberedChat();
           if (id && current()) void chat.adopt(id);
@@ -273,6 +306,20 @@ export function App({ bridge }: { bridge: Bridge }) {
   const sourceReserved = active?.source
     ? model.resources.sourceReserved(active.source.source.id)
     : false;
+  const generationReason =
+    connected && !connection.status.capabilities.includes("generation")
+      ? "Generation is not supported by this server."
+      : generator.reason(
+          model.resources.selectedDate,
+          settings.user?.writing_locale ?? null,
+          model.resources.selectedDate !== null &&
+            model.imports
+              .view(model.resources.selectedDate)
+              .items.some(
+                (item) =>
+                  "source" in item && !!item.source && !item.source.eligible,
+              ),
+        );
   const handlers: Handlers = {
     "palette.open": { reason: null, run: () => setPaletteOpen(true) },
     "editor.save": {
@@ -313,9 +360,24 @@ export function App({ bridge }: { bridge: Bridge }) {
       reason: model.trashReason(trashTarget),
       run: () => (trashTarget ? model.trashSource(trashTarget) : undefined),
     },
-    "generate.start": { reason: later("Generation"), run: () => {} },
+    "generate.start": {
+      reason: generationReason,
+      run: () => {
+        const date = model.resources.selectedDate,
+          locale = settings.user?.writing_locale;
+        if (date && locale)
+          return generator.start(
+            date,
+            locale,
+            settings.user?.generation_count ?? 3,
+          );
+      },
+    },
     "ai.activity.open": { reason: later("AI activity"), run: () => {} },
-    "ai.run.cancel": { reason: later("AI cancellation"), run: () => {} },
+    "ai.run.cancel": {
+      reason: generator.running || chat.running ? null : "No AI run is active.",
+      run: () => (generator.running ? generator.cancel() : chat.cancel()),
+    },
     "ai.results.open": { reason: later("AI results"), run: () => {} },
     "ai.results.discard": { reason: later("AI results"), run: () => {} },
     "export.start": { reason: later("Export"), run: () => {} },
@@ -349,10 +411,14 @@ export function App({ bridge }: { bridge: Bridge }) {
               {version ? `Version v${version}` : "Version unavailable"}
             </span>
           </div>
-          <p role="status" className="ai-activity">
-            {chatState.chat || chat.running
-              ? activitySummary(chat, chatNow)
-              : ""}
+          <p className="ai-activity" aria-live="off">
+            {generator.running
+              ? generator.active
+                ? `Generating for ${generator.active.date} · candidate ${generator.active.progress.candidate_index ?? 1} of ${generator.active.count} · ${generator.active.progress.ready_count} ready · ${Math.floor(generator.active.progress.elapsed_ms / 1000)}s`
+                : `Preparing generation for ${generationState.originDate}`
+              : chatState.chat || chat.running
+                ? activitySummary(chat, chatNow)
+                : ""}
           </p>
           <div className="toolbar-actions">
             <button
@@ -400,10 +466,18 @@ export function App({ bridge }: { bridge: Bridge }) {
                   : "No file open"}
             </span>
             <button
-              disabled
-              title="Select eligible snippets after import becomes available."
+              disabled={!!generationReason}
+              title={hint(
+                "generate.start",
+                generationReason ?? "Generate candidates",
+              )}
+              aria-describedby="generation-reason"
+              onClick={() => void handlers["generate.start"].run()}
             >
-              <SymbolLabel name="sparkles" label="Generate" />
+              <SymbolLabel
+                name="sparkles"
+                label={generationState.submitting ? "Submitting…" : "Generate"}
+              />
             </button>
           </div>
           <div className="connection">
@@ -503,6 +577,7 @@ export function App({ bridge }: { bridge: Bridge }) {
                       server.config_generation,
                       false,
                     );
+                    void generator.loadProfiles();
                     await model.connect(
                       true,
                       connection.status.instance_id,
@@ -522,10 +597,12 @@ export function App({ bridge }: { bridge: Bridge }) {
             connected={connected}
             onClose={() => {
               setSettingsOpen(false);
+              void generator.loadProfiles();
               requestAnimationFrame(() => settingsButton.current?.focus());
             }}
           />
         )}
+        <GenerationDialog controller={generator} />
         <div
           className="workspace"
           hidden={settingsOpen}
@@ -578,6 +655,25 @@ export function App({ bridge }: { bridge: Bridge }) {
                 </span>
               ))}
             </div>
+            <GenerationControls
+              showGenerate={false}
+              adjacentDates={
+                !!model.resources.selectedDate &&
+                model.imports
+                  .eligible(model.resources.selectedDate)
+                  .some(
+                    (source) =>
+                      !!source.navigation?.included &&
+                      source.navigation.included.date !==
+                        model.resources.selectedDate,
+                  )
+              }
+              controller={generator}
+              date={model.resources.selectedDate}
+              locale={settings.user?.writing_locale ?? null}
+              count={settings.user?.generation_count ?? 3}
+              reason={generationReason}
+            />
             {active?.kind === "source" && (
               <button
                 disabled={!!handlers["source.refresh"].reason}
@@ -621,6 +717,10 @@ export function App({ bridge }: { bridge: Bridge }) {
                       : null
               }
             />
+            <CandidateCards
+              controller={generator}
+              date={model.resources.selectedDate}
+            />
             <PaneSeparator
               label="Resize Global Messages"
               orientation="horizontal"
@@ -650,6 +750,11 @@ export function App({ bridge }: { bridge: Bridge }) {
             connected={connected}
             locale={settings.user?.writing_locale ?? null}
             context={chatContext}
+            otherRun={
+              generator.running
+                ? (generationState.originDate ?? "generation")
+                : null
+            }
           />
         </div>
         <footer>

@@ -36,7 +36,7 @@ Each feature owns one top-level section with its own validation. Key bindings st
 - **Schema:** version 1 is fixed; no silent migration, and a newer version is read-only. A migration needs a backup copy first.
 - **Logs:** log that a load or save happened and any error code, never section contents.
 
-`generation.count` is an integer 1–5, default 3 when absent or invalid. Invalid section contents remain on disk when another section changes; only an explicit generation section update replaces them. This is a schema-1 section, not a schema migration. P1-M22 Stage A implements its storage and bridge snapshot (`generation_count`); the Settings control and use by Generate follow in Stage C.
+`generation.count` is an integer 1–5, default 3 when absent or invalid. Invalid section contents remain on disk when another section changes; only an explicit generation section update replaces them. This is a schema-1 section, not a schema migration. The bridge snapshot exposes `generation_count`; Settings → Generation saves it through the guarded section update, and new Generate requests use that saved value. An admitted request retains its original count.
 
 ## Commands
 

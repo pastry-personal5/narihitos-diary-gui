@@ -45,7 +45,7 @@ export function useSettings(bridge: Bridge, connected: boolean) {
   }, []);
   const update = useCallback(
     async (
-      section: "writing" | "writing_init" | "keybindings",
+      section: "writing" | "writing_init" | "keybindings" | "generation",
       value: unknown,
     ) => {
       if (revision.current === undefined) return false;
@@ -135,6 +135,7 @@ export function useSettings(bridge: Bridge, connected: boolean) {
     serverError,
     reloading,
     setWriting: (tag: string) => update("writing", tag),
+    setGenerationCount: (count: number) => update("generation", { count }),
     setKeybindings: (value: unknown) => update("keybindings", value),
     recover: async () => {
       if (revision.current === undefined) return;

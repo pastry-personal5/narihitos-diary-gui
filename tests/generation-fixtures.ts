@@ -52,3 +52,41 @@ export function candidateView(): CandidateView {
     warnings: [],
   };
 }
+
+export function generationSource(
+  date: string,
+  id = "source",
+  digest = "a".repeat(64),
+  importId = "import",
+) {
+  const local = { date, datetime: `${date}T09:00:00`, offset_seconds: 32400 };
+  return {
+    id,
+    relative_key: `${date}/${id}.md`,
+    digest,
+    import_id: importId,
+    dating: {
+      state: "agreed" as const,
+      header: { unix_ms: 0, precision: "milli" as const },
+      filename: { unix_ms: 0, precision: "milli" as const },
+    },
+    duplicate_producer_id: false,
+    header_invalid: null,
+    filename_invalid: null,
+    eligible: true,
+    capabilities: {
+      read: true,
+      save: true,
+      trash: false,
+      trash_reason: "trash_unverified" as const,
+      reason: "ready" as const,
+    },
+    navigation: {
+      group_id: "g",
+      header: local,
+      filename: local,
+      included: local,
+      authority: null,
+    },
+  };
+}

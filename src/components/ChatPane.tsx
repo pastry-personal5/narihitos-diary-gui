@@ -7,11 +7,13 @@ export function ChatPane({
   connected,
   locale,
   context,
+  otherRun = null,
 }: {
   controller: ChatController;
   connected: boolean;
   locale: string | null;
   context: () => ChatContext;
+  otherRun?: string | null;
 }) {
   const s = useChat(controller);
   const [draft, setDraft] = useState("");
@@ -28,15 +30,17 @@ export function ChatPane({
     ? "AI Chat is unavailable."
     : !connected
       ? "The server is disconnected."
-      : !s.profile
-        ? "No chat-capable profile is configured."
-        : !locale
-          ? "Choose a Writing Language in Settings."
-          : running
-            ? "A reply is in progress."
-            : draft.trim() === ""
-              ? "Write a message first."
-              : null;
+      : otherRun
+        ? `An AI run is active for ${otherRun}; wait for it or cancel it.`
+        : !s.profile
+          ? "No chat-capable profile is configured."
+          : !locale
+            ? "Choose a Writing Language in Settings."
+            : running
+              ? "A reply is in progress."
+              : draft.trim() === ""
+                ? "Write a message first."
+                : null;
   function submit() {
     if (reason) return;
     const ctx = context();

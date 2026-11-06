@@ -378,3 +378,34 @@ describe("Command palette and Keyboard Shortcuts", () => {
     );
   });
 });
+
+it("persists generation count and reloads the saved value", async () => {
+  const fake = settingsFake({ writing_locale: "en-US" });
+  const app = render(<App bridge={bridge(fake)} />);
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveProperty(
+      "disabled",
+      false,
+    ),
+  );
+  await openSettings("Generation");
+  const count = screen.getByLabelText("Candidates per generation");
+  await waitFor(() => expect(count).toHaveProperty("value", "3"));
+  await waitFor(() => expect(count).toHaveProperty("disabled", false));
+  fireEvent.change(count, { target: { value: "5" } });
+  await waitFor(() => expect(fake.user.generation_count).toBe(5));
+  expect(fake.updates.at(-1)).toMatchObject({
+    section: "generation",
+    value: { count: 5 },
+    recover: false,
+  });
+  app.unmount();
+  render(<App bridge={bridge(fake)} />);
+  await openSettings("Generation");
+  await waitFor(() =>
+    expect(screen.getByLabelText("Candidates per generation")).toHaveProperty(
+      "value",
+      "5",
+    ),
+  );
+});

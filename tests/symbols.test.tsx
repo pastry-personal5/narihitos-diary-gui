@@ -139,7 +139,9 @@ describe("toolbar symbols", () => {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     const generate = screen.getByRole("button", { name: "Generate" });
     expect((generate as HTMLButtonElement).disabled).toBe(true);
-    expect(generate.getAttribute("title")).toMatch(/eligible snippets/u);
+    expect(generate.getAttribute("title")).toMatch(
+      /Generation is (unavailable|not supported by this server)/u,
+    );
   });
   it("posts one Global Message per unsupported name and keeps the text label", async () => {
     const load = vi.fn(async (): Promise<SymbolResult> => ({

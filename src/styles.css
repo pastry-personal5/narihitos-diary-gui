@@ -398,3 +398,55 @@ footer {
 .trash-activity li {
   margin-block: 8px;
 }
+
+.generation-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.generation-reason {
+  margin: 4px 12px;
+  font-size: 12px;
+}
+.candidate-region {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 40%;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.candidate-list {
+  overflow: auto;
+  min-height: 0;
+  padding: 8px 12px;
+  overflow-anchor: none;
+}
+.candidate-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.candidate-heading h2,
+.candidate-card h3 {
+  font-size: 13px;
+  margin: 8px 0;
+}
+.candidate-card {
+  padding: 8px;
+  margin-block: 8px;
+  border: 1px solid var(--line);
+}
+.candidate-text {
+  font-family: inherit;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
