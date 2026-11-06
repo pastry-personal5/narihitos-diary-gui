@@ -161,8 +161,9 @@ Notes: Also builds the real job layer (single-run busy gate, runner, bounded SSE
 
 ### P1-M22: Candidate generation
 
-Status: Planned
+Status: Planned (plan approved 2026-11-06)
 Goal: Generate one to five sequential validated candidates from eligible selected snapshots, preserving immutable date/baseline context and independent candidate outcomes.
+Plan: [overview](milestone-22-candidate-generation-overview.md), [work plan](milestone-22-candidate-generation-architecture.md).
 
 ### P1-M23: Background AI activity and results
 
