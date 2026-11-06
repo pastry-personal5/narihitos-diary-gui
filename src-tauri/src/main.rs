@@ -221,6 +221,48 @@ async fn check_agent(
     state.check_profile(alias).await
 }
 #[tauri::command]
+async fn open_chat(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    profile: String,
+    locale: String,
+) -> Result<bridge::ChatOpened, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.open_chat(profile, locale).await
+}
+#[tauri::command]
+async fn send_chat(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    chat_id: String,
+    request_id: String,
+    message: String,
+    document: Option<bridge::ChatDocument>,
+) -> Result<bridge::TurnAccepted, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state
+        .send_chat(chat_id, request_id, message, document)
+        .await
+}
+#[tauri::command]
+async fn get_chat(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    chat_id: String,
+) -> Result<bridge::ChatView, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.get_chat(chat_id).await
+}
+#[tauri::command]
+async fn close_chat(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    chat_id: String,
+) -> Result<(), bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.close_chat(chat_id).await
+}
+#[tauri::command]
 async fn read_source(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -525,6 +567,10 @@ fn main() {
             get_calendar,
             list_agents,
             check_agent,
+            open_chat,
+            send_chat,
+            get_chat,
+            close_chat,
             read_source,
             save_source,
             preview_source_delete,

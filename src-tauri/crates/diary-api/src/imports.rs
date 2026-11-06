@@ -10,7 +10,7 @@ use diary_domain::{
 };
 use std::sync::atomic::Ordering;
 
-fn opaque(value: &str) -> bool {
+pub(super) fn opaque(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 64
         && value
@@ -102,7 +102,7 @@ fn remember_error(s: &ServerState, session: &str, job: &str, code: &'static str)
     // Per-job coordinator admission accounts for this bounded metadata.
     errors.1.insert(job.to_owned(), code);
 }
-fn body<T>(b: Result<Json<T>, JsonRejection>) -> Result<T, Response> {
+pub(super) fn body<T>(b: Result<Json<T>, JsonRejection>) -> Result<T, Response> {
     b.map(|Json(v)| v).map_err(|e| {
         failure(
             if e.status() == StatusCode::PAYLOAD_TOO_LARGE {
@@ -114,7 +114,7 @@ fn body<T>(b: Result<Json<T>, JsonRejection>) -> Result<T, Response> {
         )
     })
 }
-fn publish(s: &ServerState, c: &mut Coordinator, session: &str, job: &Job) {
+pub(super) fn publish(s: &ServerState, c: &mut Coordinator, session: &str, job: &Job) {
     let bytes = serde_json::to_vec(&json!({"instance_id":s.instance_id,"session_id":session,"event_id":u64::MAX,"job_id":job.id,"job_sequence":job.sequence,"kind":"job_changed","payload":JobDto::from(job.clone())})).expect("fixed DTO").len();
     let _ = c.publish(session, s.now(), &job.id, bytes);
 }

@@ -222,7 +222,7 @@ async fn run() -> Result<(), &'static str> {
         &mut state,
         config.observe_startup(&launch_path, &launch_cwd),
     );
-    // Read-only profile status; nothing here starts a run (P1-M21/P1-M22 own that).
+    // Profile status is read-only; chat turns (P1-M21) are the only run-starting route.
     diary_infrastructure::agent::host::sweep_stale_runs(&config.paths.runtime_root);
     let profile_table =
         Arc::new(diary_infrastructure::agent::profiles::ProfileTable::from_config(&config));
@@ -243,6 +243,7 @@ async fn run() -> Result<(), &'static str> {
         let adapter = adapter.clone();
         diary_api::ServerState::set_lease_ended(&mut state, Arc::new(move || adapter.cancel_all()));
     }
+    diary_api::ServerState::set_agent_runner(&mut state, adapter.clone());
     diary_api::ServerState::set_profiles(
         &mut state,
         Arc::new(diary_infrastructure::agent::profiles::ProfileService::new(

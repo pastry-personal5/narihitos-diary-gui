@@ -1,5 +1,6 @@
 mod authentic;
 mod calendar;
+mod chat;
 mod imports;
 mod profiles;
 mod source_trash;
@@ -11,6 +12,7 @@ pub use authentic::{
     AuthenticError, AuthenticFile, AuthenticList, OperationState, RefreshReport, Revision, SaveAck,
 };
 pub use calendar::{Calendar, CalendarAction};
+pub use chat::{ChatDocument, ChatOpened, ChatView, TurnAccepted};
 use diary_application::diagnostics::{Component, ErrorTag, EventCode, Level, Record, TraceId};
 use diary_logging::private_fs::PrivateDir;
 pub use imports::{ImportAck, ImportPage, ResolutionAck, SourceBody, SourceSaved, TimeAuthority};

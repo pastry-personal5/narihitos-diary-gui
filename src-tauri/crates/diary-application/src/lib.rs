@@ -6,6 +6,7 @@
 
 pub mod agent;
 pub mod authentic;
+pub mod chat;
 pub mod diagnostics;
 pub mod operations;
 pub mod run;

@@ -113,6 +113,9 @@ const SERVER_CODES: &[&str] = &[
     "ownership_ambiguous",
     "checkpoint_mismatch",
     "partial_trash",
+    "busy",
+    "profile_not_ready",
+    "context",
 ];
 const LOCAL_CODES: &[&str] = &[
     "permission_denied",

@@ -1,6 +1,7 @@
 //! Explicit authenticated scaffold transport; no content mutation or fake admission route.
 mod authentic;
 mod calendar;
+mod chats;
 mod imports;
 mod profiles;
 #[cfg(feature = "scaffold-smoke")]
@@ -53,6 +54,8 @@ pub struct ServerState {
     source_writer: Option<Arc<dyn diary_application::source::SourceWriter>>,
     source_trash: Option<Arc<dyn diary_application::source_trash::SourceTrash>>,
     profiles: Option<Arc<dyn diary_application::agent::ProfileDirectory>>,
+    agent_runner: Option<Arc<dyn diary_application::agent::AgentRunner + Send + Sync>>,
+    chat: Mutex<Option<diary_application::chat::Chat>>,
     lease_ended: Option<Arc<dyn Fn() + Send + Sync>>,
     source_slots: Arc<tokio::sync::Semaphore>,
     import_errors: Mutex<(String, std::collections::BTreeMap<String, &'static str>)>,
@@ -90,6 +93,8 @@ impl ServerState {
             source_writer: None,
             source_trash: None,
             profiles: None,
+            agent_runner: None,
+            chat: Mutex::new(None),
             lease_ended: None,
             source_slots: Arc::new(tokio::sync::Semaphore::new(2)),
             import_errors: Mutex::new((String::new(), std::collections::BTreeMap::new())),
@@ -164,6 +169,10 @@ impl ServerState {
             .lease_ended = Some(hook);
     }
     fn lease_ended(&self) {
+        // The chat and its transcript belong to the lease; a running turn is cancelled first.
+        if let Some(chat) = self.chat.lock().expect("chat poisoned").take() {
+            chat.cancel();
+        }
         if let Some(hook) = &self.lease_ended {
             hook();
         }
@@ -178,6 +187,15 @@ impl ServerState {
         if expired {
             self.lease_ended();
         }
+    }
+    /// Enables chat turns. Without it `POST /chats` answers `unavailable`.
+    pub fn set_agent_runner(
+        state: &mut Arc<Self>,
+        runner: Arc<dyn diary_application::agent::AgentRunner + Send + Sync>,
+    ) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .agent_runner = Some(runner);
     }
     /// Enables `GET /profiles` and `POST /profiles/{alias}/check`; read-only, never starts a run.
     pub fn set_profiles(
@@ -249,6 +267,15 @@ pub fn router(state: Arc<ServerState>) -> Router {
             "/api/v1/imports",
             post(imports::create).layer(DefaultBodyLimit::max(4096)),
         )
+        .route(
+            "/api/v1/chats",
+            post(chats::open).layer(DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/api/v1/chats/{id}/turns",
+            post(chats::turn).layer(DefaultBodyLimit::max(chats::BODY_LIMIT)),
+        )
+        .route("/api/v1/chats/{id}", get(chats::get).delete(chats::close))
         .route("/api/v1/profiles", get(profiles::list))
         .route("/api/v1/profiles/{alias}/check", post(profiles::check))
         .route("/api/v1/calendar", get(calendar::get_calendar))
@@ -464,7 +491,7 @@ async fn authenticate(
 }
 async fn status(State(s): State<Arc<ServerState>>) -> Json<Value> {
     Json(
-        json!({"instance_id":s.instance_id,"workspace_key":s.workspace_key,"server_version":env!("CARGO_PKG_VERSION"),"api_version":1,"api_minor":0,"config_schema_version":1,"storage_ready":s.storage_ready,"capabilities":["status","sessions","jobs","events"],"limits":{"http_bytes":10485760,"event_bytes":65536,"replay_events":2048,"replay_bytes":4194304,"transient_bytes":67108864,"business_jobs":32,"reserved_save_slots":8,"sse_connections":4}}),
+        json!({"instance_id":s.instance_id,"workspace_key":s.workspace_key,"server_version":env!("CARGO_PKG_VERSION"),"api_version":1,"api_minor":0,"config_schema_version":1,"storage_ready":s.storage_ready,"capabilities":["status","sessions","jobs","events","chat"],"limits":{"http_bytes":10485760,"event_bytes":65536,"replay_events":2048,"replay_bytes":4194304,"transient_bytes":67108864,"business_jobs":32,"reserved_save_slots":8,"sse_connections":4}}),
     )
 }
 #[derive(Deserialize)]
@@ -588,7 +615,7 @@ async fn settings(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Resp
     {
         Ok(_) => {
             let startup = s.startup.lock().expect("startup state poisoned").clone();
-            let value = json!({"config_schema_version":1,"config_generation":s.config_generation.load(std::sync::atomic::Ordering::SeqCst),"last_reload":s.last_reload.lock().expect("reload state poisoned").clone(),"storage_ready":s.storage_ready,"sources_available":startup.sources.iter().any(|s|s.reason.is_none()),"agents_available":false,"exports_available":false,"sources":availability_dto(&startup.sources),"profiles":availability_dto(&startup.profiles)});
+            let value = json!({"config_schema_version":1,"config_generation":s.config_generation.load(std::sync::atomic::Ordering::SeqCst),"last_reload":s.last_reload.lock().expect("reload state poisoned").clone(),"storage_ready":s.storage_ready,"sources_available":startup.sources.iter().any(|s|s.reason.is_none()),"agents_available":s.agent_runner.is_some() && startup.profiles.iter().any(|p|p.reason.is_none()),"exports_available":false,"sources":availability_dto(&startup.sources),"profiles":availability_dto(&startup.profiles)});
             #[cfg(feature = "scaffold-smoke")]
             let value = {
                 let mut value = value;
@@ -742,6 +769,9 @@ async fn cancel_job(
         .is_ok_and(|j| j.state.is_terminal());
     match c.cancel(id, s.now(), &job) {
         Ok(job) => {
+            if let Some(chat) = s.chat.lock().expect("chat poisoned").as_ref() {
+                chat.cancel_job(&job.id);
+            }
             // Compute the exact encoded envelope size before retaining notification.
             let dto = JobDto::from(job.clone());
             let bytes = serde_json::to_vec(&json!({"instance_id":s.instance_id,"session_id":id,"event_id":u64::MAX,"job_id":job.id,"job_sequence":job.sequence,"kind":"job_changed","payload":dto})).expect("fixed DTO").len();
