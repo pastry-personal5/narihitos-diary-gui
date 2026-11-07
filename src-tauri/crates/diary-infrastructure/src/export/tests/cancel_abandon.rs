@@ -34,6 +34,23 @@ fn cancel_declines_a_pending_confirmation_and_releases_the_destination() {
     e.wait(2, ExportState::Succeeded);
 }
 
+// A saved export still waiting for confirmation is stopped automatically by the next start.
+#[test]
+fn a_new_start_force_stops_a_stale_pending_confirmation() {
+    let e = env();
+    std::fs::write(e.remote.join("2026-11-05.md"), "occupant").unwrap();
+    let rev = e.save(1, "2026-11-05", None, "one\n");
+    e.preview(1, "2026-11-05", &rev);
+    let other = e.save(2, "2026-11-06", None, "two\n");
+    e.start(2, "2026-11-06", &other).unwrap();
+    e.wait(2, ExportState::Succeeded);
+    assert_eq!(
+        e.svc.operation(&op(1)).unwrap().unwrap().state,
+        ExportState::Cancelled
+    );
+    assert_eq!(e.remote_text("2026-11-05").unwrap(), "occupant");
+}
+
 // T06: a running export stops before `apply`; an uncertain one is not cancellable.
 #[test]
 fn cancel_before_apply_stops_without_writing() {

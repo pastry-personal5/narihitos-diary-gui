@@ -1,5 +1,9 @@
 # Notion Heading-Day Export Implementation Plan
 
+Status: Implemented (2026-11-07)
+
+Task plan for the [heading-day design](../specs/2026-11-07-notion-heading-days-design.md): each diary day becomes a `heading_2` plus plain sibling blocks in the month page.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Export each diary day to Notion as a `heading_2` titled `YYYY-MM-DD (WED)` followed by plain sibling blocks in the month page, replacing the daily toggle.

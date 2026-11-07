@@ -95,6 +95,8 @@ export interface ExportDeps {
   notify(text: string, severity: "info" | "warning" | "error"): void;
   newId(): string;
   sleep?(ms: number): Promise<void>;
+  /** Narrates each step and a progress line every 2 seconds as global messages. */
+  verbose?: boolean;
 }
 const code = (e: unknown) =>
   e instanceof AuthenticError ? e.code : "unavailable";
@@ -104,6 +106,9 @@ export class ExportController {
   private readonly listeners = new Set<() => void>();
   private pending: { key: string; id: string } | null = null;
   private disposed = false;
+  private step = "";
+  private since = 0;
+  private timer: ReturnType<typeof setInterval> | null = null;
   constructor(
     private readonly bridge: Bridge,
     private readonly deps: ExportDeps,
@@ -117,6 +122,31 @@ export class ExportController {
   getSnapshot = () => this.snapshot;
   dispose() {
     this.disposed = true;
+    this.stopTicker();
+  }
+  /** Undoes `dispose`: StrictMode runs an effect's cleanup and then its setup again. */
+  revive() {
+    this.disposed = false;
+  }
+  private stopTicker() {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+  }
+  /** Records the current step and, when verbose, says it as an info message. */
+  private say(step: string) {
+    this.step = step;
+    if (!this.deps.verbose || this.disposed) return;
+    this.deps.notify(`${NAME[this.snapshot.target].place}: ${step}`, "info");
+    if (!this.timer && this.snapshot.phase === "working") {
+      this.since = Date.now();
+      this.timer = setInterval(() => {
+        const secs = Math.round((Date.now() - this.since) / 1000);
+        this.deps.notify(
+          `${NAME[this.snapshot.target].place}: still working, ${this.step} (${secs}s)`,
+          "info",
+        );
+      }, 2000);
+    }
   }
   /** Why Export cannot run now (`null` when it can). */
   reason(date: string | null, authenticOpen: boolean): string | null {
@@ -130,6 +160,7 @@ export class ExportController {
   private set(patch: Partial<ExportSnapshot>) {
     if (this.disposed) return;
     this.snapshot = { ...this.snapshot, ...patch };
+    if (this.snapshot.phase !== "working") this.stopTicker();
     for (const l of this.listeners) l();
   }
   private fail(error: string) {
@@ -142,8 +173,11 @@ export class ExportController {
   async start(date: string, target: ExportTarget = "icloud"): Promise<void> {
     if (this.snapshot.phase !== "idle" || !this.bridge.startExport) return;
     this.set({ ...IDLE, phase: "working", date, target });
+    this.say(`export of ${date} requested`);
     try {
+      this.say("saving the open entry first");
       if (!(await this.deps.flush(date))) return this.fail("save_failed");
+      this.say("loading the saved revision");
       // The acknowledged revision after the flush, never the editor text.
       const file = await this.bridge.loadAuthentic(date);
       if (!file.exists || !file.revision) return this.fail("nothing_to_export");
@@ -152,6 +186,9 @@ export class ExportController {
       const id =
         this.pending?.key === key ? this.pending.id : this.deps.newId();
       this.pending = { key, id };
+      this.say(
+        `revision ${file.revision.sequence} loaded; asking the server to start (operation ${id.slice(0, 8)}), this checks the destination`,
+      );
       const outcome = await this.bridge.startExport({
         operation_id: id,
         date,
@@ -159,8 +196,14 @@ export class ExportController {
         expected_revision: file.revision,
       });
       this.pending = null;
+      this.say(
+        outcome.outcome === "needs_confirmation"
+          ? `the destination needs your confirmation (${outcome.preview.reason}, would ${outcome.preview.write})`
+          : `the server answered: ${outcome.result.state}`,
+      );
       await this.handle(outcome, false);
     } catch (e) {
+      this.say(`the server refused the start (${code(e)})`);
       if (code(e) === "outcome_uncertain" || code(e) === "resource_reserved")
         return this.findUnfinished(code(e));
       this.fail(code(e));
@@ -190,6 +233,7 @@ export class ExportController {
       const op = await this.bridge.getOperation(result.operation_id);
       if (!op.export) return this.fail("unavailable");
       latest = op.export;
+      this.say(`server state ${latest.state}, checkpoint ${latest.checkpoint}`);
     }
     switch (latest.state) {
       case "succeeded":
@@ -251,6 +295,7 @@ export class ExportController {
     }
   }
   private async findUnfinished(error: string) {
+    this.say("an earlier export holds the destination; looking it up");
     try {
       const list = (await this.bridge.listExports?.()) ?? [];
       const found = list.find((r) => r.target === this.snapshot.target);
@@ -259,8 +304,18 @@ export class ExportController {
         await this.finish(found);
         return;
       }
-    } catch {
-      /* fall through to the original reservation error */
+      // Diagnostic: say what was listed, since the reservation text alone hides the mismatch.
+      this.deps.notify(
+        `No resumable ${this.snapshot.target} export was listed (${list.map((r) => `${r.target}:${r.state}`).join(", ") || "none"}).`,
+        "error",
+      );
+    } catch (e) {
+      // Name the recovery failure: the reservation text alone hides why it could not be resolved.
+      this.deps.notify(
+        `Could not resume the earlier export (${code(e)}).`,
+        "error",
+      );
+      return this.set({ ...IDLE, target: this.snapshot.target });
     }
     this.fail(error);
   }
@@ -269,6 +324,7 @@ export class ExportController {
     const p = this.snapshot.preview;
     if (this.snapshot.phase !== "preview" || !p) return;
     this.set({ phase: "working", preview: null });
+    this.say("sending your confirmation to the server");
     const request = {
       step_id: this.deps.newId(),
       expected_checkpoint: p.expected_checkpoint,
@@ -281,6 +337,7 @@ export class ExportController {
         );
       } else {
         await this.bridge.confirmExport!(p.operation_id, request);
+        this.say("confirmation accepted; waiting for the result");
         const op = await this.bridge.getOperation(p.operation_id);
         if (!op.export) return this.fail("unavailable");
         await this.finish(op.export);

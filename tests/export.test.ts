@@ -243,6 +243,71 @@ it("recovers a paused export after reload instead of stranding its reservation",
   );
 });
 
+it("names the failure when a paused export cannot be resumed", async () => {
+  const startExport = vi
+    .fn()
+    .mockRejectedValueOnce(new AuthenticError("resource_reserved", false))
+    .mockRejectedValueOnce(new AuthenticError("invalid_response", false));
+  const { c, notes } = setup({
+    startExport,
+    listExports: vi.fn(async () => [result("needs_confirmation")]),
+  });
+  await c.start("2026-11-06");
+  expect(notes).toEqual([
+    "Could not resume the earlier export (invalid_response).",
+  ]);
+  expect(c.getSnapshot().phase).toBe("idle");
+});
+
+it("narrates each step and reports progress every 2 seconds when verbose", async () => {
+  vi.useFakeTimers();
+  try {
+    const notes: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const bridge = {
+      loadAuthentic: vi.fn(async () => ({
+        date: "2026-11-05",
+        exists: true,
+        body: "x",
+        revision: { sequence: 3, sha256: "a".repeat(64) },
+      })),
+      startExport: vi.fn(async () => {
+        await gate;
+        return preview();
+      }),
+    } as unknown as Bridge;
+    const c = new ExportController(bridge, {
+      flush: async () => true,
+      notify: (t) => notes.push(t),
+      newId: () => OP,
+      verbose: true,
+    });
+    const started = c.start("2026-11-05", "notion");
+    await vi.advanceTimersByTimeAsync(4100);
+    release();
+    await started;
+    expect(notes[0]).toBe("Notion: export of 2026-11-05 requested");
+    expect(notes.filter((t) => t.includes("still working"))).toHaveLength(2);
+    expect(notes.some((t) => t.includes("needs your confirmation"))).toBe(true);
+    const before = notes.length;
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(notes).toHaveLength(before);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("keeps working after StrictMode's dispose-then-remount", async () => {
+  const { c } = setup({
+    startExport: vi.fn(async () => preview()),
+  });
+  c.dispose();
+  c.revive();
+  await c.start("2026-11-05", "notion");
+  expect(c.getSnapshot().phase).toBe("preview");
+});
+
 describe("Notion export", () => {
   const notionResult = (state: ExportResult["state"], reason: string | null) =>
     ({ ...result(state, reason), target: "notion" }) as ExportResult;

@@ -87,6 +87,8 @@ None yet.
 - [x] T19 `[docs]` - Architecture text, P1-M27 O8 note, changelog and a live reorder leg. Evidence: docs diff, `notion-live.py` compiles. Evidence: architecture text, P1-M27 note and changelog updated; `notion-live.py` has a reorder leg (compiles).
   - [ ] T19.1 - Owner-run live round trip records the reorder leg result (`Q3`).
 
+- [x] T20 `[gui]` - Icon Bar: icons half as big (64 → 32 px), column narrower (80 → 48 px); idle icons use the darker `--muted` color and brighten to `--text` on hover (pressed keeps the accent fill). Evidence: `src/components/App.tsx`, `src/styles.css`. Not done: visual check in the running app.
+
 ### Proof and docs
 
 - [x] Z01 - Full gate (`scripts/gate.sh`) passes (2026-11-07): G01–G07 all exit 0. Fixes made on the way: `cargo fmt --all` on `diary-logging` `codec.rs`/`codec/tests.rs` (formatting only; the architecture test checks all workspace members) and the T11 default in `tests/accessibility.test.tsx`.

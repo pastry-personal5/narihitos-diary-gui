@@ -97,10 +97,14 @@ export function useAppControllers(bridge: Bridge) {
         flush: settleAuthentic(model),
         notify: (text, severity) => model.messages.add(text, severity),
         newId: () => crypto.randomUUID(),
+        verbose: true,
       }),
     [bridge, model],
   );
-  useEffect(() => () => exporter.dispose(), [exporter]);
+  useEffect(() => {
+    exporter.revive();
+    return () => exporter.dispose();
+  }, [exporter]);
   const exportState = useExport(exporter);
   const generationState = useGeneration(generator);
   const chatContext = useCallback(() => {

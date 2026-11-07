@@ -57,6 +57,9 @@ tag_enum!(EventCode {
     BridgeDiscoveryRead => "bridge.discovery_read",
     BridgeStatusProbe => "bridge.status_probe",
     BridgeConnected => "bridge.connected",
+    ExportRoute => "export.route",
+    ExportAdapterCall => "export.adapter",
+    NotionHttp => "notion.http",
 });
 tag_enum!(ErrorTag {
     StaleRevision => "stale_revision",
@@ -298,6 +301,78 @@ impl TraceId {
     }
 }
 
+/// A short closed-vocabulary tag (`[a-z0-9_]`, 1..=40) taken from the code's own allowlists
+/// (states, error codes, reasons). Anything else is rejected, so no text can ride along.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Token(String);
+impl Token {
+    pub fn parse(value: &str) -> Option<Self> {
+        let ok = (1..=40).contains(&value.len())
+            && value
+                .bytes()
+                .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'_'));
+        ok.then(|| Self(value.to_owned()))
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Export diagnostics (routes, adapter calls, Notion HTTP): tags and numbers only.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportDetail {
+    pub stage: Token,
+    pub target: Option<Token>,
+    pub state: Option<Token>,
+    pub code: Option<Token>,
+    pub reason: Option<Token>,
+    pub checkpoint: Option<u64>,
+    pub status: Option<u16>,
+    pub ms: Option<u32>,
+}
+impl ExportDetail {
+    pub fn new(stage: &str) -> Self {
+        Self {
+            stage: Token::parse(stage).unwrap_or_else(|| Token("invalid".into())),
+            target: None,
+            state: None,
+            code: None,
+            reason: None,
+            checkpoint: None,
+            status: None,
+            ms: None,
+        }
+    }
+    pub fn target(mut self, v: &str) -> Self {
+        self.target = Token::parse(v);
+        self
+    }
+    pub fn state(mut self, v: &str) -> Self {
+        self.state = Token::parse(v);
+        self
+    }
+    pub fn code(mut self, v: &str) -> Self {
+        self.code = Token::parse(v);
+        self
+    }
+    pub fn reason(mut self, v: &str) -> Self {
+        self.reason = Token::parse(v);
+        self
+    }
+    pub fn checkpoint(mut self, v: u64) -> Self {
+        self.checkpoint = Some(v);
+        self
+    }
+    pub fn status(mut self, v: u16) -> Self {
+        self.status = Some(v);
+        self
+    }
+    pub fn ms(mut self, v: u32) -> Self {
+        self.ms = Some(v);
+        self
+    }
+}
+
 /// Redacted description of a resource: identity, size and state, never content or path text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceDetail {
@@ -325,6 +400,7 @@ pub struct Record {
     pub fault: Option<Fault>,
     pub count: Option<u32>,
     pub agent: Option<AgentDetail>,
+    pub export: Option<ExportDetail>,
 }
 
 impl Record {
@@ -342,7 +418,12 @@ impl Record {
             fault: None,
             count: None,
             agent: None,
+            export: None,
         }
+    }
+    pub fn export(mut self, v: ExportDetail) -> Self {
+        self.export = Some(v);
+        self
     }
     pub fn trace(mut self, v: TraceId) -> Self {
         self.trace = Some(v);

@@ -2,6 +2,8 @@
 # Start the GUI against an already running server. Optional arg: discovery.json path.
 set -euo pipefail
 
+export RUST_BACKTRACE=1
+
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 CONFIG=config/global_config.yaml
 

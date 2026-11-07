@@ -1,16 +1,11 @@
 use super::*;
 
 #[test]
-fn paused_exports_hold_the_destination_across_restart_but_not_authentic_saves() {
+fn paused_exports_survive_restart_and_a_new_start_force_stops_them() {
     let e = env();
     std::fs::write(e.remote.join("2026-11-05.md"), "x").unwrap();
     let rev = e.save(1, "2026-11-05", None, "one\n");
     e.preview(1, "2026-11-05", &rev);
-    let rev_b = e.save(2, "2026-11-06", None, "b\n");
-    assert_eq!(
-        e.start(2, "2026-11-06", &rev_b).unwrap_err(),
-        ExportError::Busy
-    );
     // Autosave of the exported date proceeds while the export is paused.
     e.save(3, "2026-11-05", Some(&rev), "one more\n");
     let again = e.restart();
@@ -19,11 +14,14 @@ fn paused_exports_hold_the_destination_across_restart_but_not_authentic_saves() 
         ExportState::NeedsConfirmation
     );
     assert!(again.has_unfinished().unwrap());
+    // The paused export survives the restart, but the next start force-stops it.
+    let rev_b = e.save(2, "2026-11-06", None, "b\n");
+    again
+        .start("s", 1, e.request(2, "2026-11-06", &rev_b))
+        .unwrap();
     assert_eq!(
-        again
-            .start("s", 1, e.request(2, "2026-11-06", &rev_b))
-            .unwrap_err(),
-        ExportError::Busy
+        again.operation(&op(1)).unwrap().unwrap().state,
+        ExportState::Cancelled
     );
 }
 

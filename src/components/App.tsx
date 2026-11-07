@@ -298,7 +298,7 @@ export function App({ bridge }: { bridge: Bridge }) {
           className="workspace"
           hidden={settingsOpen}
           style={{
-            gridTemplateColumns: `80px ${explorerWidth}px 6px minmax(220px, 1fr) 6px ${chatWidth}px`,
+            gridTemplateColumns: `48px ${explorerWidth}px 6px minmax(220px, 1fr) 6px ${chatWidth}px`,
           }}
         >
           <nav aria-label="Icon Bar" className="icon-bar">
@@ -313,8 +313,8 @@ export function App({ bridge }: { bridge: Bridge }) {
                 aria-hidden="true"
                 className="symbol"
                 style={{
-                  width: 64,
-                  height: 64,
+                  width: 32,
+                  height: 32,
                   maskImage: `url(${settingsIcon})`,
                   WebkitMaskImage: `url(${settingsIcon})`,
                 }}

@@ -4,9 +4,9 @@
 use super::clock::LocalStamp;
 use diary_application::agent::{AgentErrorCode, AgentKind, Reason, Style};
 use diary_application::diagnostics::{
-    ActionTag, AgentDetail, Component, ErrorTag, EventCode, ExitTag, Fault, Level, OpaqueId,
-    PathClass, PhaseTag, Record, ResourceDetail, ResourceKind, Role, StateTag, StatusTag, StopTag,
-    TraceId,
+    ActionTag, AgentDetail, Component, ErrorTag, EventCode, ExitTag, ExportDetail, Fault, Level,
+    OpaqueId, PathClass, PhaseTag, Record, ResourceDetail, ResourceKind, Role, StateTag, StatusTag,
+    StopTag, Token, TraceId,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -149,6 +149,29 @@ pub fn render_line(h: &Header, r: &Record) -> Option<String> {
         }
         s.push('}');
     }
+    if let Some(x) = &r.export {
+        let _ = write!(s, r#","export":{{"stage":"{}""#, x.stage.as_str());
+        for (k, v) in [
+            ("target", &x.target),
+            ("state", &x.state),
+            ("code", &x.code),
+            ("reason", &x.reason),
+        ] {
+            if let Some(v) = v {
+                let _ = write!(s, r#","{k}":"{}""#, v.as_str());
+            }
+        }
+        if let Some(v) = x.checkpoint {
+            let _ = write!(s, r#","cp":{v}"#);
+        }
+        if let Some(v) = x.status {
+            let _ = write!(s, r#","status":{v}"#);
+        }
+        if let Some(v) = x.ms {
+            let _ = write!(s, r#","ms":{v}"#);
+        }
+        s.push('}');
+    }
     s.push_str("}\n");
     fit(s)
 }
@@ -171,6 +194,20 @@ struct WireLine {
     fault: Option<String>,
     n: Option<u32>,
     agent: Option<WireAgent>,
+    export: Option<WireExport>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WireExport {
+    stage: String,
+    target: Option<String>,
+    state: Option<String>,
+    code: Option<String>,
+    reason: Option<String>,
+    cp: Option<u64>,
+    status: Option<u16>,
+    ms: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -277,6 +314,19 @@ fn convert(w: WireLine) -> Result<ParsedLine, ()> {
             not_started: a.not_started,
         }),
     };
+    let export = match &w.export {
+        None => None,
+        Some(x) => Some(ExportDetail {
+            stage: Token::parse(&x.stage).ok_or(())?,
+            target: opt(&x.target, Token::parse)?,
+            state: opt(&x.state, Token::parse)?,
+            code: opt(&x.code, Token::parse)?,
+            reason: opt(&x.reason, Token::parse)?,
+            checkpoint: x.cp,
+            status: x.status,
+            ms: x.ms,
+        }),
+    };
     let record = Record {
         code: EventCode::parse(&w.code).ok_or(())?,
         level,
@@ -290,6 +340,7 @@ fn convert(w: WireLine) -> Result<ParsedLine, ()> {
         fault: opt(&w.fault, Fault::parse)?,
         count: w.n,
         agent,
+        export,
     };
     Ok(ParsedLine {
         ts: w.ts,

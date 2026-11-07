@@ -114,6 +114,13 @@ fn is_plain(rich: &Value) -> bool {
         })
     })
 }
+/// Block-level settings a plain copy would drop: color, a toggleable heading and a code caption.
+fn block_is_plain(k: &Value) -> bool {
+    is_plain(&k["rich_text"])
+        && k["color"].as_str().is_none_or(|c| c == "default")
+        && !k["is_toggleable"].as_bool().unwrap_or(false)
+        && k["caption"].as_array().is_none_or(Vec::is_empty)
+}
 fn plain(v: &Value) -> String {
     v.as_array()
         .map(|items| {
@@ -160,7 +167,7 @@ pub fn parse_page(v: &Value) -> Result<(Vec<Remote>, Option<String>), Error> {
                 .get("has_children")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
-            plain: r.get(kind).is_none_or(|k| is_plain(&k["rich_text"]))
+            plain: r.get(kind).is_none_or(block_is_plain)
                 && lang.as_deref().is_none_or(|l| {
                     l == "plain text" || LANGUAGES.contains(&l.to_ascii_lowercase().as_str())
                 }),
@@ -430,9 +437,11 @@ mod tests {
             item(json!([text(json!({"color": "red"}))])),
             item(json!([text(json!({}))])),
             item(json!([])),
+            json!({"id": "y", "type": "paragraph", "has_children": false, "paragraph": {"rich_text": [], "color": "blue"}}),
+            json!({"id": "z", "type": "heading_2", "has_children": false, "heading_2": {"rich_text": [], "color": "default", "is_toggleable": true}}),
         ],"has_more":false,"next_cursor":null});
         let (items, _) = parse_page(&page).unwrap();
         let plain: Vec<bool> = items.iter().map(|i| i.plain).collect();
-        assert_eq!(plain, [false, false, false, true, true]);
+        assert_eq!(plain, [false, false, false, true, true, false, false]);
     }
 }

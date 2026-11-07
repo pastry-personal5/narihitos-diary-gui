@@ -1,5 +1,9 @@
 # Notion Automatic Day Reorder Implementation Plan
 
+Status: Implemented (2026-11-07)
+
+Task plan for the [reorder design](../specs/2026-11-07-notion-reorder-days-design.md): out-of-order day headings are moved into ascending order before the requested day is written.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** When a Notion month page's dated day headings are out of ascending order, the export reorders them itself (copy, verify, delete) before writing the requested day.

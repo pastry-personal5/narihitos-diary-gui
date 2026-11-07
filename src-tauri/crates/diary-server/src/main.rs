@@ -1,3 +1,4 @@
+mod export_log;
 #[cfg(feature = "scaffold-smoke")]
 mod native_smoke;
 mod notion_http;
@@ -99,6 +100,7 @@ impl Drop for Drain {
 fn connect_notion(
     workspace: &diary_infrastructure::workspace::Workspace,
     notion: &diary_infrastructure::config::Notion,
+    diag: &Arc<dyn Diagnostics>,
 ) -> Option<diary_infrastructure::export::notion::Notion> {
     use diary_infrastructure::export::notion::client::Client;
     #[cfg(feature = "fault-injection")]
@@ -110,6 +112,10 @@ fn connect_notion(
         return workspace.notion(client, &notion.root_page_id);
     }
     let http = notion_http::Reqwest::new(&notion.token)?;
+    let http = export_log::LoggedHttp {
+        inner: http,
+        diag: diag.clone(),
+    };
     workspace.notion(Client::production(Arc::new(http)), &notion.root_page_id)
 }
 
@@ -267,11 +273,19 @@ async fn run() -> Result<(), &'static str> {
         }
         if let Some(notion) = &config.notion {
             // The workspace identity is fetched on first use, so startup never waits on Notion.
-            match connect_notion(&workspace, notion) {
+            match connect_notion(
+                &workspace,
+                notion,
+                &(diagnostics.clone() as Arc<dyn Diagnostics>),
+            ) {
                 Some(a) => adapters.push(Arc::new(a)),
                 None => diagnostics.emit(Record::new(EventCode::OperationBlocked, Level::Warn)),
             }
         }
+        let adapters = adapters
+            .into_iter()
+            .map(|a| Arc::new(export_log::LoggedAdapter::new(a, diagnostics.clone())) as _)
+            .collect();
         if let Some(service) = workspace.exports_with(store, adapters) {
             if service.recover().is_err() {
                 diagnostics.emit(Record::new(EventCode::OperationBlocked, Level::Error));

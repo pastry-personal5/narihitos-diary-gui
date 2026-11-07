@@ -66,16 +66,13 @@ fn intent_and_reservation_precede_destination_observation() {
         Started::Preview(_)
     ));
     assert_eq!(adapter.observations.load(Ordering::SeqCst), 1);
+    // A later start force-stops the paused export instead of being refused.
     let other = e.save(2, "2026-11-06", None, "two\n");
+    svc.start("s", 1, e.request(2, "2026-11-06", &other))
+        .unwrap();
     assert_eq!(
-        svc.start("s", 1, e.request(2, "2026-11-06", &other))
-            .unwrap_err(),
-        ExportError::Busy
-    );
-    assert_eq!(
-        adapter.observations.load(Ordering::SeqCst),
-        1,
-        "reserved destination is not inspected"
+        svc.operation(&op(1)).unwrap().unwrap().state,
+        ExportState::Cancelled
     );
 }
 

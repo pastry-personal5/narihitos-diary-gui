@@ -10,6 +10,7 @@ use axum::{
 };
 use diary_application::{
     Error, JobState,
+    diagnostics::{EventCode, ExportDetail, Level, OpaqueId, Record},
     export::*,
     operations::{OperationId, StepId},
 };
@@ -74,6 +75,72 @@ pub(super) fn error(e: ExportError) -> Response {
         Storage => (StatusCode::INTERNAL_SERVER_ERROR, "storage_error"),
     };
     failure(status, code)
+}
+fn err_code(e: &ExportError) -> &'static str {
+    use ExportError::*;
+    match e {
+        Invalid => "invalid_input",
+        Disabled => "export_disabled",
+        NothingToExport => "nothing_to_export",
+        StaleRevision => "stale_revision",
+        Busy => "resource_reserved",
+        Limit => "limit",
+        Expired => "preview_expired",
+        PreviewStale => "preview_stale",
+        Mismatch => "operation_mismatch",
+        CheckpointMismatch => "checkpoint_mismatch",
+        Uncertain => "outcome_uncertain",
+        CloudUnavailable(_) => "cloud_unavailable",
+        NotFound => "not_found",
+        Storage => "storage_error",
+    }
+}
+fn route_log(s: &ServerState, op: Option<&str>, level: Level, detail: ExportDetail) {
+    let mut r = Record::new(EventCode::ExportRoute, level).export(detail);
+    if let Some(id) = op.and_then(OpaqueId::parse) {
+        r = r.operation(id);
+    }
+    s.log(r);
+}
+/// Logs a rejected export call (no operation ID known here) and answers it.
+fn fail(s: &ServerState, stage: &str, e: ExportError) -> Response {
+    let mut d = ExportDetail::new(stage).code(err_code(&e));
+    if let ExportError::CloudUnavailable(r) = &e {
+        d = d.reason(r.as_str());
+    }
+    route_log(s, None, Level::Warn, d);
+    error(e)
+}
+/// Logs a request refused before the export service ran (session or body problems).
+fn rejected(s: &ServerState, stage: &str, r: Response) -> Response {
+    let d = ExportDetail::new(stage).status(r.status().as_u16());
+    route_log(s, None, Level::Warn, d);
+    r
+}
+fn log_result(s: &ServerState, stage: &str, r: &ExportResult) {
+    let mut d = ExportDetail::new(stage)
+        .target(r.target.as_str())
+        .state(r.state.as_str())
+        .checkpoint(r.checkpoint);
+    if let Some(reason) = &r.reason {
+        d = d.reason(reason);
+    }
+    route_log(s, Some(r.operation_id.as_str()), Level::Info, d);
+}
+fn log_started(s: &ServerState, stage: &str, st: &Started) {
+    match st {
+        Started::Result(r) => log_result(s, stage, r),
+        Started::Preview(p) => route_log(
+            s,
+            Some(p.operation_id.as_str()),
+            Level::Info,
+            ExportDetail::new(stage)
+                .state("needs_confirmation")
+                .reason(p.reason.as_str())
+                .code(p.write.as_str())
+                .checkpoint(p.expected_checkpoint),
+        ),
+    }
 }
 fn authorize(s: &ServerState, headers: &HeaderMap) -> Result<String, Response> {
     let id = session(headers).map_err(app_error)?;
@@ -183,30 +250,30 @@ pub(super) async fn start(
 ) -> Response {
     let session = match authorize(&s, &headers) {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return rejected(&s, "start_auth", e),
     };
     let input = match payload(input) {
         Ok(i) => i,
-        Err(e) => return e,
+        Err(e) => return rejected(&s, "start_payload", e),
     };
     let (Some(operation_id), Some(date), Some(target)) = (
         OperationId::parse(&input.operation_id),
         DiaryDate::parse(&input.date),
         Target::parse(&input.target),
     ) else {
-        return error(ExportError::Invalid);
+        return fail(&s, "start", ExportError::Invalid);
     };
     if !digest(&input.expected_revision.sha256)
         || input.expected_revision.sequence > i64::MAX as u64
     {
-        return error(ExportError::Invalid);
+        return fail(&s, "start", ExportError::Invalid);
     }
     let Some(service) = s.exports.clone() else {
-        return error(ExportError::Disabled);
+        return fail(&s, "start", ExportError::Disabled);
     };
     let permit = match s.source_slots.clone().try_acquire_owned() {
         Ok(p) => p,
-        Err(_) => return error(ExportError::Limit),
+        Err(_) => return fail(&s, "start", ExportError::Limit),
     };
     let generation = s.config_generation.load(Ordering::SeqCst);
     let request = StartRequest {
@@ -228,13 +295,14 @@ pub(super) async fn start(
     .await
     {
         Ok(Ok((st, latest))) => {
+            log_started(&s, "start", &st);
             if let Ok(Some(r)) = latest {
                 sync(&s, &session, &r);
             }
             started(&st)
         }
-        Ok(Err(e)) => error(e),
-        Err(_) => error(ExportError::Storage),
+        Ok(Err(e)) => fail(&s, "start", e),
+        Err(_) => fail(&s, "start", ExportError::Storage),
     }
 }
 
@@ -246,30 +314,30 @@ pub(super) async fn confirm(
 ) -> Response {
     let session = match authorize(&s, &headers) {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return rejected(&s, "confirm_auth", e),
     };
     let input = match payload(input) {
         Ok(i) => i,
-        Err(e) => return e,
+        Err(e) => return rejected(&s, "confirm_payload", e),
     };
     let (Some(operation_id), Some(step_id)) =
         (OperationId::parse(&id), StepId::parse(&input.step_id))
     else {
-        return error(ExportError::Invalid);
+        return fail(&s, "confirm", ExportError::Invalid);
     };
     if input.token.is_empty()
         || input.token.len() > 128
         || input.expected_checkpoint == 0
         || input.expected_checkpoint > i64::MAX as u64 - 1
     {
-        return error(ExportError::Invalid);
+        return fail(&s, "confirm", ExportError::Invalid);
     }
     let Some(service) = s.exports.clone() else {
-        return error(ExportError::Disabled);
+        return fail(&s, "confirm", ExportError::Disabled);
     };
     let permit = match s.source_slots.clone().try_acquire_owned() {
         Ok(p) => p,
-        Err(_) => return error(ExportError::Limit),
+        Err(_) => return fail(&s, "confirm", ExportError::Limit),
     };
     let generation = s.config_generation.load(Ordering::SeqCst);
     let who = session.clone();
@@ -294,7 +362,14 @@ pub(super) async fn confirm(
         Ok(Ok((a, latest))) => {
             // Only an admitted (or recorded) step reaches here, so a rejected or duplicate
             // confirmation publishes nothing new: `sync` ignores an unchanged state.
+            route_log(
+                &s,
+                Some(a.operation_id.as_str()),
+                Level::Info,
+                ExportDetail::new("confirm").checkpoint(a.admitted_checkpoint),
+            );
             if let Ok(Some(r)) = latest {
+                log_result(&s, "confirm_state", &r);
                 sync(&s, &session, &r);
             }
             bounded(
@@ -302,8 +377,8 @@ pub(super) async fn confirm(
                 4096,
             )
         }
-        Ok(Err(e)) => error(e),
-        Err(_) => error(ExportError::Storage),
+        Ok(Err(e)) => fail(&s, "confirm", e),
+        Err(_) => fail(&s, "confirm", ExportError::Storage),
     }
 }
 
@@ -311,10 +386,11 @@ pub(super) async fn confirm(
 /// export before `apply`. Remote state is never rolled back.
 pub(super) async fn cancel(s: &Arc<ServerState>, session: &str, job: &str) -> Response {
     let (Some(service), Some(id)) = (s.exports.clone(), OperationId::parse(job)) else {
-        return error(ExportError::Invalid);
+        return fail(s, "cancel", ExportError::Invalid);
     };
     match tokio::task::spawn_blocking(move || service.cancel(&id)).await {
         Ok(Ok(r)) => {
+            log_result(s, "cancel", &r);
             sync(s, session, &r);
             let mut c = s.coordinator.lock().expect("coordinator poisoned");
             match c.get(session, s.now(), job) {
@@ -322,8 +398,8 @@ pub(super) async fn cancel(s: &Arc<ServerState>, session: &str, job: &str) -> Re
                 Err(e) => app_error(e),
             }
         }
-        Ok(Err(e)) => error(e),
-        Err(_) => error(ExportError::Storage),
+        Ok(Err(e)) => fail(s, "cancel", e),
+        Err(_) => fail(s, "cancel", ExportError::Storage),
     }
 }
 
@@ -335,14 +411,14 @@ pub(super) async fn abandon(
 ) -> Response {
     let session = match authorize(&s, &headers) {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return rejected(&s, "abandon_auth", e),
     };
     let (Some(service), Some(operation_id)) = (s.exports.clone(), OperationId::parse(&id)) else {
-        return error(ExportError::Invalid);
+        return fail(&s, "abandon", ExportError::Invalid);
     };
     let permit = match s.source_slots.clone().try_acquire_owned() {
         Ok(p) => p,
-        Err(_) => return error(ExportError::Limit),
+        Err(_) => return fail(&s, "abandon", ExportError::Limit),
     };
     let generation = s.config_generation.load(Ordering::SeqCst);
     let who = session.clone();
@@ -355,13 +431,14 @@ pub(super) async fn abandon(
     .await
     {
         Ok(Ok((st, latest))) => {
+            log_started(&s, "abandon", &st);
             if let Ok(Some(r)) = latest {
                 sync(&s, &session, &r);
             }
             started(&st)
         }
-        Ok(Err(e)) => error(e),
-        Err(_) => error(ExportError::Storage),
+        Ok(Err(e)) => fail(&s, "abandon", e),
+        Err(_) => fail(&s, "abandon", ExportError::Storage),
     }
 }
 
@@ -373,26 +450,26 @@ pub(super) async fn abandon_confirm(
 ) -> Response {
     let session = match authorize(&s, &headers) {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return rejected(&s, "abandon_confirm_auth", e),
     };
     let input = match payload(input) {
         Ok(i) => i,
-        Err(e) => return e,
+        Err(e) => return rejected(&s, "abandon_confirm_payload", e),
     };
     let (Some(operation_id), Some(step_id)) =
         (OperationId::parse(&id), StepId::parse(&input.step_id))
     else {
-        return error(ExportError::Invalid);
+        return fail(&s, "abandon_confirm", ExportError::Invalid);
     };
     if input.token.is_empty() || input.token.len() > 128 || input.expected_checkpoint == 0 {
-        return error(ExportError::Invalid);
+        return fail(&s, "abandon_confirm", ExportError::Invalid);
     }
     let Some(service) = s.exports.clone() else {
-        return error(ExportError::Disabled);
+        return fail(&s, "abandon_confirm", ExportError::Disabled);
     };
     let permit = match s.source_slots.clone().try_acquire_owned() {
         Ok(p) => p,
-        Err(_) => return error(ExportError::Limit),
+        Err(_) => return fail(&s, "abandon_confirm", ExportError::Limit),
     };
     let generation = s.config_generation.load(Ordering::SeqCst);
     let who = session.clone();
@@ -412,11 +489,12 @@ pub(super) async fn abandon_confirm(
     .await
     {
         Ok(Ok(r)) => {
+            log_result(&s, "abandon_confirm", &r);
             sync(&s, &session, &r);
             bounded(result(&r), 4096)
         }
-        Ok(Err(e)) => error(e),
-        Err(_) => error(ExportError::Storage),
+        Ok(Err(e)) => fail(&s, "abandon_confirm", e),
+        Err(_) => fail(&s, "abandon_confirm", ExportError::Storage),
     }
 }
 
@@ -426,15 +504,26 @@ pub(super) async fn unfinished(
     limit: usize,
 ) -> Response {
     let Some(service) = s.exports.clone() else {
-        return error(ExportError::Disabled);
+        return fail(s, "unfinished", ExportError::Disabled);
     };
     match tokio::task::spawn_blocking(move || service.unfinished(cursor.as_deref(), limit)).await {
-        Ok(Ok(p)) => bounded(
-            json!({"operations":p.operations.iter().map(result).collect::<Vec<_>>(),"next_cursor":p.next_cursor}),
-            512 * 1024,
-        ),
-        Ok(Err(e)) => error(e),
-        Err(_) => error(ExportError::Storage),
+        Ok(Ok(p)) => {
+            route_log(
+                s,
+                None,
+                Level::Info,
+                ExportDetail::new("unfinished").checkpoint(p.operations.len() as u64),
+            );
+            for r in &p.operations {
+                log_result(s, "unfinished_item", r);
+            }
+            bounded(
+                json!({"operations":p.operations.iter().map(result).collect::<Vec<_>>(),"next_cursor":p.next_cursor}),
+                512 * 1024,
+            )
+        }
+        Ok(Err(e)) => fail(s, "unfinished", e),
+        Err(_) => fail(s, "unfinished", ExportError::Storage),
     }
 }
 

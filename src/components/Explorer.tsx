@@ -1,6 +1,10 @@
 import { useRef, useState } from "react";
 import type { CalendarAction } from "../application/navigation/contracts";
 import trashIcon from "../assets/trash.png";
+import dateIcon from "../assets/tab-date.png";
+import snippetIcon from "../assets/tab-snippet.png";
+import draftIcon from "../assets/tab-draft.png";
+import entryIcon from "../assets/tab-entry.png";
 import { snippetLabels } from "../application/navigation/snippet-label";
 import { SymbolLabel } from "./Symbol";
 import type { NavigationModel } from "../application/navigation/model";
@@ -11,6 +15,12 @@ import type {
 } from "../application/navigation/contracts";
 
 const views = ["Date tab", "Snippet tab", "Draft tab", "Entry tab"] as const;
+const viewIcons = {
+  "Date tab": dateIcon,
+  "Snippet tab": snippetIcon,
+  "Draft tab": draftIcon,
+  "Entry tab": entryIcon,
+};
 import { useGeneration } from "./useGeneration";
 import { candidateKey } from "./candidateTabs";
 import type { GenerationController } from "../application/generation/controller";
@@ -210,9 +220,20 @@ export function Explorer({
           <button
             key={name}
             aria-pressed={view === name}
+            title={name}
             onClick={() => setView(name)}
           >
-            {name}
+            <span
+              aria-hidden="true"
+              className="symbol"
+              style={{
+                width: 20,
+                height: 20,
+                maskImage: `url(${viewIcons[name]})`,
+                WebkitMaskImage: `url(${viewIcons[name]})`,
+              }}
+            />
+            <span className="visually-hidden">{name}</span>
           </button>
         ))}
       </div>

@@ -2,6 +2,8 @@
 //! decision table, confirmation types and the adapter port. No destination, token or body is
 //! stored here; the service lives in `diary-infrastructure`.
 use crate::operations::{OperationId, StepId};
+/// Re-exported so adapter decorators outside this crate need no extra dependency.
+pub use diary_domain::authentic::DiaryDate as ExportDate;
 use diary_domain::authentic::{AuthenticRevision, DiaryDate, MAX_BODY_BYTES};
 use std::fmt;
 

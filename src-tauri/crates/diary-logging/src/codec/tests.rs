@@ -278,3 +278,27 @@ fn debug_level_and_fault_round_trip() {
     assert_eq!(p.record.fault, Some(Fault::UnsafeDiscovery));
     assert_eq!(p.level, Level::Debug);
 }
+
+#[test]
+fn export_detail_round_trips_and_rejects_free_text() {
+    let r = Record::new(EventCode::NotionHttp, Level::Warn).export(
+        ExportDetail::new("get")
+            .target("notion")
+            .state("needs_confirmation")
+            .code("object_not_found")
+            .reason("deleted")
+            .checkpoint(2)
+            .status(404)
+            .ms(120),
+    );
+    let h = Header {
+        ts: TS,
+        role: Role::Server,
+        instance: None,
+    };
+    let line = render_line(&h, &r).unwrap();
+    assert_eq!(parse_line(&line).unwrap().record, r);
+    assert!(Token::parse("Has Space\"").is_none());
+    let bad = line.replace("object_not_found", "Not Allowed");
+    assert!(parse_line(&bad).is_none());
+}

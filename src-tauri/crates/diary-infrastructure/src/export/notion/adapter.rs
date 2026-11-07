@@ -66,6 +66,19 @@ struct Day {
     body: Vec<String>,
 }
 
+impl Day {
+    fn of(items: &[wire::Remote], r: &wire::DayRange) -> Self {
+        Self {
+            iso: r.iso.clone(),
+            heading: items[r.heading].id.clone(),
+            body: items[r.heading + 1..r.end]
+                .iter()
+                .map(|i| i.id.clone())
+                .collect(),
+        }
+    }
+}
+
 /// A month page split into days. Duplicate dates that are only an unfinished move (one range is
 /// a prefix or suffix of the other) are reported as `twin`; any other duplicate is structural.
 struct View {
@@ -256,29 +269,11 @@ impl Notion {
                 } else {
                     return Err(Fail::Structural);
                 };
-                let r = ranges.remove(drop);
-                twin = Some(Day {
-                    iso: r.iso,
-                    heading: items[r.heading].id.clone(),
-                    body: items[r.heading + 1..r.end]
-                        .iter()
-                        .map(|i| i.id.clone())
-                        .collect(),
-                });
+                twin = Some(Day::of(&items, &ranges.remove(drop)));
             }
             _ => return Err(Fail::Structural),
         }
-        let days: Vec<Day> = ranges
-            .iter()
-            .map(|r| Day {
-                iso: r.iso.clone(),
-                heading: items[r.heading].id.clone(),
-                body: items[r.heading + 1..r.end]
-                    .iter()
-                    .map(|i| i.id.clone())
-                    .collect(),
-            })
-            .collect();
+        let days: Vec<Day> = ranges.iter().map(|r| Day::of(&items, r)).collect();
         let dates: Vec<String> = days.iter().map(|d| d.iso.clone()).collect();
         let moves = wire::plan_moves(&dates);
         Ok(View {
@@ -424,11 +419,11 @@ impl Run<'_> {
         month: &str,
         date: &DiaryDate,
         slot: &Slot,
-        old: Option<(&str, &str)>,
+        old_tail: Option<&str>,
     ) -> Result<String, Stop> {
         let title = projection::day_title(*date);
-        let (after, start) = match (old, slot) {
-            (Some((_, tail)), _) => (Some(tail), false),
+        let (after, start) = match (old_tail, slot) {
+            (Some(tail), _) => (Some(tail), false),
             (None, Slot::Start) => (None, true),
             (None, Slot::After(id)) => (Some(id.as_str()), false),
             (None, Slot::End) => (None, false),
@@ -568,11 +563,8 @@ impl Run<'_> {
             }
         };
         self.known = loc.ids.clone();
-        let anchor = old
-            .as_ref()
-            .zip(loc.tail.as_deref())
-            .map(|((heading, _), tail)| (heading.as_str(), tail));
-        let heading = self.heading(&month, date, &loc.slot, anchor)?;
+        let old_tail = old.as_ref().and(loc.tail.as_deref());
+        let heading = self.heading(&month, date, &loc.slot, old_tail)?;
         let mut after = heading.clone();
         for chunk in chunks {
             after = self.append(&month, chunk, &after)?;

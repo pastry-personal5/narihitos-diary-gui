@@ -5,14 +5,14 @@
   background: var(--bg);
   font-synthesis: none;
   font-size: 14px;
-  --bg: #131414;
-  --panel: #18191a;
-  --surface: #262728;
-  --line: #2e2f30;
+  --bg: #1f1f1f;
+  --panel: #181818;
+  --surface: #2b2b2b;
+  --line: #2b2b2b;
   --scrim: rgb(0 0 0 / 60%);
   --shadow: rgb(0 0 0 / 40%);
-  --text: #bfbfbf;
-  --muted: #9a9a9a;
+  --text: #cccccc;
+  --muted: #9d9d9d;
   --accent: #48a0c7;
   --accent-fill: #2a7fa8;
   --on-accent: #fff;
@@ -106,7 +106,7 @@ footer {
 }
 .workspace {
   display: grid;
-  grid-template-columns: 80px 220px minmax(220px, 1fr) 240px;
+  grid-template-columns: 48px 220px minmax(220px, 1fr) 240px;
   flex: 1;
   min-height: 0;
 }
@@ -130,8 +130,12 @@ footer {
   background: transparent;
   border-color: transparent;
 }
+.icon-bar button:not([aria-pressed="true"]) {
+  color: var(--muted);
+}
 .icon-bar button:not([aria-pressed="true"]):hover {
   background: var(--surface);
+  color: var(--text);
 }
 .explorer,
 .chat {
@@ -217,20 +221,26 @@ footer {
 }
 .explorer-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 5px;
   margin-bottom: 28px;
 }
 .explorer-tabs button {
-  font-size: 12px;
-  padding: 7px 4px;
+  padding: 9px 4px;
+  line-height: 0;
+}
+.explorer-tabs button:not([aria-pressed="true"]) {
+  color: var(--muted);
+}
+.explorer-tabs button:not([aria-pressed="true"]):hover {
+  color: var(--text);
 }
 .editor-pane {
   display: flex;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: var(--surface);
+  background: var(--panel);
 }
 .pane-heading {
   display: flex;
@@ -289,7 +299,7 @@ footer {
 }
 @media (max-width: 1000px) {
   .workspace {
-    grid-template-columns: 80px 180px minmax(220px, 1fr) 200px;
+    grid-template-columns: 48px 180px minmax(220px, 1fr) 200px;
   }
   .toolbar {
     gap: 12px;
@@ -332,6 +342,7 @@ footer {
   overflow: auto;
   padding: 8px 16px;
   border-top: 1px solid var(--line);
+  background: var(--panel);
 }
 .editor-column [aria-label="Global Messages"] h2 {
   margin: 0;

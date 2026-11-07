@@ -89,6 +89,14 @@ impl Inner {
             }
             return Ok(Started::Result(self.result(&rec, &row)));
         }
+        // A saved operation still waiting for confirmation (e.g. from an earlier run) would hold
+        // the destination forever: stop it so this export can proceed. Nothing was written for
+        // it, and `uncertain`/`running` holders are left alone.
+        if let Some((holder, OperationState::Paused)) =
+            self.db.export_holder(&key).map_err(stored)?
+        {
+            self.cancel(&holder)?;
+        }
         let snapshot = self.snapshot(&request)?;
         self.hit("before_intent")?;
         let first = NewStep {
