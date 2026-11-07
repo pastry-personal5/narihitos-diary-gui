@@ -69,13 +69,13 @@ None yet.
 
 - [x] T12 `[gui]` - Snippet tab: "Move to Trash" becomes a bitmap icon button (`src/assets/trash.png`, masked like Chat Send; `aria-label` and tooltip kept). Evidence: `src/components/Explorer.tsx`, `src/styles.css`. Full vitest rerun passes (Z01). Not done: visual check.
 
-- [ ] T13 `[behavior]` - Notion day title and body headings: `day_title` gives `YYYY-MM-DD (WED)`; every projected Markdown heading becomes `heading_3`. Evidence: `diary-domain` `notion::tests`.
+- [x] T13 `[behavior]` - Notion day title and body headings: `day_title` gives `YYYY-MM-DD (WED)`; every projected Markdown heading becomes `heading_3`. Evidence: `diary-domain` `notion::tests`. Passes: `cargo test -p diary-domain` (34): `day_title_has_iso_date_and_english_weekday`, `body_headings_never_project_as_heading_two`.
 
-- [ ] T14 `[behavior]` - Notion read side: a day is a dated `heading_2` plus its following siblings; ascending order, duplicates, legacy toggles and foreign blocks. Evidence: `export/notion/tests.rs`, `wire.rs` unit tests.
+- [x] T14 `[behavior]` - Notion read side: a day is a dated `heading_2` plus its following siblings; ascending order, duplicates, legacy toggles and foreign blocks. Evidence: `export/notion/tests.rs`, `wire.rs` unit tests. Passes: `wire::tests` (`partition_splits_on_dated_heading_two_only`, `day_of_ignores_the_weekday_suffix`) and `export::notion::tests` (`duplicate_and_disordered_hierarchy_is_a_structural_conflict`, `a_legacy_dated_toggle_is_a_structural_conflict`, `a_foreign_block_in_a_day_is_a_structural_conflict_with_no_write`, `observing_an_absent_date_never_writes`, `pagination_reads_every_page_of_a_long_month`).
 
-- [ ] T15 `[behavior]` - Notion write side: create, backdate and replace as heading ranges with the O10 order and crash/lost-reply cases. Evidence: `export/notion/tests.rs`.
+- [x] T15 `[behavior]` - Notion write side: create, backdate and replace as heading ranges with the O10 order and crash/lost-reply cases. Evidence: `export/notion/tests.rs`. Passes: `export::notion::tests` (create, ascending insertion, replace, crash and lost-reply cases, preamble, empty body, body headings, wrong weekday, hand-typed heading); `cargo test --no-fail-fast`: 577 pass, 0 fail.
 
-- [ ] T16 `[docs]` - Smoke scripts, architecture text, P1-M27 wording and changelog updated for heading days. Evidence: `scripts/smoke/export.py` fake leg, docs diff.
+- [x] T16 `[docs]` - Smoke scripts, architecture text, P1-M27 wording and changelog updated for heading days. Evidence: `scripts/smoke/export.py` fake leg, docs diff. Evidence: `scripts/smoke/export.py` prints `PASS export smoke`; `notion-live.py` compiles; architecture, P1-M27 and changelog updated.
   - [ ] T16.1 - Owner-run live round trip (`scripts/smoke/notion-live.py`) records Q1 and Q2 of the spec.
 
 ### Proof and docs
