@@ -39,7 +39,7 @@ None yet.
   - [x] T02.2 - CodeMirror gutter and caret styled for dark.
   - [ ] T02.3 - Visual check in the running app (not yet done).
 
-- [ ] T03 `[gui]` - Define one dark-theme color palette (named tokens, roles and contrast targets) and use it across the GUI; no hard-coded colors outside the token block.
+- [x] T03 `[gui]` - Define one dark-theme color palette (named tokens, roles and contrast targets) and use it across the GUI; no hard-coded colors outside the token block.
   - [x] T03.1 - Owner approves the palette (design in chat, 2026-11-07).
   - [x] T03.2 - Tokens defined once in `src/styles.css` and documented in `docs/ux-gui.md`; text roles meet WCAG AA (4.5:1) on every surface; selected-state text uses an on-accent token (white on the mint accent is 1.9:1 today).
   - [x] T03.3 - A test checks that `src/styles.css` has no color literals outside the token block.
@@ -61,10 +61,14 @@ None yet.
 
 - [x] T09 `[gui]` `[bug]` - Chat and generation profile pickers move to the top of the AI Activity widget; both profiles are checked automatically in the background (15 s doubling, capped at 1 h) and the manual "Check generation profile" button is gone. Fix: the chat and generation controllers kept their own stale profile lists (status only changed on a manual check), so Generate stayed blocked as "not ready"; both now take the app-wide list from `useProfiles` via `applyProfiles`. Evidence: `src/components/{ProfilePicker.tsx,App.tsx}`, `src/application/{chat.ts,generation/controller.ts}`. Not done: test updates run, visual check.
 
-- [ ] T10 `[ux]` `[behavior]` - Candidates open as read-only Editor tabs (one per slot) at Generate without changing the active tab; choosing a candidate in the Explorer Draft tab activates and focuses it (owner, 2026-11-07); the candidate card list is removed and a banner holds status, Review and Discard. Evidence: `src/components/{candidateTabs.ts,GenerationPane.tsx,Explorer.tsx}`, `src/application/navigation/resources.ts`, `tests/generation-ui.test.tsx` (5 pass), eslint clean, `tsc` clean. Not done: full vitest rerun after the file split, visual check in the running app, `scripts/gate.sh` (`cargo fmt --check` fails on `diary-logging` `codec.rs`/`codec/tests.rs`, untouched by this task).
+- [x] T10 `[ux]` `[behavior]` - Candidates open as read-only Editor tabs (one per slot) at Generate without changing the active tab; choosing a candidate in the Explorer Draft tab activates and focuses it (owner, 2026-11-07); the candidate card list is removed and a banner holds status, Review and Discard. Evidence: `src/components/{candidateTabs.ts,GenerationPane.tsx,Explorer.tsx}`, `src/application/navigation/resources.ts`, `tests/generation-ui.test.tsx` (5 pass), eslint clean, `tsc` clean. Full vitest rerun and `scripts/gate.sh` pass (Z01; the `diary-logging` formatting was fixed with `cargo fmt --all`). Not done: visual check in the running app.
+
+- [x] T11 `[behavior]` - Snippet tab default selection: eligible snippets whose local date is the selected day D start checked; D-1 and D+1 snippets start unchecked (owner, 2026-11-07). Evidence: `src/application/navigation/imports.ts`, `tests/navigation.test.ts` (new test; navigation suites 29 pass before the new test was added). Full vitest rerun passes (Z01); `tests/accessibility.test.tsx` now dates its snippet fixtures on the selected day. Not done: visual check.
+
+- [x] T12 `[gui]` - Snippet tab: "Move to Trash" becomes a bitmap icon button (`src/assets/trash.png`, masked like Chat Send; `aria-label` and tooltip kept). Evidence: `src/components/Explorer.tsx`, `src/styles.css`. Full vitest rerun passes (Z01). Not done: visual check.
 
 ### Proof and docs
 
-- [ ] Z01 - Full gate (`scripts/gate.sh`) passes.
+- [x] Z01 - Full gate (`scripts/gate.sh`) passes (2026-11-07): G01–G07 all exit 0. Fixes made on the way: `cargo fmt --all` on `diary-logging` `codec.rs`/`codec/tests.rs` (formatting only; the architecture test checks all workspace members) and the T11 default in `tests/accessibility.test.tsx`.
 - [ ] Z02 - Smokes for touched areas pass.
-- [ ] Z03 - Affected docs, phase plan, roadmap and changelog are updated. Done so far: `ux-gui.md`, `ux-terms.md`, `ux-information-architecture.md` (T01–T10).
+- [ ] Z03 - Affected docs, phase plan, roadmap and changelog are updated. Done so far: `ux-gui.md`, `ux-terms.md`, `ux-information-architecture.md` (T01–T10), `sources-and-dates.md` and `ux-gui.md` for T11/T12, and a changelog entry for T01–T12. Open: tick this box once the owner finishes the visual checks.

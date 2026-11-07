@@ -206,6 +206,15 @@ footer {
 .chat .chat-send:not(:disabled):hover {
   background: var(--panel);
 }
+.snippet-trash {
+  width: auto;
+  padding: 4px;
+  border-color: transparent;
+  background: transparent;
+}
+.snippet-trash:not(:disabled):hover {
+  background: var(--panel);
+}
 .explorer-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;

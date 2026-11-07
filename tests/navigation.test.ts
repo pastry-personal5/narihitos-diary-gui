@@ -285,6 +285,26 @@ describe("session-owned imports", () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(bridge.getJob).not.toHaveBeenCalled();
   });
+  it("checks eligible snippets by default only on the selected day, not D-1 or D+1", async () => {
+    const { s, bridge } = store();
+    const other = (id: string, d: string) => {
+      const x = source(id);
+      const local = { date: d, datetime: `${d}T00:00:00`, offset_seconds: 0 };
+      x.navigation = { ...x.navigation!, included: local };
+      return included(x);
+    };
+    vi.mocked(bridge.listSources).mockResolvedValue(
+      page([
+        other("prev", "2024-02-28"),
+        other("day", date),
+        other("next", "2024-03-01"),
+      ]),
+    );
+    await s.select(date);
+    expect(s.inclusion("day")?.checked).toBe(true);
+    expect(s.inclusion("prev")?.checked).toBe(false);
+    expect(s.inclusion("next")?.checked).toBe(false);
+  });
   it("publishes pages progressively, retries the same cursor and reconciles absence only at full coverage", async () => {
     const { s, bridge } = store();
     vi.mocked(bridge.listSources).mockResolvedValue(

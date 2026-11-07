@@ -8,6 +8,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { App } from "../src/components/App";
+import { today } from "../src/components/useAuthentic";
 import type { Bridge } from "../src/application/bridge";
 import { navigationFake } from "./navigation-fake";
 import { settingsFake } from "./settings-fake";
@@ -22,9 +23,10 @@ const status = {
   capabilities: ["status", "sessions", "jobs", "events"],
 };
 afterEach(cleanup);
+// Snippets default to included only on the selected day, which starts as today.
 const local = {
-  date: "2024-02-29",
-  datetime: "2024-02-29T00:00:00",
+  date: today(),
+  datetime: `${today()}T00:00:00`,
   offset_seconds: 0,
 };
 const sourceItem = {

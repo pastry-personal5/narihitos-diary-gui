@@ -394,14 +394,16 @@ export class ImportController {
           throw new AuthenticError("invalid_response", false);
         seen.add(s.id);
         const before = choices.get(s.id);
+        // Default include: only snippets whose local date is the selected day D (not D±1).
+        const onDay = s.eligible && s.navigation?.included?.date === page.date;
         choices.set(s.id, {
           digest: s.digest,
           checked: moved.has(s.id)
             ? false
             : before
               ? before.digest === s.digest &&
-                (s.eligible && !before.eligibleSeen ? true : before.checked)
-              : s.eligible,
+                (s.eligible && !before.eligibleSeen ? onDay : before.checked)
+              : onDay,
           eligibleSeen:
             before?.digest === s.digest
               ? before.eligibleSeen || s.eligible

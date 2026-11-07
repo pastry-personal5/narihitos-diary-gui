@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { CalendarAction } from "../application/navigation/contracts";
+import trashIcon from "../assets/trash.png";
 import { snippetLabels } from "../application/navigation/snippet-label";
 import { SymbolLabel } from "./Symbol";
 import type { NavigationModel } from "../application/navigation/model";
@@ -116,12 +117,22 @@ export function Explorer({
             {labels.get(source.id) ?? source.relative_key}
           </button>
           <button
+            className="snippet-trash"
             disabled={!!trashReason}
             title={trashReason ?? "Preview this snippet and its related audio"}
             aria-label={`Move ${labels.get(source.id) ?? source.relative_key} to Trash`}
             onClick={() => void model.trashSource(source)}
           >
-            Move to Trash
+            <span
+              aria-hidden="true"
+              className="symbol"
+              style={{
+                width: 16,
+                height: 16,
+                maskImage: `url(${trashIcon})`,
+                WebkitMaskImage: `url(${trashIcon})`,
+              }}
+            />
           </button>
         </div>
         {moved && (
