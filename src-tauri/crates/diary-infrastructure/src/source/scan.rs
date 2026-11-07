@@ -35,6 +35,27 @@ struct Walker<'a> {
     directories: Option<&'a BTreeSet<String>>,
     cancelled: &'a dyn Fn() -> bool,
     ownership: bool,
+    hydrate: Vec<std::path::PathBuf>,
+}
+
+const HYDRATE_THREADS: usize = 8;
+
+/// Best-effort: reading an evicted iCloud file makes macOS materialise it; a later import sees it.
+/// A few workers share the queue, so parallel downloads stay bounded however many files are evicted.
+fn hydrate_all(paths: Vec<std::path::PathBuf>) {
+    if paths.is_empty() {
+        return;
+    }
+    let workers = HYDRATE_THREADS.min(paths.len());
+    let queue = std::sync::Arc::new(std::sync::Mutex::new(paths));
+    for _ in 0..workers {
+        let queue = queue.clone();
+        std::thread::spawn(move || {
+            while let Some(path) = queue.lock().ok().and_then(|mut q| q.pop()) {
+                let _ = std::fs::read(path);
+            }
+        });
+    }
 }
 
 pub fn scan(root: &ResolvedRoot, kind: &SourceKind, generation: u64) -> ScanReport {
@@ -135,6 +156,7 @@ fn scan_options(
         directories,
         cancelled,
         ownership,
+        hydrate: Vec::new(),
     };
     match validated_root(root) {
         Ok(fd) => w.walk(fd, "", 0),
@@ -143,6 +165,7 @@ fn scan_options(
             .failures
             .push((String::new(), SourceOutcome::Unavailable(e))),
     }
+    hydrate_all(std::mem::take(&mut w.hydrate));
     for indices in w.producers.values().filter(|v| v.len() > 1) {
         for i in indices {
             w.report.listings[*i]
@@ -164,16 +187,10 @@ fn scan_options(
     w.report
 }
 impl Walker<'_> {
-    /// Best-effort: reading an evicted iCloud file makes macOS materialise it; a later import sees it.
-    /// shortcut: one detached thread per file, unbounded by anything but the candidate limit.
-    fn hydrate(&self, rel: &str) {
-        if self.ownership {
-            return;
+    fn hydrate(&mut self, rel: &str) {
+        if !self.ownership {
+            self.hydrate.push(self.root.canonical.join(rel));
         }
-        let path = self.root.canonical.join(rel);
-        std::thread::spawn(move || {
-            let _ = std::fs::read(path);
-        });
     }
     fn failure(&mut self, rel: String, e: Unavailable) {
         if e == Unavailable::NotDownloaded {
