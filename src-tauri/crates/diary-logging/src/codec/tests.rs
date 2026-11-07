@@ -269,7 +269,11 @@ fn debug_level_and_fault_round_trip() {
     use diary_application::diagnostics::Fault;
     let r = Record::new(EventCode::BridgeStatusProbe, Level::Debug)
         .fault(Fault::from_code("unsafe_discovery"));
-    let header = Header { ts: TS, role: Role::Client, instance: None };
+    let header = Header {
+        ts: TS,
+        role: Role::Client,
+        instance: None,
+    };
     let p = parse_line(&render_line(&header, &r).unwrap()).unwrap();
     assert_eq!(p.record.fault, Some(Fault::UnsafeDiscovery));
     assert_eq!(p.level, Level::Debug);

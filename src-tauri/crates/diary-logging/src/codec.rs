@@ -4,8 +4,9 @@
 use super::clock::LocalStamp;
 use diary_application::agent::{AgentErrorCode, AgentKind, Reason, Style};
 use diary_application::diagnostics::{
-    ActionTag, AgentDetail, Component, ErrorTag, EventCode, ExitTag, Fault, Level, OpaqueId, PathClass,
-    PhaseTag, Record, ResourceDetail, ResourceKind, Role, StateTag, StatusTag, StopTag, TraceId,
+    ActionTag, AgentDetail, Component, ErrorTag, EventCode, ExitTag, Fault, Level, OpaqueId,
+    PathClass, PhaseTag, Record, ResourceDetail, ResourceKind, Role, StateTag, StatusTag, StopTag,
+    TraceId,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
