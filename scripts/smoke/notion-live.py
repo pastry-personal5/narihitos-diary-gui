@@ -221,6 +221,18 @@ with tempfile.TemporaryDirectory(prefix='diary-notion-live-') as temporary:
     op, code, out = c.export('2026-11-07', c.revision('2026-11-07'))
     assert code == 200 and out['outcome'] != 'needs_confirmation', (code, out)
     c.wait(op, 'succeeded')
+    # Q3: a day typed in by hand above the others is moved to its place by the next export.
+    month_id = month_days()[0]
+    hand = lambda kind, t: {'object': 'block', 'type': kind, kind: {'rich_text': [{'type': 'text', 'text': {'content': t}}]}}
+    code, _ = notion('PATCH', f'/v1/blocks/{month_id}/children', {'children': [hand('heading_2', '2026-11-30 (MON)'), hand('paragraph', 'moved by hand')], 'position': {'type': 'start'}})
+    assert code == 200, code
+    rev = c.save('2026-11-25', 'Reorder trigger.\n')
+    c.settle('2026-11-25', rev)
+    titles = [text(t) for t in month_days()[1]]
+    assert titles == sorted(titles) and titles[-1].startswith('2026-11-30'), titles
+    assert [text(k) for k in day_body(month_id, '2026-11-30')] == ['moved by hand']
+    observed['q3_reorder'] = titles
+    print('Q3: reordered ->', titles)
     stop(server, c)
 
 # Q1/Q2 probe on the month page: what an append with `position` returns, and whether blocks can be

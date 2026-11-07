@@ -80,11 +80,11 @@ None yet.
 - [x] T16 `[docs]` - Smoke scripts, architecture text, P1-M27 wording and changelog updated for heading days. Evidence: `scripts/smoke/export.py` fake leg, docs diff. Evidence: `scripts/smoke/export.py` prints `PASS export smoke`; `notion-live.py` compiles; architecture, P1-M27 and changelog updated.
   - [ ] T16.1 - Owner-run live round trip (`scripts/smoke/notion-live.py`) records Q1 and Q2 of the spec.
 
-- [ ] T17 `[behavior]` - Notion move planner and plain-text flag: `plan_moves` keeps the longest ascending run; `Remote.plain` marks formatted text. Evidence: `wire.rs` unit tests.
+- [x] T17 `[behavior]` - Notion move planner and plain-text flag: `plan_moves` keeps the longest ascending run; `Remote.plain` marks formatted text. Evidence: `wire.rs` unit tests. Passes: `wire::tests` (`plan_moves_*`, `parse_page_marks_formatted_text_not_plain`). Tie rule: the earliest-positioned day stays.
 
-- [ ] T18 `[behavior]` - Notion reorder: `look` reports disorder instead of failing; `apply` copies, verifies and deletes out-of-place days, repairs identical twins, and refuses formatted, foreign, duplicate and legacy days without writing. Evidence: `export/notion/tests.rs`.
+- [x] T18 `[behavior]` - Notion reorder: `look` reports disorder instead of failing; `apply` copies, verifies and deletes out-of-place days, repairs identical twins, and refuses formatted, foreign, duplicate and legacy days without writing. Evidence: `export/notion/tests.rs`. Passes: `export::notion::tests` (`one_misplaced_day_moves_alone_and_the_requested_day_is_written`, `a_reversed_page_moves_the_minimum`, `the_requested_day_may_itself_be_the_moved_one`, crash/lost-reply cases, `a_formatted_day_is_not_moved`, `a_foreign_block_in_a_moved_day_refuses`, `two_different_texts_for_one_day_refuse`, nested items, small API pages, preamble); `cargo test --no-fail-fast`: 665 pass, 0 fail.
 
-- [ ] T19 `[docs]` - Architecture text, P1-M27 O8 note, changelog and a live reorder leg. Evidence: docs diff, `notion-live.py` compiles.
+- [x] T19 `[docs]` - Architecture text, P1-M27 O8 note, changelog and a live reorder leg. Evidence: docs diff, `notion-live.py` compiles. Evidence: architecture text, P1-M27 note and changelog updated; `notion-live.py` has a reorder leg (compiles).
   - [ ] T19.1 - Owner-run live round trip records the reorder leg result (`Q3`).
 
 ### Proof and docs
