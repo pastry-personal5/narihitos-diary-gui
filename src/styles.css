@@ -16,6 +16,7 @@
   --accent: #48a0c7;
   --accent-fill: #2a7fa8;
   --on-accent: #fff;
+  --caret: #fff;
   --danger: #f48771;
   --warning: #cca700;
   --success: #89d185;
@@ -624,10 +625,10 @@ footer {
   border-right: 1px solid var(--line);
 }
 .cm-editor .cm-content {
-  caret-color: #fff;
+  caret-color: var(--caret);
 }
 .cm-editor .cm-cursor {
-  border-left-color: #fff;
+  border-left-color: var(--caret);
 }
 
 .toolbar,
