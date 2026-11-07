@@ -163,10 +163,22 @@ with tempfile.TemporaryDirectory(prefix='diary-notion-live-') as temporary:
         process.send_signal(signal.SIGINT)
         process.wait(timeout=15)
 
-    def month_toggles():
+    def month_days():
         year = next(b for b in children(ROOT_PAGE) if b['type'] == 'child_page' and b['child_page']['title'] == '2026')
         month = next(b for b in children(year['id']) if b['type'] == 'child_page' and b['child_page']['title'] == '2026-11')
-        return month['id'], [b for b in children(month['id']) if b['type'] == 'toggle']
+        return month['id'], [b for b in children(month['id']) if b['type'] == 'heading_2']
+
+    def day_body(month_id, prefix):
+        """The blocks after the day heading starting with `prefix`, up to the next day heading."""
+        body, inside = [], False
+        for b in children(month_id):
+            if b['type'] == 'heading_2':
+                if inside:
+                    break
+                inside = text(b).startswith(prefix)
+            elif inside:
+                body.append(b)
+        return body
 
     server, record = start()
     c = Client(record)
@@ -175,13 +187,12 @@ with tempfile.TemporaryDirectory(prefix='diary-notion-live-') as temporary:
     for date in ['2026-11-10', '2026-11-03', '2026-11-07', '2026-11-20']:
         rev = c.save(date, f'Live entry for {date}.\n\n- item one\n  - nested item\n\n> quoted\n')
         c.settle(date, rev)
-    _, toggles = month_toggles()
-    titles = [text(t) for t in toggles]
+    month_id, days = month_days()
+    titles = [text(t) for t in days]
     assert titles == sorted(titles) and len(titles) == 4, titles
-    print('daily sections ascending:', titles)
-    # Q4: how Notion nests a list item's child under the daily toggle.
-    day = next(t for t in toggles if text(t) == '2026-11-07')
-    kids = children(day['id'])
+    print('days ascending:', titles)
+    # Q4: how Notion nests a list item's child under a day's blocks.
+    kids = day_body(month_id, '2026-11-07')
     observed['q4_children'] = [(k['type'], k['has_children']) for k in kids]
     print('Q4 section children:', observed['q4_children'])
     # No-op.
@@ -193,8 +204,7 @@ with tempfile.TemporaryDirectory(prefix='diary-notion-live-') as temporary:
     if out['outcome'] == 'needs_confirmation':
         c.confirm(op, out)
     c.wait(op, 'succeeded')
-    day = next(t for t in month_toggles()[1] if text(t) == '2026-11-07')
-    kids = children(day['id'])
+    kids = day_body(month_days()[0], '2026-11-07')
     assert len(kids) == 151, len(kids)
     code, _ = notion('PATCH', f"/v1/blocks/{kids[1]['id']}", {'paragraph': {'rich_text': [{'type': 'text', 'text': {'content': 'edited in Notion'}}]}})
     assert code == 200
@@ -203,8 +213,7 @@ with tempfile.TemporaryDirectory(prefix='diary-notion-live-') as temporary:
     assert code == 200 and pv['outcome'] == 'needs_confirmation' and pv['reason'] == 'changed', (code, pv)
     c.confirm(op, pv)
     c.wait(op, 'succeeded')
-    day = next(t for t in month_toggles()[1] if text(t) == '2026-11-07')
-    assert [text(k) for k in children(day['id'])] == ['Replacement body.']
+    assert [text(k) for k in day_body(month_days()[0], '2026-11-07')] == ['Replacement body.']
     # Restart: the receipt survives and an unchanged export is a no-op.
     stop(server, c)
     server, record = start()
@@ -213,6 +222,20 @@ with tempfile.TemporaryDirectory(prefix='diary-notion-live-') as temporary:
     assert code == 200 and out['outcome'] != 'needs_confirmation', (code, out)
     c.wait(op, 'succeeded')
     stop(server, c)
+
+# Q1/Q2 probe on the month page: what an append with `position` returns, and whether blocks can be
+# deleted in order (first, then the one that followed it). The probe blocks are deleted again.
+_, year_blocks = None, [b for b in children(ROOT_PAGE) if b['type'] == 'child_page' and b['child_page']['title'] == '2026']
+month_block = next(b for b in children(year_blocks[0]['id']) if b['type'] == 'child_page' and b['child_page']['title'] == '2026-11')
+first_day = next(b for b in children(month_block['id']) if b['type'] == 'heading_2')
+probe = lambda t: {'object': 'block', 'type': 'paragraph', 'paragraph': {'rich_text': [{'type': 'text', 'text': {'content': t}}]}}
+code, reply = notion('PATCH', f"/v1/blocks/{month_block['id']}/children", {'children': [probe('q probe a'), probe('q probe b')], 'position': {'type': 'after_block', 'after_block': {'id': first_day['id']}}})
+assert code == 200, (code, reply)
+observed['q1_reply_blocks'] = len(reply['results'])
+observed['q1_month_blocks'] = len(children(month_block['id']))
+ids = [b['id'] for b in reply['results'] if text(b).startswith('q probe')]
+observed['q2_ordered_deletes'] = [notion('DELETE', f'/v1/blocks/{i}')[0] for i in ids]
+print('Q1:', {k: v for k, v in observed.items() if k.startswith('q1')}, 'Q2:', observed['q2_ordered_deletes'])
 
 # Page ordering probe: does page creation accept a position? (informational; leaves two pages)
 code, a = notion('POST', '/v1/pages', {'parent': {'page_id': ROOT_PAGE}, 'properties': {'title': {'title': [{'text': {'content': 'zz-order-probe-a'}}]}}})

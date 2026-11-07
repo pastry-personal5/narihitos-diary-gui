@@ -251,11 +251,24 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     def nodes():
         return json.loads(remote_state.read_text())['nodes']
 
-    def section_texts():
+    def day():
+        """The DATE heading, its body block IDs and their texts: a day is a heading_2 plus the blocks after it."""
         found = nodes()
-        toggles = [k for k, n in found.items() if n['kind'] == 'toggle' and ''.join(i['plain_text'] for i in n['payload']['rich_text']) == DATE]
-        assert len(toggles) == 1, toggles
-        return toggles[0], [''.join(i['plain_text'] for i in found[c]['payload']['rich_text']) for c in found[toggles[0]]['children']]
+        text = lambda k: ''.join(i['plain_text'] for i in found[k]['payload'].get('rich_text', []))
+        month = next(k for k, n in found.items() if n['kind'] == 'child_page' and n.get('title') == DATE[:7])
+        kids = found[month]['children']
+        heads = [k for k in kids if found[k]['kind'] == 'heading_2' and text(k).startswith(DATE)]
+        assert len(heads) == 1, heads
+        body = []
+        for k in kids[kids.index(heads[0]) + 1:]:
+            if found[k]['kind'] == 'heading_2':
+                break
+            body.append(k)
+        return heads[0], body, [text(k) for k in body]
+
+    def section_texts():
+        heading, _, texts = day()
+        return heading, texts
 
     server, record = start(destination=False, cfg=notion_cfg, notion=remote_state)
     c = Client(record)
@@ -273,10 +286,10 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     # iCloud stays disabled when only Notion is configured.
     assert c.export(rev_n)[1] == 422
     stop(server)
-    # An edit made in Notion needs confirmation; the replacement is a new section after the old.
+    # An edit made in Notion needs confirmation; the replacement is a new range after the old one.
     state = json.loads(remote_state.read_text())
-    toggle_id, _ = section_texts()
-    first = state['nodes'][toggle_id]['children'][0]
+    toggle_id, first_ids, _ = day()
+    first = first_ids[0]
     state['nodes'][first]['payload']['rich_text'] = [{'type': 'text', 'text': {'content': 'edited in Notion'}, 'plain_text': 'edited in Notion'}]
     remote_state.write_text(json.dumps(state))
     server, record = start(destination=False, cfg=notion_cfg, notion=remote_state)
@@ -288,7 +301,7 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     confirm(c, opn3, pv)
     c.wait(opn3, 'succeeded')
     new_toggle, texts = section_texts()
-    assert texts == ['Notion three.'] and new_toggle != toggle_id, 'replace inserts a new section (O10)'
+    assert texts == ['Notion three.'] and new_toggle != toggle_id, 'replace inserts a new range (O10)'
     toggle_id = new_toggle
     stop(server)
     # A kill right after the Notion write is proven by read-back on restart; nothing is replayed.
