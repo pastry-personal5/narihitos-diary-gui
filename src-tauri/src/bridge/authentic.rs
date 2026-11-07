@@ -119,6 +119,13 @@ const SERVER_CODES: &[&str] = &[
     "empty_selection",
     "discard_required",
     "result_unavailable",
+    "review_invalidated",
+    "stale_baseline",
+    "set_mismatch",
+    "decided",
+    "review_unsupported",
+    "review_limit",
+    "review_active",
 ];
 const LOCAL_CODES: &[&str] = &[
     "permission_denied",

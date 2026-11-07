@@ -215,6 +215,10 @@ async fn run() -> Result<(), &'static str> {
     let watched_store = authentic.clone();
     if let Some(store) = authentic {
         diary_api::ServerState::set_authentic(&mut state, store);
+        diary_api::ServerState::set_review_hasher(
+            &mut state,
+            Arc::new(diary_infrastructure::authentic::Sha256Hasher),
+        );
     }
     let launch_path = std::env::var_os("PATH").unwrap_or_default();
     let launch_cwd = std::env::current_dir().map_err(|_| "launch directory unavailable")?;

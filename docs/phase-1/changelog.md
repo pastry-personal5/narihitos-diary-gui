@@ -120,3 +120,13 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 - 2026-11-05 — agent, P1-M10 plan — Drafted the civil-date import and timestamp-resolution plan. Open for owner: O1 Jiff as a direct dependency, O2 server routes plus bridge commands now, O3 system tzdb version source.
 
 - 2026-11-05 — owner — Approved the P1-M10 plan: pinned `jiff` as a direct dependency (license-notice review required), server routes plus bridge commands without UI, and the system tzdb `+VERSION` as the recorded database version.
+
+- 2026-11-07 — agent, P1-M24 plan — Drafted the [overview](../archive/milestones/p1-m24/milestone-24-paragraph-review-overview.md) and [work plan](../archive/milestones/p1-m24/milestone-24-paragraph-review-architecture.md). Open for owner: O1 hand-written tokenizer vs a Markdown crate, O2 `sha2` in `diary-domain`, O3 evidence policy.
+
+- 2026-11-07 — owner, P1-M24 decisions — O1 adopt pinned `pulldown-cmark` in `diary-domain` (license-notice review); O2 compute SHA-256 in infrastructure behind a hasher port; O3 close on automated tests, synthetic built-server smoke and full gate, with packaged native proof moved to P1-M28.
+
+- 2026-11-07 — agent, P1-M24 plan review — Fixed interface and fixture gaps in the work plan (compose input, unsupported fixtures, `review_accept` receipt path, recovery order, serialization/invalidation wiring, digest encoding, `pulldown-cmark` pin); see its Plan review corrections. No owner decision changed.
+
+- 2026-11-07 — owner, P1-M24 review presentation — Review unit stays one paragraph (a group of sentences); the GUI should resemble CodeMirror's unified merge view (use the extension or hand-code). Agent choice: hand-code with decorations, no new dependency. Plans updated.
+
+- 2026-11-07 — agent, P1-M24 delivered — Implemented paragraph review (domain tokenizer/alignment, `review_accept` receipts, serialized decisions, routes, bridge commands, unified-merge-style editor view, guards). Automated tests, `scripts/smoke/review.py` and the full gate passed; packaged native proof moves to P1-M28. See the [checklist](../archive/milestones/p1-m24/milestone-24-paragraph-review-overview.md).

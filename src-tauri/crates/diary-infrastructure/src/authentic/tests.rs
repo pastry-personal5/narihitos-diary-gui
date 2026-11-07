@@ -623,3 +623,129 @@ fn recovery_mode_keeps_files_readable_and_refuses_every_mutation() {
     );
     assert!(!db.exists(), "no empty ledger is created");
 }
+
+fn review_save(
+    op: OperationId,
+    date: &str,
+    expected: Option<&AuthenticRevision>,
+    body: &str,
+) -> diary_application::authentic::ReviewSave {
+    diary_application::authentic::ReviewSave {
+        operation_id: op,
+        date: d(date),
+        expected: expected.cloned(),
+        body: body.into(),
+        candidate_digest: "c".repeat(64),
+        hunk: "h".repeat(64),
+        before: "b".repeat(64),
+        after: "a".repeat(64),
+    }
+}
+
+fn receipt_text() -> String {
+    format!("{},{},{}", "h".repeat(64), "b".repeat(64), "a".repeat(64))
+}
+
+#[test]
+fn review_accept_commits_its_receipt_with_the_save_and_replays_by_id() {
+    let e = env();
+    let date = "2026-11-05";
+    let o = open(&e.root);
+    let base = o.store.save(save(op(1), date, None, "one")).unwrap();
+    let out = o
+        .store
+        .save_review(review_save(op(2), date, Some(&base.revision), "two"))
+        .unwrap();
+    let record = o.store.operation(&op(2)).unwrap().unwrap();
+    assert_eq!(record.kind, KIND_REVIEW);
+    assert_eq!(
+        record.result.unwrap(),
+        format!(
+            "{}:{} {}",
+            out.revision.sequence,
+            out.revision.sha256,
+            receipt_text()
+        )
+    );
+    // Same ID and inputs replay; a different hunk under the same ID is a mismatch.
+    let again = o
+        .store
+        .save_review(review_save(op(2), date, Some(&base.revision), "two"))
+        .unwrap();
+    assert_eq!(again.revision, out.revision);
+    let mut other = review_save(op(2), date, Some(&base.revision), "two");
+    other.hunk = "x".repeat(64);
+    assert_eq!(o.store.save_review(other), Err(StoreError::Mismatch));
+    // A manual save of the same body under a review ID never matches the review hash.
+    assert_eq!(
+        o.store.save(save(op(2), date, Some(&base.revision), "two")),
+        Err(StoreError::Mismatch)
+    );
+    // A plain save keeps its plain result format.
+    let next = o
+        .store
+        .save(save(op(3), date, Some(&out.revision), "three"))
+        .unwrap();
+    let plain = o.store.operation(&op(3)).unwrap().unwrap().result.unwrap();
+    assert_eq!(
+        plain,
+        format!("{}:{}", next.revision.sequence, next.revision.sha256)
+    );
+    drop(o);
+    // The receipt survives a restart.
+    let o = open(&e.root);
+    assert!(
+        o.store
+            .operation(&op(2))
+            .unwrap()
+            .unwrap()
+            .result
+            .unwrap()
+            .ends_with(&receipt_text())
+    );
+    clean(&o, date);
+}
+
+#[test]
+fn review_accept_reconciles_at_every_crash_boundary() {
+    for step in POINTS {
+        for when in [When::Before, When::After] {
+            let e = env();
+            let date = "2026-11-05";
+            let o = open(&e.root);
+            let base = o.store.save(save(op(1), date, None, "one")).unwrap();
+            o.store.inject(Fault {
+                step,
+                when,
+                kind: FaultKind::Crash,
+            });
+            assert!(
+                o.store
+                    .save_review(review_save(op(2), date, Some(&base.revision), "two"))
+                    .is_err()
+            );
+            drop(o);
+            let o = open(&e.root);
+            let out = o
+                .store
+                .save_review(review_save(op(2), date, Some(&base.revision), "two"))
+                .unwrap_or_else(|x| panic!("{step:?} {when:?}: {x:?}"));
+            let result = o.store.operation(&op(2)).unwrap().unwrap().result.unwrap();
+            assert_eq!(
+                result,
+                format!(
+                    "{}:{} {}",
+                    out.revision.sequence,
+                    out.revision.sha256,
+                    receipt_text()
+                ),
+                "{step:?} {when:?}"
+            );
+            let (_, body) = parse(&bytes(&e.root, date), &d(date)).unwrap();
+            assert_eq!(body, "two");
+            drop(o);
+            let o = open(&e.root);
+            clean(&o, date);
+        }
+    }
+}

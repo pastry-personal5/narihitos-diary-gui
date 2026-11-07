@@ -4,6 +4,8 @@ Status: Active
 
 This index lists the design and process docs, one line each. Read only the doc you need. The rules for writing docs are in [AGENTS.md](../AGENTS.md) under "Documentation".
 
+- [P1-M24 overview/checklist](archive/milestones/p1-m24/milestone-24-paragraph-review-overview.md) and [work plan](archive/milestones/p1-m24/milestone-24-paragraph-review-architecture.md): completed paragraph review and acceptance (unified-merge-style GUI, durable per-paragraph accepts), automated tests, synthetic built-server smoke, full gate and the P1-M28 packaged-evidence handoff.
+
 - [P1-M23 overview/checklist](archive/milestones/p1-m23/milestone-23-background-ai-activity-results-overview.md) and [work plan](archive/milestones/p1-m23/milestone-23-background-ai-activity-results-architecture.md): completed shared AI activity/results, live-session discovery/reconciliation, passing automated acceptance/full gate and explicit P1-M28 packaged evidence handoff.
 
 - [P1-M22 code review](archive/milestones/p1-m22/milestone-22-review-overview.md): follow-up findings, fixes, regression tests and validation.

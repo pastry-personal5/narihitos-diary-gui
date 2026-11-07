@@ -142,6 +142,10 @@ pub(super) async fn start(
             return failure(StatusCode::CONFLICT, "busy");
         }
     }
+    // Regeneration ends the old review first (client), so a live one for the date blocks it.
+    if s.reviews.has_date(&session, &date) {
+        return failure(StatusCode::CONFLICT, "review_active");
+    }
     if b.selections.is_empty() {
         return failure(StatusCode::UNPROCESSABLE_ENTITY, "empty_selection");
     }
@@ -359,6 +363,9 @@ pub(super) async fn discard(
         Ok(id) => id,
         Err(r) => return r,
     };
+    if s.reviews.uses_job(&session, &id) {
+        return failure(StatusCode::CONFLICT, "review_active");
+    }
     let mut c = s.coordinator.lock().expect("coordinator poisoned");
     match s.generations.lock().expect("generations poisoned").discard(
         &mut c,

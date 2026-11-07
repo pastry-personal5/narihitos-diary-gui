@@ -50,7 +50,7 @@ async fn blocking<T: Send + 'static>(
         .map_err(store_error)
 }
 
-fn store_error(error: StoreError) -> Response {
+pub(super) fn store_error(error: StoreError) -> Response {
     let (status, code) = match &error {
         StoreError::Conflict(ConflictKind::Stale) => (StatusCode::CONFLICT, "revision_conflict"),
         StoreError::Conflict(ConflictKind::Exists) => (StatusCode::CONFLICT, "already_exists"),

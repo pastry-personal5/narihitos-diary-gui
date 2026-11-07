@@ -8,6 +8,7 @@ import {
   resolutionDto,
 } from "./navigation-validation";
 import { jobPageDto } from "./activity-validation";
+import { reviewDecisionDto, reviewViewDto } from "./review-validation";
 import { streamEvent } from "../application/events";
 import { trashAckDto, trashPageDto, trashPreviewDto } from "./trash-validation";
 import { Channel, invoke } from "@tauri-apps/api/core";
@@ -144,6 +145,11 @@ export const tauriBridge: Bridge = {
     authentic("read_candidate", { candidateId }, candidateDto),
   discardGeneration: (jobId) =>
     authentic("discard_generation", { jobId }, () => undefined),
+  startReview: (input) => authentic("start_review", { input }, reviewViewDto),
+  decideReview: (input) =>
+    authentic("decide_review", { input }, reviewDecisionDto),
+  endReview: (reviewId) =>
+    authentic("end_review", { reviewId }, () => undefined),
   getUserSettings: () =>
     settings("get_user_settings", undefined, userSettingsDto),
   updateUserSettings: (u) =>

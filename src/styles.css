@@ -479,3 +479,69 @@ footer {
 .ai-activity-details button {
   margin: 0.2rem;
 }
+
+/* Paragraph review, modelled on CodeMirror's unified merge view. */
+.review-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border, #8884);
+}
+.cm-review-removed {
+  background: color-mix(in srgb, #e5484d 18%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: #e5484d;
+}
+.cm-review-inserted {
+  background: color-mix(in srgb, #30a46c 20%, transparent);
+  text-decoration: underline;
+  text-decoration-color: #30a46c;
+  text-decoration-style: dotted;
+  white-space: pre-wrap;
+}
+.cm-review-controls {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-inline: 0.25rem;
+  font-size: 0.8em;
+  vertical-align: baseline;
+}
+.cm-review-controls button {
+  padding: 0 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.cm-review-controls .cm-review-accept {
+  color: #1a7f4e;
+}
+.cm-review-controls .cm-review-reject {
+  color: #c4272d;
+}
+.cm-review-label {
+  padding: 0 0.3rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.cm-review-gutter {
+  width: 0.5rem;
+}
+.cm-review-bar {
+  display: block;
+  width: 3px;
+  height: 100%;
+  background: #3b82f6;
+}
+@media (prefers-color-scheme: dark) {
+  .cm-review-controls .cm-review-accept {
+    color: #5ee0a0;
+  }
+  .cm-review-controls .cm-review-reject {
+    color: #ff8589;
+  }
+}

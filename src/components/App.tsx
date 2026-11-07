@@ -25,6 +25,8 @@ import {
 import { useGeneration } from "./useGeneration";
 import { GenerationController } from "../application/generation/controller";
 import { generationPreparation } from "../application/generation/navigation";
+import { ReviewController } from "../application/review/controller";
+import { ReviewBar } from "./ReviewBar";
 import { useChat } from "./useChat";
 import { ChatController, rememberedChat } from "../application/chat";
 import { NavigationModel } from "../application/navigation/model";
@@ -72,14 +74,51 @@ export function App({ bridge }: { bridge: Bridge }) {
     [bridge, model],
   );
   const chatState = useChat(chat);
+  const review = useMemo(
+    () =>
+      new ReviewController(bridge, {
+        flush: async (date) => {
+          const r = model.resources.resources.get(`authentic:${date}`);
+          if (!r?.session || r.loading || r.error) return false;
+          return (await r.session.settle()) === "proceed";
+        },
+        show: async (date, view, decide) => {
+          if (view && !(await model.resources.openAuthentic(date)))
+            return false;
+          const r = model.resources.resources.get(`authentic:${date}`);
+          if (!r) return !view;
+          try {
+            r.buffer.setReview(view, decide);
+          } catch {
+            return false;
+          }
+          return true;
+        },
+        reload: (date) =>
+          model.resources.resources
+            .get(`authentic:${date}`)
+            ?.session?.invalidated(),
+      }),
+    [bridge, model],
+  );
+  useEffect(() => {
+    model.beforeDateChange = () => review.end();
+    return () => {
+      model.beforeDateChange = null;
+    };
+  }, [model, review]);
   const generator = useMemo(
     () =>
       new GenerationController(
         bridge,
-        generationPreparation(model, () => chat.running),
+        generationPreparation(
+          model,
+          () => chat.running,
+          async (date) => review.date !== date || review.end(),
+        ),
         model.budget,
       ),
-    [bridge, model, chat],
+    [bridge, model, chat, review],
   );
   const activity = useMemo(
     () =>
@@ -156,10 +195,11 @@ export function App({ bridge }: { bridge: Bridge }) {
           model.dispose();
           generator.dispose();
           chat.dispose();
+          review.dispose();
         }
       });
     };
-  }, [model, generator, chat]);
+  }, [model, generator, chat, review]);
   useEffect(() => {
     let off: (() => void) | undefined;
     let disposed = false;
@@ -253,6 +293,8 @@ export function App({ bridge }: { bridge: Bridge }) {
         chat.onEvent(event);
         generator.onEvent(event);
         activity.event(event);
+        if (event.kind === "authentic_changed")
+          void review.onAuthenticChanged();
         if (event.kind === "disconnected") {
           connectionEpoch.current++;
           void dispose.current?.();
@@ -791,6 +833,7 @@ export function App({ bridge }: { bridge: Bridge }) {
                     ? "This source requires a fresh import."
                     : null
               }
+              banner={<ReviewBar controller={review} />}
               dispatch={(action) => model.resources.dispatch(action)}
               readOnlyReason={
                 active?.kind === "source"
@@ -807,6 +850,7 @@ export function App({ bridge }: { bridge: Bridge }) {
               }
             />
             <CandidateCards
+              review={review}
               controller={generator}
               date={model.resources.selectedDate}
             />

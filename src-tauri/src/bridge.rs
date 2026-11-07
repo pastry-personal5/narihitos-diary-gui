@@ -5,6 +5,7 @@ mod generation;
 mod imports;
 mod profiles;
 mod progress;
+mod review;
 mod source_trash;
 use crate::delivery::{Delivery, Flow};
 use crate::diagnostics::ClientLog;
@@ -21,6 +22,7 @@ pub use generation::{CandidateView, GenerationInput, GenerationView};
 pub use imports::{ImportAck, ImportPage, ResolutionAck, SourceBody, SourceSaved, TimeAuthority};
 pub use profiles::{ProfileList, ProfileStatus};
 use reqwest::{Client, Method};
+pub use review::{DecideReviewInput, ReviewDecision, ReviewView, StartReviewInput};
 use serde::{Deserialize, Serialize};
 pub use source_trash::{
     TrashAcknowledged, TrashConfirmRequest, TrashPage, TrashPreview, TrashPreviewRequest,

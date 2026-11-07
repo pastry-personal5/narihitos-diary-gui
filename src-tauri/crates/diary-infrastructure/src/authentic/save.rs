@@ -28,16 +28,28 @@ struct Prepared {
     old: Option<String>,
     new: String,
     seq: u64,
+    /// Review receipt `hunk,before,after` (no spaces), committed with the save result.
+    receipt: Option<String>,
+}
+
+/// Business input beyond date and expected revision, for saves whose body is derived.
+pub(crate) struct Extra {
+    pub fields: Vec<(&'static str, String)>,
+    pub receipt: String,
 }
 
 fn encode(p: &Prepared) -> String {
-    format!(
+    let base = format!(
         "prepared {} {} {} {}",
         p.date,
         p.old.as_deref().unwrap_or("absent"),
         p.new,
         p.seq
-    )
+    );
+    match &p.receipt {
+        Some(r) => format!("{base} {r}"),
+        None => base,
+    }
 }
 
 fn decode(text: &str) -> Option<Prepared> {
@@ -50,11 +62,13 @@ fn decode(text: &str) -> Option<Prepared> {
     };
     let new = parts.next()?.to_owned();
     let seq = parts.next()?.parse().ok()?;
+    let receipt = parts.next().map(str::to_owned);
     parts.next().is_none().then_some(Prepared {
         date,
         old,
         new,
         seq,
+        receipt,
     })
 }
 
@@ -96,21 +110,22 @@ impl Store {
         date: DiaryDate,
         expected: Option<AuthenticRevision>,
         body: String,
-        generation: u64,
+        (generation, extra): (u64, Option<Extra>),
     ) -> Result<SaveOutcome, Fail> {
         let expected_text = expected.as_ref().map_or_else(
             || "absent".to_owned(),
             |r| format!("{}:{}", r.sequence, r.sha256),
         );
-        let hash = hash_input(
-            kind,
-            1,
-            &[
-                ("date", &date.to_string()),
-                ("expected", &expected_text),
-                ("body", &sha_hex(body.as_bytes())),
-            ],
-        );
+        let (date_text, body_digest) = (date.to_string(), sha_hex(body.as_bytes()));
+        let mut fields = vec![
+            ("date", date_text.as_str()),
+            ("expected", expected_text.as_str()),
+        ];
+        match &extra {
+            None => fields.push(("body", body_digest.as_str())),
+            Some(x) => fields.extend(x.fields.iter().map(|(k, v)| (*k, v.as_str()))),
+        }
+        let hash = hash_input(kind, 1, &fields);
         // A known ID answers with its recorded outcome before any new-action precondition.
         if let Some(record) = self.db.get(&op).map_err(ledger_err)? {
             if record.kind != kind || record.hash_version != 1 || record.input_hash != hash {
@@ -171,6 +186,7 @@ impl Store {
             old: seen.as_ref().map(|o| sha_hex(&o.bytes)),
             new: sha_hex(&bytes),
             seq: header.revision,
+            receipt: extra.map(|x| x.receipt),
         };
 
         // Stage, then record the intent; a failure here has published nothing.
@@ -321,7 +337,10 @@ impl Store {
         self.hit(Step::Verify, When::After)?;
         self.hit(Step::Receipt, When::Before)?;
         let row = catalog::row_from(&p.date, &seen);
-        let result = format!("{}:{}", p.seq, p.new);
+        let result = match &p.receipt {
+            Some(r) => format!("{}:{} {r}", p.seq, p.new),
+            None => format!("{}:{}", p.seq, p.new),
+        };
         self.db
             .transact(|tx| {
                 catalog::upsert(tx, &row)?;
@@ -398,7 +417,7 @@ impl Store {
                 let (sequence, sha256) = record
                     .result
                     .as_deref()
-                    .and_then(|r| r.split_once(':'))
+                    .and_then(|r| r.split(' ').next()?.split_once(':'))
                     .and_then(|(s, d)| Some((s.parse().ok()?, d.to_owned())))
                     .ok_or(StoreError::Storage)?;
                 Ok(SaveOutcome {

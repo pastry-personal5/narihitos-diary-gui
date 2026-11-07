@@ -1,4 +1,5 @@
 import type { GenerationBridge } from "./generation/contracts";
+import type { ReviewBridge } from "./review/contracts";
 import type { NavigationBridge } from "./navigation/contracts";
 import type { TrashBridge, TrashResult } from "./trash/contracts";
 import type { StreamEvent } from "./events";
@@ -182,7 +183,7 @@ export class SettingsError extends Error {
 export type SymbolResult =
   { status: "ok"; png_base64: string } | { status: "unsupported" };
 export interface Bridge
-  extends NavigationBridge, TrashBridge, GenerationBridge {
+  extends NavigationBridge, TrashBridge, GenerationBridge, ReviewBridge {
   listJobs?(cursor?: string): Promise<JobPage>;
   metadata(): Promise<AppMetadata>;
   /** Absent in fakes; symbols then fall back to their text labels. */

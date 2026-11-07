@@ -2,6 +2,7 @@
 
 pub mod authentic;
 pub mod calendar;
+pub mod review;
 pub mod source;
 
 /// Compatibility is explicit: every required capability must be advertised.

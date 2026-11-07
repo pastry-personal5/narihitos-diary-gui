@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Action } from "../application/authentic/saveQueue";
 import type { SessionView } from "../application/authentic/session";
 
@@ -11,6 +11,7 @@ export function AuthenticPane({
   notice,
   dispatch,
   readOnlyReason,
+  banner,
 }: {
   hostRef: (element: HTMLDivElement | null) => void;
   date: string;
@@ -19,6 +20,7 @@ export function AuthenticPane({
   notice: string | null;
   dispatch: (action: Action) => void;
   readOnlyReason: string | null;
+  banner?: ReactNode;
 }) {
   const [label, setLabel] = useState<"Draft" | "Entry">("Draft");
   const [confirming, setConfirming] = useState(false);
@@ -101,6 +103,7 @@ export function AuthenticPane({
           )}
         </div>
       ) : null}
+      {banner}
       <div ref={hostRef} className="editor-host" />
     </section>
   );

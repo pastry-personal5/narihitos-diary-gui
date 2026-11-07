@@ -5,6 +5,8 @@ import {
   type GenerationController,
 } from "../application/generation/controller";
 import { ModalDialog } from "./ModalDialog";
+import type { ReviewController } from "../application/review/controller";
+import { useReview } from "./useReview";
 /** Reuses the text node and restores a selection touching it without focusing the output. */
 function ReadOnlyText({ text, label }: { text: string; label: string }) {
   const host = useRef<HTMLPreElement>(null);
@@ -184,11 +186,14 @@ export function GenerationDialog({
 export function CandidateCards({
   controller,
   date,
+  review,
 }: {
   controller: GenerationController;
   date: string | null;
+  review?: ReviewController;
 }) {
   const state = useGeneration(controller);
+  const reviewing = useReview(review);
   const revision = useSyncExternalStore(
     controller.subscribeOutput,
     () => controller.outputRevision,
@@ -225,7 +230,17 @@ export function CandidateCards({
                 {job.date} · {job.profile} · {job.count} candidates
               </h2>
               {!["running", "queued"].includes(job.job.state) && (
-                <button onClick={() => void controller.discard(job.job.id)}>
+                <button
+                  disabled={
+                    !!reviewing.view?.candidate_id.startsWith(`${job.job.id}-`)
+                  }
+                  title={
+                    reviewing.view?.candidate_id.startsWith(`${job.job.id}-`)
+                      ? "End the review before discarding these results."
+                      : undefined
+                  }
+                  onClick={() => void controller.discard(job.job.id)}
+                >
                   Discard results for {job.date}
                 </button>
               )}
@@ -264,6 +279,26 @@ export function CandidateCards({
                     ) : null}
                     {slot.status === "ready" && !candidate && (
                       <p>Reading candidate…</p>
+                    )}
+                    {review && slot.status === "ready" && candidate && (
+                      <button
+                        disabled={
+                          job.stale_baseline ||
+                          reviewing.busy ||
+                          !!reviewing.view ||
+                          job.job.state === "running"
+                        }
+                        title={
+                          job.stale_baseline
+                            ? "Entry changed — regenerate to review"
+                            : undefined
+                        }
+                        onClick={() =>
+                          slot.id && void review?.start(job.date, slot.id)
+                        }
+                      >
+                        Review candidate {slot.index}
+                      </button>
                     )}
                     {slot.error_code && (
                       <p>

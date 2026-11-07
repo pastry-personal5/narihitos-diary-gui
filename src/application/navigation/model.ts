@@ -19,6 +19,8 @@ export class NavigationModel {
   readonly messages = new Messages();
   readonly trash: TrashCoordinator;
   focusedSnippet: Source | null = null;
+  /** Runs before a date change; false keeps the date (an unsettled review). */
+  beforeDateChange: (() => Promise<boolean>) | null = null;
   calendar: Calendar | null = null;
   calendarError: string | null = null;
   calendarLoading = false;
@@ -215,6 +217,7 @@ export class NavigationModel {
     }
   }
   async chooseDate(date: string) {
+    if (this.beforeDateChange && !(await this.beforeDateChange())) return false;
     if (await this.resources.changeDate(date)) {
       this.focusedSnippet = null;
       this.messages.add(`Working date: ${date}.`, "info", true);

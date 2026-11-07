@@ -21,6 +21,21 @@ pub struct SaveRequest {
     pub buffer_generation: u64,
 }
 
+/// One reviewed hunk accepted as a save. The body is derived from the review, so it is not part
+/// of the operation's business input; the hunk, candidate and prior accepted set are.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReviewSave {
+    pub operation_id: OperationId,
+    pub date: DiaryDate,
+    pub expected: Option<AuthenticRevision>,
+    pub body: String,
+    pub candidate_digest: String,
+    pub hunk: String,
+    /// Accepted-set digests before and after this hunk.
+    pub before: String,
+    pub after: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateRequest {
     pub operation_id: OperationId,
@@ -103,6 +118,11 @@ pub trait AuthenticStore: Send + Sync {
     fn list(&self, after: Option<DiaryDate>, limit: usize) -> Result<Page, StoreError>;
     fn save(&self, request: SaveRequest) -> Result<SaveOutcome, StoreError>;
     fn create_empty(&self, request: CreateRequest) -> Result<SaveOutcome, StoreError>;
+    /// A save whose ledger result also carries the review receipt `hunk before after`,
+    /// committed in the same transaction. Stores without review support refuse it.
+    fn save_review(&self, _request: ReviewSave) -> Result<SaveOutcome, StoreError> {
+        Err(StoreError::Unavailable)
+    }
     /// Rescans the Authentic tree and rebuilds the catalog; never touches operations.
     fn refresh(&self) -> Result<RebuildReport, StoreError>;
     fn operation(&self, id: &OperationId) -> Result<Option<Record>, StoreError>;

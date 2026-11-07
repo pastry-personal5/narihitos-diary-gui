@@ -6164,6 +6164,26 @@
   },
   {
     "ecosystem": "cargo",
+    "name": "pulldown-cmark",
+    "version": "0.13.5",
+    "license": "MIT",
+    "source_archive": "https://crates.io/api/v1/crates/pulldown-cmark/0.13.5/download",
+    "features": [],
+    "authors": [
+      "Raph Levien <raph.levien@gmail.com>",
+      "Marcus Klaas de Vries <mail@marcusklaas.nl>"
+    ],
+    "notices": [
+      {
+        "original_name": "LICENSE",
+        "file": "licenses/c4f10f55904bdb9f27d3fbf94c354926d6cfe8b982276e556238c258941b243b.txt",
+        "sha256": "c4f10f55904bdb9f27d3fbf94c354926d6cfe8b982276e556238c258941b243b"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
     "name": "quick-xml",
     "version": "0.42.0",
     "license": "MIT",
@@ -8810,6 +8830,28 @@
         "original_name": "LICENSE-MIT",
         "file": "licenses/a825bd853ab71619a4923d7b4311221427848070ff44d990da39b0b274c1683f.txt",
         "sha256": "a825bd853ab71619a4923d7b4311221427848070ff44d990da39b0b274c1683f"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "unicase",
+    "version": "2.10.0",
+    "license": "MIT OR Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/unicase/2.10.0/download",
+    "features": [],
+    "authors": ["Sean McArthur <sean@seanmonstar.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/4f6bd11a0f17fe5b085ace1daaedb7b002a08316850dd9577c246c6a68a68e8c.txt",
+        "sha256": "4f6bd11a0f17fe5b085ace1daaedb7b002a08316850dd9577c246c6a68a68e8c"
       }
     ],
     "selected_licenses": ["MIT"]

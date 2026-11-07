@@ -63,6 +63,7 @@ async function imported(
 export function generationPreparation(
   model: NavigationModel,
   chatRunning: () => boolean,
+  endReview?: (date: string) => Promise<boolean>,
 ): Preparation {
   return {
     chatRunning,
@@ -85,6 +86,8 @@ export function generationPreparation(
         .map((r) => ({ id: r.source!.source.id, label: r.label }));
     },
     flushAuthentic: async (date) => {
+      // Regeneration ends the old review first (the server refuses a live one for the date).
+      if (endReview && !(await endReview(date))) return false;
       const resource = model.resources.resources.get(`authentic:${date}`);
       if (!resource?.session || resource.loading || resource.error)
         return false;

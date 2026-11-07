@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Done; P1-M21 is Done; P1-M22 is Done; P1-M23–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Done; P1-M21 is Done; P1-M22 is Done; P1-M23 is Done; P1-M24 is Done; P1-M25–P1-M28 remain Planned.
 
 ### P1-M1: Research
 
@@ -174,8 +174,9 @@ Notes: Completed 2026-11-07 on automated tests, synthetic built-server smoke and
 
 ### P1-M24: Paragraph review and acceptance
 
-Status: Planned
+Status: Done
 Goal: Add deterministic lossless paragraph/structure review with serialized durable accepts, transient rejects and regeneration after baseline changes.
+Plan: [overview](../archive/milestones/p1-m24/milestone-24-paragraph-review-overview.md), [work plan](../archive/milestones/p1-m24/milestone-24-paragraph-review-architecture.md); owner decisions O1–O3 recorded (2026-11-07).
 
 ### P1-M25: Export coordination and confirmations
 

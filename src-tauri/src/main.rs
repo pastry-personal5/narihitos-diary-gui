@@ -302,6 +302,33 @@ async fn discard_generation(
     state.discard_generation(job_id).await
 }
 #[tauri::command]
+async fn start_review(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    input: bridge::StartReviewInput,
+) -> Result<bridge::ReviewView, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.start_review(input).await
+}
+#[tauri::command]
+async fn decide_review(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    input: bridge::DecideReviewInput,
+) -> Result<bridge::ReviewDecision, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.decide_review(input).await
+}
+#[tauri::command]
+async fn end_review(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    review_id: String,
+) -> Result<(), bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.end_review(review_id).await
+}
+#[tauri::command]
 async fn read_source(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -618,6 +645,9 @@ fn main() {
             get_generation,
             read_candidate,
             discard_generation,
+            start_review,
+            decide_review,
+            end_review,
             read_source,
             save_source,
             preview_source_delete,

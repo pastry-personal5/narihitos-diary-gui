@@ -12,8 +12,8 @@ use crate::{
 };
 use diary_application::{
     authentic::{
-        AuthenticStore, CreateRequest, Loaded, PAGE_LIMIT, Page, RebuildReport, SaveOutcome,
-        SaveRequest, StoreError,
+        AuthenticStore, CreateRequest, Loaded, PAGE_LIMIT, Page, RebuildReport, ReviewSave,
+        SaveOutcome, SaveRequest, StoreError,
     },
     operations::{Identity, LedgerError, OperationId, OperationLedger, Record},
 };
@@ -31,6 +31,7 @@ use std::{
 pub(crate) const MAX_FILE: u64 = (MAX_BODY_BYTES + 32 * 1024) as u64;
 pub const KIND_SAVE: &str = "authentic_save";
 pub const KIND_CREATE: &str = "authentic_create";
+pub use diary_application::review::KIND_REVIEW;
 
 /// Durable boundaries of one save, in order. Tests inject a fault before or after any of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -172,6 +173,14 @@ pub fn sha_hex(bytes: &[u8]) -> String {
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect()
+}
+
+/// SHA-256 for paragraph review digests, injected into the domain and application (O2).
+pub struct Sha256Hasher;
+impl diary_domain::review::Hasher for Sha256Hasher {
+    fn sha256_hex(&self, bytes: &[u8]) -> String {
+        sha_hex(bytes)
+    }
 }
 
 pub struct RecoverReport {
@@ -385,7 +394,28 @@ impl AuthenticStore for Store {
             request.date,
             request.expected,
             request.body,
-            request.buffer_generation,
+            (request.buffer_generation, None),
+        )
+        .map_err(StoreError::from)
+    }
+
+    fn save_review(&self, r: ReviewSave) -> Result<SaveOutcome, StoreError> {
+        let _guard = self.write_lock.lock().map_err(|_| StoreError::Storage)?;
+        let extra = save::Extra {
+            fields: vec![
+                ("candidate", r.candidate_digest),
+                ("hunk", r.hunk.clone()),
+                ("before", r.before.clone()),
+            ],
+            receipt: format!("{},{},{}", r.hunk, r.before, r.after),
+        };
+        self.execute(
+            KIND_REVIEW,
+            r.operation_id,
+            r.date,
+            r.expected,
+            r.body,
+            (0, Some(extra)),
         )
         .map_err(StoreError::from)
     }
@@ -398,7 +428,7 @@ impl AuthenticStore for Store {
             request.date,
             None,
             String::new(),
-            0,
+            (0, None),
         )
         .map_err(StoreError::from)
     }

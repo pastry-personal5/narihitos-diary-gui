@@ -1,7 +1,7 @@
 //! Workspace initialization and opening under the OS lock. The marker `workspace.json` is
 //! published last; authoritative state is never created over existing state.
 use crate::{
-    authentic::{KIND_CREATE, KIND_SAVE, ReadOnlyStore, RecoverReport, Store},
+    authentic::{KIND_CREATE, KIND_REVIEW, KIND_SAVE, ReadOnlyStore, RecoverReport, Store},
     lifecycle::{WorkspaceLock, random_uuid},
     source::write::{KIND_SOURCE_SAVE, Writer},
     sqlite::{DB_FILE, Db, DbError},
@@ -151,7 +151,7 @@ impl Workspace {
                 .into_iter()
                 .filter(|c| {
                     c.class == diary_application::operations::Class::Resume
-                        && matches!(c.kind.as_str(), KIND_SAVE | KIND_CREATE)
+                        && matches!(c.kind.as_str(), KIND_SAVE | KIND_CREATE | KIND_REVIEW)
                 })
                 .map(|c| c.id)
                 .collect();
@@ -178,7 +178,13 @@ impl Workspace {
         Ok(classify(
             &self.ledger()?.unfinished()?,
             &self.identity,
-            &[KIND_SAVE, KIND_CREATE, KIND_SOURCE_SAVE, "source_trash"],
+            &[
+                KIND_SAVE,
+                KIND_CREATE,
+                KIND_REVIEW,
+                KIND_SOURCE_SAVE,
+                "source_trash",
+            ],
         ))
     }
 }

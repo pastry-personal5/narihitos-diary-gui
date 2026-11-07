@@ -60,7 +60,9 @@ describe("scaffold assembly", () => {
           expect(allowed[pkg.name]).toContain(dep.name);
         else if (["diary-domain", "diary-application"].includes(pkg.name))
           expect(
-            pkg.name === "diary-domain" ? ["unicode-normalization"] : [],
+            pkg.name === "diary-domain"
+              ? ["unicode-normalization", "pulldown-cmark"]
+              : [],
           ).toContain(dep.name);
       }
     }
@@ -106,6 +108,9 @@ describe("explicit command permission boundary", () => {
     "get_generation",
     "read_candidate",
     "discard_generation",
+    "start_review",
+    "decide_review",
+    "end_review",
     "read_source",
     "save_source",
     "preview_source_delete",

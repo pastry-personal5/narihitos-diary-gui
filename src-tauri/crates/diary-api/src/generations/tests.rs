@@ -672,3 +672,153 @@ async fn close_waits_for_ack_and_blocks_new_admissions() {
     assert_eq!(closing.await.unwrap().0, StatusCode::NO_CONTENT);
     assert!(f.s.generations.lock().unwrap().is_empty());
 }
+
+struct TestHash;
+impl diary_domain::review::Hasher for TestHash {
+    fn sha256_hex(&self, bytes: &[u8]) -> String {
+        format!(
+            "{:064x}",
+            bytes
+                .iter()
+                .fold(7u128, |h, b| h.wrapping_mul(31).wrapping_add(*b as u128))
+        )
+    }
+}
+const REVIEW_ID: &str = "11111111-1111-4111-8111-111111111111";
+const OP_ID: &str = "22222222-2222-4222-8222-222222222222";
+
+async fn ready_candidate(f: &Fx) -> String {
+    let job = start(f, "req-review", 1).await;
+    terminal(f, &job).await;
+    format!("{job}-1")
+}
+async fn review_start(f: &Fx, candidate: &str) -> (StatusCode, Value) {
+    call(
+        &f.s,
+        "POST",
+        "/api/v1/reviews",
+        Some(json!({"review_id":REVIEW_ID,"date":"2026-11-06","candidate_id":candidate})),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn t09_review_routes_validate_and_reject_writes_nothing() {
+    let mut f = setup(AgentKind::Codex, false, false, false);
+    ServerState::set_review_hasher(&mut f.s, Arc::new(TestHash));
+    let candidate = ready_candidate(&f).await;
+    // Forged and malformed inputs.
+    let (st, _) = call(
+        &f.s,
+        "POST",
+        "/api/v1/reviews",
+        Some(json!({"review_id":REVIEW_ID,"date":"2026-11-06","candidate_id":"nope"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let (st, _) = call(
+        &f.s,
+        "POST",
+        "/api/v1/reviews",
+        Some(json!({"review_id":REVIEW_ID,"date":"2026-11-07","candidate_id":candidate})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let (st, _) = call(
+        &f.s,
+        "POST",
+        "/api/v1/reviews",
+        Some(json!({"review_id":REVIEW_ID,"date":"2026-11-06","candidate_id":candidate,"x":1})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    // A saved entry that is no longer the (absent) baseline requires regeneration.
+    f.entry.present.store(true, Ordering::SeqCst);
+    let (st, v) = review_start(&f, &candidate).await;
+    assert_eq!(
+        (st, v["error"]["code"].as_str()),
+        (StatusCode::CONFLICT, Some("stale_baseline"))
+    );
+    f.entry.present.store(false, Ordering::SeqCst);
+
+    let (st, v) = review_start(&f, &candidate).await;
+    assert_eq!(st, StatusCode::CREATED, "{v}");
+    assert_eq!(v["body"], "");
+    assert_eq!(v["hunks"][0]["kind"], "insert");
+    assert_eq!(v["hunks"][0]["text"], "PRIVATE_DRAFT");
+    let hunk = v["hunks"][0]["id"].as_str().unwrap().to_owned();
+    let decision = |action: &str, op: &str, set: &str| json!({"operation_id":op,"hunk_id":hunk,"action":action,"expected_revision":null,"expected_set_digest":set});
+    let path = format!("/api/v1/reviews/{REVIEW_ID}/decisions");
+    let set = v["set_digest"].as_str().unwrap().to_owned();
+    let (st, _) = call(&f.s, "POST", &path, Some(decision("merge", OP_ID, &set))).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let (st, _) = call(
+        &f.s,
+        "POST",
+        &path,
+        Some(decision("reject", "not-a-uuid", &set)),
+    )
+    .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    let (st, v) = call(
+        &f.s,
+        "POST",
+        &path,
+        Some(decision("reject", OP_ID, &"0".repeat(64))),
+    )
+    .await;
+    assert_eq!(
+        (st, v["error"]["code"].as_str()),
+        (StatusCode::CONFLICT, Some("set_mismatch"))
+    );
+    // T10: discard and regeneration are refused while the review uses the result.
+    let job = candidate.rsplit_once('-').unwrap().0.to_owned();
+    for p in [
+        format!("/api/v1/generations/{job}"),
+        format!("/api/v1/jobs/{job}/result"),
+    ] {
+        let (st, v) = call(&f.s, "DELETE", &p, None).await;
+        assert_eq!(
+            (st, v["error"]["code"].as_str()),
+            (StatusCode::CONFLICT, Some("review_active"))
+        );
+    }
+    let (st, v) = call(
+        &f.s,
+        "POST",
+        "/api/v1/generations",
+        Some(input("req-again", 1)),
+    )
+    .await;
+    assert_eq!(
+        (st, v["error"]["code"].as_str()),
+        (StatusCode::CONFLICT, Some("review_active"))
+    );
+    let (st, v) = call(&f.s, "POST", &path, Some(decision("reject", OP_ID, &set))).await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    assert_eq!(v["view"]["hunks"].as_array().unwrap().len(), 0);
+    assert!(v["receipt"].is_null());
+    // Ending is idempotent and releases the guards.
+    for _ in 0..2 {
+        let (st, _) = call(
+            &f.s,
+            "DELETE",
+            &format!("/api/v1/reviews/{REVIEW_ID}"),
+            None,
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
+    }
+    let (st, _) = call(&f.s, "DELETE", &format!("/api/v1/generations/{job}"), None).await;
+    assert_eq!(st, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn t09_review_needs_a_session_and_the_hasher() {
+    let f = setup(AgentKind::Codex, false, false, false);
+    let (st, v) = review_start(&f, "job-1").await;
+    assert_ne!(st, StatusCode::CREATED, "{v}");
+    let r = request("POST", "/api/v1/reviews");
+    let response = router(f.s.clone()).oneshot(r).await.unwrap();
+    assert!(response.status().is_client_error());
+}

@@ -10,6 +10,7 @@ pub mod chat;
 pub mod diagnostics;
 pub mod generation;
 pub mod operations;
+pub mod review;
 pub mod run;
 pub mod source_trash;
 use std::collections::{BTreeMap, VecDeque};

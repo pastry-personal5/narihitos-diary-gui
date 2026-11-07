@@ -73,6 +73,10 @@ See [README.md](README.md) for the overview and [docs/product-behavior.md](docs/
 
 - **P1-M23 transport and validation (delivered 2026-11-07):** Shared activity uses body-less job progress and native paginated baseline/replay reconciliation. Updated streams negotiate `x-diary-reconcile: 1`; native code consumes replay completion before committing the baseline. `subscribe_events` Stop detaches delivery without ending the lease; actual window close still waits for server acknowledgement. `scripts/smoke/agent.py` covers synthetic discovery, negotiated replay completion, heartbeat and discard. Automated acceptance, the synthetic smoke and the full gate passed. No live inference was required for this milestone; Qwen live proof remains exempt: GPU throttling. See the [M23 checklist](docs/archive/milestones/p1-m23/milestone-23-background-ai-activity-results-overview.md).
 
+- **P1-M24 review presentation (owner, 2026-11-07):** The review unit stays one paragraph (a group of sentences). The GUI mimics CodeMirror's unified merge view (inline red struck removals, green insertions, gutter marker, per-change Accept/Reject), hand-coded with CodeMirror decorations and no new dependency; `@codemirror/merge` is not adopted unless the owner approves the dependency. See the [work plan](docs/archive/milestones/p1-m24/milestone-24-paragraph-review-architecture.md#unified-merge-style-presentation-2026-11-07).
+
+- **P1-M24 approvals (owner, 2026-11-07):** Approved a pinned `pulldown-cmark` dependency in `diary-domain` (license-notice review), SHA-256 digests computed in infrastructure behind a hasher port, and closing on automated tests, a synthetic built-server smoke and the full gate with packaged native proof moved to P1-M28. See the [work plan](docs/archive/milestones/p1-m24/milestone-24-paragraph-review-architecture.md). Delivered 2026-11-07: automated tests, `python3 scripts/smoke/review.py` and the full gate passed; packaged native proof is P1-M28.
+
 ## Undecided — ask before inventing
 
 The [P1-M2 owner interview](docs/phase-1/milestone-02-owner-decisions.md) resolves the earlier product choices. The maintained [architecture](docs/architecture.md) resolves delegated internal design work; do not ask again about already approved choices. Ask before changing those choices or inventing new product behavior outside the delegation.
@@ -104,6 +108,7 @@ python3 scripts/smoke/trash.py --enabled-server                                 
 python3 scripts/smoke/agent.py                                                                                     # Built-binary prompt and Apple helper embedding + profile status and chat open/close refusals with fake CLIs
 DIARY_GENERATION_LIVE=codex DIARY_GENERATION_LIVE_HOME=/absolute/profile python3 scripts/smoke/generation-live.py # real candidate + cancel; claude/apple also supported; Qwen exempt
 python3 scripts/smoke/authentic.py                                                                                 # Authentic create/save/restart/kill-recovery smoke on the real server binary
+python3 scripts/smoke/review.py                                                                                    # Paragraph review: start/reject/accept/invalidate/kill-recovery on a fault-injection server binary
 cargo run --manifest-path src-tauri/Cargo.toml -p diary-server -- trace --config PATH --select recent:20        # redacted debugging trace of the logs
 ```
 

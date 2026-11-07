@@ -5,6 +5,7 @@ mod chats;
 mod generations;
 mod imports;
 mod profiles;
+mod reviews;
 #[cfg(feature = "scaffold-smoke")]
 mod smoke;
 mod source_save;
@@ -58,6 +59,8 @@ pub struct ServerState {
     agent_runner: Option<Arc<dyn diary_application::agent::AgentRunner + Send + Sync>>,
     chat: Mutex<Option<diary_application::chat::Chat>>,
     generations: Mutex<diary_application::generation::Store>,
+    reviews: diary_application::review::Reviews,
+    review_hasher: Option<Arc<dyn diary_domain::review::Hasher>>,
     lease_ended: Option<Arc<dyn Fn() + Send + Sync>>,
     source_slots: Arc<tokio::sync::Semaphore>,
     import_errors: Mutex<(String, std::collections::BTreeMap<String, &'static str>)>,
@@ -98,6 +101,8 @@ impl ServerState {
             agent_runner: None,
             chat: Mutex::new(None),
             generations: Mutex::new(Default::default()),
+            reviews: Default::default(),
+            review_hasher: None,
             lease_ended: None,
             source_slots: Arc::new(tokio::sync::Semaphore::new(2)),
             import_errors: Mutex::new((String::new(), std::collections::BTreeMap::new())),
@@ -141,6 +146,12 @@ impl ServerState {
             .expect("startup precedes shared use")
             .authentic = Some(store);
     }
+    /// Enables paragraph review; digests come from infrastructure (SHA-256).
+    pub fn set_review_hasher(state: &mut Arc<Self>, hasher: Arc<dyn diary_domain::review::Hasher>) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .review_hasher = Some(hasher);
+    }
     pub fn set_imports(
         state: &mut Arc<Self>,
         store: Arc<dyn diary_application::imports::ImportStore>,
@@ -176,6 +187,7 @@ impl ServerState {
         if let Some(chat) = self.chat.lock().expect("chat poisoned").take() {
             chat.cancel();
         }
+        self.reviews.clear();
         self.generations
             .lock()
             .expect("generations poisoned")
@@ -301,6 +313,15 @@ pub fn router(state: Arc<ServerState>) -> Router {
             get(generations::result).delete(generations::discard),
         )
         .route("/api/v1/candidates/{id}", get(generations::candidate))
+        .route(
+            "/api/v1/reviews",
+            post(reviews::start).layer(DefaultBodyLimit::max(reviews::BODY_LIMIT)),
+        )
+        .route(
+            "/api/v1/reviews/{id}/decisions",
+            post(reviews::decide).layer(DefaultBodyLimit::max(reviews::BODY_LIMIT)),
+        )
+        .route("/api/v1/reviews/{id}", delete(reviews::end))
         .route("/api/v1/profiles", get(profiles::list))
         .route("/api/v1/profiles/{alias}/check", post(profiles::check))
         .route("/api/v1/calendar", get(calendar::get_calendar))

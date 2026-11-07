@@ -1,4 +1,4 @@
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, Text } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import {
   defaultKeymap,
@@ -9,6 +9,8 @@ import {
 import { markdown } from "@codemirror/lang-markdown";
 import { SessionBudget, payloadBytes } from "../application/navigation/budget";
 import type { BufferPort } from "../application/authentic/session";
+import type { ReviewView } from "../application/review/contracts";
+import { type ReviewDecide, reviewExtension } from "./review-extension";
 
 export class ResourceLimit extends Error {
   constructor() {
@@ -51,6 +53,7 @@ export class ResourceBuffer implements BufferPort {
   private view: EditorView | null = null;
   private readonly access = new Compartment();
   private editable = false;
+  private review: { view: ReviewView; decide: ReviewDecide } | null = null;
   private scroll = { top: 0, left: 0 };
   composing = false;
   constructor(
@@ -66,10 +69,14 @@ export class ResourceBuffer implements BufferPort {
     return EditorState.create({
       doc,
       extensions: [
-        this.access.of([
-          EditorView.editable.of(this.editable),
-          EditorState.readOnly.of(!this.editable),
-        ]),
+        this.access.of(this.accessExtensions(this.editable)),
+        this.review && this.review.view.body === doc
+          ? reviewExtension(
+              this.review.view,
+              Text.of(doc.split("\n")),
+              this.review.decide,
+            )
+          : [],
         history({ minDepth: 50 }),
         markdown(),
         EditorView.lineWrapping,
@@ -114,6 +121,28 @@ export class ResourceBuffer implements BufferPort {
       ],
     });
   }
+  /** Editing is paused while a review is shown; reading and selection stay available. */
+  private accessExtensions(editable: boolean) {
+    const live = editable && !this.review;
+    return [EditorView.editable.of(live), EditorState.readOnly.of(!live)];
+  }
+  /** Shows a review (the editor text becomes the server's saved body) or clears it, keeping
+   * the text. History resets with the replacement, which is an explicit server-side change. */
+  setReview(view: ReviewView | null, decide: ReviewDecide) {
+    const previous = this.review;
+    this.review = view ? { view, decide } : null;
+    const text = view ? view.body : this.getText();
+    const next = this.create(text);
+    if (!this.account(next)) {
+      this.review = previous;
+      throw new ResourceLimit();
+    }
+    this.state = next;
+    this.view?.setState(next);
+  }
+  get reviewing() {
+    return this.review !== null;
+  }
   private account(state: EditorState) {
     return this.pool.reserve(
       this.key,
@@ -136,10 +165,7 @@ export class ResourceBuffer implements BufferPort {
     if (editable === this.editable) return;
     this.editable = editable;
     const tr = this.state.update({
-      effects: this.access.reconfigure([
-        EditorView.editable.of(editable),
-        EditorState.readOnly.of(!editable),
-      ]),
+      effects: this.access.reconfigure(this.accessExtensions(editable)),
     });
     this.state = tr.state;
     this.view?.update([tr]);

@@ -271,7 +271,7 @@ esac
         code, refused = call('/generations', 'POST', session, body=generation_input('changed-source'))
         assert code == 409 and refused['error']['code'] == 'reimport_required', (code, refused)
         assert (home / 'runs').read_text() == runs_before
-        assert call('/reviews', 'POST', session)[0] == 404
+        assert call('/reviews', 'POST', session)[0] in (400, 415, 422)
         assert call('/candidates/not-a-candidate/accept', 'POST', session)[0] == 404
         traced = subprocess.run([str(binary), 'trace', '--config', str(config), '--select', 'recent:50'], capture_output=True, text=True, check=True).stdout
         for secret in [SOURCE_SECRET, 'Tea was nice.', str(base)]:

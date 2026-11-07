@@ -110,7 +110,6 @@ request-ID admission recovery, lease-preserving detach/activation and native
 paginated reconciliation with replay completion. Chat and generation output use
 bounded subscriptions and shared payload accounting; server-observed silence and
 closed progress drive in-app feedback. The [M23 checklist](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-overview.md)
-records targeted tests and the synthetic built-server smoke; the full seven-command gate and synthetic built-server smoke passed on 2026-11-07. P1-M24 retains paragraph review and review-dependent discard
-guards. P1-M28 retains all packaged slow-run/editing/autosave, native interaction,
+records targeted tests and the synthetic built-server smoke; the full seven-command gate and synthetic built-server smoke passed on 2026-11-07. Paragraph review and the review-dependent discard guards were delivered in P1-M24 (see its [checklist](../archive/milestones/p1-m24/milestone-24-paragraph-review-overview.md)). P1-M28 retains all packaged slow-run/editing/autosave, native interaction,
 wake/reconnect and measured performance obligations in the phase plan. Native
 VoiceOver proof remains exempt; no real Qwen leg ran (exempt: GPU throttling).
