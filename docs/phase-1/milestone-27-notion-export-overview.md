@@ -30,7 +30,7 @@ P1-M25 and P1-M26 are delivered ([P1-M25](../archive/milestones/p1-m25/milestone
 - Stage C: wiring (config to adapter, `exports_available` per target), separate Notion action in the UI, Global Messages for warnings and throttling.
 - Stage D: fake-HTTP matrix, `scripts/smoke/export.py` Notion legs, the live round trip, full gate, docs.
 
-Out of scope: image or attachment upload, remote image fetch, clearing a destination, archiving Notion pages, any claim of atomic or compare-and-swap replacement, a user-configurable API base URL, new prompts or adapters, packaged-app proof (P1-M28).
+Out of scope: image or attachment upload, remote image fetch, clearing a destination, archiving Notion pages, any claim of atomic or compare-and-swap replacement, a user-configurable API base URL, new prompts or adapters, packaged-app proof (P1-M32).
 
 ## Open items
 

@@ -1,6 +1,7 @@
 //! Authentic commands. Inputs are validated before any request, the route is fixed here, and
 //! only allowlisted fields and error codes reach the WebView (never body text, paths or raw
 //! server messages).
+use super::validate::{date_shape, invalid};
 use super::{Bridge, valid_id};
 use diary_application::diagnostics::ErrorTag;
 use reqwest::Method;
@@ -178,21 +179,6 @@ impl AuthenticError {
     }
 }
 
-/// `YYYY-MM-DD` shape only; the server owns calendar validity.
-pub(super) fn date_shape(text: &str) -> bool {
-    let b = text.as_bytes();
-    b.len() == 10
-        && b.iter().enumerate().all(|(i, c)| {
-            if i == 4 || i == 7 {
-                *c == b'-'
-            } else {
-                c.is_ascii_digit()
-            }
-        })
-}
-fn invalid() -> AuthenticError {
-    AuthenticError::new("invalid_input")
-}
 fn revision_json(r: &Revision) -> Result<serde_json::Value, AuthenticError> {
     if r.sequence == 0 || r.sha256.len() != 64 || !r.sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(invalid());

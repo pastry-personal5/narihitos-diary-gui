@@ -181,7 +181,6 @@ impl Writer {
         }
     }
     #[cfg(not(test))]
-    #[allow(clippy::unused_self)]
     fn hit(&self, _: Step, _: When) -> Result<(), Fail> {
         Ok(())
     }

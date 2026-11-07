@@ -1,6 +1,5 @@
 //! Fixed, authenticated source Trash operations. DTOs expose relative labels and
 //! allowlisted codes; no filesystem/native receipt or bearer token enters a result.
-#![allow(clippy::result_large_err)]
 use super::{ServerState, app_error, failure, session};
 use axum::{
     Json,

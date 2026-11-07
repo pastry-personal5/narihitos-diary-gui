@@ -1,5 +1,6 @@
 //! Paragraph review commands: fixed routes, closed inputs and a validated view. The view carries
 //! the saved text and located pending hunks; the client never computes offsets itself.
+use super::validate::{invalid, sha256, uuid};
 use super::{AuthenticError, Bridge, Revision};
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
@@ -66,27 +67,18 @@ fn opaque(s: &str) -> bool {
         && s.bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
 }
-fn uuid(s: &str) -> bool {
-    diary_application::operations::OperationId::parse(s).is_some()
-}
-fn digest(s: &str) -> bool {
-    s.len() == 64 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
-}
 fn revision(r: &Option<Revision>) -> bool {
     r.as_ref()
-        .is_none_or(|r| r.sequence > 0 && digest(&r.sha256))
-}
-fn bad() -> AuthenticError {
-    AuthenticError::new("invalid_input")
+        .is_none_or(|r| r.sequence > 0 && sha256(&r.sha256))
 }
 fn sound(v: &ReviewView) -> bool {
     let units = v.body.encode_utf16().count();
     let mut last = 0;
     opaque(&v.review_id)
         && opaque(&v.candidate_id)
-        && super::authentic::date_shape(&v.date)
+        && super::validate::date_shape(&v.date)
         && revision(&v.revision)
-        && digest(&v.set_digest)
+        && sha256(&v.set_digest)
         && v.body.len() <= MAX_BODY
         && v.hunks.len() <= MAX_HUNKS
         && v.hunks.iter().all(|h| {
@@ -109,9 +101,9 @@ impl Bridge {
     ) -> Result<ReviewView, AuthenticError> {
         if !uuid(&input.review_id)
             || !opaque(&input.candidate_id)
-            || !super::authentic::date_shape(&input.date)
+            || !super::validate::date_shape(&input.date)
         {
-            return Err(bad());
+            return Err(invalid());
         }
         let view: ReviewView = self
             .authentic(Method::POST, "/reviews", Some(json!(input)))
@@ -130,10 +122,10 @@ impl Bridge {
             || !uuid(&input.operation_id)
             || !opaque(&input.hunk_id)
             || !matches!(input.action.as_str(), "accept" | "reject")
-            || !digest(&input.expected_set_digest)
+            || !sha256(&input.expected_set_digest)
             || !revision(&input.expected_revision)
         {
-            return Err(bad());
+            return Err(invalid());
         }
         let path = format!("/reviews/{}/decisions", input.review_id);
         let body = json!({
@@ -145,7 +137,7 @@ impl Bridge {
         });
         let decision: ReviewDecision = self.authentic(Method::POST, &path, Some(body)).await?;
         let receipt_ok = decision.receipt.as_ref().is_none_or(|r| {
-            opaque(&r.hunk) && digest(&r.revision.sha256) && digest(&r.before) && digest(&r.after)
+            opaque(&r.hunk) && sha256(&r.revision.sha256) && sha256(&r.before) && sha256(&r.after)
         });
         let view_ok = decision
             .view
@@ -159,7 +151,7 @@ impl Bridge {
 
     pub async fn end_review(&self, review_id: String) -> Result<(), AuthenticError> {
         if !uuid(&review_id) {
-            return Err(bad());
+            return Err(invalid());
         }
         let _: serde_json::Value = self
             .authentic(Method::DELETE, &format!("/reviews/{review_id}"), None)

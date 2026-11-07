@@ -1,4 +1,5 @@
 //! Typed import commands; every route and authority is constructed from bounded inputs.
+use super::validate::{date_shape, invalid};
 use super::{AuthenticError, Bridge, valid_id};
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
@@ -179,19 +180,6 @@ pub struct SourceBody {
     pub snapshot_id: String,
     pub body: String,
     pub capabilities: Capabilities,
-}
-fn invalid() -> AuthenticError {
-    AuthenticError::new("invalid_input")
-}
-fn date_shape(s: &str) -> bool {
-    s.len() == 10
-        && s.bytes().enumerate().all(|(i, b)| {
-            if i == 4 || i == 7 {
-                b == b'-'
-            } else {
-                b.is_ascii_digit()
-            }
-        })
 }
 fn digest_shape(s: &str) -> bool {
     s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit())

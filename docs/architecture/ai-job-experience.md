@@ -107,7 +107,7 @@ Use a polite status region for admission, important stage changes and completion
 
 Fake-clock and fake-adapter scenarios must cover 0/30/120-second silence, all wall/lease deadlines, delayed/lost admission, duplicate activation, an adapter with no deltas, reordered/duplicate/gapped events, flooding output, partial success then cancel/failure, terminal cancellation races and stale completion. Verify date switching preserves origin/results, same-date edits require regeneration, initial locale remains snapshotted, and completion never changes focus, caret, tab, scroll or unsaved buffers. A stalled event consumer must leave heartbeat/cancel/save available. Assert zero extra inference calls and no system notification request.
 
-Owner update (2026-11-06): P1-M23 closes on automated tests and the full gate; the packaged evidence below is explicitly required in P1-M28. Native VoiceOver proof remains exempt under the P1-M13 owner decision; automated accessibility coverage remains required.
+Owner update (2026-11-06): P1-M23 closes on automated tests and the full gate; the packaged evidence below is explicitly required in P1-M32. Native VoiceOver proof remains exempt under the P1-M13 owner decision; automated accessibility coverage remains required.
 
 Packaged macOS evidence must demonstrate editing and autosave during a deliberately slow synthetic run, toolbar/detail feedback, visible progress for an off-date run, keyboard/reduced-motion behavior, loss/recovery of connection and activation after sleep. Measure input-to-feedback (target 100 ms), editing responsiveness under maximum admitted streaming, cancel acknowledgement, rendering budgets and bounds separately from total provider latency. Mocks cannot establish WKWebView responsiveness or native adapter cancellation. Real-agent profiles retain their own compatibility/process/native gates.
 
@@ -136,4 +136,4 @@ apply only to output. No system attention or decorative activity animation is
 introduced. The milestone completed its automated acceptance audit and full gate on 2026-11-07;
 see the [M23 checklist](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-overview.md).
 Packaged macOS timing, sleep/reconnect and native interaction evidence remains
-explicitly assigned to P1-M28 as described above.
+explicitly assigned to P1-M32 as described above.

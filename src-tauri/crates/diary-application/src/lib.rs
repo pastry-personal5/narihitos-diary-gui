@@ -140,6 +140,14 @@ pub struct Coordinator {
     event_id: u64,
 }
 
+/// The per-request values shared by both admission entry points.
+struct Admission<'a> {
+    request_id: &'a str,
+    digest: &'a str,
+    job_id: &'a str,
+    reserved_bytes: usize,
+}
+
 impl Coordinator {
     pub fn new(instance_id: String, limits: Limits) -> Self {
         Self {
@@ -237,7 +245,17 @@ impl Coordinator {
         job_id: &str,
         reserved_bytes: usize,
     ) -> Result<Job, Error> {
-        self.admit_inner(id, now, request_id, digest, job_id, reserved_bytes, false)
+        self.admit_inner(
+            id,
+            now,
+            Admission {
+                request_id,
+                digest,
+                job_id,
+                reserved_bytes,
+            },
+            false,
+        )
     }
 
     /// Admits an agent run: after the idempotent lookup, a second active agent job is `Busy`
@@ -251,20 +269,32 @@ impl Coordinator {
         job_id: &str,
         reserved_bytes: usize,
     ) -> Result<Job, Error> {
-        self.admit_inner(id, now, request_id, digest, job_id, reserved_bytes, true)
+        self.admit_inner(
+            id,
+            now,
+            Admission {
+                request_id,
+                digest,
+                job_id,
+                reserved_bytes,
+            },
+            true,
+        )
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn admit_inner(
         &mut self,
         id: &str,
         now: u64,
-        request_id: &str,
-        digest: &str,
-        job_id: &str,
-        reserved_bytes: usize,
+        admission: Admission<'_>,
         agent: bool,
     ) -> Result<Job, Error> {
+        let Admission {
+            request_id,
+            digest,
+            job_id,
+            reserved_bytes,
+        } = admission;
         validate_id(request_id)?;
         validate_id(job_id)?;
         if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {

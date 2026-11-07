@@ -53,7 +53,7 @@ impl Bridge {
     ) -> Result<Calendar, AuthenticError> {
         if anchor
             .as_ref()
-            .is_some_and(|s| !super::authentic::date_shape(s))
+            .is_some_and(|s| !super::validate::date_shape(s))
         {
             return Err(AuthenticError::new("invalid_input"));
         }

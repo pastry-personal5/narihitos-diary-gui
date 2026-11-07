@@ -1,4 +1,5 @@
 //! Fixed source Trash commands. Filesystem paths and native receipts are not DTOs.
+use super::validate::{digest, invalid, uuid};
 use super::{AuthenticError, Bridge};
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
@@ -98,19 +99,8 @@ pub struct TrashPage {
     pub operations: Vec<TrashResult>,
     pub next_cursor: Option<String>,
 }
-fn invalid() -> AuthenticError {
-    AuthenticError::new("invalid_input")
-}
 fn bad() -> AuthenticError {
     AuthenticError::new("invalid_response")
-}
-fn uuid(s: &str) -> bool {
-    diary_application::operations::OperationId::parse(s).is_some()
-}
-fn digest(s: &str, len: usize) -> bool {
-    s.len() == len
-        && s.bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 fn ordinals(ordinals: &[u8]) -> bool {
     !ordinals.is_empty()

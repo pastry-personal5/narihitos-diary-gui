@@ -1,7 +1,6 @@
 //! Paragraph review routes: start against a captured candidate, serialized per-hunk decisions
 //! and end. The view carries the saved text and located pending hunks (UTF-16 offsets), never
 //! paths. Store work runs off the async executor.
-#![allow(clippy::result_large_err)]
 use super::*;
 use axum::extract::rejection::JsonRejection;
 use diary_application::{

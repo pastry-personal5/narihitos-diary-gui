@@ -2,7 +2,7 @@
 
 Status: Delivered (2026-11-07)
 
-Register a real macOS File Provider adapter behind the P1-M25 `ExportAdapter` port, add the deferred recovery paths (export cancel, clear or abandon an `uncertain` export) and a minimal Export UI. The [work plan](milestone-26-icloud-export-architecture.md) defines stages and scenarios. This plan does not certify runtime behavior; real iCloud Drive proof is carried to P1-M28.
+Register a real macOS File Provider adapter behind the P1-M25 `ExportAdapter` port, add the deferred recovery paths (export cancel, clear or abandon an `uncertain` export) and a minimal Export UI. The [work plan](milestone-26-icloud-export-architecture.md) defines stages and scenarios. This plan does not certify runtime behavior; real iCloud Drive proof is carried to P1-M32.
 
 ## Entry conditions
 
@@ -11,7 +11,7 @@ P1-M25 is delivered ([overview](../archive/milestones/p1-m25/milestone-25-export
 ## Owner decisions (2026-11-07)
 
 - **O1 - Reach:** real adapter and production wiring, recovery paths (cancel, clear or abandon `uncertain`) and a minimal Export UI.
-- **O2 - Evidence:** close on automated tests, a temp-directory smoke and the full gate. Real iCloud Drive proof moves to P1-M28; no live iCloud test and no human gate.
+- **O2 - Evidence:** close on automated tests, a temp-directory smoke and the full gate. Real iCloud Drive proof moves to P1-M32; no live iCloud test and no human gate.
 
 - **O3 - Abandon (Q2):** abandoning an `uncertain` export reads back first. A read-back equal to the saved revision resolves it as Succeeded with a receipt; otherwise a preview and one-use confirmation record "abandoned", delete the snapshot, release the reservation and reload block, leave the remote file untouched and add a Global Message.
 - **O4 - Export UI:** toolbar button plus command-palette action for the selected date. It flushes the Authentic buffer first, then previews and confirms. Status appears in the toolbar and Global Messages.
@@ -26,12 +26,12 @@ P1-M25 is delivered ([overview](../archive/milestones/p1-m25/milestone-25-export
 - Stage C: Export action, preview and confirm dialog, and status in the toolbar and Global Messages; UI uses the existing `start_export`/`confirm_export` commands plus new bridge commands for stage B.
 - Stage D: scenarios, `scripts/smoke/export.py` extended for the real adapter on a temp directory, full gate, docs.
 
-Out of scope: Notion (P1-M27), packaged and live iCloud proof (P1-M28), automatic download of evicted files, any claim that a local write means upload completed, new prompts or adapters.
+Out of scope: Notion (P1-M27), packaged and live iCloud proof (P1-M32), automatic download of evicted files, any claim that a local write means upload completed, new prompts or adapters.
 
 ## Open items
 
 - **Q1:** `NSFileVersion` conflict versions would need a new feature; they stay a recorded gap, as in P1-M14.
-- **Q4 - Staging files in iCloud:** a staged temp file in the destination directory may be synced by iCloud before it is renamed. Unverified; the plan removes it on every outcome and carries the question to P1-M28 live proof.
+- **Q4 - Staging files in iCloud:** a staged temp file in the destination directory may be synced by iCloud before it is renamed. Unverified; the plan removes it on every outcome and carries the question to P1-M32 live proof.
 
 ## Completion checklist
 
@@ -72,7 +72,7 @@ Check only when evidence exists.
 
 - [x] V01 - Review adapter path, staging and timeout safety; add regression coverage for confirmed defects. Evidence: native regression tests listed below passed in the full gate.
 - [x] V02 - Review cancellation/recovery and UI outcome reporting; add regression coverage for confirmed defects. Evidence: controller, dialog keyboard/focus and App dirty-save integration tests passed (340 frontend tests in the full gate).
-- [x] V03 - Run the temp-directory export smoke and full gate after fixes; record evidence and remaining limits. Evidence: strengthened `python3 scripts/smoke/export.py` PASS and final `scripts/gate.sh` G01-G07 all PASS on 2026-11-07; live iCloud and packaged evidence remain P1-M28.
+- [x] V03 - Run the temp-directory export smoke and full gate after fixes; record evidence and remaining limits. Evidence: strengthened `python3 scripts/smoke/export.py` PASS and final `scripts/gate.sh` G01-G07 all PASS on 2026-11-07; live iCloud and packaged evidence remain P1-M32.
 
 ### Review findings and corrections
 
@@ -83,4 +83,4 @@ Check only when evidence exists.
 - **Built-server smoke:** the real adapter now explicitly verifies no-op without republishing, confirmed recreation after external deletion and exact exported bytes. Kill/restart must produce `uncertain`; the recovery assertions can no longer silently skip that path.
 - **Documentation:** the maintained architecture no longer claims production exports are disabled or cancellation is absent. No dependency, prompt, live provider access or product decision changed.
 
-Native workers can remain blocked until Foundation returns; deadlines bound the caller and repeated calls cannot accumulate workers. Coordination remains cooperative, so arbitrary non-coordinating writes racing the final rename cannot be guaranteed lossless. Live File Provider behavior and packaged proof remain P1-M28 evidence limits.
+Native workers can remain blocked until Foundation returns; deadlines bound the caller and repeated calls cannot accumulate workers. Coordination remains cooperative, so arbitrary non-coordinating writes racing the final rename cannot be guaranteed lossless. Live File Provider behavior and packaged proof remain P1-M32 evidence limits.

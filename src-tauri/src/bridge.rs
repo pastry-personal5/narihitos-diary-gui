@@ -8,6 +8,7 @@ mod profiles;
 mod progress;
 mod review;
 mod source_trash;
+mod validate;
 use crate::delivery::{Delivery, Flow};
 use crate::diagnostics::ClientLog;
 use crate::discovery::{self, Discovery};

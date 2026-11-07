@@ -71,8 +71,10 @@ pub fn scan_selected(
         root,
         kind,
         generation,
-        entry_limit,
-        candidate_limit,
+        Bounds {
+            entries: entry_limit,
+            candidates: candidate_limit,
+        },
         directories,
         cancelled,
         false,
@@ -92,21 +94,28 @@ pub(super) fn scan_ownership(
         root,
         kind,
         0,
-        entry_limit,
-        candidate_limit,
+        Bounds {
+            entries: entry_limit,
+            candidates: candidate_limit,
+        },
         None,
         cancelled,
         true,
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Walk limits for one scan.
+#[derive(Clone, Copy)]
+struct Bounds {
+    entries: usize,
+    candidates: usize,
+}
+
 fn scan_options(
     root: &ResolvedRoot,
     kind: &SourceKind,
     generation: u64,
-    entry_limit: usize,
-    candidate_limit: usize,
+    bounds: Bounds,
     directories: Option<&BTreeSet<String>>,
     cancelled: &dyn Fn() -> bool,
     ownership: bool,
@@ -121,8 +130,8 @@ fn scan_options(
         candidates: 0,
         producers: BTreeMap::new(),
         identities: IdentityIndex::default(),
-        entry_limit,
-        candidate_limit,
+        entry_limit: bounds.entries,
+        candidate_limit: bounds.candidates,
         directories,
         cancelled,
         ownership,

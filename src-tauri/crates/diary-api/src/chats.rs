@@ -2,7 +2,6 @@
 //! transcript and at most one running turn. Events carry only job state; clients query the chat
 //! for the stage and provisional text, so a lost event never loses text. Responses and errors
 //! carry codes, never model text beyond the validated reply itself.
-#![allow(clippy::result_large_err)]
 use super::{JobDto, ServerState, app_error, failure, imports};
 use axum::{
     Json,

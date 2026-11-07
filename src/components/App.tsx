@@ -1,15 +1,7 @@
 import { ActivityFeedback } from "./ActivityFeedback";
 import { ActivityDetails } from "./ActivityDetails";
-import { ActivityRuntime } from "../application/activity/runtime";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from "react";
-import type { Bridge, Connection } from "../application/bridge";
+import { useRef, useState } from "react";
+import type { Bridge } from "../application/bridge";
 import { AuthenticPane } from "./AuthenticPane";
 import { SettingsView } from "./SettingsView";
 import { SAVE_LABEL } from "./useAuthentic";
@@ -22,512 +14,74 @@ import {
   GenerationControls,
   GenerationDialog,
 } from "./GenerationPane";
-import { useGeneration } from "./useGeneration";
-import { ExportController } from "../application/export/controller";
 import { ExportDialog } from "./ExportDialog";
-import { useExport } from "./useExport";
-import { GenerationController } from "../application/generation/controller";
-import { generationPreparation } from "../application/generation/navigation";
-import { ReviewController } from "../application/review/controller";
 import { ReviewBar } from "./ReviewBar";
-import { useChat } from "./useChat";
-import { ChatController, rememberedChat } from "../application/chat";
-import { NavigationModel } from "../application/navigation/model";
 import { saveOff } from "../application/navigation/resources";
 import { useSettings } from "./useSettings";
-import { sourceImportAdvice } from "../application/sourceAdvice";
 import { CommandPalette } from "./CommandPalette";
 import { TrashDialog } from "./TrashDialog";
 import { ModalDialog } from "./ModalDialog";
-import { SymbolLabel, SymbolProvider, type SymbolHost } from "./Symbol";
-import {
-  ACTIONS,
-  DEFAULT_BINDINGS,
-  type Handlers,
-} from "../application/actions/actions";
-import { createDispatcher } from "../application/actions/dispatcher";
+import { SymbolLabel, SymbolProvider } from "./Symbol";
+import { ACTIONS } from "../application/actions/actions";
+import { useAppActions } from "./useAppActions";
+import { useAppControllers } from "./useAppControllers";
+import { useCloseRequest } from "./useCloseRequest";
+import { useConnection } from "./useConnection";
+
 export function App({ bridge }: { bridge: Bridge }) {
-  const mounted = useRef(true);
   const settingsButton = useRef<HTMLButtonElement>(null);
-  const activeGeneration = useRef<number | null>(null);
-  const connectionEpoch = useRef(0);
-  const dispose = useRef<(() => Promise<void>) | undefined>(undefined);
-  const [version, setVersion] = useState<string>();
-  const [connection, setConnection] = useState<Connection>({
-    kind: "disconnected",
-    message: "Server disconnected",
-  });
-  const connected = connection.kind === "connected";
   const [explorerWidth, setExplorerWidth] = useState(220);
   const [chatWidth, setChatWidth] = useState(240);
   const [messageHeight, setMessageHeight] = useState(160);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [closePending, setClosePending] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const controllers = useAppControllers(bridge);
+  const {
+    model,
+    chat,
+    chatState,
+    review,
+    generator,
+    activity,
+    exporter,
+    exportState,
+    generationState,
+    chatContext,
+    editorHost,
+    symbols,
+  } = controllers;
+  const closePending = useCloseRequest(bridge, model, generator);
+  const {
+    version,
+    connection,
+    connected,
+    connect,
+    latestConnect,
+    recheckConfiguration,
+  } = useConnection(bridge, closePending, controllers);
   const settings = useSettings(bridge, connected);
-  const model = useMemo(() => new NavigationModel(bridge), [bridge]);
-  const chat = useMemo(
-    () =>
-      new ChatController(
-        bridge,
-        Date.now,
-        () => crypto.randomUUID(),
-        model.budget,
-      ),
-    [bridge, model],
-  );
-  const chatState = useChat(chat);
-  const review = useMemo(
-    () =>
-      new ReviewController(bridge, {
-        flush: async (date) => {
-          const r = model.resources.resources.get(`authentic:${date}`);
-          if (!r?.session || r.loading || r.error) return false;
-          return (await r.session.settle()) === "proceed";
-        },
-        show: async (date, view, decide) => {
-          if (view && !(await model.resources.openAuthentic(date)))
-            return false;
-          const r = model.resources.resources.get(`authentic:${date}`);
-          if (!r) return !view;
-          try {
-            r.buffer.setReview(view, decide);
-          } catch {
-            return false;
-          }
-          return true;
-        },
-        reload: (date) =>
-          model.resources.resources
-            .get(`authentic:${date}`)
-            ?.session?.invalidated(),
-      }),
-    [bridge, model],
-  );
-  useEffect(() => {
-    model.beforeDateChange = () => review.end();
-    return () => {
-      model.beforeDateChange = null;
-    };
-  }, [model, review]);
-  const generator = useMemo(
-    () =>
-      new GenerationController(
-        bridge,
-        generationPreparation(
-          model,
-          () => chat.running,
-          async (date) => review.date !== date || review.end(),
-        ),
-        model.budget,
-      ),
-    [bridge, model, chat, review],
-  );
-  const activity = useMemo(
-    () =>
-      new ActivityRuntime(
-        bridge,
-        (job) => {
-          if (job.progress?.kind === "generation")
-            generator.discover(job.id, job.progress.request_id);
-          if (job.progress?.kind === "chat") chat.discover(job.progress);
-        },
-        (id, remaining) => {
-          generator.forgetResult(id);
-          if (
-            !remaining.some(
-              (job) =>
-                job.progress?.kind === "chat" &&
-                job.progress.chat_id === chat.state.chat?.chat_id,
-            )
-          )
-            chat.forgetJob(id);
-        },
-        model.budget,
-      ),
-    [bridge, generator, chat, model],
-  );
-  useEffect(() => () => activity.dispose(), [activity]);
-  const exporter = useMemo(
-    () =>
-      new ExportController(bridge, {
-        flush: async (date) => {
-          const r = model.resources.resources.get(`authentic:${date}`);
-          if (!r?.session || r.loading || r.error) return false;
-          return (await r.session.settle()) === "proceed";
-        },
-        notify: (text, severity) => model.messages.add(text, severity),
-        newId: () => crypto.randomUUID(),
-      }),
-    [bridge, model],
-  );
-  useEffect(() => () => exporter.dispose(), [exporter]);
-  const exportState = useExport(exporter);
-  const generationState = useGeneration(generator);
-  const chatContext = useCallback(() => {
-    const r = model.resources.active;
-    const date = r?.date ?? model.resources.selectedDate;
-    if (!r || !date) return { document: null, chip: "No document" };
-    const what = r.kind === "authentic" ? `Entry ${date}` : `Source ${r.label}`;
-    return {
-      document: {
-        kind: r.kind,
-        date,
-        unsaved: r.dirty,
-        body: r.buffer.getText(),
-      },
-      chip: r.dirty ? `${what}, unsaved edits included` : what,
-    };
-  }, [model]);
-  const editorHost = useCallback(
-    (element: HTMLDivElement | null) => model.resources.attach(element),
-    [model],
-  );
-  const symbols = useMemo<SymbolHost | null>(() => {
-    const load = bridge.getSymbol?.bind(bridge);
-    if (!load) return null;
-    const reported = new Set<string>();
-    return {
-      load,
-      unsupported: (name) => {
-        if (reported.has(name)) return;
-        reported.add(name);
-        model.messages.add(
-          `Unsupported symbol ${name}; showing its text label.`,
-          "warning",
-        );
-      },
-    };
-  }, [bridge, model]);
-  const [, update] = useReducer((n: number) => n + 1, 0);
-  const lifetime = useRef(0);
-  useEffect(() => {
-    const counter = lifetime;
-    const generation = ++counter.current;
-    const off = model.subscribe(update);
-    return () => {
-      off();
-      model.resources.attach(null);
-      queueMicrotask(() => {
-        if (counter.current === generation) {
-          model.dispose();
-          generator.dispose();
-          chat.dispose();
-          review.dispose();
-        }
-      });
-    };
-  }, [model, generator, chat, review]);
-  useEffect(() => {
-    let off: (() => void) | undefined;
-    let disposed = false;
-    void bridge
-      .onCloseRequested?.(
-        async () => {
-          if (
-            generator.state.dirty ||
-            (generator.state.submitting &&
-              !generator.state.activeJob &&
-              !generator.state.uncertain)
-          )
-            await generator.cancel();
-          const proceed = await model.resources.closeApp();
-          if (proceed) setClosePending(true);
-          return proceed;
-        },
-        () => {
-          setClosePending(false);
-          model.messages.add(
-            "The server could not confirm closing. The window stayed open; retry closing or reconnect.",
-            "error",
-            true,
-          );
-        },
-      )
-      .then((stop) => {
-        if (disposed) stop();
-        else off = stop;
-      });
-    return () => {
-      disposed = true;
-      off?.();
-    };
-  }, [bridge, model, generator]);
-  useEffect(() => {
-    let disposed = false;
-    const epoch = connectionEpoch;
-    mounted.current = true;
-    void bridge
-      .metadata()
-      .then((metadata) => {
-        if (!disposed) setVersion(metadata.version);
-      })
-      .catch(() => {});
-    return () => {
-      disposed = true;
-      mounted.current = false;
-      epoch.current++;
-      void dispose.current?.();
-      dispose.current = undefined;
-    };
-  }, [bridge]);
-  // Connect in the background after launch and after any drop: 0.5s, 1s, 2s … capped at 30s.
-  const attempts = useRef(0);
-  const latestConnect = useRef(() => {});
-  useEffect(() => {
-    latestConnect.current = () => void connect();
+  const {
+    storage,
+    selectedView,
+    active,
+    activeView,
+    canCreate,
+    createReason,
+    bindings,
+    generationReason,
+    exportReason,
+    handlers,
+    hint,
+  } = useAppActions({
+    model,
+    connection,
+    settings,
+    generator,
+    chat,
+    exporter,
+    setPaletteOpen,
+    setSettingsOpen,
   });
-  useEffect(() => {
-    if (connection.kind === "connected") attempts.current = 0;
-    if (closePending || connection.kind !== "disconnected") return;
-    const delay = Math.min(30_000, 500 * 2 ** attempts.current++);
-    const timer = setTimeout(() => latestConnect.current(), delay);
-    return () => clearTimeout(timer);
-  }, [connection, closePending]);
-  useEffect(() => {
-    if (!connected) return;
-    const focus = () => {
-      void model.browse(model.calendar?.anchor, "month");
-    };
-    window.addEventListener("focus", focus);
-    return () => window.removeEventListener("focus", focus);
-  }, [connected, model]);
-  function adviseSources(sources: Parameters<typeof sourceImportAdvice>[0]) {
-    const advice = sourceImportAdvice(sources);
-    if (advice) model.messages.add(advice, "warning", true);
-  }
-  async function connect() {
-    const epoch = ++connectionEpoch.current;
-    const current = () => mounted.current && connectionEpoch.current === epoch;
-    setConnection({ kind: "connecting" });
-    try {
-      await dispose.current?.();
-      dispose.current = undefined;
-      const status = await bridge.connect();
-      if (!current()) return;
-      const stop = await bridge.watch((event) => {
-        if (!current()) return;
-        model.onEvent(event);
-        chat.onEvent(event);
-        generator.onEvent(event);
-        activity.event(event);
-        if (event.kind === "authentic_changed")
-          void review.onAuthenticChanged();
-        if (event.kind === "disconnected") {
-          connectionEpoch.current++;
-          void dispose.current?.();
-          dispose.current = undefined;
-          void model.connect(false, "", 0, false);
-          setConnection({
-            kind: "disconnected",
-            message:
-              "Connection interrupted. Reconnect to refresh server state.",
-          });
-        }
-        if (event.kind === "resync_required")
-          void bridge
-            .status()
-            .then((fresh) => {
-              if (current())
-                setConnection({ kind: "connected", status: fresh });
-            })
-            .catch(() => {
-              if (current()) {
-                connectionEpoch.current++;
-                void dispose.current?.();
-                dispose.current = undefined;
-                void model.connect(false, "", 0, false);
-                setConnection({
-                  kind: "disconnected",
-                  message: "Server unavailable. Reconnect to refresh state.",
-                });
-              }
-            });
-      });
-      if (!current()) {
-        await stop();
-        return;
-      }
-      dispose.current = stop;
-      if (current()) {
-        const server = await bridge.serverSettings();
-        if (!current()) {
-          await stop();
-          return;
-        }
-        setConnection({ kind: "connected", status });
-        generator.connect(true);
-        void generator.loadProfiles();
-        void chat.loadProfiles().then(() => {
-          const id = rememberedChat();
-          if (id && current()) void chat.adopt(id);
-        });
-        activeGeneration.current = server.config_generation;
-        adviseSources(server.sources);
-        await model.connect(
-          true,
-          status.instance_id,
-          server.config_generation,
-          status.storage_ready,
-        );
-      }
-    } catch (error) {
-      if (current()) {
-        await dispose.current?.();
-        dispose.current = undefined;
-        void model.connect(false, "", 0, false);
-        setConnection({
-          kind: "disconnected",
-          message:
-            error === "client_busy"
-              ? "Another Diary client is connected. Close it before reconnecting."
-              : "Server unavailable. Check the separate server process and discovery path.",
-        });
-      }
-    }
-  }
-  const storage = connected && connection.status.storage_ready;
-  const selectedView = model.resources.authentic?.session?.view();
-  const active = model.resources.active;
-  const activeView = active?.session?.view();
-  const queueState = selectedView?.queue.state;
-  const canCreate =
-    storage &&
-    !!selectedView &&
-    !selectedView.exists &&
-    !selectedView.creating &&
-    queueState === "clean";
-  const createReason = !connected
-    ? "Connect to the server first."
-    : !storage
-      ? "Storage is unavailable."
-      : !selectedView
-        ? "Loading this date."
-        : selectedView.exists
-          ? "A file already exists for this date."
-          : selectedView.creating
-            ? "Creating the file."
-            : queueState !== "clean"
-              ? "Wait for pending changes to save."
-              : (selectedView.createError ??
-                "Save an empty file for this date.");
-  const bindings = settings.user?.effective_keybindings ?? DEFAULT_BINDINGS;
-  const later = (what: string) => `${what} is not available yet.`;
-  const trashTarget = model.focusedSnippet ?? active?.source?.source ?? null;
-  const sourceReserved = active?.source
-    ? model.resources.sourceReserved(active.source.source.id)
-    : false;
-  const generationReason =
-    connected && !connection.status.capabilities.includes("generation")
-      ? "Generation is not supported by this server."
-      : generator.reason(
-          model.resources.selectedDate,
-          settings.user?.writing_locale ?? null,
-          model.resources.selectedDate !== null &&
-            model.imports
-              .view(model.resources.selectedDate)
-              .items.some(
-                (item) =>
-                  "source" in item && !!item.source && !item.source.eligible,
-              ),
-        );
-  const exportReason = !connected
-    ? "Connect to the server first."
-    : exporter.reason(model.resources.selectedDate, !!selectedView?.exists);
-  const handlers: Handlers = {
-    "palette.open": { reason: null, run: () => setPaletteOpen(true) },
-    "editor.save": {
-      reason:
-        active?.kind === "source"
-          ? active.detached
-            ? "The original source moved to Trash; this copy is read-only."
-            : sourceReserved
-              ? "This source is reserved by an unfinished Move to Trash operation."
-              : active.source?.capabilities.save
-                ? null
-                : saveOff(active.source?.capabilities.reason ?? "")
-          : activeView
-            ? null
-            : "No file is open.",
-      run: () => {
-        if (active?.kind === "source") void model.resources.saveSource();
-        else model.resources.dispatch({ kind: "flush" });
-      },
-    },
-    "authentic.create_empty": {
-      reason: canCreate ? null : createReason,
-      run: () => model.resources.createEmpty(),
-    },
-    "source.refresh": {
-      reason:
-        active?.kind !== "source"
-          ? "Open a source snippet first."
-          : active.detached || sourceReserved
-            ? "This source cannot be refreshed while its Trash operation is unfinished."
-            : active.loading || model.resources.transitioning
-              ? "Wait for the source to finish loading."
-              : null,
-      run: () => model.refreshActiveSource(),
-    },
-    "settings.open": { reason: null, run: () => setSettingsOpen(true) },
-    "source.trash": {
-      reason: model.trashReason(trashTarget),
-      run: () => (trashTarget ? model.trashSource(trashTarget) : undefined),
-    },
-    "generate.start": {
-      reason: generationReason,
-      run: () => {
-        const date = model.resources.selectedDate,
-          locale = settings.user?.writing_locale;
-        if (date && locale)
-          return generator.start(
-            date,
-            locale,
-            settings.user?.generation_count ?? 3,
-          );
-      },
-    },
-    "ai.activity.open": { reason: later("AI activity"), run: () => {} },
-    "ai.run.cancel": {
-      reason: generator.running || chat.running ? null : "No AI run is active.",
-      run: () => (generator.running ? generator.cancel() : chat.cancel()),
-    },
-    "ai.results.open": { reason: later("AI results"), run: () => {} },
-    "ai.results.discard": { reason: later("AI results"), run: () => {} },
-    "export.start": {
-      reason: exportReason,
-      run: () => {
-        const date = model.resources.selectedDate;
-        if (date) return exporter.start(date);
-      },
-    },
-    "export.start.notion": {
-      reason: exportReason,
-      run: () => {
-        const date = model.resources.selectedDate;
-        if (date) return exporter.start(date, "notion");
-      },
-    },
-  };
-  const live = useRef({ bindings, handlers });
-  useEffect(() => {
-    live.current = { bindings, handlers };
-  });
-  useEffect(() => {
-    const onKey = createDispatcher({
-      bindings: () => live.current.bindings,
-      handlers: () => live.current.handlers,
-      suspended: () =>
-        document.querySelector('[role="dialog"], [data-capture]') !== null,
-      inSnippetTree: () =>
-        !!document.activeElement?.closest("[data-snippet-tree]"),
-      notice: (text) => model.messages.add(text, "warning"),
-    });
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [model]);
-  const hint = (id: string, base: string) =>
-    bindings[id]?.length ? `${base} (${bindings[id].join(", ")})` : base;
   return (
     <SymbolProvider value={symbols}>
       {closePending && (
@@ -751,33 +305,7 @@ export function App({ bridge }: { bridge: Bridge }) {
               ...settings,
               reload: async () => {
                 await settings.reload();
-                if (connection.kind !== "connected") return;
-                try {
-                  const server = await bridge.serverSettings();
-                  adviseSources(server.sources);
-                  if (activeGeneration.current !== server.config_generation) {
-                    activeGeneration.current = server.config_generation;
-                    await model.connect(
-                      false,
-                      "",
-                      server.config_generation,
-                      false,
-                    );
-                    void generator.loadProfiles();
-                    await model.connect(
-                      true,
-                      connection.status.instance_id,
-                      server.config_generation,
-                      server.storage_ready,
-                    );
-                  }
-                } catch {
-                  model.messages.add(
-                    "Configuration could not be rechecked. Reconnect to refresh source access.",
-                    "warning",
-                    true,
-                  );
-                }
+                await recheckConfiguration();
               },
             }}
             connected={connected}

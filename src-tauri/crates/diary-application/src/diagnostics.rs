@@ -245,14 +245,7 @@ fn valid_date(s: &str) -> bool {
     (1..=days).contains(&d)
 }
 
-pub fn valid_uuid(s: &str) -> bool {
-    let b = s.as_bytes();
-    b.len() == 36
-        && [8, 13, 18, 23].iter().all(|&i| b[i] == b'-')
-        && s.bytes()
-            .enumerate()
-            .all(|(i, c)| [8, 13, 18, 23].contains(&i) || matches!(c, b'0'..=b'9' | b'a'..=b'f'))
-}
+pub use diary_domain::authentic::valid_uuid;
 
 /// A UUID, a `YYYY-MM-DD` date, or 16–64 lowercase hex characters; nothing else.
 #[derive(Debug, Clone, PartialEq, Eq)]

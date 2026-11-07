@@ -20,7 +20,14 @@ export class NavigationModel {
   readonly trash: TrashCoordinator;
   focusedSnippet: Source | null = null;
   /** Runs before a date change; false keeps the date (an unsettled review). */
-  beforeDateChange: (() => Promise<boolean>) | null = null;
+  private beforeDateChange: (() => Promise<boolean>) | null = null;
+  /** Registers a guard run before the selected date changes; returns its unregister function. */
+  guardDateChange(guard: () => Promise<boolean>): () => void {
+    this.beforeDateChange = guard;
+    return () => {
+      this.beforeDateChange = null;
+    };
+  }
   calendar: Calendar | null = null;
   calendarError: string | null = null;
   calendarLoading = false;

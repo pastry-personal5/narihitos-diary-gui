@@ -89,7 +89,7 @@ Checked against the P1-M25 code.
 
 ## Risks and notes
 
-- iCloud Drive behavior (download-needed, eviction, upload timing) cannot be forced in tests; injected provider states cover logic only. State this in the completion record and carry live proof to P1-M28.
+- iCloud Drive behavior (download-needed, eviction, upload timing) cannot be forced in tests; injected provider states cover logic only. State this in the completion record and carry live proof to P1-M32.
 - Coordination can block; every call needs a timeout and a typed failure.
 - The macOS adapter must compile out cleanly on other targets, like the Trash native module.
 
@@ -99,4 +99,4 @@ Checked against the P1-M25 code.
 - `square.and.arrow.up` joined the allowlisted SF Symbols.
 - The abandon preview uses `Reason::Uncertain` and a placeholder `Write::Replace`; its token is accepted only by the abandon route.
 - A crash between the abandon step and its terminal write leaves the export `running`; recovery re-proves or re-parks it as `uncertain`, and the user can abandon again.
-- Non-iCloud folders have no provider state and are always available (O5). Real iCloud Drive proof (download-needed, eviction, staging-file sync, TCC) is carried to P1-M28.
+- Non-iCloud folders have no provider state and are always available (O5). Real iCloud Drive proof (download-needed, eviction, staging-file sync, TCC) is carried to P1-M32.

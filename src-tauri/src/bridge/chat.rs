@@ -1,6 +1,7 @@
 //! Transient AI chat. The server owns the transcript for the lease; the WebView sends the active
 //! document snapshot with each turn and re-reads the chat after a reload. Requests are bounded
 //! before they leave and responses are re-validated against closed vocabularies.
+use super::validate::invalid;
 use super::{AuthenticError, Bridge, Job};
 use diary_application::agent::{
     AgentErrorCode, Locale, MAX_TEXT_BYTES, MAX_TRANSCRIPT_BYTES, MAX_TURNS, MAX_USER_MESSAGE_BYTES,
@@ -65,9 +66,6 @@ pub struct TurnAccepted {
     pub job: Job,
 }
 
-fn invalid() -> AuthenticError {
-    AuthenticError::new("invalid_input")
-}
 fn id_ok(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
@@ -130,7 +128,7 @@ impl Bridge {
     ) -> Result<TurnAccepted, AuthenticError> {
         let doc_ok = document.as_ref().is_none_or(|d| {
             matches!(d.kind.as_str(), "authentic" | "source")
-                && super::authentic::date_shape(&d.date)
+                && super::validate::date_shape(&d.date)
                 && d.body.len() <= DOCUMENT_LIMIT
         });
         if !id_ok(&chat_id)

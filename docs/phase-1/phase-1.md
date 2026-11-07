@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M28 are 25 theme-level milestones derived from the architecture, within the owner's limit of 27 milestones after P1-M3. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Done; P1-M21 is Done; P1-M22 is Done; P1-M23 is Done; P1-M24 is Done; P1-M25–P1-M28 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M27 are 24 theme-level milestones derived from the architecture; the owner (2026-11-07) moved release qualification to P1-M32 and inserted P1-M28–P1-M31. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Done; P1-M21 is Done; P1-M22 is Done; P1-M23 is Done; P1-M24 is Done; P1-M25–P1-M27 are Delivered; P1-M28 is Done; P1-M29–P1-M32 remain Planned.
 
 ### P1-M1: Research
 
@@ -36,7 +36,7 @@ Notes: [Clean Architecture](../architecture.md) and nine themed contracts comple
 Status: Done
 Goal: Create the project skeleton following the documented architecture.
 Plan: [overview](../archive/milestones/p1-m3/milestone-03-scaffolding-overview.md), [work plan](../archive/milestones/p1-m3/milestone-03-scaffolding-architecture.md).
-Notes: Scaffolding only: S01–S10/G01–G06 map approved setup, the implemented command subset, fixture transport, build/type checks and packaged evidence to verifiable acceptance. Workspace initialization/recovery and all feature implementation remain in P1-M4–P1-M28; completed 2026-11-05 with S01–S10/G01–G06 evidence in the archived overview.
+Notes: Scaffolding only: S01–S10/G01–G06 map approved setup, the implemented command subset, fixture transport, build/type checks and packaged evidence to verifiable acceptance. Workspace initialization/recovery and all feature implementation remain in P1-M4–P1-M32; completed 2026-11-05 with S01–S10/G01–G06 evidence in the archived overview.
 
 ### P1-M4: Diagnostic logging
 
@@ -99,16 +99,16 @@ Plan: [overview](milestone-12-command-palette-shortcuts-overview.md), [work plan
 ### P1-M13: Native symbols and accessible interaction
 
 Status: Done
-Goal: Add allowlisted AppKit SF Symbols and close the keyboard, focus, pane-resizing and IME-safe-save gaps that automated tests can reach; packaged key, resize and Korean IME proof is carried to P1-M28; native VoiceOver proof are not required.
+Goal: Add allowlisted AppKit SF Symbols and close the keyboard, focus, pane-resizing and IME-safe-save gaps that automated tests can reach; packaged key, resize and Korean IME proof is carried to P1-M32; native VoiceOver proof are not required.
 Plan: [overview](milestone-13-native-symbols-accessibility-overview.md), [work plan](milestone-13-native-symbols-accessibility-architecture.md).
-Notes: Owner closes on automated tests only; native proof moves to P1-M28.
+Notes: Owner closes on automated tests only; native proof moves to P1-M32.
 
 ### P1-M14: Producer-compatible source saves
 
 Status: Done
 Goal: Enable explicit body saves only for producer-verified formats, preserving metadata, audio integrity and guarded recovery under concurrent changes.
 Plan: [overview](milestone-14-producer-compatible-source-saves-overview.md), [work plan](milestone-14-producer-compatible-source-saves-architecture.md).
-Notes: Narihito mobile schema 1 only; Ayumi stays disabled without a producer contract. The save was enabled after `scripts/smoke/producer.py` passed (format-level evidence only; phone-app and live-iCloud proof is carried to P1-M28). Owner decisions (2026-11-06): the title is left unchanged, the producer harness is sufficient evidence to enable the save, and unresolved iCloud conflict versions are a recorded known gap.
+Notes: Narihito mobile schema 1 only; Ayumi stays disabled without a producer contract. The save was enabled after `scripts/smoke/producer.py` passed (format-level evidence only; phone-app and live-iCloud proof is carried to P1-M32). Owner decisions (2026-11-06): the title is left unchanged, the producer harness is sufficient evidence to enable the save, and unresolved iCloud conflict versions are a recorded known gap.
 
 ### P1-M15: Source and audio Trash
 
@@ -170,7 +170,7 @@ Plan: [overview](../archive/milestones/p1-m22/milestone-22-candidate-generation-
 Status: Done
 Goal: Complete nonblocking cross-date AI progress, provisional previews, cancellation, reconnect/result discovery and accessible in-app completion feedback.
 Plan: [overview](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-overview.md), [work plan](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-architecture.md).
-Notes: Completed 2026-11-07 on automated tests, synthetic built-server smoke and the full gate; packaged slow-run, responsiveness, native interaction and reconnect/wake proof moves explicitly to P1-M28. Native VoiceOver proof remains exempt.
+Notes: Completed 2026-11-07 on automated tests, synthetic built-server smoke and the full gate; packaged slow-run, responsiveness, native interaction and reconnect/wake proof moves explicitly to P1-M32. Native VoiceOver proof remains exempt.
 
 ### P1-M24: Paragraph review and acceptance
 
@@ -196,9 +196,30 @@ Status: Delivered (2026-11-07)
 Goal: Export deterministic year/month/daily projections with ascending dates, bounded chunking, service-limit handling and provenance-aware ambiguous-write recovery.
 Plan: [overview](milestone-27-notion-export-overview.md), [work plan](milestone-27-notion-export-architecture.md); owner decisions O1–O12 recorded (2026-11-07), including `reqwest` `native-tls`, an agent-run live round trip and ascending order enforced for daily sections only.
 
-### P1-M28: Personal release qualification
+### P1-M28: Simple refactoring
+
+Status: Done (2026-11-07)
+Goal: Simple refactoring.
+Plan: [overview](milestone-28-simple-refactoring-overview.md), [work plan](milestone-28-simple-refactoring-architecture.md); owner scope decided 2026-11-07 (split modules over 900 lines, fix lint suppressions, merge duplicated helpers, no behavior change).
+
+### P1-M29: Owner-requested revisions
+
+Status: Planned
+Goal: Bug fixes, UX fixes, GUI fixes, behavior changes, refactoring and architecture changes as the owner requests.
+
+### P1-M30: Refactoring
+
+Status: Planned
+Goal: Refactoring.
+
+### P1-M31: Owner-requested revisions (second round)
+
+Status: Planned
+Goal: Again bug fixes, UX fixes, GUI fixes, behavior changes, refactoring and architecture changes as the owner requests.
+
+### P1-M32: Personal release qualification
 
 Status: Planned
 Goal: Qualify Diary v1.0.0 on the owner's Apple Silicon Mac with separate shell launch, complete workflow/recovery/native evidence and the full release gate.
 
-Notes: P1-M28 also owns the packaged AI proof moved from M23 by the owner on 2026-11-06: editing/autosave under a slow synthetic run and maximum streaming, toolbar/details and off-date results, native keyboard/reduced motion, connection recovery and activation after sleep, measured submission feedback (100 ms target), cancel acknowledgement and render/memory bounds. See the [M23 evidence limits](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-architecture.md#gate-and-evidence-limits). Native VoiceOver proof remains exempt.
+Notes: P1-M32 also owns the packaged AI proof moved from M23 by the owner on 2026-11-06: editing/autosave under a slow synthetic run and maximum streaming, toolbar/details and off-date results, native keyboard/reduced motion, connection recovery and activation after sleep, measured submission feedback (100 ms target), cancel acknowledgement and render/memory bounds. See the [M23 evidence limits](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-architecture.md#gate-and-evidence-limits). Native VoiceOver proof remains exempt.

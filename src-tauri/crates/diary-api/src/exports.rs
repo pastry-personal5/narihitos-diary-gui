@@ -1,7 +1,6 @@
 //! Destination-neutral export routes. DTOs expose IDs, digests and allowlisted codes; the
 //! snapshot body, bearer token (outside the one preview response) and remote content never
 //! appear. State changes also reach the client as `job_changed` events, after the durable write.
-#![allow(clippy::result_large_err)]
 use super::{ServerState, app_error, failure, session};
 use axum::{
     Json,

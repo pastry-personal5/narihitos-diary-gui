@@ -2,7 +2,6 @@
 //! operation lookup. Every route needs an admitted session; store calls run off the async
 //! executor; responses and errors never carry body text or paths.
 // Helpers return the finished HTTP `Response` as their error so handlers can return it directly.
-#![allow(clippy::result_large_err)]
 use super::{ServerState, app_error, failure, session, traced};
 use axum::{
     Extension, Json,

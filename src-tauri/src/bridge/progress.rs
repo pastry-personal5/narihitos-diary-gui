@@ -55,7 +55,7 @@ impl TryFrom<WireJob> for Job {
                     && valid_id(&p.chat_id)
                     && p.origin_date
                         .as_deref()
-                        .is_none_or(super::authentic::date_shape)
+                        .is_none_or(super::validate::date_shape)
                     && common(
                         &p.request_id,
                         &p.instance_id,
@@ -71,7 +71,7 @@ impl TryFrom<WireJob> for Job {
                 p.kind == "generation"
                     && p.job_id == w.id
                     && (1..=5).contains(&n)
-                    && super::authentic::date_shape(&p.origin_date)
+                    && super::validate::date_shape(&p.origin_date)
                     && common(
                         &p.request_id,
                         &p.instance_id,

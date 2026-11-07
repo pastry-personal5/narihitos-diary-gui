@@ -1,6 +1,5 @@
 //! `PUT /sources/{id}/body`: the guarded body save of a producer source. Needs an admitted
 //! session; the writer runs off the async executor; errors are allowlisted codes only.
-#![allow(clippy::result_large_err)]
 use super::{ServerState, app_error, failure, session};
 use axum::{
     Json,

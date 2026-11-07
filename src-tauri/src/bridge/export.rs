@@ -1,5 +1,6 @@
 //! Fixed export commands. DTOs carry IDs, digests and allowlisted codes only; the bearer token
 //! exists in the preview response and nowhere else.
+use super::validate::{date_shape, invalid, sha256, uuid};
 use super::{AuthenticError, Bridge};
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
@@ -81,33 +82,12 @@ pub struct ExportAcknowledged {
     pub admitted_checkpoint: u64,
 }
 
-fn invalid() -> AuthenticError {
-    AuthenticError::new("invalid_input")
-}
-fn uuid(s: &str) -> bool {
-    diary_application::operations::OperationId::parse(s).is_some()
-}
 /// The server owns calendar validity; this only keeps malformed text off the wire.
-fn date_shape(s: &str) -> bool {
-    s.len() == 10
-        && s.bytes().enumerate().all(|(i, b)| {
-            if matches!(i, 4 | 7) {
-                b == b'-'
-            } else {
-                b.is_ascii_digit()
-            }
-        })
-}
-fn digest(s: &str) -> bool {
-    s.len() == 64
-        && s.bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-}
 impl ExportResult {
     pub(super) fn valid(&self) -> bool {
         self.kind == "export"
             && uuid(&self.operation_id)
-            && digest(&self.revision.sha256)
+            && sha256(&self.revision.sha256)
             && self.date.len() == 10
             && self.checkpoint > 0
             && self.checkpoint <= i64::MAX as u64
@@ -120,7 +100,7 @@ impl Bridge {
         request: StartExportRequest,
     ) -> Result<StartExportResult, AuthenticError> {
         if !uuid(&request.operation_id)
-            || !digest(&request.expected_revision.sha256)
+            || !sha256(&request.expected_revision.sha256)
             || request.expected_revision.sequence > i64::MAX as u64
             || !date_shape(&request.date)
         {

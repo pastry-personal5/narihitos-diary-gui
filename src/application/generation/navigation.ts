@@ -60,6 +60,14 @@ async function imported(
     "source" in item && item.source ? [item.source] : [],
   );
 }
+/** Settles the open Entry for a date; false when it is not loaded or has a load error. */
+export const settleAuthentic =
+  (model: NavigationModel) =>
+  async (date: string): Promise<boolean> => {
+    const r = model.resources.resources.get(`authentic:${date}`);
+    if (!r?.session || r.loading || r.error) return false;
+    return (await r.session.settle()) === "proceed";
+  };
 export function generationPreparation(
   model: NavigationModel,
   chatRunning: () => boolean,
@@ -88,10 +96,7 @@ export function generationPreparation(
     flushAuthentic: async (date) => {
       // Regeneration ends the old review first (the server refuses a live one for the date).
       if (endReview && !(await endReview(date))) return false;
-      const resource = model.resources.resources.get(`authentic:${date}`);
-      if (!resource?.session || resource.loading || resource.error)
-        return false;
-      return (await resource.session.settle()) === "proceed";
+      return settleAuthentic(model)(date);
     },
     saveAndRefresh: async (date, selected, dirty, signal) => {
       const expected = new Map(selected.map((s) => [s.source_id, s.digest]));

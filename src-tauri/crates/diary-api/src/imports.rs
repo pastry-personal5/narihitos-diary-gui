@@ -1,5 +1,4 @@
 //! Owning-session import jobs and bounded body-less source pages. Errors are fixed codes.
-#![allow(clippy::result_large_err)]
 use super::*;
 use axum::extract::rejection::JsonRejection;
 use diary_application::imports::{Authority, ImportError, ImportListing, ImportStore};

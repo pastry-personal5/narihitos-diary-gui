@@ -1,4 +1,5 @@
 //! Explicit candidate-generation commands: fixed routes, closed statuses and bounded content.
+use super::validate::invalid;
 use super::{AuthenticError, Bridge, Job, Revision, TurnAccepted};
 use diary_application::agent::{AgentErrorCode, Locale, MAX_RESULT_BYTES, MAX_TEXT_BYTES};
 use reqwest::Method;
@@ -90,9 +91,6 @@ fn id(s: &str) -> bool {
 fn code(c: Option<&str>) -> bool {
     c.is_none_or(|c| AgentErrorCode::parse(c).is_some())
 }
-fn bad() -> AuthenticError {
-    AuthenticError::new("invalid_input")
-}
 fn sound(v: &GenerationView) -> bool {
     let p = &v.progress;
     let slots = v.candidates.len() == v.count as usize
@@ -112,7 +110,7 @@ fn sound(v: &GenerationView) -> bool {
         r.sequence > 0 && r.sha256.len() == 64 && r.sha256.bytes().all(|b| b.is_ascii_hexdigit())
     });
     id(&v.job.id)
-        && super::authentic::date_shape(&v.date)
+        && super::validate::date_shape(&v.date)
         && super::profiles::valid_alias(&v.profile)
         && Locale::parse(&v.locale).is_ok()
         && (1..=5).contains(&v.count)
@@ -162,7 +160,7 @@ impl Bridge {
         input: GenerationInput,
     ) -> Result<TurnAccepted, AuthenticError> {
         if !id(&input.request_id)
-            || !super::authentic::date_shape(&input.date)
+            || !super::validate::date_shape(&input.date)
             || !super::profiles::valid_alias(&input.profile)
             || Locale::parse(&input.locale).is_err()
             || !(1..=5).contains(&input.count)
@@ -172,7 +170,7 @@ impl Bridge {
                 .iter()
                 .any(|s| !id(&s.import_id) || !id(&s.source_id))
         {
-            return Err(bad());
+            return Err(invalid());
         }
         let accepted: TurnAccepted = self
             .authentic(Method::POST, "/generations", Some(json!(input)))
@@ -184,7 +182,7 @@ impl Bridge {
     }
     pub async fn get_generation(&self, job_id: String) -> Result<GenerationView, AuthenticError> {
         if !id(&job_id) {
-            return Err(bad());
+            return Err(invalid());
         }
         let view: GenerationView = self
             .authentic(Method::GET, &format!("/jobs/{job_id}/result"), None)
@@ -199,7 +197,7 @@ impl Bridge {
         candidate_id: String,
     ) -> Result<CandidateView, AuthenticError> {
         if !id(&candidate_id) {
-            return Err(bad());
+            return Err(invalid());
         }
         let c: CandidateView = self
             .authentic(Method::GET, &format!("/candidates/{candidate_id}"), None)
@@ -208,7 +206,7 @@ impl Bridge {
             && id(&c.job_id)
             && (1..=5).contains(&c.index)
             && c.id == format!("{}-{}", c.job_id, c.index)
-            && super::authentic::date_shape(&c.date)
+            && super::validate::date_shape(&c.date)
             && c.draft_markdown.len() <= MAX_TEXT_BYTES
             && c.claim_support.len() <= 2000
             && c.warnings.len() <= 100
@@ -228,7 +226,7 @@ impl Bridge {
     }
     pub async fn discard_generation(&self, job_id: String) -> Result<(), AuthenticError> {
         if !id(&job_id) {
-            return Err(bad());
+            return Err(invalid());
         }
         let _: serde_json::Value = self
             .authentic(Method::DELETE, &format!("/generations/{job_id}"), None)

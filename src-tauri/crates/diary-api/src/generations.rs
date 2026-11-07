@@ -1,5 +1,4 @@
 //! Session-owned candidate admission and bounded reads. No diary/model text enters diagnostics.
-#![allow(clippy::result_large_err)]
 use super::*;
 use axum::extract::rejection::JsonRejection;
 use diary_application::{
