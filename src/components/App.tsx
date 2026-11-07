@@ -162,6 +162,22 @@ export function App({ bridge }: { bridge: Bridge }) {
                 Save
               </button>
             )}
+            <button
+              disabled={!!generationReason}
+              title={hint(
+                "generate.start",
+                generationReason ?? "Generate candidates",
+              )}
+              aria-describedby="generation-reason"
+              onClick={() => void handlers["generate.start"].run()}
+            >
+              <SymbolLabel
+                name="sparkles"
+                label={generationState.submitting ? "Submitting…" : "Generate"}
+              />
+            </button>
+          </div>
+          <div className="connection">
             <span role="status" aria-label="Save status">
               {activeView
                 ? SAVE_LABEL[activeView.queue.state]
@@ -181,22 +197,6 @@ export function App({ bridge }: { bridge: Bridge }) {
                               : "Saved"
                   : "No file open"}
             </span>
-            <button
-              disabled={!!generationReason}
-              title={hint(
-                "generate.start",
-                generationReason ?? "Generate candidates",
-              )}
-              aria-describedby="generation-reason"
-              onClick={() => void handlers["generate.start"].run()}
-            >
-              <SymbolLabel
-                name="sparkles"
-                label={generationState.submitting ? "Submitting…" : "Generate"}
-              />
-            </button>
-          </div>
-          <div className="connection">
             <span role="status">
               {connection.kind === "connected"
                 ? connection.status.storage_ready
