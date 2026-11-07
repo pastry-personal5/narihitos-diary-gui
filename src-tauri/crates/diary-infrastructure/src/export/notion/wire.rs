@@ -95,6 +95,20 @@ pub struct Remote {
     pub text: String,
     pub title: Option<String>,
     pub has_children: bool,
+    /// No rich-text item carries an annotation, a non-default color or a link: copying the block
+    /// as plain text loses nothing.
+    pub plain: bool,
+}
+fn is_plain(rich: &Value) -> bool {
+    rich.as_array().is_none_or(|items| {
+        items.iter().all(|i| {
+            let a = &i["annotations"];
+            let flags = ["bold", "italic", "strikethrough", "underline", "code"];
+            flags.iter().all(|f| !a[*f].as_bool().unwrap_or(false))
+                && a["color"].as_str().is_none_or(|c| c == "default")
+                && i["href"].is_null()
+        })
+    })
 }
 fn plain(v: &Value) -> String {
     v.as_array()
@@ -139,6 +153,7 @@ pub fn parse_page(v: &Value) -> Result<(Vec<Remote>, Option<String>), Error> {
                 .get("has_children")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            plain: r.get(kind).is_none_or(|k| is_plain(&k["rich_text"])),
         });
     }
     let more = v.get("has_more").and_then(Value::as_bool).unwrap_or(false);
@@ -186,6 +201,32 @@ pub fn day_of(r: &Remote) -> Option<DiaryDate> {
     let date = DiaryDate::parse(t.get(..10)?)?;
     let rest = &t[10..];
     (rest.is_empty() || rest.starts_with(char::is_whitespace)).then_some(date)
+}
+/// Indexes of the days to move so the page ends ascending: everything outside the longest
+/// strictly ascending run, which keeps the earliest-positioned days on ties. `dates` are unique
+/// ISO dates in page order.
+pub fn plan_moves(dates: &[String]) -> Vec<usize> {
+    let n = dates.len();
+    let (mut len, mut prev) = (vec![1usize; n], vec![usize::MAX; n]);
+    for i in 0..n {
+        for j in 0..i {
+            if dates[j] < dates[i] && len[j] + 1 > len[i] {
+                len[i] = len[j] + 1;
+                prev[i] = j;
+            }
+        }
+    }
+    let mut kept = vec![false; n];
+    // The first index with the longest run, so ties keep the earlier days.
+    let mut end = (0..n).fold(None, |best: Option<usize>, i| match best {
+        Some(b) if len[b] >= len[i] => Some(b),
+        _ => Some(i),
+    });
+    while let Some(i) = end.filter(|i| *i != usize::MAX) {
+        kept[i] = true;
+        end = Some(prev[i]);
+    }
+    (0..n).filter(|i| !kept[*i]).collect()
 }
 /// The old daily toggle shape; it is not migrated.
 pub fn is_legacy_day(r: &Remote) -> bool {
@@ -271,6 +312,7 @@ mod tests {
             text: text.into(),
             title: None,
             has_children: false,
+            plain: true,
         }
     }
 
@@ -317,5 +359,63 @@ mod tests {
         assert_eq!(day("heading_3", "2026-11-04"), None);
         assert!(is_legacy_day(&r("toggle", "2026-11-04")));
         assert!(!is_legacy_day(&r("toggle", "notes")));
+    }
+
+    fn dates(days: &[&str]) -> Vec<String> {
+        days.iter().map(|d| format!("2026-11-{d}")).collect()
+    }
+
+    #[test]
+    fn plan_moves_leaves_an_ascending_page_alone() {
+        assert!(plan_moves(&dates(&["01", "02", "09"])).is_empty());
+        assert!(plan_moves(&[]).is_empty());
+    }
+
+    #[test]
+    fn plan_moves_moves_one_misplaced_day() {
+        // 05 and 03 tie for a place in the run; the earlier-positioned 05 stays.
+        assert_eq!(plan_moves(&dates(&["01", "05", "03", "07"])), [2]);
+        assert_eq!(plan_moves(&dates(&["02", "01", "03"])), [1]);
+    }
+
+    #[test]
+    fn plan_moves_on_a_reversed_page_moves_all_but_one() {
+        assert_eq!(plan_moves(&dates(&["05", "04", "03", "02", "01"])).len(), 4);
+    }
+
+    #[test]
+    fn plan_moves_prefers_the_longer_run() {
+        assert_eq!(plan_moves(&dates(&["03", "01", "02"])), [0]);
+    }
+
+    #[test]
+    fn plan_moves_keeps_the_earliest_day_on_equal_length_ties() {
+        assert_eq!(plan_moves(&dates(&["02", "01"])), [1]);
+    }
+
+    #[test]
+    fn parse_page_marks_formatted_text_not_plain() {
+        let item = |rich: Value| json!({"id": "x", "type": "paragraph", "has_children": false, "paragraph": {"rich_text": rich}});
+        let text = |extra: Value| {
+            let mut t = json!({"type":"text","text":{"content":"a"},"plain_text":"a","annotations":{"bold":false,"italic":false,"strikethrough":false,"underline":false,"code":false,"color":"default"},"href":null});
+            for (k, v) in extra.as_object().unwrap() {
+                if k == "href" {
+                    t["href"] = v.clone();
+                } else {
+                    t["annotations"][k] = v.clone();
+                }
+            }
+            t
+        };
+        let page = json!({"results":[
+            item(json!([text(json!({"bold": true}))])),
+            item(json!([text(json!({"href": "https://example.com"}))])),
+            item(json!([text(json!({"color": "red"}))])),
+            item(json!([text(json!({}))])),
+            item(json!([])),
+        ],"has_more":false,"next_cursor":null});
+        let (items, _) = parse_page(&page).unwrap();
+        let plain: Vec<bool> = items.iter().map(|i| i.plain).collect();
+        assert_eq!(plain, [false, false, false, true, true]);
     }
 }

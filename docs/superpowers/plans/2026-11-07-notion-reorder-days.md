@@ -67,7 +67,7 @@ git commit -m "docs: plan automatic Notion day reorder"
   - `plan_moves_moves_one_misplaced_day`: dates `["2026-11-01","2026-11-05","2026-11-03","2026-11-07"]` gives `[1]` (the longest ascending run is 01,03,07; 05 moves). Also `["...-02","...-01","...-03"]` gives `[0]`.
   - `plan_moves_on_a_reversed_page_moves_all_but_one`: five reversed dates give four indexes.
   - `plan_moves_prefers_the_longer_run`: `["2026-11-03","2026-11-01","2026-11-02"]` gives `[0]` (the run 01, 02 beats 03 alone).
-  - `plan_moves_breaks_equal_length_ties_by_earliest_end`: `["2026-11-02","2026-11-01"]` gives `[0]`.
+  - `plan_moves_keeps_the_earliest_day_on_equal_length_ties`: `["2026-11-02","2026-11-01"]` gives `[1]` (ledger ruling: the spec keeps the earliest-positioned day).
   - `parse_page_marks_formatted_text_not_plain`: one fixture item with `annotations.bold = true`, one with `href`, one with `color = "red"`, one plain; assert `plain` is `false,false,false,true`.
 
 - [ ] **Step 2: Run to confirm failure**
