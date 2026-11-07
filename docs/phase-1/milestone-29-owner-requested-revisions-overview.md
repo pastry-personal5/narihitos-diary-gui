@@ -21,6 +21,8 @@ P1-M28 is Done ([overview](milestone-28-simple-refactoring-overview.md)). Decide
 - **T03 (owner, 2026-11-07):** Neutral gray surfaces with no green tint, referenced from the owner's VS Code dark theme screenshot (blue accent). Palette approved in chat and recorded in [ux-gui.md](../ux-gui.md).
 - **T05 (owner, 2026-11-07):** Settings panes use cards. Agent profiles are checked in the background from launch (first at launch, then 15 s doubling, capped at 1 h, per profile, for the whole session) and shown in a table with SF Symbols; an Advanced card lists what blocks Chat and Generate. The owner approved the background polling.
 
+- **T13–T16 (owner, 2026-11-07):** The Notion export shows each day as a Heading 2 titled `YYYY-MM-DD (WED)` followed by ordinary paragraph blocks, with no daily toggle. Old toggle days are not migrated: a leftover dated toggle is a structural conflict repaired by hand. Spec: [heading days](../superpowers/specs/2026-11-07-notion-heading-days-design.md).
+
 ## Scope
 
 In scope: the requests listed in the checklist. Out of scope: anything not requested, new dependencies or build tools without approval, and release qualification (P1-M32).
@@ -66,6 +68,15 @@ None yet.
 - [x] T11 `[behavior]` - Snippet tab default selection: eligible snippets whose local date is the selected day D start checked; D-1 and D+1 snippets start unchecked (owner, 2026-11-07). Evidence: `src/application/navigation/imports.ts`, `tests/navigation.test.ts` (new test; navigation suites 29 pass before the new test was added). Full vitest rerun passes (Z01); `tests/accessibility.test.tsx` now dates its snippet fixtures on the selected day. Not done: visual check.
 
 - [x] T12 `[gui]` - Snippet tab: "Move to Trash" becomes a bitmap icon button (`src/assets/trash.png`, masked like Chat Send; `aria-label` and tooltip kept). Evidence: `src/components/Explorer.tsx`, `src/styles.css`. Full vitest rerun passes (Z01). Not done: visual check.
+
+- [ ] T13 `[behavior]` - Notion day title and body headings: `day_title` gives `YYYY-MM-DD (WED)`; every projected Markdown heading becomes `heading_3`. Evidence: `diary-domain` `notion::tests`.
+
+- [ ] T14 `[behavior]` - Notion read side: a day is a dated `heading_2` plus its following siblings; ascending order, duplicates, legacy toggles and foreign blocks. Evidence: `export/notion/tests.rs`, `wire.rs` unit tests.
+
+- [ ] T15 `[behavior]` - Notion write side: create, backdate and replace as heading ranges with the O10 order and crash/lost-reply cases. Evidence: `export/notion/tests.rs`.
+
+- [ ] T16 `[docs]` - Smoke scripts, architecture text, P1-M27 wording and changelog updated for heading days. Evidence: `scripts/smoke/export.py` fake leg, docs diff.
+  - [ ] T16.1 - Owner-run live round trip (`scripts/smoke/notion-live.py`) records Q1 and Q2 of the spec.
 
 ### Proof and docs
 
