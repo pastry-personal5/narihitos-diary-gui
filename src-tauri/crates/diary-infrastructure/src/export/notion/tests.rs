@@ -24,12 +24,15 @@ struct Env {
     notion: Notion,
 }
 fn env_with(page_size: usize) -> Env {
+    env_with_fake(FakeNotion::new(ROOT).with_page_size(page_size))
+}
+fn env_with_fake(fake: FakeNotion) -> Env {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().canonicalize().unwrap().join("ws");
     std::fs::create_dir(&root).unwrap();
     let lock = WorkspaceLock::acquire(&root).unwrap();
     let ws = Workspace::open(&lock).unwrap();
-    let fake = Arc::new(FakeNotion::new(ROOT).with_page_size(page_size));
+    let fake = Arc::new(fake);
     let slept = Arc::new(Mutex::new(Vec::new()));
     let log = slept.clone();
     let client = Client::new(
@@ -711,7 +714,7 @@ fn a_crash_between_copy_and_delete_is_finished_by_the_next_export() {
 }
 
 #[test]
-fn a_crash_in_the_middle_of_the_delete_is_finished_by_the_next_export() {
+fn a_crash_in_the_middle_of_the_delete_needs_repair_by_hand_and_loses_nothing() {
     let e = env();
     for day in ["01", "05", "07"] {
         e.put(&format!("2026-11-{day}"), "x\n");
@@ -719,8 +722,16 @@ fn a_crash_in_the_middle_of_the_delete_is_finished_by_the_next_export() {
     e.add_day("2026-11-03 (TUE)", &["first", "second"]);
     e.fake.fault_after("delete", 1, Fault::Drop);
     assert_eq!(e.put("2026-11-09", "x\n"), Applied::Unknown);
-    assert_eq!(e.put("2026-11-09", "x\n"), Applied::Done);
-    assert_eq!(e.days(), ASCENDING);
+    // The copy is complete and the original keeps its unfinished tail. A suffix could equally be
+    // the old text of an interrupted replace, so it is never guessed at.
+    assert_eq!(
+        e.days()
+            .iter()
+            .filter(|d| d.starts_with("2026-11-03"))
+            .count(),
+        2
+    );
+    assert_refused_without_writing(&e);
     assert_eq!(e.range_texts("2026-11-03"), ["first", "second"]);
 }
 
@@ -814,4 +825,151 @@ fn a_preamble_never_moves_during_a_reorder() {
     assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Done);
     assert_eq!(e.fake.children(&e.month())[0], pre);
     assert_eq!(e.days(), ASCENDING);
+}
+
+fn code_block(language: &str) -> Value {
+    json!({"object":"block","type":"code","code":{"rich_text":[{"type":"text","text":{"content":"fn x() {}"}}],"language":language}})
+}
+
+#[test]
+fn adjacent_moved_days_terminate_and_end_ascending() {
+    let e = env();
+    e.put("2026-11-01", "text 01\n");
+    for (title, day) in [
+        ("2026-11-05 (THU)", "05"),
+        ("2026-11-06 (FRI)", "06"),
+        ("2026-11-02 (MON)", "02"),
+        ("2026-11-03 (TUE)", "03"),
+        ("2026-11-04 (WED)", "04"),
+    ] {
+        e.add_day(title, &[&format!("text {day}")]);
+    }
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Done);
+    assert_eq!(
+        e.days(),
+        [
+            "2026-11-01 (SUN)",
+            "2026-11-02 (MON)",
+            "2026-11-03 (TUE)",
+            "2026-11-04 (WED)",
+            "2026-11-05 (THU)",
+            "2026-11-06 (FRI)",
+            "2026-11-09 (MON)"
+        ]
+    );
+    for day in ["01", "02", "03", "04", "05", "06", "09"] {
+        assert_eq!(
+            e.range_texts(&format!("2026-11-{day}")),
+            [format!("text {day}")]
+        );
+    }
+}
+
+#[test]
+fn a_moved_code_block_keeps_its_language() {
+    let e = env();
+    for day in ["01", "05", "07"] {
+        e.put(&format!("2026-11-{day}"), "x\n");
+    }
+    e.fake
+        .external_block(&e.month(), &day_heading("2026-11-03 (TUE)"), None);
+    e.fake.external_block(&e.month(), &code_block("rust"), None);
+    assert_eq!(e.put("2026-11-09", "x\n"), Applied::Done);
+    let code = e
+        .fake
+        .children(&e.month())
+        .into_iter()
+        .find(|c| e.fake.kind_of(c) == "code")
+        .unwrap();
+    assert_eq!(e.fake.language_of(&code).as_deref(), Some("rust"));
+    assert_eq!(e.days()[1], "2026-11-03 (TUE)");
+}
+
+#[test]
+fn a_code_language_the_copy_cannot_keep_is_not_moved() {
+    let e = env();
+    for day in ["01", "05", "07"] {
+        e.put(&format!("2026-11-{day}"), "x\n");
+    }
+    e.fake
+        .external_block(&e.month(), &day_heading("2026-11-03 (TUE)"), None);
+    e.fake
+        .external_block(&e.month(), &code_block("kotlin"), None);
+    assert_refused_without_writing(&e);
+}
+
+#[test]
+fn a_mention_is_not_flattened_by_a_move() {
+    let e = env();
+    for day in ["01", "05", "07"] {
+        e.put(&format!("2026-11-{day}"), "x\n");
+    }
+    e.fake
+        .external_block(&e.month(), &day_heading("2026-11-03 (TUE)"), None);
+    e.fake.external_block(
+        &e.month(),
+        &json!({"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"mention","mention":{"type":"user","user":{"id":"u"}},"text":{"content":"@someone"}}]}}),
+        None,
+    );
+    assert_refused_without_writing(&e);
+}
+
+#[test]
+fn an_append_reply_that_lists_neighbours_does_not_confuse_the_copy() {
+    // 08 sits above 01 and 05 and moves forward, so its copy lands after the original heading
+    // and a reply listing the whole page shows the original first.
+    let e = env_with_fake(FakeNotion::new(ROOT).chatty());
+    e.put("2026-11-01", "text 01\n");
+    e.put("2026-11-05", "text 05\n");
+    e.fake
+        .external_block(&e.month(), &day_heading("2026-11-08 (SUN)"), Some(0));
+    e.fake
+        .external_block(&e.month(), &paragraph("text 08"), Some(1));
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Done);
+    assert_eq!(
+        e.days(),
+        [
+            "2026-11-01 (SUN)",
+            "2026-11-05 (THU)",
+            "2026-11-08 (SUN)",
+            "2026-11-09 (MON)"
+        ]
+    );
+    assert_eq!(e.range_texts("2026-11-08"), ["text 08"]);
+    assert_eq!(e.range_texts("2026-11-01"), ["text 01"]);
+}
+
+#[test]
+fn a_replace_that_crashed_after_its_first_delete_is_not_resolved_by_deleting_the_new_text() {
+    let e = env();
+    e.put("2026-11-07", "a\n\nb\n\nc\n\nd\n");
+    e.fake.fault_after("delete", 1, Fault::Drop);
+    assert_eq!(e.put("2026-11-07", "c\n\nd\n"), Applied::Unknown);
+    // The old range keeps [b, c, d] and the new one holds [c, d] (a suffix of the old).
+    assert_eq!(e.days().len(), 2);
+    assert_eq!(
+        e.seen("2026-11-07").unavailable,
+        Some(Unavailable::Structural)
+    );
+    let heads: Vec<String> = e
+        .fake
+        .children(&e.month())
+        .into_iter()
+        .filter(|c| e.fake.kind_of(c) == "heading_2")
+        .collect();
+    assert_eq!(heads.len(), 2);
+}
+
+#[test]
+fn a_formatted_duplicate_is_never_deleted_as_a_twin() {
+    let e = env();
+    page_with_03_last(&e);
+    e.fake
+        .external_block(&e.month(), &day_heading("2026-11-03 (TUE)"), None);
+    e.fake.external_block(
+        &e.month(),
+        &json!({"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"text 03"},"annotations":{"bold":true}}]}}),
+        None,
+    );
+    assert_refused_without_writing(&e);
 }

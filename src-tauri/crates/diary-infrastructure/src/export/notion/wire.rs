@@ -98,6 +98,8 @@ pub struct Remote {
     /// No rich-text item carries an annotation, a non-default color or a link: copying the block
     /// as plain text loses nothing.
     pub plain: bool,
+    /// A code block's language as Notion reports it.
+    pub lang: Option<String>,
 }
 fn is_plain(rich: &Value) -> bool {
     rich.as_array().is_none_or(|items| {
@@ -107,6 +109,8 @@ fn is_plain(rich: &Value) -> bool {
             flags.iter().all(|f| !a[*f].as_bool().unwrap_or(false))
                 && a["color"].as_str().is_none_or(|c| c == "default")
                 && i["href"].is_null()
+                // Mentions and equations would be flattened to their text by a copy.
+                && i["type"].as_str().is_none_or(|t| t == "text")
         })
     })
 }
@@ -139,6 +143,9 @@ pub fn parse_page(v: &Value) -> Result<(Vec<Remote>, Option<String>), Error> {
             .get("id")
             .and_then(Value::as_str)
             .ok_or(Error::Malformed)?;
+        let lang = (kind == "code")
+            .then(|| r[kind]["language"].as_str().map(str::to_string))
+            .flatten();
         out.push(Remote {
             id: id.into(),
             kind: kind.into(),
@@ -153,7 +160,11 @@ pub fn parse_page(v: &Value) -> Result<(Vec<Remote>, Option<String>), Error> {
                 .get("has_children")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
-            plain: r.get(kind).is_none_or(|k| is_plain(&k["rich_text"])),
+            plain: r.get(kind).is_none_or(|k| is_plain(&k["rich_text"]))
+                && lang.as_deref().is_none_or(|l| {
+                    l == "plain text" || LANGUAGES.contains(&l.to_ascii_lowercase().as_str())
+                }),
+            lang,
         });
     }
     let more = v.get("has_more").and_then(Value::as_bool).unwrap_or(false);
@@ -169,13 +180,13 @@ pub fn parse_page(v: &Value) -> Result<(Vec<Remote>, Option<String>), Error> {
     };
     Ok((out, cursor))
 }
-/// The ID of the day heading titled `title` in an append reply. The reply may list more than the
-/// new block, so position is never trusted.
-pub fn new_heading(v: &Value, title: &str, old: Option<&str>) -> Option<String> {
+/// The ID of the day heading titled `title` in an append reply that is not already `known`. The
+/// reply may list neighbours, including an older heading with the same title.
+pub fn new_heading(v: &Value, title: &str, known: &HashSet<String>) -> Option<String> {
     let (items, _) = parse_page(v).ok()?;
     items
         .into_iter()
-        .find(|r| r.kind == "heading_2" && r.text.trim() == title && Some(r.id.as_str()) != old)
+        .find(|r| r.kind == "heading_2" && r.text.trim() == title && !known.contains(&r.id))
         .map(|r| r.id)
 }
 /// Reply blocks not seen before, in reply order. Real replies may list neighbours too.
@@ -287,6 +298,11 @@ impl Section {
 }
 pub fn to_block(r: &Remote, children: Vec<Block>) -> Block {
     match Kind::from_tag(&r.kind) {
+        Some(Kind::Code(_)) => Block {
+            kind: Kind::Code(r.lang.clone().unwrap_or_default()),
+            text: r.text.clone(),
+            children,
+        },
         Some(kind) => Block {
             kind,
             text: r.text.clone(),
@@ -313,6 +329,7 @@ mod tests {
             title: None,
             has_children: false,
             plain: true,
+            lang: None,
         }
     }
 

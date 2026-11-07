@@ -40,6 +40,8 @@ pub struct FakeNotion {
     faults: Mutex<VecDeque<(String, usize, Fault)>>,
     calls: Mutex<Vec<String>>,
     page_size: usize,
+    /// Append replies list every child of the parent, as the real service may.
+    chatty: bool,
     file: Option<PathBuf>,
 }
 
@@ -71,6 +73,7 @@ impl FakeNotion {
             faults: Mutex::new(VecDeque::new()),
             calls: Mutex::new(vec![]),
             page_size: 100,
+            chatty: false,
             file: None,
         }
     }
@@ -112,6 +115,16 @@ impl FakeNotion {
         }
         fake.file = Some(file);
         fake
+    }
+    pub fn chatty(mut self) -> Self {
+        self.chatty = true;
+        self
+    }
+    pub fn language_of(&self, id: &str) -> Option<String> {
+        let st = self.state.lock().unwrap();
+        st.nodes
+            .get(id)
+            .and_then(|n| n.payload["language"].as_str().map(str::to_string))
     }
     pub fn with_page_size(mut self, size: usize) -> Self {
         self.page_size = size;
@@ -351,7 +364,12 @@ impl FakeNotion {
                     .unwrap()
                     .children
                     .splice(at..at, ids.iter().cloned());
-                let results: Vec<Value> = ids.iter().map(|i| Self::render(&st, i)).collect();
+                let listed = if self.chatty {
+                    st.nodes[*id].children.clone()
+                } else {
+                    ids
+                };
+                let results: Vec<Value> = listed.iter().map(|i| Self::render(&st, i)).collect();
                 self.save(&st);
                 Self::reply(
                     200,

@@ -242,17 +242,16 @@ impl Notion {
                 let [a, b] = at[..] else {
                     return Err(Fail::Structural);
                 };
+                // Strict: a duplicate with formatting must never be dropped as a "copy".
                 let read =
-                    |r: &wire::DayRange| self.section_of(&items[r.heading + 1..r.end], 0, false);
+                    |r: &wire::DayRange| self.section_of(&items[r.heading + 1..r.end], 0, true);
                 let (sa, sb) = (read(&ranges[a])?, read(&ranges[b])?);
-                // The shorter range holds nothing the longer one lacks; on equal ranges the
-                // later one goes. Anything else is two different texts for one day.
-                let covers = |long: &Section, short: &Section| {
-                    long.blocks.starts_with(&short.blocks) || long.blocks.ends_with(&short.blocks)
-                };
-                let drop = if sb.blocks.len() <= sa.blocks.len() && covers(&sa, &sb) {
+                // Only a byte-identical copy or a bare heading (a copy whose body never landed)
+                // is an unfinished move. A prefix or suffix could just as well be the old text of
+                // an interrupted replace, so it is never guessed at.
+                let drop = if sa.blocks == sb.blocks || sb.blocks.is_empty() {
                     b
-                } else if covers(&sb, &sa) {
+                } else if sa.blocks.is_empty() {
                     a
                 } else {
                     return Err(Fail::Structural);
@@ -441,9 +440,8 @@ impl Run<'_> {
             &format!("/v1/blocks/{month}/children"),
             Some(&body),
         );
-        let id = self.after(seq, r, |v| {
-            wire::new_heading(v, &title, old.map(|(heading, _)| heading))
-        })?;
+        let known = self.known.clone();
+        let id = self.after(seq, r, |v| wire::new_heading(v, &title, &known))?;
         self.known.insert(id.clone());
         Ok(id)
     }
@@ -491,14 +489,18 @@ impl Run<'_> {
             n.section_of(&v.items[r.heading + 1..r.end], 0, true)
                 .map_err(|_| self.stop())?;
         }
+        let v_moves = v.moves.len();
         if let Some(t) = v.twin {
             self.delete_day(&t)?;
         }
-        // shortcut: a later tie flip can pick a day not checked above; it is then refused after
-        // earlier moves, which leaves no duplicate or lost text. Upgrade if that is ever seen.
-        loop {
+        // shortcut: a later tie flip can pick a day not checked above; its strict read then fails
+        // after earlier moves and the export returns `Unknown` (every copy was verified before
+        // its original was deleted, so nothing is lost). Upgrade if that is ever seen.
+        // Each pass places one day, so a page that is still unordered after this many passes is
+        // not converging; stop rather than write forever.
+        for _ in 0..=2 * v_moves + 2 {
             let v = n.view(month).map_err(|_| self.stop())?;
-            let Some(i) = v.moves.iter().copied().min_by_key(|i| &v.days[*i].iso) else {
+            let Some(i) = v.moves.iter().copied().max_by_key(|i| &v.days[*i].iso) else {
                 return Ok(());
             };
             let (day, range) = (&v.days[i], &v.ranges[i]);
@@ -525,6 +527,7 @@ impl Run<'_> {
             }
             self.delete_day(day)?;
         }
+        Err(Stop::Unknown)
     }
     /// Body blocks in order, the heading last, so a half-deleted day still has its heading.
     fn delete_day(&mut self, day: &Day) -> Result<(), Stop> {
