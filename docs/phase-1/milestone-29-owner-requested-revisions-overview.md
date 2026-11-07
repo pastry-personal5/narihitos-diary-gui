@@ -23,6 +23,8 @@ P1-M28 is Done ([overview](milestone-28-simple-refactoring-overview.md)). Decide
 
 - **T13–T16 (owner, 2026-11-07):** The Notion export shows each day as a Heading 2 titled `YYYY-MM-DD (WED)` followed by ordinary paragraph blocks, with no daily toggle. Old toggle days are not migrated: a leftover dated toggle is a structural conflict repaired by hand. Spec: [heading days](../superpowers/specs/2026-11-07-notion-heading-days-design.md).
 
+- **T17–T19 (owner, 2026-11-07):** The Notion export reorders out-of-order day headings automatically, with no prompt; originals are deleted only after the copy is verified. Spec: [reorder days](../superpowers/specs/2026-11-07-notion-reorder-days-design.md).
+
 ## Scope
 
 In scope: the requests listed in the checklist. Out of scope: anything not requested, new dependencies or build tools without approval, and release qualification (P1-M32).
@@ -77,6 +79,13 @@ None yet.
 
 - [x] T16 `[docs]` - Smoke scripts, architecture text, P1-M27 wording and changelog updated for heading days. Evidence: `scripts/smoke/export.py` fake leg, docs diff. Evidence: `scripts/smoke/export.py` prints `PASS export smoke`; `notion-live.py` compiles; architecture, P1-M27 and changelog updated.
   - [ ] T16.1 - Owner-run live round trip (`scripts/smoke/notion-live.py`) records Q1 and Q2 of the spec.
+
+- [ ] T17 `[behavior]` - Notion move planner and plain-text flag: `plan_moves` keeps the longest ascending run; `Remote.plain` marks formatted text. Evidence: `wire.rs` unit tests.
+
+- [ ] T18 `[behavior]` - Notion reorder: `look` reports disorder instead of failing; `apply` copies, verifies and deletes out-of-place days, repairs identical twins, and refuses formatted, foreign, duplicate and legacy days without writing. Evidence: `export/notion/tests.rs`.
+
+- [ ] T19 `[docs]` - Architecture text, P1-M27 O8 note, changelog and a live reorder leg. Evidence: docs diff, `notion-live.py` compiles.
+  - [ ] T19.1 - Owner-run live round trip records the reorder leg result (`Q3`).
 
 ### Proof and docs
 
