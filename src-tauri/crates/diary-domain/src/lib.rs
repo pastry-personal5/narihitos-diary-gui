@@ -2,6 +2,7 @@
 
 pub mod authentic;
 pub mod calendar;
+pub mod notion;
 pub mod review;
 pub mod source;
 

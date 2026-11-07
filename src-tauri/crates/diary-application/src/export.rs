@@ -105,6 +105,14 @@ pub enum Unavailable {
     PermissionDenied,
     /// Coordination failed or timed out.
     CoordinationFailed,
+    /// The destination refused the credential (Notion 401/403 or an unshared page).
+    Unauthorized,
+    /// The destination asked to wait longer than the retry budget.
+    Throttled,
+    /// The destination could not be reached before anything was sent.
+    Network,
+    /// Duplicate or disordered remote hierarchy that needs external repair.
+    Structural,
 }
 impl Unavailable {
     pub const fn as_str(self) -> &'static str {
@@ -113,6 +121,10 @@ impl Unavailable {
             Self::Unreadable => "unreadable",
             Self::PermissionDenied => "permission_denied",
             Self::CoordinationFailed => "coordination_failed",
+            Self::Unauthorized => "unauthorized",
+            Self::Throttled => "throttled",
+            Self::Network => "network",
+            Self::Structural => "structural_conflict",
         }
     }
     pub fn parse(value: &str) -> Option<Self> {
@@ -121,6 +133,10 @@ impl Unavailable {
             Self::Unreadable,
             Self::PermissionDenied,
             Self::CoordinationFailed,
+            Self::Unauthorized,
+            Self::Throttled,
+            Self::Network,
+            Self::Structural,
         ]
         .into_iter()
         .find(|r| r.as_str() == value)
@@ -228,6 +244,21 @@ pub trait ExportAdapter: Send + Sync {
         expected: &Observation,
     ) -> Applied;
     fn read_back(&self, date: &DiaryDate) -> Observation;
+    /// `Err` while the destination's identity cannot be established yet (Notion fetches its
+    /// workspace lazily). The service builds no destination key and creates no intent until
+    /// this succeeds, so a placeholder `root()` can never be persisted.
+    fn ready(&self) -> Result<(), Unavailable> {
+        Ok(())
+    }
+    /// The digest a remote holding exactly this snapshot reports in `Observation::digest`.
+    /// `None` means the snapshot's own SHA-256 (byte-for-byte destinations such as iCloud).
+    fn digest_of(&self, _snapshot: &[u8]) -> Option<String> {
+        None
+    }
+    /// Count of constructs the projection kept only as literal text; surfaced as a message.
+    fn warnings(&self, _snapshot: &[u8]) -> u32 {
+        0
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

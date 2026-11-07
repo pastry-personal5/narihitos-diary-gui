@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn registry_parity() {
         let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
-        let want: [(&str, &str, Vec<String>); 12] = [
+        let want: [(&str, &str, Vec<String>); 13] = [
             ("palette.open", "app", s(&["Shift+Command+P"])),
             ("editor.save", "app", s(&["Command+S"])),
             ("authentic.create_empty", "app", s(&[])),
@@ -260,6 +260,7 @@ mod tests {
             ("ai.results.open", "app", s(&[])),
             ("ai.results.discard", "app", s(&[])),
             ("export.start", "app", s(&[])),
+            ("export.start.notion", "app", s(&[])),
             ("settings.open", "app", s(&[])),
         ];
         let got = &registry().actions;

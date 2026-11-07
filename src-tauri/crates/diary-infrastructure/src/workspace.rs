@@ -123,12 +123,20 @@ impl Workspace {
             sources,
         )))
     }
-    /// The export service. Production passes no adapter, so every target is `disabled` while
+    /// The export service with at most one adapter. With none, every target is `disabled` while
     /// lookup, recovery and the reload guard still work.
     pub fn exports(
         &self,
         authentic: Arc<dyn diary_application::authentic::AuthenticStore>,
         adapter: Option<Arc<dyn diary_application::export::ExportAdapter>>,
+    ) -> Option<crate::export::Service> {
+        self.exports_with(authentic, adapter.into_iter().collect())
+    }
+    /// The export service with one adapter per configured target.
+    pub fn exports_with(
+        &self,
+        authentic: Arc<dyn diary_application::authentic::AuthenticStore>,
+        adapters: Vec<Arc<dyn diary_application::export::ExportAdapter>>,
     ) -> Option<crate::export::Service> {
         let (Some(db), Readiness::Ready) = (&self.db, self.readiness) else {
             return None;
@@ -137,8 +145,20 @@ impl Workspace {
             db.clone(),
             self.identity.clone(),
             authentic,
-            adapter,
+            adapters,
         ))
+    }
+    /// The Notion destination for the configured root page. `None` when the workspace has no
+    /// ledger or the page ID is malformed. The Notion workspace identity is fetched lazily.
+    pub fn notion(
+        &self,
+        client: crate::export::notion::client::Client,
+        root_page_id: &str,
+    ) -> Option<crate::export::notion::Notion> {
+        let (Some(db), Readiness::Ready) = (&self.db, self.readiness) else {
+            return None;
+        };
+        crate::export::notion::Notion::new(client, root_page_id, db.clone())
     }
     /// The lock proves exclusivity; recovery and inspection modes expose no ledger.
     pub fn open(lock: &WorkspaceLock) -> Result<Self, WorkspaceError> {

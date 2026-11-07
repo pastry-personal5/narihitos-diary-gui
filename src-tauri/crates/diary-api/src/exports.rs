@@ -44,10 +44,13 @@ pub(super) struct ConfirmIn {
 pub(super) fn error(e: ExportError) -> Response {
     use ExportError::*;
     if let CloudUnavailable(reason) = e {
-        let (status, code) = if reason == Unavailable::PermissionDenied {
-            (StatusCode::FORBIDDEN, "permission_denied")
-        } else {
-            (StatusCode::SERVICE_UNAVAILABLE, "cloud_unavailable")
+        let (status, code) = match reason {
+            Unavailable::PermissionDenied => (StatusCode::FORBIDDEN, "permission_denied"),
+            Unavailable::Unauthorized => (StatusCode::UNAUTHORIZED, "export_unauthorized"),
+            Unavailable::Throttled => (StatusCode::TOO_MANY_REQUESTS, "export_throttled"),
+            Unavailable::Network => (StatusCode::SERVICE_UNAVAILABLE, "export_network"),
+            Unavailable::Structural => (StatusCode::CONFLICT, "export_structural"),
+            _ => (StatusCode::SERVICE_UNAVAILABLE, "cloud_unavailable"),
         };
         return (
             status,

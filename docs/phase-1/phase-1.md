@@ -192,8 +192,9 @@ Plan: [overview](milestone-26-icloud-export-overview.md), [work plan](milestone-
 
 ### P1-M27: Notion export
 
-Status: Planned
+Status: Delivered (2026-11-07)
 Goal: Export deterministic year/month/daily projections with ascending dates, bounded chunking, service-limit handling and provenance-aware ambiguous-write recovery.
+Plan: [overview](milestone-27-notion-export-overview.md), [work plan](milestone-27-notion-export-architecture.md); owner decisions O1–O12 recorded (2026-11-07), including `reqwest` `native-tls`, an agent-run live round trip and ascending order enforced for daily sections only.
 
 ### P1-M28: Personal release qualification
 

@@ -2,6 +2,7 @@ import { AuthenticError, type Bridge } from "../bridge";
 import type {
   ExportPreview,
   ExportResult,
+  ExportTarget,
   StartExportOutcome,
 } from "./contracts";
 
@@ -9,6 +10,7 @@ export type ExportPhase = "idle" | "working" | "preview" | "uncertain";
 export interface ExportSnapshot {
   phase: ExportPhase;
   date: string | null;
+  target: ExportTarget;
   preview: (ExportPreview & { abandon: boolean }) | null;
   uncertain: ExportResult | null;
   announcement: string;
@@ -16,37 +18,76 @@ export interface ExportSnapshot {
 const IDLE: ExportSnapshot = {
   phase: "idle",
   date: null,
+  target: "icloud",
   preview: null,
   uncertain: null,
   announcement: "",
 };
+/** Destination wording; the file for iCloud, the daily section for Notion. */
+const NAME: Record<ExportTarget, { place: string; item: string }> = {
+  icloud: { place: "iCloud", item: "iCloud file" },
+  notion: { place: "Notion", item: "Notion section" },
+};
 /** App-authored text only; a server message or exception text never reaches the user. */
-export const EXPORT_MESSAGE: Record<string, string> = {
-  export_disabled:
-    "Export is not set up. Set an iCloud export folder in the configuration.",
-  cloud_unavailable:
-    "The iCloud file is not downloaded or not readable. Open it in Finder, then try again.",
-  permission_denied:
-    "macOS denied access to the iCloud export folder. Allow access in System Settings, then try again.",
-  nothing_to_export: "There is no saved entry to export for this date.",
-  stale_revision: "The entry changed. Save it and export again.",
-  resource_reserved:
-    "Another export is using this destination. Try again soon.",
-  outcome_uncertain:
-    "An earlier export to this destination has an unknown outcome. Resolve it first.",
-  preview_expired: "The confirmation expired. Export again.",
-  preview_stale: "The file changed again. Export again to see the new preview.",
-  save_failed: "The entry could not be saved, so it was not exported.",
-  unavailable: "Export is unavailable right now.",
+export function exportMessage(error: string, target: ExportTarget): string {
+  const { place, item } = NAME[target];
+  const text: Record<string, string> = {
+    export_disabled:
+      target === "icloud"
+        ? "Export is not set up. Set an iCloud export folder in the configuration."
+        : "Notion export is not set up or could not connect. Check the Notion settings and that the service is reachable, then restart the server.",
+    cloud_unavailable:
+      "The iCloud file is not downloaded or not readable. Open it in Finder, then try again.",
+    permission_denied:
+      "macOS denied access to the iCloud export folder. Allow access in System Settings, then try again.",
+    export_unauthorized:
+      "Notion refused the request. Check the token and that the root page is shared with the integration.",
+    export_throttled:
+      "Notion asked to wait longer than the app will. Try the export again in a few minutes.",
+    export_network: "Notion could not be reached. Check the connection.",
+    export_structural:
+      "The Notion pages contain duplicate or out-of-order sections. Repair them in Notion, then try again.",
+    nothing_to_export: "There is no saved entry to export for this date.",
+    stale_revision: "The entry changed. Save it and export again.",
+    resource_reserved:
+      "Another export is using this destination. Try again soon.",
+    outcome_uncertain: `An earlier export to ${place} has an unknown outcome. Resolve it first.`,
+    preview_expired: "The confirmation expired. Export again.",
+    preview_stale: `The ${item} changed again. Export again to see the new preview.`,
+    save_failed: "The entry could not be saved, so it was not exported.",
+    unavailable: "Export is unavailable right now.",
+  };
+  // A destination failure recorded on the operation uses the same wording as the route error.
+  const alias: Record<string, string> = {
+    download_needed: "cloud_unavailable",
+    unreadable: "cloud_unavailable",
+    coordination_failed: "cloud_unavailable",
+    unauthorized: "export_unauthorized",
+    throttled: "export_throttled",
+    network: "export_network",
+    structural_conflict: "export_structural",
+  };
+  return text[error] ?? text[alias[error] ?? ""] ?? text.unavailable;
+}
+export const EXPORT_MESSAGE = {
+  outcome_uncertain: exportMessage("outcome_uncertain", "icloud"),
 };
-const REASON_TEXT: Record<string, string> = {
-  changed: "The iCloud file was changed outside this app.",
-  deleted: "The iCloud file was deleted outside this app.",
-  unowned: "A file already exists there that this app did not export.",
-  uncertain: "The earlier export may or may not have written the file.",
-};
-export const exportReasonText = (reason: string) =>
-  REASON_TEXT[reason] ?? REASON_TEXT.changed;
+export function exportReasonText(
+  reason: string,
+  target: ExportTarget = "icloud",
+) {
+  const { item } = NAME[target];
+  const text: Record<string, string> = {
+    changed: `The ${item} was changed outside this app.`,
+    deleted: `The ${item} was deleted outside this app.`,
+    unowned:
+      target === "icloud"
+        ? "A file already exists there that this app did not export."
+        : "A section for this date already exists that this app did not export.",
+    uncertain: "The earlier export may or may not have been written.",
+  };
+  return text[reason] ?? text.changed;
+}
 
 export interface ExportDeps {
   /** Settles pending Authentic saves; false when the buffer cannot be saved. */
@@ -92,20 +133,21 @@ export class ExportController {
     for (const l of this.listeners) l();
   }
   private fail(error: string) {
-    const text = EXPORT_MESSAGE[error] ?? EXPORT_MESSAGE.unavailable;
+    const text = exportMessage(error, this.snapshot.target);
     this.deps.notify(text, "error");
-    this.set({ ...IDLE, announcement: text });
+    // Keep the destination for the next attempt's wording.
+    this.set({ ...IDLE, target: this.snapshot.target, announcement: text });
   }
 
-  async start(date: string): Promise<void> {
+  async start(date: string, target: ExportTarget = "icloud"): Promise<void> {
     if (this.snapshot.phase !== "idle" || !this.bridge.startExport) return;
-    this.set({ ...IDLE, phase: "working", date });
+    this.set({ ...IDLE, phase: "working", date, target });
     try {
       if (!(await this.deps.flush(date))) return this.fail("save_failed");
       // The acknowledged revision after the flush, never the editor text.
       const file = await this.bridge.loadAuthentic(date);
       if (!file.exists || !file.revision) return this.fail("nothing_to_export");
-      const key = `${date}:${file.revision.sequence}:${file.revision.sha256}`;
+      const key = `${target}:${date}:${file.revision.sequence}:${file.revision.sha256}`;
       // A retry of an unanswered start reuses its operation ID.
       const id =
         this.pending?.key === key ? this.pending.id : this.deps.newId();
@@ -113,7 +155,7 @@ export class ExportController {
       const outcome = await this.bridge.startExport({
         operation_id: id,
         date,
-        target: "icloud",
+        target,
         expected_revision: file.revision,
       });
       this.pending = null;
@@ -129,7 +171,10 @@ export class ExportController {
       this.set({
         phase: "preview",
         preview: { ...outcome.preview, abandon },
-        announcement: exportReasonText(outcome.preview.reason),
+        announcement: exportReasonText(
+          outcome.preview.reason,
+          this.snapshot.target,
+        ),
       });
       return;
     }
@@ -148,16 +193,29 @@ export class ExportController {
     }
     switch (latest.state) {
       case "succeeded":
-        this.deps.notify(`Exported ${latest.date} to iCloud.`, "info");
-        return this.set({ ...IDLE, announcement: "Export finished." });
+        this.deps.notify(
+          `Exported ${latest.date} to ${NAME[latest.target].place}.`,
+          "info",
+        );
+        if (latest.reason === "projection_warnings")
+          this.deps.notify(
+            "Some Markdown could not be shown as Notion formatting and was kept as plain text.",
+            "warning",
+          );
+        return this.set({
+          ...IDLE,
+          target: latest.target,
+          announcement: "Export finished.",
+        });
       case "uncertain":
         this.deps.notify(
-          "The export outcome is unknown. Check the iCloud file, then resolve it.",
+          `The export outcome is unknown. Check the ${NAME[latest.target].item}, then resolve it.`,
           "warning",
         );
         return this.set({
           phase: "uncertain",
           date: latest.date,
+          target: latest.target,
           preview: null,
           uncertain: latest,
           announcement: "Export outcome unknown.",
@@ -165,8 +223,8 @@ export class ExportController {
       case "cancelled":
         this.deps.notify(
           latest.reason === "abandoned"
-            ? "The unknown export was abandoned. The iCloud file was not touched."
-            : "Export cancelled. The iCloud file was not changed.",
+            ? `The unknown export was abandoned. The ${NAME[latest.target].item} was not touched.`
+            : `Export cancelled. The ${NAME[latest.target].item} was not changed.`,
           "info",
         );
         return this.set({ ...IDLE });
@@ -175,7 +233,7 @@ export class ExportController {
       case "needs_confirmation": {
         // Drift pauses the existing operation and retains its reservation. Re-preview
         // that exact saved revision instead of stranding it behind a new operation ID.
-        if (latest.target !== "icloud") return this.fail("unavailable");
+        this.snapshot = { ...this.snapshot, target: latest.target };
         const outcome = await this.bridge.startExport!({
           operation_id: latest.operation_id,
           date: latest.date,
@@ -195,9 +253,9 @@ export class ExportController {
   private async findUnfinished(error: string) {
     try {
       const list = (await this.bridge.listExports?.()) ?? [];
-      const found = list.find((r) => r.target === "icloud");
+      const found = list.find((r) => r.target === this.snapshot.target);
       if (found) {
-        this.set({ phase: "working", date: found.date });
+        this.set({ phase: "working", date: found.date, target: found.target });
         await this.finish(found);
         return;
       }

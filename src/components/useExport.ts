@@ -3,6 +3,7 @@ import type { ExportController } from "../application/export/controller";
 const NONE = {
   phase: "idle",
   date: null,
+  target: "icloud",
   preview: null,
   uncertain: null,
   announcement: "",

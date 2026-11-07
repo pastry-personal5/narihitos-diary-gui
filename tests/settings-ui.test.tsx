@@ -281,9 +281,11 @@ describe("Command palette and Keyboard Shortcuts", () => {
     fireEvent.change(screen.getByLabelText("Filter actions"), {
       target: { value: "Export" },
     });
-    expect(screen.getByRole("option").textContent).toMatch(
-      /Connect to the server first\./u,
-    );
+    // "Export" matches both destinations.
+    const options = screen.getAllByRole("option");
+    expect(options).toHaveLength(2);
+    for (const option of options)
+      expect(option.textContent).toMatch(/Connect to the server first\./u);
     fireEvent.keyDown(screen.getByLabelText("Filter actions"), {
       key: "Enter",
     });
@@ -302,7 +304,7 @@ describe("Command palette and Keyboard Shortcuts", () => {
     const fake = settingsFake({ writing_locale: "en-US", revision: "r0" });
     render(<App bridge={bridge(fake)} />);
     await openSettings("Keyboard Shortcuts");
-    expect(screen.getAllByRole("row")).toHaveLength(13);
+    expect(screen.getAllByRole("row")).toHaveLength(14);
     const edit = screen.getByRole("button", { name: "Edit Open Settings" });
     await waitFor(() => expect(edit.hasAttribute("disabled")).toBe(false));
     fireEvent.click(edit);

@@ -23,6 +23,7 @@ describe("registry and canonical form", () => {
       ["ai.results.open", "app", 0],
       ["ai.results.discard", "app", 0],
       ["export.start", "app", 0],
+      ["export.start.notion", "app", 0],
       ["settings.open", "app", 0],
     ]);
     expect(ACTIONS[0].defaults).toEqual(["Shift+Command+P"]);

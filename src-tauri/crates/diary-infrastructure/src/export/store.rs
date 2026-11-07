@@ -243,6 +243,17 @@ impl Db {
             .map_err(sql)
         })?)
     }
+    /// A bounded tag shown with a succeeded export (for example `projection_warnings`).
+    pub fn set_export_reason(&self, id: &OperationId, reason: &str) -> Result<(), StoreError> {
+        Ok(self.with(|c| {
+            c.execute(
+                "UPDATE export_operations SET reason=?2 WHERE operation_id=?1",
+                params![id.as_str(), reason],
+            )
+            .map(|_| ())
+            .map_err(sql)
+        })?)
+    }
     pub fn export_chunk_status(&self, id: &OperationId) -> Result<Option<String>, StoreError> {
         Ok(self.with(|c| {
             c.query_row(
@@ -272,8 +283,11 @@ impl Db {
                 return Ok(Err(StoreError::Ledger(e)));
             }
             tx.execute(
-                "UPDATE export_operations SET snapshot=NULL, reason=NULL WHERE operation_id=?1",
-                [id.as_str()],
+                // Only the success-time warning tag outlives the operation's parked reason.
+                "UPDATE export_operations SET snapshot=NULL, \
+                 reason=CASE WHEN ?2 AND reason='projection_warnings' THEN reason ELSE NULL END \
+                 WHERE operation_id=?1",
+                params![id.as_str(), state == OperationState::Succeeded],
             )
             .map_err(sql)?;
             tx.execute(

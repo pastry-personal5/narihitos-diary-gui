@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
+# Start the GUI against an already running server. Optional arg: discovery.json path.
 set -euo pipefail
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-RUNTIME_ROOT="${SCRIPT_DIR}/runtime_root"
-DISCOVERY=$(find "${RUNTIME_ROOT}" -type f -name discovery.json -print -quit 2>/dev/null || true)
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
+CONFIG=config/global_config.yaml
 
-if [[ -z "${DISCOVERY}" ]]; then
-  printf 'No discovery file found under %s\n' "${RUNTIME_ROOT}" >&2
-  printf 'Start the local diary server first, then run this script again.\n' >&2
+if [[ $# -gt 0 ]]; then
+  DISCOVERY=$1
+else
+  # The server writes discovery.json under paths.runtime_root from the config.
+  RUNTIME_ROOT=$(sed -n 's/^[[:space:]]*runtime_root:[[:space:]]*"\{0,1\}\([^"#]*[^"# ]\)"\{0,1\}.*/\1/p' "${CONFIG}" | head -n 1)
+  [[ -n "${RUNTIME_ROOT}" ]] || { printf 'No paths.runtime_root in %s\n' "${CONFIG}" >&2; exit 1; }
+  # Newest first: a stale file from an earlier workspace must not win.
+  DISCOVERY=$(find "${RUNTIME_ROOT}" -type f -name discovery.json -exec ls -t {} + 2>/dev/null | head -n 1 || true)
+fi
+
+if [[ -z "${DISCOVERY}" || ! -f "${DISCOVERY}" ]]; then
+  printf 'No discovery file found (looked under %s)\n' "${RUNTIME_ROOT:-the given path}" >&2
+  printf 'Start the server first (./run-server.sh), then run this script again.\n' >&2
   exit 1
 fi
 
-npm run tauri dev -- -- -- --connect "${DISCOVERY}"
+exec npm run tauri dev -- -- -- --connect "${DISCOVERY}"

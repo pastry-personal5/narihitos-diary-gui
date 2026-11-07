@@ -21,6 +21,7 @@ use store::{Intent, Publication, Row, StoreError};
 #[cfg(any(test, feature = "fault-injection"))]
 pub mod fake;
 pub mod icloud;
+pub mod notion;
 pub mod store;
 
 const MAX_PREVIEWS: usize = 64;
@@ -71,6 +72,7 @@ struct Prepared {
 /// Everything the background step needs; the snapshot never leaves memory except in SQLite.
 struct Job {
     id: OperationId,
+    target: Target,
     snapshot: Snapshot,
     write: Write,
     expected: Observation,
@@ -80,7 +82,7 @@ struct Inner {
     db: Arc<Db>,
     identity: Identity,
     authentic: Arc<dyn AuthenticStore>,
-    adapter: Option<Arc<dyn ExportAdapter>>,
+    adapters: Vec<Arc<dyn ExportAdapter>>,
     previews: Mutex<BTreeMap<String, Prepared>>,
     /// Running exports asked to stop before `apply`.
     cancels: Mutex<std::collections::BTreeSet<String>>,
@@ -99,13 +101,13 @@ impl Service {
         db: Arc<Db>,
         identity: Identity,
         authentic: Arc<dyn AuthenticStore>,
-        adapter: Option<Arc<dyn ExportAdapter>>,
+        adapters: Vec<Arc<dyn ExportAdapter>>,
     ) -> Self {
         Self(Arc::new(Inner {
             db,
             identity,
             authentic,
-            adapter,
+            adapters,
             previews: Mutex::new(BTreeMap::new()),
             cancels: Mutex::new(Default::default()),
             notifier: Mutex::new(None),
@@ -148,13 +150,14 @@ impl Inner {
         Ok(())
     }
     fn adapter(&self, target: Target) -> Result<&Arc<dyn ExportAdapter>, ExportError> {
-        self.adapter
-            .as_ref()
-            .filter(|a| a.target() == target)
+        self.adapters
+            .iter()
+            .find(|a| a.target() == target)
             .ok_or(ExportError::Disabled)
     }
-    fn key(&self, a: &dyn ExportAdapter) -> String {
-        hash_input(
+    fn key(&self, a: &dyn ExportAdapter) -> Result<String, ExportError> {
+        a.ready().map_err(ExportError::CloudUnavailable)?;
+        Ok(hash_input(
             "export_destination",
             1,
             &[
@@ -162,7 +165,7 @@ impl Inner {
                 ("root", &a.root()),
                 ("workspace", &self.identity.workspace_id),
             ],
-        )
+        ))
     }
     fn result(&self, rec: &Record, row: &Row) -> ExportResult {
         let state = match rec.state {
@@ -313,7 +316,7 @@ impl Inner {
         (
             Receipt {
                 revision_sha: revision_sha.into(),
-                projection_digest: revision_sha.into(),
+                projection_digest: seen.digest.clone(),
                 remote_ids: seen.ids.clone(),
                 remote_fingerprint: seen.fingerprint.clone(),
             },
@@ -336,6 +339,19 @@ impl Inner {
                 }),
             )
             .map_err(stored)
+    }
+
+    /// What a remote holding exactly this snapshot reports as its digest.
+    fn expected(adapter: &dyn ExportAdapter, bytes: &[u8], revision_sha: &str) -> String {
+        adapter
+            .digest_of(bytes)
+            .unwrap_or_else(|| revision_sha.to_string())
+    }
+    fn row_expected(adapter: &dyn ExportAdapter, row: &Row) -> String {
+        match &row.snapshot {
+            Some(bytes) => Self::expected(adapter, bytes, &row.revision_sha),
+            None => row.revision_sha.clone(),
+        }
     }
 
     fn why(seen: &Observation) -> Unavailable {
@@ -368,7 +384,7 @@ impl Inner {
         if session.is_empty() || session.len() > 128 {
             return Err(ExportError::Invalid);
         }
-        let key = self.key(&*adapter);
+        let key = self.key(&*adapter)?;
         let date = request.date.to_string();
         let hash = hash_input(
             KIND,
@@ -453,26 +469,30 @@ impl Inner {
             .db
             .export_receipt(&key, &snapshot.authentic_id)
             .map_err(stored)?;
-        let (confirm, write) =
-            match decide(receipt.as_ref(), &snapshot.revision.sha256, &seen, false) {
-                Decision::Unavailable => {
-                    let why = Self::why(&seen);
-                    self.db
-                        .finish_export(
-                            &request.operation_id,
-                            OperationState::Failed,
-                            why.as_str(),
-                            None,
-                        )
-                        .map_err(stored)?;
-                    self.notify(&request.operation_id);
-                    return Err(ExportError::CloudUnavailable(why));
-                }
-                Decision::Uncertain => return Err(ExportError::Uncertain),
-                Decision::Noop => (None, None),
-                Decision::Write(w) => (None, Some(w)),
-                Decision::Confirm(r, w) => (Some(r), Some(w)),
-            };
+        let (confirm, write) = match decide(
+            receipt.as_ref(),
+            &Self::expected(&*adapter, &snapshot.bytes, &snapshot.revision.sha256),
+            &seen,
+            false,
+        ) {
+            Decision::Unavailable => {
+                let why = Self::why(&seen);
+                self.db
+                    .finish_export(
+                        &request.operation_id,
+                        OperationState::Failed,
+                        why.as_str(),
+                        None,
+                    )
+                    .map_err(stored)?;
+                self.notify(&request.operation_id);
+                return Err(ExportError::CloudUnavailable(why));
+            }
+            Decision::Uncertain => return Err(ExportError::Uncertain),
+            Decision::Noop => (None, None),
+            Decision::Write(w) => (None, Some(w)),
+            Decision::Confirm(r, w) => (Some(r), Some(w)),
+        };
         let (_, row) = self.load(&request.operation_id)?;
         match (confirm, write) {
             (None, None) => {
@@ -500,6 +520,7 @@ impl Inner {
             (None, Some(write)) => {
                 self.spawn(Job {
                     id: request.operation_id.clone(),
+                    target: request.target,
                     snapshot,
                     write,
                     expected: seen,
@@ -521,7 +542,7 @@ impl Inner {
         row: &Row,
         adapter: &dyn ExportAdapter,
     ) -> Result<Started, ExportError> {
-        if self.key(adapter) != row.destination_key {
+        if self.key(adapter)? != row.destination_key {
             return Err(ExportError::Disabled);
         }
         let date = DiaryDate::parse(&row.date).ok_or(ExportError::Storage)?;
@@ -531,7 +552,8 @@ impl Inner {
             .export_receipt(&row.destination_key, &row.authentic_id)
             .map_err(stored)?;
         let (unresolved, _) = self.holder_blocks(&row.destination_key, Some(&rec.id))?;
-        match decide(receipt.as_ref(), &row.revision_sha, &seen, unresolved) {
+        let want = Self::row_expected(adapter, row);
+        match decide(receipt.as_ref(), &want, &seen, unresolved) {
             Decision::Unavailable => Err(ExportError::CloudUnavailable(Self::why(&seen))),
             Decision::Uncertain => Err(ExportError::Uncertain),
             Decision::Noop => {
@@ -541,7 +563,7 @@ impl Inner {
                 Ok(Started::Result(self.result(&rec, &row)))
             }
             Decision::Write(w) | Decision::Confirm(_, w) => {
-                let reason = match decide(receipt.as_ref(), &row.revision_sha, &seen, false) {
+                let reason = match decide(receipt.as_ref(), &want, &seen, false) {
                     Decision::Confirm(r, _) => r,
                     _ => Reason::Changed,
                 };
@@ -592,7 +614,7 @@ impl Inner {
             });
         }
         let adapter = self.adapter(row.target)?.clone();
-        if self.key(&*adapter) != row.destination_key {
+        if self.key(&*adapter)? != row.destination_key {
             return Err(ExportError::Disabled);
         }
         if !self.ready.load(Ordering::SeqCst) {
@@ -655,6 +677,7 @@ impl Inner {
         self.notify(&request.operation_id);
         self.spawn(Job {
             id: request.operation_id.clone(),
+            target: row.target,
             snapshot: Snapshot {
                 date,
                 authentic_id: row.authentic_id.clone(),
@@ -688,7 +711,7 @@ impl Inner {
 
     fn run(&self, job: &Job) -> Result<(), ExportError> {
         self.hit("after_admission")?;
-        let adapter = self.adapter.as_ref().ok_or(ExportError::Disabled)?.clone();
+        let adapter = self.adapter(job.target)?.clone();
         let date = job.snapshot.date;
         // Re-read immediately before mutation; a changed observation needs a new preview.
         let now = adapter.observe(&date);
@@ -738,7 +761,11 @@ impl Inner {
                 .map_err(stored);
         }
         let back = adapter.read_back(&date);
-        let sha = &job.snapshot.revision.sha256;
+        let sha = &Self::expected(
+            &*adapter,
+            &job.snapshot.bytes,
+            &job.snapshot.revision.sha256,
+        );
         if applied == Applied::Done && back.available && back.present && &back.digest == sha
             || applied == Applied::Unknown && back.available && back.present && &back.digest == sha
         {
@@ -747,6 +774,11 @@ impl Inner {
             self.db
                 .export_chunk(&job.id, "done", Some(&back.ids))
                 .map_err(stored)?;
+            if adapter.warnings(&job.snapshot.bytes) > 0 {
+                self.db
+                    .set_export_reason(&job.id, "projection_warnings")
+                    .map_err(stored)?;
+            }
             return self.succeed(&job.id, &row, &back);
         }
         // Ambiguous: no definitive evidence either way. Never replay.
@@ -796,7 +828,7 @@ impl Inner {
             return Err(ExportError::CheckpointMismatch);
         }
         let adapter = self.adapter(row.target)?.clone();
-        if self.key(&*adapter) != row.destination_key || !self.ready.load(Ordering::SeqCst) {
+        if self.key(&*adapter)? != row.destination_key || !self.ready.load(Ordering::SeqCst) {
             return Err(ExportError::Disabled);
         }
         let date = DiaryDate::parse(&row.date).ok_or(ExportError::Storage)?;
@@ -804,7 +836,7 @@ impl Inner {
         if !back.available {
             return Err(ExportError::CloudUnavailable(Self::why(&back)));
         }
-        if back.present && back.digest == row.revision_sha {
+        if back.present && back.digest == Self::row_expected(&*adapter, &row) {
             self.succeed(id, &row, &back)?;
             self.notify(id);
             let (rec, row) = self.load(id)?;
@@ -855,7 +887,7 @@ impl Inner {
             return Err(ExportError::CheckpointMismatch);
         }
         let adapter = self.adapter(row.target)?.clone();
-        if self.key(&*adapter) != row.destination_key {
+        if self.key(&*adapter)? != row.destination_key {
             return Err(ExportError::Disabled);
         }
         let fingerprint_seen = {
@@ -936,14 +968,16 @@ impl Inner {
                 )?;
             } else {
                 let proven = self
-                    .adapter
-                    .as_ref()
-                    .filter(|a| a.target() == row.target && self.key(&***a) == row.destination_key)
+                    .adapter(row.target)
+                    .ok()
+                    .filter(|a| self.key(&***a).is_ok_and(|k| k == row.destination_key))
                     .and_then(|a| {
                         let date = DiaryDate::parse(&row.date)?;
                         let back = a.read_back(&date);
-                        (back.available && back.present && back.digest == row.revision_sha)
-                            .then_some(back)
+                        (back.available
+                            && back.present
+                            && back.digest == Self::row_expected(&**a, &row))
+                        .then_some(back)
                     });
                 match proven {
                     Some(back) => self.succeed(&rec.id, &row, &back)?,

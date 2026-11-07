@@ -83,6 +83,13 @@
       "defaults": []
     },
     {
+      "id": "export.start.notion",
+      "label": "Export to Notion",
+      "info": "Starts export of the saved revision to Notion.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
       "id": "settings.open",
       "label": "Open Settings",
       "info": "Opens Settings.",

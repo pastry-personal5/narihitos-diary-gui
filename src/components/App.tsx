@@ -501,6 +501,13 @@ export function App({ bridge }: { bridge: Bridge }) {
         if (date) return exporter.start(date);
       },
     },
+    "export.start.notion": {
+      reason: exportReason,
+      run: () => {
+        const date = model.resources.selectedDate;
+        if (date) return exporter.start(date, "notion");
+      },
+    },
   };
   const live = useRef({ bindings, handlers });
   useEffect(() => {
@@ -596,6 +603,16 @@ export function App({ bridge }: { bridge: Bridge }) {
                   exportState.phase === "working" ? "Exporting…" : "Export"
                 }
               />
+            </button>
+            <button
+              disabled={!!exportReason}
+              title={hint(
+                "export.start.notion",
+                exportReason ?? "Export to Notion",
+              )}
+              onClick={() => void handlers["export.start.notion"].run()}
+            >
+              <SymbolLabel name="square.and.arrow.up" label="Notion" />
             </button>
             <button
               title={hint("palette.open", "Open command palette")}

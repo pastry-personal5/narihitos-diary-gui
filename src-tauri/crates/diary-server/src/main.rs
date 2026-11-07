@@ -1,5 +1,6 @@
 #[cfg(feature = "scaffold-smoke")]
 mod native_smoke;
+mod notion_http;
 use diary_application::{
     diagnostics::{Diagnostics, EventCode, Level, OpaqueId, Record, Role},
     operations::{Class, Readiness},
@@ -93,6 +94,25 @@ impl Drop for Drain {
         self.0.shutdown(Duration::from_secs(2));
     }
 }
+/// The Notion adapter over the real transport, or over the
+/// persistent in-memory fake when the fault-injection build is given `DIARY_FAKE_NOTION_FILE`.
+fn connect_notion(
+    workspace: &diary_infrastructure::workspace::Workspace,
+    notion: &diary_infrastructure::config::Notion,
+) -> Option<diary_infrastructure::export::notion::Notion> {
+    use diary_infrastructure::export::notion::client::Client;
+    #[cfg(feature = "fault-injection")]
+    if let Some(file) = std::env::var_os("DIARY_FAKE_NOTION_FILE") {
+        use diary_infrastructure::export::notion::{adapter::normalize_page_id, fake::FakeNotion};
+        let root = normalize_page_id(&notion.root_page_id)?;
+        let fake = Arc::new(FakeNotion::persistent(&root, file.into()));
+        let client = Client::new(fake, Arc::new(|_| {}), Duration::ZERO);
+        return workspace.notion(client, &notion.root_page_id);
+    }
+    let http = notion_http::Reqwest::new(&notion.token)?;
+    workspace.notion(Client::production(Arc::new(http)), &notion.root_page_id)
+}
+
 async fn run() -> Result<(), &'static str> {
     let mut args = std::env::args_os().skip(1);
     let first = args.next();
@@ -220,30 +240,39 @@ async fn run() -> Result<(), &'static str> {
             Arc::new(diary_infrastructure::authentic::Sha256Hasher),
         );
     }
-    // Production registers no destination, so exports stay disabled while lookup, recovery and
-    // the settings-reload guard work. The directory-backed fake is fault-injection only.
+    // Each configured destination registers one adapter; with none, every target is disabled
+    // while lookup, recovery and the settings-reload guard still work. The directory-backed
+    // fake and the in-memory Notion fake are fault-injection only.
     if let Some(store) = watched_store.clone() {
+        let mut adapters: Vec<Arc<dyn diary_application::export::ExportAdapter>> = Vec::new();
         #[cfg(feature = "fault-injection")]
-        let adapter: Option<Arc<dyn diary_application::export::ExportAdapter>> =
-            std::env::var_os("DIARY_FAKE_EXPORT_DIR")
-                .map(|dir| Arc::new(diary_infrastructure::export::fake::Fake::new(dir.into())) as _)
-                .or_else(|| {
-                    config
-                        .paths
-                        .icloud_entries_root
-                        .as_deref()
-                        .and_then(diary_infrastructure::export::icloud::Icloud::new)
-                        .map(|a| Arc::new(a) as _)
-                });
-        // A set but unusable root registers nothing, so iCloud export stays disabled.
+        let fake_dir = std::env::var_os("DIARY_FAKE_EXPORT_DIR");
         #[cfg(not(feature = "fault-injection"))]
-        let adapter: Option<Arc<dyn diary_application::export::ExportAdapter>> = config
+        let fake_dir: Option<std::ffi::OsString> = None;
+        // A set but unusable root registers nothing, so iCloud export stays disabled.
+        if let Some(dir) = fake_dir {
+            #[cfg(feature = "fault-injection")]
+            adapters.push(Arc::new(diary_infrastructure::export::fake::Fake::new(
+                dir.into(),
+            )));
+            #[cfg(not(feature = "fault-injection"))]
+            let _ = dir;
+        } else if let Some(a) = config
             .paths
             .icloud_entries_root
             .as_deref()
             .and_then(diary_infrastructure::export::icloud::Icloud::new)
-            .map(|a| Arc::new(a) as _);
-        if let Some(service) = workspace.exports(store, adapter) {
+        {
+            adapters.push(Arc::new(a));
+        }
+        if let Some(notion) = &config.notion {
+            // The workspace identity is fetched on first use, so startup never waits on Notion.
+            match connect_notion(&workspace, notion) {
+                Some(a) => adapters.push(Arc::new(a)),
+                None => diagnostics.emit(Record::new(EventCode::OperationBlocked, Level::Warn)),
+            }
+        }
+        if let Some(service) = workspace.exports_with(store, adapters) {
             if service.recover().is_err() {
                 diagnostics.emit(Record::new(EventCode::OperationBlocked, Level::Error));
             }

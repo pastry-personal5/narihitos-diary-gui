@@ -1,8 +1,9 @@
-"""P1-M25/M26 export coordination on the fault-injection diary-server binary. Legs 0-4 use the
+"""P1-M25/M26/M27 export coordination on the fault-injection diary-server binary. Legs 0-4 use the
 directory-backed fake destination; leg 5 uses the real macOS iCloud adapter on a temp directory
-(no live iCloud), plus cancel and abandon. create, verified no-op, external-change confirmation, duplicate confirmation,
+(no live iCloud), plus cancel and abandon; leg 6 uses the real Notion adapter over a file-backed
+in-memory fake service (no network). create, verified no-op, external-change confirmation, duplicate confirmation,
 disabled target, and kill/restart recovery by read-back. Synthetic data, private scratch dir.
-No real iCloud or Notion contact happens."""
+No real iCloud or Notion contact happens. The live Notion round trip is notion-live.py."""
 import json
 import os
 from pathlib import Path
@@ -34,10 +35,13 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     file = remote / f'{DATE}.md'
 
-    def start(fault=None, destination=True, cfg=None):
+    def start(fault=None, destination=True, cfg=None, notion=None):
         env = dict(os.environ)
         env.pop('DIARY_FAULT', None)
         env.pop('DIARY_FAKE_EXPORT_DIR', None)
+        env.pop('DIARY_FAKE_NOTION_FILE', None)
+        if notion:
+            env['DIARY_FAKE_NOTION_FILE'] = str(notion)
         if destination:
             env['DIARY_FAKE_EXPORT_DIR'] = str(remote)
         if fault:
@@ -81,9 +85,9 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
             assert code == 200, (code, saved)
             return self.call('/authentic/' + DATE)[1]['revision']
 
-        def export(self, revision, op=None):
+        def export(self, revision, op=None, target='icloud'):
             op = op or OP()
-            code, out = self.call('/exports', 'POST', {'operation_id': op, 'date': DATE, 'target': 'icloud', 'expected_revision': revision})
+            code, out = self.call('/exports', 'POST', {'operation_id': op, 'date': DATE, 'target': target, 'expected_revision': revision})
             return op, code, out
 
         def wait(self, op, state):
@@ -237,6 +241,72 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     assert target_file.read_text() == 'edited outside'
     stop(server)
 
+    # 6. Notion over the file-backed fake: hierarchy, no-op, external edit, kill and recovery.
+    page = '0123456789abcdef0123456789abcdef'
+    notion_cfg = base / 'notion.yaml'
+    notion_cfg.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nnotion:\n  root_page_id: {page}\n  token: smoke-notion-token\n')
+    notion_cfg.chmod(0o600)
+    remote_state = base / 'notion-state.json'
+
+    def nodes():
+        return json.loads(remote_state.read_text())['nodes']
+
+    def section_texts():
+        found = nodes()
+        toggles = [k for k, n in found.items() if n['kind'] == 'toggle' and ''.join(i['plain_text'] for i in n['payload']['rich_text']) == DATE]
+        assert len(toggles) == 1, toggles
+        return toggles[0], [''.join(i['plain_text'] for i in found[c]['payload']['rich_text']) for c in found[toggles[0]]['children']]
+
+    server, record = start(destination=False, cfg=notion_cfg, notion=remote_state)
+    c = Client(record)
+    rev_n = c.save('Notion one.\n\nNotion two.\n')
+    opn1, code, out = c.export(rev_n, target='notion')
+    assert code == 200, (code, out)
+    c.wait(opn1, 'succeeded')
+    titles = sorted(n['title'] for n in nodes().values() if n['kind'] == 'child_page')
+    assert titles == [DATE[:4], DATE[:7]], titles
+    assert section_texts()[1] == ['Notion one.', 'Notion two.']
+    stamp = remote_state.stat().st_mtime_ns
+    opn2, code, out = c.export(rev_n, target='notion')
+    c.wait(opn2, 'succeeded')
+    assert remote_state.stat().st_mtime_ns == stamp, 'no-op wrote to Notion'
+    # iCloud stays disabled when only Notion is configured.
+    assert c.export(rev_n)[1] == 422
+    stop(server)
+    # An edit made in Notion needs confirmation; the replacement is a new section after the old.
+    state = json.loads(remote_state.read_text())
+    toggle_id, _ = section_texts()
+    first = state['nodes'][toggle_id]['children'][0]
+    state['nodes'][first]['payload']['rich_text'] = [{'type': 'text', 'text': {'content': 'edited in Notion'}, 'plain_text': 'edited in Notion'}]
+    remote_state.write_text(json.dumps(state))
+    server, record = start(destination=False, cfg=notion_cfg, notion=remote_state)
+    c = Client(record)
+    rev_n2 = c.save('Notion three.\n')
+    opn3, code, pv = c.export(rev_n2, target='notion')
+    assert code == 200 and pv['outcome'] == 'needs_confirmation' and pv['reason'] == 'changed', (code, pv)
+    assert section_texts()[1][0] == 'edited in Notion'
+    confirm(c, opn3, pv)
+    c.wait(opn3, 'succeeded')
+    new_toggle, texts = section_texts()
+    assert texts == ['Notion three.'] and new_toggle != toggle_id, 'replace inserts a new section (O10)'
+    toggle_id = new_toggle
+    stop(server)
+    # A kill right after the Notion write is proven by read-back on restart; nothing is replayed.
+    server, record = start(fault='export:after_apply:kill', destination=False, cfg=notion_cfg, notion=remote_state)
+    c = Client(record)
+    rev_n3 = c.save('Notion four.\n')
+    opn4, code, out = c.export(rev_n3, target='notion')
+    if code == 200 and out['outcome'] == 'needs_confirmation':
+        confirm(c, opn4, out)
+    server.wait(timeout=10)
+    assert server.returncode == 86, server.returncode
+    assert section_texts()[1] == ['Notion four.']
+    server, record = start(destination=False, cfg=notion_cfg, notion=remote_state)
+    c = Client(record)
+    c.wait(opn4, 'succeeded')
+    assert opn4 not in [o['operation_id'] for o in c.call('/operations?kind=export&state=unfinished')[1]['operations']]
+    stop(server)
+
     logs = ''.join(p.read_text() for p in runtime.glob('*/logs/server/*.log'))
-    assert 'Smoke one' not in logs and str(remote) not in logs and str(icloud) not in logs and 'private' not in logs
+    assert 'Smoke one' not in logs and str(remote) not in logs and str(icloud) not in logs and 'private' not in logs and 'smoke-notion-token' not in logs and 'Notion one' not in logs
     print('PASS export smoke')

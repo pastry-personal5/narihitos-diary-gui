@@ -6,11 +6,12 @@ export type ExportState =
   | "succeeded"
   | "failed"
   | "cancelled";
+export type ExportTarget = "icloud" | "notion";
 export type ExportReason = "changed" | "deleted" | "unowned" | "uncertain";
 export interface ExportResult {
   kind: "export";
   operation_id: string;
-  target: "icloud" | "notion";
+  target: ExportTarget;
   date: string;
   revision: { sequence: number; sha256: string };
   state: ExportState;
@@ -31,7 +32,7 @@ export type StartExportOutcome =
 export interface StartExportRequest {
   operation_id: string;
   date: string;
-  target: "icloud";
+  target: ExportTarget;
   expected_revision: { sequence: number; sha256: string };
 }
 export interface ConfirmExportRequest {

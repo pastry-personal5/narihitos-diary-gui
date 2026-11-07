@@ -12,6 +12,8 @@ diary-logging.workspace = true
 diary-api.workspace = true
 tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "net", "signal", "time"] }
 axum = "=0.8.9"
+# HTTPS for the Notion export; the OS TLS stack, no bundled crypto (P1-M27 approval).
+reqwest = { version = "=0.13.5", default-features = false, features = ["native-tls"] }
 
 [features]
 # Smoke-test crash injection through DIARY_FAULT; never part of a release build.

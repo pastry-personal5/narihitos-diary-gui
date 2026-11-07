@@ -210,7 +210,7 @@ fn m25_upgrades_schema_five_keeping_rows_and_adding_export_tables() {
         .unwrap();
     drop(conn);
     let db = Db::open_existing(&dir, &path.join(DB_FILE), false).unwrap();
-    assert_eq!(pragma(&db, "user_version"), 6);
+    assert_eq!(pragma(&db, "user_version"), MIGRATIONS.len() as i64);
     let (kept, tables): (String, i64) = db
         .with(|c| {
             let kept = c

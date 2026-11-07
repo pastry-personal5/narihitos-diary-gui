@@ -242,3 +242,73 @@ it("recovers a paused export after reload instead of stranding its reservation",
     expect.objectContaining({ operation_id: OP, date: "2026-11-05" }),
   );
 });
+
+describe("Notion export", () => {
+  const notionResult = (state: ExportResult["state"], reason: string | null) =>
+    ({ ...result(state, reason), target: "notion" }) as ExportResult;
+
+  it("sends the Notion target and names the destination in messages", async () => {
+    const { c, bridge, notes } = setup({
+      startExport: vi.fn(async () => ({
+        outcome: "result" as const,
+        result: notionResult("succeeded", null),
+      })),
+    });
+    await c.start("2026-11-05", "notion");
+    expect(bridge.startExport).toHaveBeenCalledWith(
+      expect.objectContaining({ target: "notion" }),
+    );
+    expect(notes).toEqual(["Exported 2026-11-05 to Notion."]);
+  });
+
+  it("reports kept-as-text Markdown as a warning after success", async () => {
+    const { c, notes } = setup({
+      startExport: vi.fn(async () => ({
+        outcome: "result" as const,
+        result: notionResult("succeeded", "projection_warnings"),
+      })),
+    });
+    await c.start("2026-11-05", "notion");
+    expect(notes).toHaveLength(2);
+    expect(notes[1]).toMatch(/plain text/);
+  });
+
+  it.each([
+    ["export_unauthorized", /shared with the integration/],
+    ["export_throttled", /few minutes/],
+    ["export_network", /could not be reached/],
+    ["export_structural", /out-of-order/],
+    ["export_disabled", /Notion export is not set up/],
+  ])("maps %s to app-authored Notion text", async (code, text) => {
+    const { c, notes } = setup({
+      startExport: vi.fn(async () => {
+        throw new AuthenticError(code, false);
+      }),
+    });
+    await c.start("2026-11-05", "notion");
+    expect(notes[0]).toMatch(text);
+  });
+
+  it("maps a failed operation's recorded reason to the same wording", async () => {
+    const { c, notes } = setup({
+      startExport: vi.fn(async () => ({
+        outcome: "result" as const,
+        result: notionResult("failed", "throttled"),
+      })),
+    });
+    await c.start("2026-11-05", "notion");
+    expect(notes[0]).toMatch(/few minutes/);
+  });
+
+  it("an unknown Notion outcome names the section, not a file", async () => {
+    const { c, notes } = setup({
+      startExport: vi.fn(async () => ({
+        outcome: "result" as const,
+        result: notionResult("uncertain", null),
+      })),
+    });
+    await c.start("2026-11-05", "notion");
+    expect(notes[0]).toMatch(/Notion section/);
+    expect(c.getSnapshot().target).toBe("notion");
+  });
+});

@@ -1,0 +1,424 @@
+use super::{
+    client::{Client, Error},
+    fake::{FakeNotion, Fault},
+    http::{Http, Method},
+    *,
+};
+use crate::{lifecycle::WorkspaceLock, workspace::Workspace};
+use diary_application::export::{Applied, ExportAdapter, Observation, Unavailable, Write};
+use diary_domain::authentic::DiaryDate;
+use serde_json::{Value, json};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
+const ROOT: &str = "0123456789abcdef0123456789abcdef";
+
+struct Env {
+    _temp: tempfile::TempDir,
+    _lock: WorkspaceLock,
+    ws: Workspace,
+    fake: Arc<FakeNotion>,
+    slept: Arc<Mutex<Vec<Duration>>>,
+    notion: Notion,
+}
+fn env_with(page_size: usize) -> Env {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap().join("ws");
+    std::fs::create_dir(&root).unwrap();
+    let lock = WorkspaceLock::acquire(&root).unwrap();
+    let ws = Workspace::open(&lock).unwrap();
+    let fake = Arc::new(FakeNotion::new(ROOT).with_page_size(page_size));
+    let slept = Arc::new(Mutex::new(Vec::new()));
+    let log = slept.clone();
+    let client = Client::new(
+        fake.clone(),
+        Arc::new(move |d| log.lock().unwrap().push(d)),
+        Duration::ZERO,
+    );
+    let notion = ws.notion(client, ROOT).unwrap();
+    Env {
+        _temp: temp,
+        _lock: lock,
+        ws,
+        fake,
+        slept,
+        notion,
+    }
+}
+fn env() -> Env {
+    env_with(100)
+}
+fn d(t: &str) -> DiaryDate {
+    DiaryDate::parse(t).unwrap()
+}
+fn file(body: &str) -> Vec<u8> {
+    format!("---\nid: x\n---\n{body}").into_bytes()
+}
+impl Env {
+    fn seen(&self, date: &str) -> Observation {
+        self.notion.observe(&d(date))
+    }
+    fn put(&self, date: &str, body: &str) -> Applied {
+        let seen = self.seen(date);
+        let write = if seen.present {
+            Write::Replace
+        } else {
+            Write::Create
+        };
+        self.notion.apply(&d(date), &file(body), write, &seen)
+    }
+    fn titles(&self, parent: &str) -> Vec<String> {
+        self.fake
+            .children(parent)
+            .iter()
+            .map(|c| {
+                self.fake
+                    .title_of(c)
+                    .unwrap_or_else(|| self.fake.text_of(c))
+            })
+            .collect()
+    }
+    fn month(&self) -> String {
+        let year = self.fake.children(ROOT)[0].clone();
+        self.fake.children(&year)[0].clone()
+    }
+    fn digest_ok(&self, date: &str, body: &str) -> bool {
+        self.seen(date).digest == self.notion.digest_of(&file(body)).unwrap()
+    }
+}
+
+#[test]
+fn create_builds_the_hierarchy_and_exact_content() {
+    let e = env();
+    assert_eq!(e.seen("2026-11-07"), Observation::absent());
+    let body = "# Day\n\nHello *world*.\n\n- a\n  - b\n";
+    assert_eq!(e.put("2026-11-07", body), Applied::Done);
+    assert_eq!(e.titles(ROOT), ["2026"]);
+    let year = e.fake.children(ROOT)[0].clone();
+    assert_eq!(e.titles(&year), ["2026-11"]);
+    assert_eq!(e.titles(&e.month()), ["2026-11-07"]);
+    assert!(e.digest_ok("2026-11-07", body));
+    let steps = e.notion.steps.states("2026-11-07");
+    assert_eq!(steps.len(), 4);
+    assert!(steps.iter().all(|(_, s)| s == "done"));
+}
+
+#[test]
+fn daily_sections_stay_ascending_for_first_middle_and_last_insertion() {
+    let e = env();
+    for day in [
+        "2026-11-10",
+        "2026-11-05",
+        "2026-11-07",
+        "2026-11-20",
+        "2026-11-01",
+    ] {
+        assert_eq!(
+            e.put(day, &format!("entry {day}\n")),
+            Applied::Done,
+            "{day}"
+        );
+    }
+    assert_eq!(
+        e.titles(&e.month()),
+        [
+            "2026-11-01",
+            "2026-11-05",
+            "2026-11-07",
+            "2026-11-10",
+            "2026-11-20"
+        ]
+    );
+    // One year page and one month page only.
+    assert_eq!(e.fake.children(ROOT).len(), 1);
+}
+
+#[test]
+fn pagination_reads_every_page_of_a_long_month() {
+    let e = env_with(2);
+    for day in 1..=9 {
+        assert_eq!(e.put(&format!("2026-11-0{day}"), "x\n"), Applied::Done);
+    }
+    assert!(e.seen("2026-11-09").present);
+    assert!(e.seen("2026-11-01").present);
+    assert!(e.fake.count("list") > 9);
+}
+
+#[test]
+fn duplicate_and_disordered_hierarchy_is_a_structural_conflict() {
+    let e = env();
+    e.put("2026-11-07", "x\n");
+    e.fake.external_page(ROOT, "2026");
+    assert_eq!(
+        e.seen("2026-11-07").unavailable,
+        Some(Unavailable::Structural)
+    );
+
+    let e = env();
+    e.put("2026-11-07", "x\n");
+    let toggle = json!({"object":"block","type":"toggle","toggle":{"rich_text":[{"type":"text","text":{"content":"2026-11-03"}}]}});
+    e.fake.external_block(&e.month(), &toggle, None);
+    assert_eq!(
+        e.seen("2026-11-07").unavailable,
+        Some(Unavailable::Structural)
+    );
+
+    let e = env();
+    e.put("2026-11-07", "x\n");
+    let dup = json!({"object":"block","type":"toggle","toggle":{"rich_text":[{"type":"text","text":{"content":"2026-11-07"}}]}});
+    e.fake.external_block(&e.month(), &dup, None);
+    assert_eq!(
+        e.seen("2026-11-07").unavailable,
+        Some(Unavailable::Structural)
+    );
+}
+
+#[test]
+fn replace_inserts_a_new_section_after_the_old_one_then_removes_the_old_one() {
+    let e = env();
+    e.put("2026-11-07", "one\n\ntwo\n");
+    let old = e.fake.children(&e.month())[0].clone();
+    assert_eq!(e.put("2026-11-07", "three\n"), Applied::Done);
+    // Exactly one section remains, with a new block ID (O10).
+    let sections = e.fake.children(&e.month());
+    assert_eq!(sections.len(), 1);
+    assert_ne!(sections[0], old);
+    assert!(e.fake.children(&old).is_empty());
+    let kids = e.fake.children(&sections[0]);
+    assert_eq!(kids.len(), 1);
+    assert_eq!(e.fake.text_of(&kids[0]), "three");
+    assert!(e.digest_ok("2026-11-07", "three\n"));
+    // A neighbouring day keeps its position relative to the replaced one.
+    e.put("2026-11-09", "later\n");
+    e.put("2026-11-07", "four\n");
+    assert_eq!(e.titles(&e.month()), ["2026-11-07", "2026-11-09"]);
+}
+
+#[test]
+fn a_crash_between_the_new_section_and_the_old_delete_keeps_the_old_text() {
+    // The delete of the old section is lost before it commits.
+    let e = env();
+    e.put("2026-11-07", "keep me\n");
+    let old = e.fake.children(&e.month())[0].clone();
+    e.fake.fault("delete", Fault::Drop);
+    assert_eq!(e.put("2026-11-07", "new text\n"), Applied::Unknown);
+    assert_eq!(e.fake.text_of(&e.fake.children(&old)[0]), "keep me");
+    // Both same-date sections now exist: reported, not guessed at.
+    assert_eq!(e.fake.children(&e.month()).len(), 2);
+    assert_eq!(
+        e.seen("2026-11-07").unavailable,
+        Some(Unavailable::Structural)
+    );
+    assert_eq!(e.fake.count("delete"), 1);
+
+    // A refusal while the new section is being filled leaves the old one untouched too.
+    let e = env();
+    e.put("2026-11-07", "keep me\n");
+    let old = e.fake.children(&e.month())[0].clone();
+    e.fake.fault_after("append", 1, Fault::Throttle(90));
+    assert_eq!(e.put("2026-11-07", "new text\n"), Applied::Unknown);
+    assert_eq!(e.fake.text_of(&e.fake.children(&old)[0]), "keep me");
+    assert_eq!(e.fake.count("delete"), 0);
+}
+
+#[test]
+fn a_foreign_block_in_a_section_is_a_structural_conflict_with_no_write() {
+    let e = env();
+    e.put("2026-11-07", "one\n");
+    let section = e.fake.children(&e.month())[0].clone();
+    e.fake.external_page(&section, "Notes the user keeps here");
+    assert_eq!(
+        e.seen("2026-11-07").unavailable,
+        Some(Unavailable::Structural)
+    );
+    let before = e.fake.count("append") + e.fake.count("delete");
+    let expected = Observation::absent();
+    assert_eq!(
+        e.notion
+            .apply(&d("2026-11-07"), &file("two\n"), Write::Replace, &expected),
+        Applied::Failed
+    );
+    assert_eq!(e.fake.count("append") + e.fake.count("delete"), before);
+    assert!(e.fake.children(&section).len() == 2);
+}
+
+#[test]
+fn an_external_edit_between_observe_and_apply_fails_without_writing() {
+    let e = env();
+    e.put("2026-11-07", "one\n");
+    let seen = e.seen("2026-11-07");
+    let section = e.fake.children(&e.month())[0].clone();
+    let child = e.fake.children(&section)[0].clone();
+    e.fake.edit_text(&child, "changed outside");
+    let before = e.fake.count("append") + e.fake.count("delete");
+    assert_eq!(
+        e.notion
+            .apply(&d("2026-11-07"), &file("new\n"), Write::Replace, &seen),
+        Applied::Failed
+    );
+    assert_eq!(e.fake.count("append") + e.fake.count("delete"), before);
+    assert_ne!(e.seen("2026-11-07").fingerprint, seen.fingerprint);
+    assert_eq!(e.fake.text_of(&child), "changed outside");
+}
+
+#[test]
+fn long_unicode_entries_chunk_and_round_trip() {
+    let e = env();
+    let long = "한😀".repeat(3_000);
+    let many: String = (0..250).map(|i| format!("para {i}\n\n")).collect();
+    let body = format!("{long}\n\n{many}");
+    assert_eq!(e.put("2026-11-07", &body), Applied::Done);
+    assert!(e.digest_ok("2026-11-07", &body));
+    // 251 top-level blocks need three requests of at most 100 children.
+    assert_eq!(e.fake.count("append") - 1, 3);
+}
+
+#[test]
+fn a_short_throttle_waits_and_retries_but_a_long_one_stops_cleanly() {
+    let e = env();
+    e.fake.fault("create_page", Fault::Throttle(2));
+    assert_eq!(e.put("2026-11-07", "x\n"), Applied::Done);
+    assert!(e.slept.lock().unwrap().iter().any(|d| d.as_secs() == 2));
+
+    let e = env();
+    e.fake.fault("create_page", Fault::Throttle(90));
+    assert_eq!(e.put("2026-11-07", "x\n"), Applied::Failed);
+    assert!(e.fake.children(ROOT).is_empty());
+    assert_eq!(e.fake.count("create_page"), 1);
+
+    // After a write has landed, a refusal leaves a partial section: unknown, never failed.
+    let e = env();
+    e.fake.fault("append", Fault::Throttle(90));
+    assert_eq!(e.put("2026-11-07", "x\n"), Applied::Unknown);
+}
+
+#[test]
+fn a_lost_reply_is_unknown_never_replayed_and_the_read_back_sees_the_commit() {
+    let e = env();
+    e.fake.fault("append", Fault::LoseReply);
+    // The first append is the section toggle; its reply is lost.
+    assert_eq!(e.put("2026-11-07", "x\n"), Applied::Unknown);
+    assert_eq!(e.fake.count("append"), 1);
+    assert_eq!(e.titles(&e.month()), ["2026-11-07"]);
+
+    let e = env();
+    e.fake.fault("create_page", Fault::Drop);
+    assert_eq!(e.put("2026-11-07", "x\n"), Applied::Unknown);
+    assert_eq!(e.fake.count("create_page"), 1);
+    assert!(e.fake.children(ROOT).is_empty());
+}
+
+#[test]
+fn server_errors_on_writes_are_not_retried_but_reads_are() {
+    let e = env();
+    e.fake.fault("create_page", Fault::Status(503));
+    assert_eq!(e.put("2026-11-07", "x\n"), Applied::Unknown);
+    assert_eq!(e.fake.count("create_page"), 1);
+
+    let e = env();
+    e.fake.fault("list", Fault::Status(503));
+    assert_eq!(e.seen("2026-11-07"), Observation::absent());
+    assert!(e.fake.count("list") >= 2);
+
+    let e = env();
+    e.fake.fault("create_page", Fault::Status(403));
+    assert_eq!(e.put("2026-11-07", "x\n"), Applied::Failed);
+}
+
+#[test]
+fn credential_and_network_problems_are_typed() {
+    let e = env();
+    e.fake.fault("list", Fault::Status(401));
+    assert_eq!(
+        e.seen("2026-11-07").unavailable,
+        Some(Unavailable::Unauthorized)
+    );
+    e.fake.fault("list", Fault::NotSent);
+    assert_eq!(e.seen("2026-11-07").unavailable, Some(Unavailable::Network));
+    e.fake.fault("list", Fault::Throttle(120));
+    assert_eq!(
+        e.seen("2026-11-07").unavailable,
+        Some(Unavailable::Throttled)
+    );
+}
+
+#[test]
+fn the_client_reports_the_wait_and_never_exposes_bodies() {
+    let fake = Arc::new(FakeNotion::new(ROOT));
+    let client = Client::new(fake.clone(), Arc::new(|_| {}), Duration::ZERO);
+    fake.fault("list", Fault::Throttle(61));
+    assert_eq!(
+        client.call(Method::Get, &format!("/v1/blocks/{ROOT}/children"), None),
+        Err(Error::Throttled(61))
+    );
+    let huge = json!({"x": "a".repeat(client::MAX_REQUEST_BYTES)});
+    assert_eq!(
+        client.call(Method::Patch, "/v1/blocks/x/children", Some(&huge)),
+        Err(Error::TooLarge)
+    );
+}
+
+#[test]
+fn workspace_identity_is_fetched_lazily_and_gates_the_destination_key() {
+    let e = env();
+    assert_eq!(e.fake.count("me"), 0, "construction makes no request");
+    assert_eq!(e.notion.root(), format!("{ROOT}@pending"));
+    e.fake.fault("me", Fault::Status(401));
+    assert_eq!(e.notion.ready(), Err(Unavailable::Unauthorized));
+    assert_eq!(e.notion.root(), format!("{ROOT}@pending"));
+    // The next attempt succeeds; the root then carries the workspace and is cached.
+    assert_eq!(e.notion.ready(), Ok(()));
+    assert_eq!(e.notion.root(), format!("{ROOT}@workspace-1"));
+    let calls = e.fake.count("me");
+    e.notion.ready().unwrap();
+    assert_eq!(e.fake.count("me"), calls);
+
+    // While the identity is unknown, observing reports why and reads nothing else.
+    let e = env();
+    e.fake.fault("me", Fault::NotSent);
+    assert_eq!(e.seen("2026-11-07").unavailable, Some(Unavailable::Network));
+    assert_eq!(e.fake.count("list"), 0);
+}
+
+#[test]
+fn a_malformed_root_page_id_registers_nothing() {
+    let e = env();
+    let client = Client::new(
+        e.fake.clone() as Arc<dyn Http>,
+        Arc::new(|_| {}),
+        Duration::ZERO,
+    );
+    assert!(e.ws.notion(client, "not-a-page-id").is_none());
+}
+
+#[test]
+fn projection_warnings_are_reported_without_changing_the_digest_contract() {
+    let e = env();
+    assert_eq!(e.notion.warnings(&file("| a |\n|---|\n| 1 |\n")), 1);
+    assert_eq!(e.notion.warnings(&file("plain\n")), 0);
+    let _: Value = json!(null);
+}
+
+#[test]
+fn concurrent_exports_never_create_duplicate_year_or_month_pages() {
+    let e = Arc::new(env());
+    let handles: Vec<_> = ["2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23"]
+        .into_iter()
+        .map(|day| {
+            let e = e.clone();
+            std::thread::spawn(move || e.put(day, "x\n"))
+        })
+        .collect();
+    for h in handles {
+        assert_eq!(h.join().unwrap(), Applied::Done);
+    }
+    assert_eq!(e.fake.children(ROOT).len(), 1);
+    let year = e.fake.children(ROOT)[0].clone();
+    assert_eq!(e.fake.children(&year).len(), 1);
+    assert_eq!(
+        e.titles(&e.month()),
+        ["2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23"]
+    );
+}

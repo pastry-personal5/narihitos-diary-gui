@@ -1,5 +1,5 @@
 import {
-  EXPORT_MESSAGE,
+  exportMessage,
   exportReasonText,
   type ExportController,
 } from "../application/export/controller";
@@ -8,6 +8,7 @@ import { useExport } from "./useExport";
 
 export function ExportDialog({ controller }: { controller: ExportController }) {
   const s = useExport(controller);
+  const item = s.target === "notion" ? "Notion section" : "iCloud file";
   return (
     <>
       <p role="status" className="visually-hidden">
@@ -25,11 +26,11 @@ export function ExportDialog({ controller }: { controller: ExportController }) {
             {s.preview.abandon ? "Abandon unknown export" : "Confirm export"}
           </h2>
           <p id="export-description">
-            Entry date: {s.date}. {exportReasonText(s.preview.reason)}{" "}
+            Entry date: {s.date}. {exportReasonText(s.preview.reason, s.target)}{" "}
             {s.preview.abandon
-              ? "Abandoning stops tracking this export. The iCloud file is not touched."
+              ? `Abandoning stops tracking this export. The ${item} is not touched.`
               : s.preview.write === "create"
-                ? "Confirming creates the file again with your saved entry."
+                ? "Confirming creates it again with your saved entry."
                 : "Confirming replaces it with your saved entry."}
           </p>
           <div className="dialog-actions">
@@ -57,9 +58,9 @@ export function ExportDialog({ controller }: { controller: ExportController }) {
         >
           <h2>Export outcome unknown</h2>
           <p id="export-uncertain">
-            Entry date: {s.date}. {EXPORT_MESSAGE.outcome_uncertain} Check the
-            iCloud file, then resolve it: if it matches your saved entry the
-            export is marked done, otherwise you can abandon it.
+            Entry date: {s.date}. {exportMessage("outcome_uncertain", s.target)}{" "}
+            Check the {item}, then resolve it: if it matches your saved entry
+            the export is marked done, otherwise you can abandon it.
           </p>
           <div className="dialog-actions">
             <button data-initial-focus onClick={() => controller.close()}>

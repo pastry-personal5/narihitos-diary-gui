@@ -2088,6 +2088,28 @@
   {
     "ecosystem": "cargo",
     "name": "foreign-types",
+    "version": "0.3.2",
+    "license": "MIT/Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/foreign-types/0.3.2/download",
+    "features": [],
+    "authors": ["Steven Fackler <sfackler@gmail.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt",
+        "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/333ea3aaa3cadb819f4acd9f9153f9feee060a995ca8710f32bc5bd9a4b91734.txt",
+        "sha256": "333ea3aaa3cadb819f4acd9f9153f9feee060a995ca8710f32bc5bd9a4b91734"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "foreign-types",
     "version": "0.5.0",
     "license": "MIT/Apache-2.0",
     "source_archive": "https://crates.io/api/v1/crates/foreign-types/0.5.0/download",
@@ -2114,6 +2136,28 @@
     "license": "MIT/Apache-2.0",
     "source_archive": "https://crates.io/api/v1/crates/foreign-types-macros/0.2.4/download",
     "features": ["std"],
+    "authors": ["Steven Fackler <sfackler@gmail.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt",
+        "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/333ea3aaa3cadb819f4acd9f9153f9feee060a995ca8710f32bc5bd9a4b91734.txt",
+        "sha256": "333ea3aaa3cadb819f4acd9f9153f9feee060a995ca8710f32bc5bd9a4b91734"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "foreign-types-shared",
+    "version": "0.1.1",
+    "license": "MIT/Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/foreign-types-shared/0.1.1/download",
+    "features": [],
     "authors": ["Steven Fackler <sfackler@gmail.com>"],
     "notices": [
       {
@@ -3089,6 +3133,28 @@
         "original_name": "LICENSE",
         "file": "licenses/2d01890414494742ba4a509fcec8efa40f6d8be22cbd72be7cff08d6fda4ec89.txt",
         "sha256": "2d01890414494742ba4a509fcec8efa40f6d8be22cbd72be7cff08d6fda4ec89"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "hyper-tls",
+    "version": "0.6.0",
+    "license": "MIT/Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/hyper-tls/0.6.0/download",
+    "features": ["alpn"],
+    "authors": ["Sean McArthur <sean@seanmonstar.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/7b033f57f23fffca5bee9406cf453ce31e919c1b867df54bfa7487e73d8c9c1f.txt",
+        "sha256": "7b033f57f23fffca5bee9406cf453ce31e919c1b867df54bfa7487e73d8c9c1f"
       }
     ],
     "selected_licenses": ["MIT"]
@@ -4393,6 +4459,28 @@
   },
   {
     "ecosystem": "cargo",
+    "name": "native-tls",
+    "version": "0.2.18",
+    "license": "MIT OR Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/native-tls/0.2.18/download",
+    "features": ["alpn", "default"],
+    "authors": ["Steven Fackler <sfackler@gmail.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt",
+        "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/f2ad7982ddbfa8c45eb965315718c55b70b9cc311b49afacb50d5fe84173ae2c.txt",
+        "sha256": "f2ad7982ddbfa8c45eb965315718c55b70b9cc311b49afacb50d5fe84173ae2c"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
     "name": "ndk",
     "version": "0.9.0",
     "license": "MIT OR Apache-2.0",
@@ -5639,6 +5727,92 @@
   },
   {
     "ecosystem": "cargo",
+    "name": "openssl",
+    "version": "0.10.81",
+    "license": "Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/openssl/0.10.81/download",
+    "features": ["default"],
+    "authors": ["Steven Fackler <sfackler@gmail.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE",
+        "file": "licenses/f3d4287b4a21c5176fea2f9bd4ae800696004e2fb8e05cbc818be513f188a941.txt",
+        "sha256": "f3d4287b4a21c5176fea2f9bd4ae800696004e2fb8e05cbc818be513f188a941"
+      },
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt",
+        "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+      }
+    ],
+    "selected_licenses": ["Apache-2.0"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "openssl-macros",
+    "version": "0.1.1",
+    "license": "MIT/Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/openssl-macros/0.1.1/download",
+    "features": [],
+    "authors": [],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt",
+        "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/ea5ab440900ab271811d5c2dc02a9de6e03a6956ac5727e85c11d76df5883d30.txt",
+        "sha256": "ea5ab440900ab271811d5c2dc02a9de6e03a6956ac5727e85c11d76df5883d30"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "openssl-probe",
+    "version": "0.2.2",
+    "license": "MIT OR Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/openssl-probe/0.2.2/download",
+    "features": [],
+    "authors": ["Alex Crichton <alex@alexcrichton.com>"],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397.txt",
+        "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "openssl-sys",
+    "version": "0.9.117",
+    "license": "MIT",
+    "source_archive": "https://crates.io/api/v1/crates/openssl-sys/0.9.117/download",
+    "features": [],
+    "authors": [
+      "Alex Crichton <alex@alexcrichton.com>",
+      "Steven Fackler <sfackler@gmail.com>"
+    ],
+    "notices": [
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397.txt",
+        "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
     "name": "option-ext",
     "version": "0.2.0",
     "license": "MPL-2.0",
@@ -6498,7 +6672,14 @@
     "version": "0.13.5",
     "license": "MIT OR Apache-2.0",
     "source_archive": "https://crates.io/api/v1/crates/reqwest/0.13.5/download",
-    "features": ["json", "stream"],
+    "features": [
+      "__native-tls",
+      "__native-tls-alpn",
+      "__tls",
+      "json",
+      "native-tls",
+      "stream"
+    ],
     "authors": ["Sean McArthur <sean@seanmonstar.com>"],
     "notices": [
       {
@@ -6637,6 +6818,28 @@
   },
   {
     "ecosystem": "cargo",
+    "name": "rustls-pki-types",
+    "version": "1.15.1",
+    "license": "MIT OR Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/rustls-pki-types/1.15.1/download",
+    "features": ["alloc", "default", "std"],
+    "authors": [],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/45fd05c4865e7c350b98ad7ac50e1b15462d49af4a91e9b0c9dd933dc9a69742.txt",
+        "sha256": "45fd05c4865e7c350b98ad7ac50e1b15462d49af4a91e9b0c9dd933dc9a69742"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/9117d922e667125508dde62b02c1f57ed22f5ad21eb536aa2e2d99e1c796e639.txt",
+        "sha256": "9117d922e667125508dde62b02c1f57ed22f5ad21eb536aa2e2d99e1c796e639"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
     "name": "rustversion",
     "version": "1.0.23",
     "license": "MIT OR Apache-2.0",
@@ -6702,6 +6905,26 @@
         "original_name": "UNLICENSE",
         "file": "licenses/7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c.txt",
         "sha256": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "schannel",
+    "version": "0.1.30",
+    "license": "MIT",
+    "source_archive": "https://crates.io/api/v1/crates/schannel/0.1.30/download",
+    "features": [],
+    "authors": [
+      "Steven Fackler <sfackler@gmail.com>",
+      "Steffen Butzer <steffen.butzer@outlook.com>"
+    ],
+    "notices": [
+      {
+        "original_name": "LICENSE.md",
+        "file": "licenses/aa72991ac35b4de0034da0afe943e62b48c4092fc2ba13ae47806d8e9a4ad551.txt",
+        "sha256": "aa72991ac35b4de0034da0afe943e62b48c4092fc2ba13ae47806d8e9a4ad551"
       }
     ],
     "selected_licenses": ["MIT"]
@@ -6800,6 +7023,56 @@
         "original_name": "LICENSE-MIT",
         "file": "licenses/fb77f0a9c53e473abe5103c8632ef9f0f2874d4fb3f17cb2d8c661aab9cee9d7.txt",
         "sha256": "fb77f0a9c53e473abe5103c8632ef9f0f2874d4fb3f17cb2d8c661aab9cee9d7"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "security-framework",
+    "version": "3.7.0",
+    "license": "MIT OR Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/security-framework/3.7.0/download",
+    "features": ["OSX_10_14", "alpn", "default", "session-tickets"],
+    "authors": [
+      "Steven Fackler <sfackler@gmail.com>",
+      "Kornel <kornel@geekhood.net>"
+    ],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/91e934255ba3b2f21103d68c5581c23ef34aa95c4628e4405b8c901935e11c69.txt",
+        "sha256": "91e934255ba3b2f21103d68c5581c23ef34aa95c4628e4405b8c901935e11c69"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "security-framework-sys",
+    "version": "2.17.0",
+    "license": "MIT OR Apache-2.0",
+    "source_archive": "https://crates.io/api/v1/crates/security-framework-sys/2.17.0/download",
+    "features": ["OSX_10_13", "default"],
+    "authors": [
+      "Steven Fackler <sfackler@gmail.com>",
+      "Kornel <kornel@geekhood.net>"
+    ],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/91e934255ba3b2f21103d68c5581c23ef34aa95c4628e4405b8c901935e11c69.txt",
+        "sha256": "91e934255ba3b2f21103d68c5581c23ef34aa95c4628e4405b8c901935e11c69"
       }
     ],
     "selected_licenses": ["MIT"]
@@ -8393,6 +8666,23 @@
         "original_name": "LICENSE",
         "file": "licenses/0b83dc40cba89b9922bb84b0a9c7d2768ce37c1d7e138b7424fd4549915778c9.txt",
         "sha256": "0b83dc40cba89b9922bb84b0a9c7d2768ce37c1d7e138b7424fd4549915778c9"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "tokio-native-tls",
+    "version": "0.3.1",
+    "license": "MIT",
+    "source_archive": "https://crates.io/api/v1/crates/tokio-native-tls/0.3.1/download",
+    "features": [],
+    "authors": ["Tokio Contributors <team@tokio.rs>"],
+    "notices": [
+      {
+        "original_name": "LICENSE",
+        "file": "licenses/898b1ae9821e98daf8964c8d6c7f61641f5f5aa78ad500020771c0939ee0dea1.txt",
+        "sha256": "898b1ae9821e98daf8964c8d6c7f61641f5f5aa78ad500020771c0939ee0dea1"
       }
     ],
     "selected_licenses": ["MIT"]
@@ -10123,6 +10413,10 @@
       "Win32_Networking",
       "Win32_Networking_WinSock",
       "Win32_Security",
+      "Win32_Security_Authentication",
+      "Win32_Security_Authentication_Identity",
+      "Win32_Security_Credentials",
+      "Win32_Security_Cryptography",
       "Win32_Storage",
       "Win32_Storage_FileSystem",
       "Win32_System",
@@ -10132,6 +10426,7 @@
       "Win32_System_Diagnostics_Debug",
       "Win32_System_IO",
       "Win32_System_LibraryLoader",
+      "Win32_System_Memory",
       "Win32_System_Pipes",
       "Win32_System_Registry",
       "Win32_System_SystemInformation",
@@ -10828,6 +11123,28 @@
       }
     ],
     "selected_licenses": ["Unicode-3.0"]
+  },
+  {
+    "ecosystem": "cargo",
+    "name": "zeroize",
+    "version": "1.9.1",
+    "license": "Apache-2.0 OR MIT",
+    "source_archive": "https://crates.io/api/v1/crates/zeroize/1.9.1/download",
+    "features": ["alloc", "default"],
+    "authors": ["The RustCrypto Project Developers"],
+    "notices": [
+      {
+        "original_name": "LICENSE-APACHE",
+        "file": "licenses/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      },
+      {
+        "original_name": "LICENSE-MIT",
+        "file": "licenses/8c7516d4b27b1e495be5e38b612298b63de48d05f49cdac94f70f3cd70f8864b.txt",
+        "sha256": "8c7516d4b27b1e495be5e38b612298b63de48d05f49cdac94f70f3cd70f8864b"
+      }
+    ],
+    "selected_licenses": ["MIT"]
   },
   {
     "ecosystem": "cargo",
