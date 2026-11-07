@@ -4,8 +4,16 @@
 //! dropped. Constructs Notion cannot represent become literal text and are counted in
 //! [`Projection::warnings`]. JSON encoding and hashing live in infrastructure.
 
+use crate::authentic::DiaryDate;
+use crate::calendar::weekday;
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use std::ops::Range;
+
+/// The day heading text, for example `2026-11-04 (WED)`. English weekdays keep it stable.
+pub fn day_title(date: DiaryDate) -> String {
+    const DAYS: [&str; 7] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+    format!("{date} ({})", DAYS[usize::from(weekday(date))])
+}
 
 /// Notion allows 2,000 characters per rich-text item; UTF-16 units are the conservative count.
 pub const MAX_RICH_UNITS: usize = 2_000;
@@ -206,7 +214,8 @@ impl<'a> Ctx<'a> {
                         .inline_range(i)
                         .map(|r| literal(self.src, r))
                         .unwrap_or_default();
-                    out.push(Block::leaf(Kind::Heading(n.min(3)), text));
+                    // Heading 2 marks a day in the export, so every body heading becomes heading 3.
+                    out.push(Block::leaf(Kind::Heading(3), text));
                     i = self.skip(i);
                 }
                 Event::Start(Tag::CodeBlock(kind)) => {

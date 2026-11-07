@@ -12,7 +12,7 @@ fn supported_blocks_project_in_order() {
     assert_eq!(
         kinds(&p),
         [
-            "heading_1",
+            "heading_3",
             "paragraph",
             "bulleted_list_item",
             "bulleted_list_item",
@@ -99,4 +99,23 @@ fn chunks_respect_count_blocks_and_bytes() {
     assert!(chunks.iter().all(|c| c.len() <= 10));
     assert_eq!(chunks.concat(), blocks);
     assert!(chunk(&[], |_| 1, 10).is_empty());
+}
+
+#[test]
+fn day_title_has_iso_date_and_english_weekday() {
+    let d = |y, m, day| DiaryDate::from_ymd(y, m, day).unwrap();
+    assert_eq!(day_title(d(2026, 11, 4)), "2026-11-04 (WED)");
+    assert_eq!(day_title(d(2026, 11, 8)), "2026-11-08 (SUN)");
+    assert_eq!(day_title(d(2026, 11, 2)), "2026-11-02 (MON)");
+    assert_eq!(day_title(d(2026, 11, 7)), "2026-11-07 (SAT)");
+}
+
+#[test]
+fn body_headings_never_project_as_heading_two() {
+    let p = project("# A\n\n## B\n\n### C\n\n#### D\n");
+    assert_eq!(
+        kinds(&p),
+        ["heading_3", "heading_3", "heading_3", "heading_3"]
+    );
+    assert_eq!(p.warnings, 1);
 }
