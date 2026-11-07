@@ -2,6 +2,7 @@ import type { GenerationBridge } from "./generation/contracts";
 import type { ReviewBridge } from "./review/contracts";
 import type { NavigationBridge } from "./navigation/contracts";
 import type { TrashBridge, TrashResult } from "./trash/contracts";
+import type { ExportBridge, ExportResult } from "./export/contracts";
 import type { StreamEvent } from "./events";
 /** Only redacted DTOs belong here. Discovery paths and credentials stay in Rust. */
 export interface AppMetadata {
@@ -58,6 +59,7 @@ export interface OperationState {
   succeeded: boolean;
   result: string | null;
   trash?: TrashResult;
+  export?: ExportResult;
 }
 export interface SaveRequest {
   date: string;
@@ -183,7 +185,12 @@ export class SettingsError extends Error {
 export type SymbolResult =
   { status: "ok"; png_base64: string } | { status: "unsupported" };
 export interface Bridge
-  extends NavigationBridge, TrashBridge, GenerationBridge, ReviewBridge {
+  extends
+    NavigationBridge,
+    TrashBridge,
+    GenerationBridge,
+    ReviewBridge,
+    ExportBridge {
   listJobs?(cursor?: string): Promise<JobPage>;
   metadata(): Promise<AppMetadata>;
   /** Absent in fakes; symbols then fall back to their text labels. */

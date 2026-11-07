@@ -186,8 +186,9 @@ Plan: [overview](../archive/milestones/p1-m25/milestone-25-export-coordination-o
 
 ### P1-M26: iCloud export
 
-Status: Planned
+Status: Delivered (2026-11-07)
 Goal: Export exact saved Markdown through verified File Provider availability and coordinated publication, with external-change confirmation and honest local-write outcomes.
+Plan: [overview](milestone-26-icloud-export-overview.md), [work plan](milestone-26-icloud-export-architecture.md); includes export cancel, uncertain clear/abandon and a minimal Export UI (owner, 2026-11-07).
 
 ### P1-M27: Notion export
 

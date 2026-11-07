@@ -40,6 +40,12 @@ pub enum ExportState {
     Uncertain,
     Succeeded,
     Failed,
+    Cancelled,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExportPage {
+    pub operations: Vec<ExportResult>,
+    pub next_cursor: Option<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExportResult {
@@ -132,7 +138,12 @@ impl Bridge {
         if result.operation_id != request.operation_id
             || !matches!(
                 result.outcome.as_str(),
-                "running" | "needs_confirmation" | "uncertain" | "succeeded" | "failed"
+                "running"
+                    | "needs_confirmation"
+                    | "uncertain"
+                    | "succeeded"
+                    | "failed"
+                    | "cancelled"
             )
             || !token_ok
         {
@@ -168,5 +179,76 @@ impl Bridge {
             return Err(AuthenticError::new("invalid_response"));
         }
         Ok(result)
+    }
+
+    /// Resolves an `uncertain` export: a matching read-back succeeds, otherwise a preview.
+    pub async fn abandon_export(
+        &self,
+        operation_id: String,
+    ) -> Result<StartExportResult, AuthenticError> {
+        if !uuid(&operation_id) {
+            return Err(invalid());
+        }
+        let result: StartExportResult = self
+            .authentic(
+                Method::POST,
+                &format!("/exports/{operation_id}/abandon"),
+                None,
+            )
+            .await?;
+        let token_ok = result.outcome != "needs_confirmation"
+            || result
+                .detail
+                .get("token")
+                .and_then(|t| t.as_str())
+                .is_some_and(|t| !t.is_empty() && t.len() <= 128);
+        if result.operation_id != operation_id
+            || !matches!(result.outcome.as_str(), "needs_confirmation" | "succeeded")
+            || !token_ok
+        {
+            return Err(AuthenticError::new("invalid_response"));
+        }
+        Ok(result)
+    }
+    pub async fn confirm_abandon_export(
+        &self,
+        operation_id: String,
+        request: ConfirmExportRequest,
+    ) -> Result<ExportResult, AuthenticError> {
+        if !uuid(&operation_id)
+            || !uuid(&request.step_id)
+            || request.token.is_empty()
+            || request.token.len() > 128
+            || request.expected_checkpoint == 0
+            || request.expected_checkpoint > i64::MAX as u64 - 1
+        {
+            return Err(invalid());
+        }
+        let result: ExportResult = self
+            .authentic(
+                Method::POST,
+                &format!("/exports/{operation_id}/abandon/confirmation"),
+                Some(json!(request)),
+            )
+            .await?;
+        if !result.valid() || result.operation_id != operation_id {
+            return Err(AuthenticError::new("invalid_response"));
+        }
+        Ok(result)
+    }
+
+    /// Unfinished exports (paused, running or uncertain), including ones that survived a restart.
+    pub async fn list_exports(&self) -> Result<ExportPage, AuthenticError> {
+        let page: ExportPage = self
+            .authentic(
+                Method::GET,
+                "/operations?kind=export&state=unfinished&limit=20",
+                None,
+            )
+            .await?;
+        if page.operations.len() > 20 || !page.operations.iter().all(ExportResult::valid) {
+            return Err(AuthenticError::new("invalid_response"));
+        }
+        Ok(page)
     }
 }

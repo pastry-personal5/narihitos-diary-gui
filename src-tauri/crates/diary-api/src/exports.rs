@@ -43,6 +43,18 @@ pub(super) struct ConfirmIn {
 
 pub(super) fn error(e: ExportError) -> Response {
     use ExportError::*;
+    if let CloudUnavailable(reason) = e {
+        let (status, code) = if reason == Unavailable::PermissionDenied {
+            (StatusCode::FORBIDDEN, "permission_denied")
+        } else {
+            (StatusCode::SERVICE_UNAVAILABLE, "cloud_unavailable")
+        };
+        return (
+            status,
+            Json(json!({"error":{"code":code,"message":code,"retryable":false,"reason":reason.as_str()}})),
+        )
+            .into_response();
+    }
     let (status, code) = match e {
         Invalid => (StatusCode::BAD_REQUEST, "invalid_input"),
         Disabled => (StatusCode::UNPROCESSABLE_ENTITY, "export_disabled"),
@@ -55,7 +67,7 @@ pub(super) fn error(e: ExportError) -> Response {
         Mismatch => (StatusCode::CONFLICT, "operation_mismatch"),
         CheckpointMismatch => (StatusCode::CONFLICT, "checkpoint_mismatch"),
         Uncertain => (StatusCode::CONFLICT, "outcome_uncertain"),
-        CloudUnavailable => (StatusCode::SERVICE_UNAVAILABLE, "cloud_unavailable"),
+        CloudUnavailable(_) => unreachable!("answered above"),
         NotFound => (StatusCode::NOT_FOUND, "not_found"),
         Storage => (StatusCode::INTERNAL_SERVER_ERROR, "storage_error"),
     };
@@ -125,6 +137,7 @@ pub(super) fn sync(s: &ServerState, session: &str, r: &ExportResult) {
     };
     let target = match r.state {
         ExportState::Succeeded => JobState::Succeeded,
+        ExportState::Cancelled => JobState::Cancelled,
         ExportState::Failed | ExportState::Uncertain => JobState::Failed,
         _ => JobState::Running,
     };
@@ -286,6 +299,119 @@ pub(super) async fn confirm(
                 json!({"operation_id":a.operation_id.as_str(),"step_id":a.step_id.as_str(),"admitted_checkpoint":a.admitted_checkpoint}),
                 4096,
             )
+        }
+        Ok(Err(e)) => error(e),
+        Err(_) => error(ExportError::Storage),
+    }
+}
+
+/// `POST /jobs/{id}/cancel` for an export: declines a pending confirmation or stops a running
+/// export before `apply`. Remote state is never rolled back.
+pub(super) async fn cancel(s: &Arc<ServerState>, session: &str, job: &str) -> Response {
+    let (Some(service), Some(id)) = (s.exports.clone(), OperationId::parse(job)) else {
+        return error(ExportError::Invalid);
+    };
+    match tokio::task::spawn_blocking(move || service.cancel(&id)).await {
+        Ok(Ok(r)) => {
+            sync(s, session, &r);
+            let mut c = s.coordinator.lock().expect("coordinator poisoned");
+            match c.get(session, s.now(), job) {
+                Ok(j) => Json(super::job_value(s, session, j)).into_response(),
+                Err(e) => app_error(e),
+            }
+        }
+        Ok(Err(e)) => error(e),
+        Err(_) => error(ExportError::Storage),
+    }
+}
+
+/// Resolves an `uncertain` export: a matching read-back succeeds, otherwise a one-use preview.
+pub(super) async fn abandon(
+    State(s): State<Arc<ServerState>>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    let session = match authorize(&s, &headers) {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+    let (Some(service), Some(operation_id)) = (s.exports.clone(), OperationId::parse(&id)) else {
+        return error(ExportError::Invalid);
+    };
+    let permit = match s.source_slots.clone().try_acquire_owned() {
+        Ok(p) => p,
+        Err(_) => return error(ExportError::Limit),
+    };
+    let generation = s.config_generation.load(Ordering::SeqCst);
+    let who = session.clone();
+    match tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        service
+            .abandon(&who, generation, &operation_id)
+            .map(|st| (st, service.operation(&operation_id)))
+    })
+    .await
+    {
+        Ok(Ok((st, latest))) => {
+            if let Ok(Some(r)) = latest {
+                sync(&s, &session, &r);
+            }
+            started(&st)
+        }
+        Ok(Err(e)) => error(e),
+        Err(_) => error(ExportError::Storage),
+    }
+}
+
+pub(super) async fn abandon_confirm(
+    State(s): State<Arc<ServerState>>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    input: Result<Json<ConfirmIn>, JsonRejection>,
+) -> Response {
+    let session = match authorize(&s, &headers) {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+    let input = match payload(input) {
+        Ok(i) => i,
+        Err(e) => return e,
+    };
+    let (Some(operation_id), Some(step_id)) =
+        (OperationId::parse(&id), StepId::parse(&input.step_id))
+    else {
+        return error(ExportError::Invalid);
+    };
+    if input.token.is_empty() || input.token.len() > 128 || input.expected_checkpoint == 0 {
+        return error(ExportError::Invalid);
+    }
+    let Some(service) = s.exports.clone() else {
+        return error(ExportError::Disabled);
+    };
+    let permit = match s.source_slots.clone().try_acquire_owned() {
+        Ok(p) => p,
+        Err(_) => return error(ExportError::Limit),
+    };
+    let generation = s.config_generation.load(Ordering::SeqCst);
+    let who = session.clone();
+    match tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        service.abandon_confirm(
+            &who,
+            generation,
+            ConfirmRequest {
+                operation_id,
+                step_id,
+                expected_checkpoint: input.expected_checkpoint,
+                token: input.token,
+            },
+        )
+    })
+    .await
+    {
+        Ok(Ok(r)) => {
+            sync(&s, &session, &r);
+            bounded(result(&r), 4096)
         }
         Ok(Err(e)) => error(e),
         Err(_) => error(ExportError::Storage),

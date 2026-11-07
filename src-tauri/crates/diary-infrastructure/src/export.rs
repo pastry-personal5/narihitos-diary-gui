@@ -1,6 +1,6 @@
 //! Export coordination service: saved-revision snapshot, durable intent before any destination
-//! call, session-bound previews, token-consuming step admission and crash recovery. No real
-//! destination exists yet; production registers no adapter, so every target is `disabled`.
+//! call, session-bound previews, token-consuming step admission and crash recovery. The
+//! optional iCloud adapter is registered from validated configuration.
 use crate::{ledger::hash_input, lifecycle::random_uuid, sqlite::Db};
 use diary_application::{
     authentic::{AuthenticStore, Loaded},
@@ -20,6 +20,7 @@ use store::{Intent, Publication, Row, StoreError};
 
 #[cfg(any(test, feature = "fault-injection"))]
 pub mod fake;
+pub mod icloud;
 pub mod store;
 
 const MAX_PREVIEWS: usize = 64;
@@ -64,6 +65,7 @@ struct Prepared {
     checkpoint: u64,
     fingerprint: String,
     write: Write,
+    abandon: bool,
     expires: u64,
 }
 /// Everything the background step needs; the snapshot never leaves memory except in SQLite.
@@ -80,6 +82,8 @@ struct Inner {
     authentic: Arc<dyn AuthenticStore>,
     adapter: Option<Arc<dyn ExportAdapter>>,
     previews: Mutex<BTreeMap<String, Prepared>>,
+    /// Running exports asked to stop before `apply`.
+    cancels: Mutex<std::collections::BTreeSet<String>>,
     notifier: Mutex<Option<Notifier>>,
     ready: AtomicBool,
     clock: Box<dyn Fn() -> u64 + Send + Sync>,
@@ -103,6 +107,7 @@ impl Service {
             authentic,
             adapter,
             previews: Mutex::new(BTreeMap::new()),
+            cancels: Mutex::new(Default::default()),
             notifier: Mutex::new(None),
             ready: AtomicBool::new(false),
             clock: Box::new(monotonic),
@@ -165,7 +170,8 @@ impl Inner {
             OperationState::Paused => ExportState::NeedsConfirmation,
             OperationState::Uncertain => ExportState::Uncertain,
             OperationState::Succeeded => ExportState::Succeeded,
-            OperationState::Failed | OperationState::Cancelled => ExportState::Failed,
+            OperationState::Failed => ExportState::Failed,
+            OperationState::Cancelled => ExportState::Cancelled,
         };
         ExportResult {
             operation_id: rec.id.clone(),
@@ -177,7 +183,7 @@ impl Inner {
             state,
             checkpoint: rec.checkpoint,
             reason: match state {
-                ExportState::Failed => rec.result.clone(),
+                ExportState::Failed | ExportState::Cancelled => rec.result.clone(),
                 _ => row.reason.clone(),
             },
         }
@@ -270,7 +276,7 @@ impl Inner {
         id: &OperationId,
         checkpoint: u64,
         observed: &Observation,
-        (reason, write): (Reason, Write),
+        (reason, write, abandon): (Reason, Write, bool),
     ) -> Result<Preview, ExportError> {
         let token = format!("{}{}", uuid()?, uuid()?);
         let now = (self.clock)();
@@ -289,6 +295,7 @@ impl Inner {
                 checkpoint,
                 fingerprint: observed.fingerprint.clone(),
                 write,
+                abandon,
                 expires: now.saturating_add(TOKEN_TTL_MS),
             },
         );
@@ -329,6 +336,10 @@ impl Inner {
                 }),
             )
             .map_err(stored)
+    }
+
+    fn why(seen: &Observation) -> Unavailable {
+        seen.unavailable.unwrap_or(Unavailable::Unreadable)
     }
 
     fn holder_blocks(
@@ -445,16 +456,17 @@ impl Inner {
         let (confirm, write) =
             match decide(receipt.as_ref(), &snapshot.revision.sha256, &seen, false) {
                 Decision::Unavailable => {
+                    let why = Self::why(&seen);
                     self.db
                         .finish_export(
                             &request.operation_id,
                             OperationState::Failed,
-                            "cloud_unavailable",
+                            why.as_str(),
                             None,
                         )
                         .map_err(stored)?;
                     self.notify(&request.operation_id);
-                    return Err(ExportError::CloudUnavailable);
+                    return Err(ExportError::CloudUnavailable(why));
                 }
                 Decision::Uncertain => return Err(ExportError::Uncertain),
                 Decision::Noop => (None, None),
@@ -480,7 +492,7 @@ impl Inner {
                     &request.operation_id,
                     rec.checkpoint,
                     &seen,
-                    (reason, write),
+                    (reason, write, false),
                 )?;
                 self.notify(&request.operation_id);
                 return Ok(Started::Preview(preview));
@@ -520,7 +532,7 @@ impl Inner {
             .map_err(stored)?;
         let (unresolved, _) = self.holder_blocks(&row.destination_key, Some(&rec.id))?;
         match decide(receipt.as_ref(), &row.revision_sha, &seen, unresolved) {
-            Decision::Unavailable => Err(ExportError::CloudUnavailable),
+            Decision::Unavailable => Err(ExportError::CloudUnavailable(Self::why(&seen))),
             Decision::Uncertain => Err(ExportError::Uncertain),
             Decision::Noop => {
                 self.succeed(&rec.id, row, &seen)?;
@@ -539,7 +551,7 @@ impl Inner {
                     &rec.id,
                     rec.checkpoint,
                     &seen,
-                    (reason, w),
+                    (reason, w, false),
                 )?))
             }
         }
@@ -604,12 +616,15 @@ impl Inner {
             {
                 return Err(ExportError::PreviewStale);
             }
+            if p.abandon {
+                return Err(ExportError::PreviewStale);
+            }
             (p.fingerprint.clone(), p.write)
         };
         let date = DiaryDate::parse(&row.date).ok_or(ExportError::Storage)?;
         let seen = adapter.observe(&date);
         if !seen.available {
-            return Err(ExportError::CloudUnavailable);
+            return Err(ExportError::CloudUnavailable(Self::why(&seen)));
         }
         if seen.fingerprint != prepared.0 {
             return Err(ExportError::PreviewStale);
@@ -664,6 +679,9 @@ impl Inner {
         std::thread::spawn(move || {
             // An error leaves the durable state for recovery; nothing is replayed here.
             let _ = inner.run(&job);
+            if let Ok(mut cancels) = inner.cancels.lock() {
+                cancels.remove(job.id.as_str());
+            }
             inner.notify(&job.id);
         });
     }
@@ -674,6 +692,21 @@ impl Inner {
         let date = job.snapshot.date;
         // Re-read immediately before mutation; a changed observation needs a new preview.
         let now = adapter.observe(&date);
+        let stop = self
+            .cancels
+            .lock()
+            .map(|mut c| c.remove(job.id.as_str()))
+            .unwrap_or(false);
+        if stop {
+            // Nothing was applied: cancelling is a clean terminal state with no rollback.
+            self.db
+                .export_chunk(&job.id, "failed", None)
+                .map_err(stored)?;
+            return self
+                .db
+                .finish_export(&job.id, OperationState::Cancelled, "cancelled", None)
+                .map_err(stored);
+        }
         if !now.available
             || now.present != job.expected.present
             || now.fingerprint != job.expected.fingerprint
@@ -693,7 +726,7 @@ impl Inner {
             .export_chunk(&job.id, "applying", None)
             .map_err(stored)?;
         self.hit("before_apply")?;
-        let applied = adapter.apply(&date, &job.snapshot.bytes, job.write);
+        let applied = adapter.apply(&date, &job.snapshot.bytes, job.write, &job.expected);
         self.hit("after_apply")?;
         if applied == Applied::Failed {
             self.db
@@ -726,6 +759,158 @@ impl Inner {
             "uncertain",
             Some("uncertain"),
         )
+    }
+
+    fn cancel(&self, id: &OperationId) -> Result<ExportResult, ExportError> {
+        let (rec, row) = self.load(id)?;
+        match rec.state {
+            OperationState::Paused => {
+                self.db
+                    .finish_export(id, OperationState::Cancelled, "cancelled", None)
+                    .map_err(stored)?;
+                self.notify(id);
+            }
+            OperationState::Running => {
+                // Read by `run` before `apply`; past that point the export finishes by read-back.
+                if let Ok(mut c) = self.cancels.lock() {
+                    c.insert(id.as_str().to_owned());
+                }
+            }
+            OperationState::Uncertain => return Err(ExportError::Uncertain),
+            _ => return Ok(self.result(&rec, &row)),
+        }
+        let (rec, row) = self.load(id)?;
+        Ok(self.result(&rec, &row))
+    }
+
+    /// A read-back equal to the saved revision proves the write and resolves the export;
+    /// otherwise the user may abandon it after a fresh preview. The remote is never touched.
+    fn abandon(
+        &self,
+        session: &str,
+        generation: u64,
+        id: &OperationId,
+    ) -> Result<Started, ExportError> {
+        let (rec, row) = self.load(id)?;
+        if rec.state != OperationState::Uncertain {
+            return Err(ExportError::CheckpointMismatch);
+        }
+        let adapter = self.adapter(row.target)?.clone();
+        if self.key(&*adapter) != row.destination_key || !self.ready.load(Ordering::SeqCst) {
+            return Err(ExportError::Disabled);
+        }
+        let date = DiaryDate::parse(&row.date).ok_or(ExportError::Storage)?;
+        let back = adapter.read_back(&date);
+        if !back.available {
+            return Err(ExportError::CloudUnavailable(Self::why(&back)));
+        }
+        if back.present && back.digest == row.revision_sha {
+            self.succeed(id, &row, &back)?;
+            self.notify(id);
+            let (rec, row) = self.load(id)?;
+            return Ok(Started::Result(self.result(&rec, &row)));
+        }
+        Ok(Started::Preview(self.issue_preview(
+            session,
+            generation,
+            id,
+            rec.checkpoint,
+            &back,
+            (Reason::Uncertain, Write::Replace, true),
+        )?))
+    }
+
+    fn abandon_confirm(
+        &self,
+        session: &str,
+        generation: u64,
+        request: ConfirmRequest,
+    ) -> Result<ExportResult, ExportError> {
+        if request.expected_checkpoint == 0
+            || request.expected_checkpoint > i64::MAX as u64 - 1
+            || request.token.is_empty()
+            || request.token.len() > 128
+        {
+            return Err(ExportError::Invalid);
+        }
+        let (rec, row) = self.load(&request.operation_id)?;
+        let hash = hash_input(
+            "export_abandon",
+            1,
+            &[
+                ("operation", &rec.input_hash),
+                ("checkpoint", &request.expected_checkpoint.to_string()),
+            ],
+        );
+        // A duplicate answers from the recorded step.
+        if self
+            .db
+            .export_step(&request.operation_id, request.step_id.as_str(), &hash)
+            .map_err(stored)?
+            .is_some()
+        {
+            return Ok(self.result(&rec, &row));
+        }
+        if rec.state != OperationState::Uncertain || rec.checkpoint != request.expected_checkpoint {
+            return Err(ExportError::CheckpointMismatch);
+        }
+        let adapter = self.adapter(row.target)?.clone();
+        if self.key(&*adapter) != row.destination_key {
+            return Err(ExportError::Disabled);
+        }
+        let fingerprint_seen = {
+            let previews = self.previews.lock().map_err(|_| ExportError::Storage)?;
+            let p = previews.get(&request.token).ok_or(ExportError::Expired)?;
+            if p.expires <= (self.clock)() {
+                return Err(ExportError::Expired);
+            }
+            if !p.abandon
+                || p.session != session
+                || p.generation != generation
+                || p.operation != request.operation_id
+                || p.checkpoint != request.expected_checkpoint
+            {
+                return Err(ExportError::PreviewStale);
+            }
+            p.fingerprint.clone()
+        };
+        let date = DiaryDate::parse(&row.date).ok_or(ExportError::Storage)?;
+        let back = adapter.read_back(&date);
+        if !back.available {
+            return Err(ExportError::CloudUnavailable(Self::why(&back)));
+        }
+        if back.fingerprint != fingerprint_seen {
+            return Err(ExportError::PreviewStale);
+        }
+        let step = NewStep {
+            step_id: request.step_id.clone(),
+            input_hash: hash,
+            expected_checkpoint: request.expected_checkpoint,
+            outcome: "abandon_admitted".into(),
+            state: Some(OperationState::Running),
+        };
+        self.db
+            .confirm_export(
+                &request.operation_id,
+                &step,
+                &hex_sha(request.token.as_bytes()),
+            )
+            .map_err(stored)?;
+        if let Ok(mut previews) = self.previews.lock() {
+            previews.remove(&request.token);
+        }
+        // A crash between the two writes leaves `running`; recovery re-proves or re-parks it.
+        self.db
+            .finish_export(
+                &request.operation_id,
+                OperationState::Cancelled,
+                "abandoned",
+                None,
+            )
+            .map_err(stored)?;
+        self.notify(&request.operation_id);
+        let (rec, row) = self.load(&request.operation_id)?;
+        Ok(self.result(&rec, &row))
     }
 
     fn recover(&self) -> Result<usize, ExportError> {
@@ -832,6 +1017,25 @@ impl Exports for Service {
                     None => Err(error),
                 }
             })
+    }
+    fn cancel(&self, id: &OperationId) -> Result<ExportResult, ExportError> {
+        self.0.cancel(id)
+    }
+    fn abandon(
+        &self,
+        session: &str,
+        generation: u64,
+        id: &OperationId,
+    ) -> Result<Started, ExportError> {
+        self.0.abandon(session, generation, id)
+    }
+    fn abandon_confirm(
+        &self,
+        session: &str,
+        generation: u64,
+        request: ConfirmRequest,
+    ) -> Result<ExportResult, ExportError> {
+        self.0.abandon_confirm(session, generation, request)
     }
     fn operation(&self, id: &OperationId) -> Result<Option<ExportResult>, ExportError> {
         match self.0.load(id) {

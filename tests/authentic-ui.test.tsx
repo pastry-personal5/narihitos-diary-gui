@@ -287,3 +287,46 @@ describe("Authentic editing", () => {
     expect(screen.getByText("Saved")).toBeTruthy();
   });
 });
+
+it("Export stays available for dirty Authentic edits and waits for their saved revision", async () => {
+  const server = new FakeServer();
+  const base = server.bridge();
+  let exported: Revision | undefined;
+  server.bridge = () => ({
+    ...base,
+    startExport: async (request) => {
+      exported = request.expected_revision;
+      return {
+        outcome: "result",
+        result: {
+          kind: "export",
+          operation_id: request.operation_id,
+          target: "icloud",
+          date: request.date,
+          revision: request.expected_revision,
+          state: "succeeded",
+          checkpoint: 2,
+          reason: null,
+        },
+      };
+    },
+  });
+  await open(server);
+  fireEvent.click(createEmpty());
+  await waitFor(() =>
+    expect(createEmpty().hasAttribute("disabled")).toBe(true),
+  );
+  let release!: () => void;
+  server.gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  type("new text");
+  const button = screen.getByRole("button", { name: "Export" });
+  expect(button.hasAttribute("disabled")).toBe(false);
+  fireEvent.click(button);
+  await waitFor(() => expect(server.saves).toHaveLength(1));
+  expect(exported).toBeUndefined();
+  await act(async () => release());
+  await waitFor(() => expect(exported?.sequence).toBe(2));
+  expect(server.files.get(date())?.body).toBe("new text");
+});

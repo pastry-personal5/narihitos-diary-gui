@@ -1,5 +1,6 @@
-"""P1-M25 export coordination on the fault-injection diary-server binary with the directory-backed
-fake destination: create, verified no-op, external-change confirmation, duplicate confirmation,
+"""P1-M25/M26 export coordination on the fault-injection diary-server binary. Legs 0-4 use the
+directory-backed fake destination; leg 5 uses the real macOS iCloud adapter on a temp directory
+(no live iCloud), plus cancel and abandon. create, verified no-op, external-change confirmation, duplicate confirmation,
 disabled target, and kill/restart recovery by read-back. Synthetic data, private scratch dir.
 No real iCloud or Notion contact happens."""
 import json
@@ -33,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     file = remote / f'{DATE}.md'
 
-    def start(fault=None, destination=True):
+    def start(fault=None, destination=True, cfg=None):
         env = dict(os.environ)
         env.pop('DIARY_FAULT', None)
         env.pop('DIARY_FAKE_EXPORT_DIR', None)
@@ -41,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
             env['DIARY_FAKE_EXPORT_DIR'] = str(remote)
         if fault:
             env['DIARY_FAULT'] = fault
-        process = subprocess.Popen([str(binary), '--config', str(config)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+        process = subprocess.Popen([str(binary), '--config', str(cfg or config)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
         for _ in range(300):
             for found in runtime.glob('*/discovery.json'):
                 record = json.loads(found.read_text())
@@ -142,7 +143,8 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     assert confirm(c, op3, preview, step)[1:] == (200, ack)
     c.wait(op3, 'succeeded')
     assert 'Smoke two.' in file.read_text()
-    assert c.call(f'/jobs/{op3}/cancel', 'POST', {})[1]['error']['code'] == 'unsupported'
+    # A finished export cannot be cancelled again; the call reports the recorded job.
+    assert c.call(f'/jobs/{op3}/cancel', 'POST', {})[0] == 200
     stop(server)
 
     # 3. A kill after the destination write: restart proves it by read-back, never a second write.
@@ -174,6 +176,67 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     assert code == 409 and out['error']['code'] == 'outcome_uncertain', (code, out)
     stop(server)
 
+    # 5. Real macOS adapter on a temp directory: create, external edit, cancel, abandon.
+    icloud = base / 'icloud'
+    icloud.mkdir(mode=0o700)
+    real_cfg = base / 'real.yaml'
+    real_cfg.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\n  icloud_entries_root: {icloud}\n')
+    real_cfg.chmod(0o600)
+    target_file = icloud.resolve() / DATE[:4] / DATE[5:7] / f'{DATE}.md'
+    server, record = start(destination=False, cfg=real_cfg)
+    c = Client(record)
+    revr = c.save('Real one.\n')
+    opr, code, out = c.export(revr)
+    assert code == 200, (code, out)
+    c.wait(opr, 'succeeded')
+    assert target_file.read_bytes() == next(workspace.rglob(f'{DATE}.md')).read_bytes(), 'byte-identical export'
+    assert not list(target_file.parent.glob('.*.stage')), 'no staged leftovers'
+    # The real adapter verifies no-op without republishing and confirms external deletion.
+    stamp = target_file.stat().st_mtime_ns
+    opn, code, out = c.export(revr)
+    assert code == 200, (code, out)
+    c.wait(opn, 'succeeded')
+    assert target_file.stat().st_mtime_ns == stamp, 'no-op republished the file'
+    target_file.unlink()
+    opd, code, pv = c.export(revr)
+    assert code == 200 and pv['outcome'] == 'needs_confirmation' and pv['reason'] == 'deleted' and pv['write'] == 'create', (code, pv)
+    confirm(c, opd, pv)
+    c.wait(opd, 'succeeded')
+    assert target_file.read_bytes() == next(workspace.rglob(f'{DATE}.md')).read_bytes(), 'recreated exact bytes'
+    # An external edit needs confirmation; declining cancels and never touches the file.
+    target_file.write_text('edited outside')
+    revr2 = c.save('Real two.\n')
+    opx, code, pv = c.export(revr2)
+    assert code == 200 and pv['outcome'] == 'needs_confirmation' and pv['reason'] == 'changed', (code, pv)
+    code, job = c.call(f'/jobs/{opx}/cancel', 'POST', {})
+    assert code == 200, (code, job)
+    assert c.call(f'/operations/{opx}')[1]['export']['state'] == 'cancelled'
+    assert target_file.read_text() == 'edited outside'
+    assert opx not in [o['operation_id'] for o in c.call('/operations?kind=export&state=unfinished')[1]['operations']]
+    stop(server)
+    # A kill before the write leaves an uncertain export; abandon needs a one-use confirmation.
+    server, record = start(fault='export:before_apply:kill', destination=False, cfg=real_cfg)
+    c = Client(record)
+    opu, code, out = c.export(c.save('Real three.\n'))
+    assert code == 200 and out['outcome'] == 'needs_confirmation', (code, out)
+    confirm(c, opu, out)
+    server.wait(timeout=10)
+    assert server.returncode == 86 and target_file.read_text() == 'edited outside', server.returncode
+    server, record = start(destination=False, cfg=real_cfg)
+    c = Client(record)
+    state = c.call(f'/operations/{opu}')[1]['export']['state']
+    assert state == 'uncertain', state
+    code, pv = c.call(f'/exports/{opu}/abandon', 'POST', {})
+    assert code == 200 and pv['outcome'] == 'needs_confirmation' and pv['reason'] == 'uncertain', (code, pv)
+    step = OP()
+    body = {'step_id': step, 'expected_checkpoint': pv['expected_checkpoint'], 'token': pv['token']}
+    code, done = c.call(f'/exports/{opu}/abandon/confirmation', 'POST', body)
+    assert code == 200 and done['state'] == 'cancelled' and done['reason'] == 'abandoned', (code, done)
+    assert c.call(f'/exports/{opu}/abandon/confirmation', 'POST', body)[0] == 200
+    assert opu not in [o['operation_id'] for o in c.call('/operations?kind=export&state=unfinished')[1]['operations']]
+    assert target_file.read_text() == 'edited outside'
+    stop(server)
+
     logs = ''.join(p.read_text() for p in runtime.glob('*/logs/server/*.log'))
-    assert 'Smoke one' not in logs and str(remote) not in logs and 'private' not in logs
+    assert 'Smoke one' not in logs and str(remote) not in logs and str(icloud) not in logs and 'private' not in logs
     print('PASS export smoke')

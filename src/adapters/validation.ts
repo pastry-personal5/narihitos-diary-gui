@@ -1,3 +1,4 @@
+import { exportResultDto } from "./export-validation";
 import type {
   GenerationView,
   CandidateView,
@@ -188,6 +189,7 @@ export function operationStateDto(value: unknown): OperationState {
     succeeded: dto.succeeded,
     result: dto.result == null ? null : text(dto.result, 256),
     ...(trash ? { trash } : {}),
+    ...(dto.export == null ? {} : { export: exportResultDto(dto.export) }),
   };
 }
 /** Anything that is not the bridge's allowlisted error becomes `unavailable`. */

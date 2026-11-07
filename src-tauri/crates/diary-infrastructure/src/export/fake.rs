@@ -3,7 +3,7 @@
 //! fingerprint is the content digest. Faults come from `DIARY_FAULT` (`export:lose_reply`,
 //! `export:fail_apply`, `export:unavailable`) or the setters.
 use super::hex_sha;
-use diary_application::export::{Applied, ExportAdapter, Observation, Target, Write};
+use diary_application::export::{Applied, ExportAdapter, Observation, Target, Unavailable, Write};
 use diary_domain::authentic::DiaryDate;
 use std::{
     io::Write as _,
@@ -44,10 +44,7 @@ impl Fake {
     }
     fn look(&self, date: &DiaryDate) -> Observation {
         if self.flag(&self.unavailable, "unavailable") {
-            return Observation {
-                available: false,
-                ..Observation::absent()
-            };
+            return Observation::unavailable(Unavailable::DownloadNeeded);
         }
         match std::fs::read(self.path(date)) {
             Ok(bytes) => {
@@ -58,13 +55,11 @@ impl Fake {
                     fingerprint: digest.clone(),
                     digest,
                     ids: format!("{date}.md"),
+                    unavailable: None,
                 }
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Observation::absent(),
-            Err(_) => Observation {
-                available: false,
-                ..Observation::absent()
-            },
+            Err(_) => Observation::unavailable(Unavailable::Unreadable),
         }
     }
 }
@@ -78,7 +73,13 @@ impl ExportAdapter for Fake {
     fn observe(&self, date: &DiaryDate) -> Observation {
         self.look(date)
     }
-    fn apply(&self, date: &DiaryDate, bytes: &[u8], write: Write) -> Applied {
+    fn apply(
+        &self,
+        date: &DiaryDate,
+        bytes: &[u8],
+        write: Write,
+        _expected: &Observation,
+    ) -> Applied {
         if self.flag(&self.fail_apply, "fail_apply") {
             return Applied::Failed;
         }

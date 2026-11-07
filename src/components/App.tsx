@@ -23,6 +23,9 @@ import {
   GenerationDialog,
 } from "./GenerationPane";
 import { useGeneration } from "./useGeneration";
+import { ExportController } from "../application/export/controller";
+import { ExportDialog } from "./ExportDialog";
+import { useExport } from "./useExport";
 import { GenerationController } from "../application/generation/controller";
 import { generationPreparation } from "../application/generation/navigation";
 import { ReviewController } from "../application/review/controller";
@@ -145,6 +148,21 @@ export function App({ bridge }: { bridge: Bridge }) {
     [bridge, generator, chat, model],
   );
   useEffect(() => () => activity.dispose(), [activity]);
+  const exporter = useMemo(
+    () =>
+      new ExportController(bridge, {
+        flush: async (date) => {
+          const r = model.resources.resources.get(`authentic:${date}`);
+          if (!r?.session || r.loading || r.error) return false;
+          return (await r.session.settle()) === "proceed";
+        },
+        notify: (text, severity) => model.messages.add(text, severity),
+        newId: () => crypto.randomUUID(),
+      }),
+    [bridge, model],
+  );
+  useEffect(() => () => exporter.dispose(), [exporter]);
+  const exportState = useExport(exporter);
   const generationState = useGeneration(generator);
   const chatContext = useCallback(() => {
     const r = model.resources.active;
@@ -413,6 +431,9 @@ export function App({ bridge }: { bridge: Bridge }) {
                   "source" in item && !!item.source && !item.source.eligible,
               ),
         );
+  const exportReason = !connected
+    ? "Connect to the server first."
+    : exporter.reason(model.resources.selectedDate, !!selectedView?.exists);
   const handlers: Handlers = {
     "palette.open": { reason: null, run: () => setPaletteOpen(true) },
     "editor.save": {
@@ -473,7 +494,13 @@ export function App({ bridge }: { bridge: Bridge }) {
     },
     "ai.results.open": { reason: later("AI results"), run: () => {} },
     "ai.results.discard": { reason: later("AI results"), run: () => {} },
-    "export.start": { reason: later("Export"), run: () => {} },
+    "export.start": {
+      reason: exportReason,
+      run: () => {
+        const date = model.resources.selectedDate;
+        if (date) return exporter.start(date);
+      },
+    },
   };
   const live = useRef({ bindings, handlers });
   useEffect(() => {
@@ -557,6 +584,18 @@ export function App({ bridge }: { bridge: Bridge }) {
               onClick={() => void handlers["authentic.create_empty"].run()}
             >
               <SymbolLabel name="doc.badge.plus" label="Create Empty" />
+            </button>
+            <button
+              disabled={!!exportReason}
+              title={hint("export.start", exportReason ?? "Export to iCloud")}
+              onClick={() => void handlers["export.start"].run()}
+            >
+              <SymbolLabel
+                name="square.and.arrow.up"
+                label={
+                  exportState.phase === "working" ? "Exporting…" : "Export"
+                }
+              />
             </button>
             <button
               title={hint("palette.open", "Open command palette")}
@@ -733,6 +772,7 @@ export function App({ bridge }: { bridge: Bridge }) {
           />
         )}
         <GenerationDialog controller={generator} />
+        <ExportDialog controller={exporter} />
         <div
           className="workspace"
           hidden={settingsOpen}

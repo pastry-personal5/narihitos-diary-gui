@@ -225,11 +225,24 @@ async fn run() -> Result<(), &'static str> {
     if let Some(store) = watched_store.clone() {
         #[cfg(feature = "fault-injection")]
         let adapter: Option<Arc<dyn diary_application::export::ExportAdapter>> =
-            std::env::var_os("DIARY_FAKE_EXPORT_DIR").map(|dir| {
-                Arc::new(diary_infrastructure::export::fake::Fake::new(dir.into())) as _
-            });
+            std::env::var_os("DIARY_FAKE_EXPORT_DIR")
+                .map(|dir| Arc::new(diary_infrastructure::export::fake::Fake::new(dir.into())) as _)
+                .or_else(|| {
+                    config
+                        .paths
+                        .icloud_entries_root
+                        .as_deref()
+                        .and_then(diary_infrastructure::export::icloud::Icloud::new)
+                        .map(|a| Arc::new(a) as _)
+                });
+        // A set but unusable root registers nothing, so iCloud export stays disabled.
         #[cfg(not(feature = "fault-injection"))]
-        let adapter: Option<Arc<dyn diary_application::export::ExportAdapter>> = None;
+        let adapter: Option<Arc<dyn diary_application::export::ExportAdapter>> = config
+            .paths
+            .icloud_entries_root
+            .as_deref()
+            .and_then(diary_infrastructure::export::icloud::Icloud::new)
+            .map(|a| Arc::new(a) as _);
         if let Some(service) = workspace.exports(store, adapter) {
             if service.recover().is_err() {
                 diagnostics.emit(Record::new(EventCode::OperationBlocked, Level::Error));

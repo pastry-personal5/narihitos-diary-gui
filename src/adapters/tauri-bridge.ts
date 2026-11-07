@@ -10,6 +10,12 @@ import {
 import { jobPageDto } from "./activity-validation";
 import { reviewDecisionDto, reviewViewDto } from "./review-validation";
 import { streamEvent } from "../application/events";
+import {
+  exportAckDto,
+  exportPageDto,
+  exportResultDto,
+  startOutcomeDto,
+} from "./export-validation";
 import { trashAckDto, trashPageDto, trashPreviewDto } from "./trash-validation";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type { Bridge, ClientEvent } from "../application/bridge";
@@ -82,6 +88,19 @@ export async function logClientEvent(event: ClientEvent): Promise<void> {
   await invoke("log_client_event", { event: payload }).catch(() => {});
 }
 export const tauriBridge: Bridge = {
+  startExport: (request) =>
+    authentic("start_export", { request }, startOutcomeDto),
+  confirmExport: (operationId, request) =>
+    authentic("confirm_export", { operationId, request }, exportAckDto),
+  abandonExport: (operationId) =>
+    authentic("abandon_export", { operationId }, startOutcomeDto),
+  confirmAbandonExport: (operationId, request) =>
+    authentic(
+      "confirm_abandon_export",
+      { operationId, request },
+      exportResultDto,
+    ),
+  listExports: () => authentic("list_exports", undefined, exportPageDto),
   previewSourceDelete: (sourceId, request) =>
     authentic("preview_source_delete", { sourceId, request }, trashPreviewDto),
   confirmSourceDelete: (sourceId, request) =>

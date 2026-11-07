@@ -1,13 +1,14 @@
 //! `get_symbol`: allowlisted SF Symbol lookup rendered to a bounded template PNG.
 use serde::Serialize;
 
-pub const NAMES: [&str; 6] = [
+pub const NAMES: [&str; 7] = [
     "doc.badge.plus",
     "command",
     "gearshape",
     "sparkles",
     "xmark",
     "arrow.clockwise",
+    "square.and.arrow.up",
 ];
 pub const SIZES: [u16; 4] = [12, 14, 16, 20];
 pub const SCALES: [u8; 2] = [1, 2];

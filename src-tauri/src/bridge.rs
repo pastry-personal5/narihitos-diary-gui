@@ -19,7 +19,10 @@ pub use calendar::{Calendar, CalendarAction};
 pub use chat::{ChatDocument, ChatOpened, ChatView, TurnAccepted};
 use diary_application::diagnostics::{Component, ErrorTag, EventCode, Level, Record, TraceId};
 use diary_logging::private_fs::PrivateDir;
-pub use export::{ConfirmExportRequest, ExportAcknowledged, StartExportRequest, StartExportResult};
+pub use export::{
+    ConfirmExportRequest, ExportAcknowledged, ExportPage, ExportResult, StartExportRequest,
+    StartExportResult,
+};
 pub use generation::{CandidateView, GenerationInput, GenerationView};
 pub use imports::{ImportAck, ImportPage, ResolutionAck, SourceBody, SourceSaved, TimeAuthority};
 pub use profiles::{ProfileList, ProfileStatus};

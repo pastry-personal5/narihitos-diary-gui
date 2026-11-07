@@ -3,6 +3,7 @@
 Status: Active
 
 - [P1-M25 export review follow-up](archive/milestones/p1-m25/milestone-25-export-review-overview.md): ordering, confirmation idempotency and destination binding regression fixes.
+- [P1-M26 iCloud export](phase-1/milestone-26-icloud-export-overview.md) ([work plan](phase-1/milestone-26-icloud-export-architecture.md)): real File Provider adapter, export cancel, uncertain clear/abandon and a minimal Export UI; includes the implementation review and regression evidence.
 
 This index lists the design and process docs, one line each. Read only the doc you need. The rules for writing docs are in [AGENTS.md](../AGENTS.md) under "Documentation".
 

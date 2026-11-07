@@ -378,6 +378,14 @@ pub fn router(state: Arc<ServerState>) -> Router {
             post(exports::confirm).layer(DefaultBodyLimit::max(4096)),
         )
         .route(
+            "/api/v1/exports/{id}/abandon",
+            post(exports::abandon).layer(DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/api/v1/exports/{id}/abandon/confirmation",
+            post(exports::abandon_confirm).layer(DefaultBodyLimit::max(4096)),
+        )
+        .route(
             "/api/v1/sources/{id}/time-resolution",
             post(imports::resolve).layer(DefaultBodyLimit::max(4096)),
         )
@@ -741,7 +749,7 @@ async fn settings(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Resp
     {
         Ok(_) => {
             let startup = s.startup.lock().expect("startup state poisoned").clone();
-            let value = json!({"config_schema_version":1,"config_generation":s.config_generation.load(std::sync::atomic::Ordering::SeqCst),"last_reload":s.last_reload.lock().expect("reload state poisoned").clone(),"storage_ready":s.storage_ready,"sources_available":startup.sources.iter().any(|s|s.reason.is_none()),"agents_available":s.agent_runner.is_some() && s.profiles.as_ref().is_some_and(|p|p.list().iter().any(|v|v.chat==diary_application::agent::Capability::Ready)),"exports_available":false,"sources":availability_dto(&startup.sources),"profiles":availability_dto(&startup.profiles)});
+            let value = json!({"config_schema_version":1,"config_generation":s.config_generation.load(std::sync::atomic::Ordering::SeqCst),"last_reload":s.last_reload.lock().expect("reload state poisoned").clone(),"storage_ready":s.storage_ready,"sources_available":startup.sources.iter().any(|s|s.reason.is_none()),"agents_available":s.agent_runner.is_some() && s.profiles.as_ref().is_some_and(|p|p.list().iter().any(|v|v.chat==diary_application::agent::Capability::Ready)),"exports_available":s.exports.as_ref().is_some_and(|e|e.available(diary_application::export::Target::Icloud)),"sources":availability_dto(&startup.sources),"profiles":availability_dto(&startup.profiles)});
             #[cfg(feature = "scaffold-smoke")]
             let value = {
                 let mut value = value;
@@ -905,7 +913,7 @@ async fn cancel_job(
         Err(e) => return app_error(e),
     };
     if exports::is_export_job(&s, &job) {
-        return failure(StatusCode::UNPROCESSABLE_ENTITY, "unsupported");
+        return exports::cancel(&s, id, &job).await;
     }
     let mut c = s.coordinator.lock().expect("coordinator poisoned");
     let was_terminal = c

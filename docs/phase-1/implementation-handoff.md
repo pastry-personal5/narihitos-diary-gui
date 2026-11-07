@@ -114,4 +114,6 @@ records targeted tests and the synthetic built-server smoke; the full seven-comm
 wake/reconnect and measured performance obligations in the phase plan. Native
 VoiceOver proof remains exempt; no real Qwen leg ran (exempt: GPU throttling).
 
+P1-M26 delivered the macOS iCloud adapter, export cancel, abandon of uncertain exports and a minimal Export UI against temp directories only (E7); live iCloud proof is P1-M28. See its [checklist](milestone-26-icloud-export-overview.md).
+
 P1-M25 delivered the destination-neutral export foundation (E7/E8 coordination only): see its [checklist](../archive/milestones/p1-m25/milestone-25-export-coordination-overview.md). It is proven against a fake destination; real File Provider and Notion behavior, export UI, cancellation and clearing an `uncertain` export remain P1-M26/M27.

@@ -55,6 +55,21 @@ impl Exports for Stub {
             admitted_checkpoint: 2,
         })
     }
+    fn cancel(&self, _: &OperationId) -> Result<ExportResult, ExportError> {
+        *self.now.lock().unwrap() = (3, ExportState::Cancelled);
+        Ok(result(3, ExportState::Cancelled))
+    }
+    fn abandon(&self, _: &str, _: u64, _: &OperationId) -> Result<Started, ExportError> {
+        Ok(Started::Result(result(3, ExportState::Succeeded)))
+    }
+    fn abandon_confirm(
+        &self,
+        _: &str,
+        _: u64,
+        _: ConfirmRequest,
+    ) -> Result<ExportResult, ExportError> {
+        Ok(result(3, ExportState::Cancelled))
+    }
     fn operation(&self, id: &OperationId) -> Result<Option<ExportResult>, ExportError> {
         let (c, s) = *self.now.lock().unwrap();
         Ok((id.as_str() == OP).then(|| result(c, s)))
@@ -246,10 +261,8 @@ async fn state_changes_publish_one_job_change_each_and_exports_cannot_be_cancell
         req("POST", &format!("/api/v1/jobs/{OP}/cancel"), None, true),
     )
     .await;
-    assert_eq!(
-        (status, body["error"]["code"].as_str()),
-        (StatusCode::UNPROCESSABLE_ENTITY, Some("unsupported"))
-    );
+    // A terminal export cannot be cancelled again; the call reports the recorded job.
+    assert_eq!(status, StatusCode::OK, "{body}");
 }
 
 #[tokio::test]

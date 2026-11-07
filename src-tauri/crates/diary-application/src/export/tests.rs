@@ -7,6 +7,7 @@ fn seen(present: bool, fingerprint: &str, digest: &str) -> Observation {
         fingerprint: fingerprint.into(),
         digest: digest.into(),
         ids: String::new(),
+        unavailable: None,
     }
 }
 fn receipt(digest: &str, fingerprint: &str) -> Receipt {

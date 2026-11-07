@@ -72,6 +72,8 @@ pub struct Observation {
     pub fingerprint: String,
     pub digest: String,
     pub ids: String,
+    /// Why `available` is false; `None` when available.
+    pub unavailable: Option<Unavailable>,
 }
 impl Observation {
     pub fn absent() -> Self {
@@ -81,7 +83,47 @@ impl Observation {
             fingerprint: String::new(),
             digest: String::new(),
             ids: String::new(),
+            unavailable: None,
         }
+    }
+    pub fn unavailable(reason: Unavailable) -> Self {
+        Self {
+            available: false,
+            unavailable: Some(reason),
+            ..Self::absent()
+        }
+    }
+}
+
+/// Allowlisted reasons a destination cannot be observed; never free text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Unavailable {
+    /// A File Provider placeholder or non-current download state.
+    DownloadNeeded,
+    Unreadable,
+    /// macOS privacy (TCC) denied access to the root.
+    PermissionDenied,
+    /// Coordination failed or timed out.
+    CoordinationFailed,
+}
+impl Unavailable {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::DownloadNeeded => "download_needed",
+            Self::Unreadable => "unreadable",
+            Self::PermissionDenied => "permission_denied",
+            Self::CoordinationFailed => "coordination_failed",
+        }
+    }
+    pub fn parse(value: &str) -> Option<Self> {
+        [
+            Self::DownloadNeeded,
+            Self::Unreadable,
+            Self::PermissionDenied,
+            Self::CoordinationFailed,
+        ]
+        .into_iter()
+        .find(|r| r.as_str() == value)
     }
 }
 
@@ -102,6 +144,8 @@ pub enum Reason {
     Deleted,
     /// An existing target no receipt owns.
     Unowned,
+    /// Abandoning an `uncertain` export whose read-back does not match the saved revision.
+    Uncertain,
 }
 impl Reason {
     pub const fn as_str(self) -> &'static str {
@@ -109,10 +153,11 @@ impl Reason {
             Self::Changed => "changed",
             Self::Deleted => "deleted",
             Self::Unowned => "unowned",
+            Self::Uncertain => "uncertain",
         }
     }
     pub fn parse(value: &str) -> Option<Self> {
-        [Self::Changed, Self::Deleted, Self::Unowned]
+        [Self::Changed, Self::Deleted, Self::Unowned, Self::Uncertain]
             .into_iter()
             .find(|r| r.as_str() == value)
     }
@@ -173,7 +218,15 @@ pub trait ExportAdapter: Send + Sync {
     /// Canonical root path or root page ID; part of the destination key.
     fn root(&self) -> String;
     fn observe(&self, date: &DiaryDate) -> Observation;
-    fn apply(&self, date: &DiaryDate, bytes: &[u8], write: Write) -> Applied;
+    /// `expected` is the observation the confirmation authorized; the adapter re-checks it
+    /// atomically with the write and returns `Failed` without writing on a mismatch.
+    fn apply(
+        &self,
+        date: &DiaryDate,
+        bytes: &[u8],
+        write: Write,
+        expected: &Observation,
+    ) -> Applied;
     fn read_back(&self, date: &DiaryDate) -> Observation;
 }
 
@@ -184,6 +237,7 @@ pub enum ExportState {
     Uncertain,
     Succeeded,
     Failed,
+    Cancelled,
 }
 impl ExportState {
     pub const fn as_str(self) -> &'static str {
@@ -193,10 +247,11 @@ impl ExportState {
             Self::Uncertain => "uncertain",
             Self::Succeeded => "succeeded",
             Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
         }
     }
     pub const fn is_terminal(self) -> bool {
-        matches!(self, Self::Succeeded | Self::Failed)
+        matches!(self, Self::Succeeded | Self::Failed | Self::Cancelled)
     }
 }
 
@@ -294,7 +349,8 @@ pub enum ExportError {
     Mismatch,
     CheckpointMismatch,
     Uncertain,
-    CloudUnavailable,
+    /// The destination cannot be observed; the typed reason is allowlisted.
+    CloudUnavailable(Unavailable),
     NotFound,
     Storage,
 }
@@ -316,6 +372,23 @@ pub trait Exports: Send + Sync {
         generation: u64,
         request: ConfirmRequest,
     ) -> Result<Admitted, ExportError>;
+    /// Declines a pending confirmation or stops a running export before `apply`. An export
+    /// already past its side effect finishes by read-back. Never rolls back remote state.
+    fn cancel(&self, id: &OperationId) -> Result<ExportResult, ExportError>;
+    /// Resolves an `uncertain` export: a read-back equal to the saved revision succeeds with a
+    /// receipt; otherwise a preview whose confirmation records `abandoned`.
+    fn abandon(
+        &self,
+        session: &str,
+        generation: u64,
+        id: &OperationId,
+    ) -> Result<Started, ExportError>;
+    fn abandon_confirm(
+        &self,
+        session: &str,
+        generation: u64,
+        request: ConfirmRequest,
+    ) -> Result<ExportResult, ExportError>;
     fn operation(&self, id: &OperationId) -> Result<Option<ExportResult>, ExportError>;
     fn unfinished(&self, cursor: Option<&str>, limit: usize) -> Result<ExportPage, ExportError>;
     /// Running, paused or uncertain exports, including ones that survived a restart.

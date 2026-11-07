@@ -282,12 +282,12 @@ describe("Command palette and Keyboard Shortcuts", () => {
       target: { value: "Export" },
     });
     expect(screen.getByRole("option").textContent).toMatch(
-      /not available yet/u,
+      /Connect to the server first\./u,
     );
     fireEvent.keyDown(screen.getByLabelText("Filter actions"), {
       key: "Enter",
     });
-    await screen.findByText(/Export is not available yet\./u);
+    await screen.findByText(/Connect to the server first\./u);
   });
 
   it("Command+S with no file posts the reason instead of saving", async () => {
