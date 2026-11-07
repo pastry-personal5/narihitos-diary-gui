@@ -84,3 +84,32 @@ Keep each commit focused. Example:
 ## Pull requests
 
 TBD
+
+## Environment
+
+- macOS with Xcode Command Line Tools.
+- Rust stable toolchain (rustup), with rustfmt and clippy.
+- Node.js (current LTS) and npm.
+- Tauri 2 prerequisites; see the Tauri docs for macOS setup.
+
+## Commands
+
+```sh
+npm run tauri dev                                                                                                # run the app in development
+npm run tauri build                                                                                              # build the app bundle
+cargo test --manifest-path src-tauri/Cargo.toml                                                                  # run Rust tests
+npx vitest run                                                                                                   # run UI tests
+cargo fmt --manifest-path src-tauri/Cargo.toml && npx prettier --write .                                         # format
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && npx eslint . --max-warnings 0  # lint
+scripts/gate.sh                                                                                                  # full gate + tsc typecheck: parallel lanes, quiet, PASS/FAIL per command
+```
+
+Smoke tests and the log trace tool: [docs/smoke-tests.md](smoke-tests.md).
+
+## Agent and code conventions
+
+- Format with `cargo fmt` and `prettier`; do not hand-format.
+- Keep `cargo clippy -D warnings` and `eslint --max-warnings 0` clean.
+- Expose backend features to the UI only through explicit Tauri commands, and grant the minimum Tauri 2 capabilities/permissions each needs.
+- Write UI in TypeScript with React function components; keep CodeMirror 6 editor setup in dedicated modules.
+- Before adding or changing agent behavior, inspect `assets/prompts/` and reuse or update the relevant files under `assets/prompts/<agent-type>/` (`codex`, `claude`, `qwen`, `apple-foundation-models`). Store all app-authored system/session instructions, task prompts and retry/repair prompts there; never hard-code prompt text or fallback prompts in source code. Source code may load assets, validate schemas and substitute request data. Missing or invalid assets disable the affected action with a visible error. See the [format and existing inventory](../assets/prompts/README.md).

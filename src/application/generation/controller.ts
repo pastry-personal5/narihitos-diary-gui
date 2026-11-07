@@ -182,6 +182,10 @@ export class GenerationController {
     const epoch = this.epoch;
     const profiles = (await this.bridge.listProfiles?.().catch(() => [])) ?? [];
     if (epoch !== this.epoch) return;
+    this.applyProfiles(profiles);
+  }
+  /** Takes the app-wide profile list, so background checks make Generate ready. */
+  applyProfiles(profiles: ProfileInfo[]) {
     const usable = profiles.filter((p) => p.capabilities.generate.available);
     const profile = usable.some((p) => p.alias === this.state.profile)
       ? this.state.profile

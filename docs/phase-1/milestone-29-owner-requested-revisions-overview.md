@@ -19,6 +19,7 @@ P1-M28 is Done ([overview](milestone-28-simple-refactoring-overview.md)). Decide
 
 - **T02 (owner, 2026-11-07):** The GUI is dark theme only for now; it no longer follows the system light/dark setting. A light or switchable theme is a later request.
 - **T03 (owner, 2026-11-07):** Neutral gray surfaces with no green tint, referenced from the owner's VS Code dark theme screenshot (blue accent). Palette approved in chat and recorded in [ux-gui.md](../ux-gui.md).
+- **T05 (owner, 2026-11-07):** Settings panes use cards. Agent profiles are checked in the background from launch (first at launch, then 15 s doubling, capped at 1 h, per profile, for the whole session) and shown in a table with SF Symbols; an Advanced card lists what blocks Chat and Generate. The owner approved the background polling.
 
 ## Scope
 
@@ -43,8 +44,27 @@ None yet.
   - [x] T03.2 - Tokens defined once in `src/styles.css` and documented in `docs/ux-gui.md`; text roles meet WCAG AA (4.5:1) on every surface; selected-state text uses an on-accent token (white on the mint accent is 1.9:1 today).
   - [x] T03.3 - A test checks that `src/styles.css` has no color literals outside the token block.
 
+- [x] T04 `[gui]` - Replace the app icon with a very simple, abstract, modern mark and a transparent background outside the shape (no green tile).
+  - [x] T04.1 - `assets/icons/app.svg` redrawn (accent-blue page, no background tile); `src-tauri/icons/icon.png` and `icon.icns` regenerated from it. Evidence: corner pixel of `icon.png` is fully transparent.
+  - [x] T04.2 - Decoded `icon.icns` (1024 px): corner fully transparent, shape fill #2a7fa8. A Dock/Finder look at a packaged build was not done.
+
+- [x] T05 `[gui]` - Settings: replace the "Close Settings" button with a "Go back" SF Symbol button (`chevron.backward`, icon only with `aria-label`; "←" glyph if the symbol is unavailable) above "Status", left-aligned with the section buttons. Evidence: `src/components/SettingsView.tsx`; tests updated; gate pending (Z01).
+  - [ ] T05.1 - Visual check in the running app (not yet done).
+
+- [x] T05 `[gui]` `[behavior]` - Settings cards, background profile checks with exponential backoff, profile table, Advanced card. Evidence: `src/components/{useProfiles.ts,ProfileTable.tsx,advanced.ts,SettingsView.tsx}`; `tests/profiles-ui.test.tsx` passes. Not done: visual check in the running app, `scripts/gate.sh`.
+
+- [x] T06 `[gui]` - Main sidebar (Icon Bar): icons four times as big (16 → 64 px), sidebar column narrower (90 → 80 px, the least that fits the 64 px icon), button shrinks to fit its icon; icons are flat (transparent background and border, matching the bar) with a hover highlight, and the pressed state keeps the accent fill. Evidence: `src/components/App.tsx`, `src/styles.css`. Not done: visual check in the running app.
+
+- [x] T07 `[gui]` - Remove the "Version v1.0.0" text from the toolbar title block. Evidence: `src/components/App.tsx`, `tests/client.test.tsx`.
+
+- [x] T08 `[gui]` - AI activity moves out of the toolbar into its own "AI Activity" widget above AI Chat (Chat gets shorter). AI Chat: bitmap Send button (`src/assets/send.png`), large flat message box in a bottom-anchored composer. Evidence: `src/components/{App.tsx,ChatPane.tsx}`, `src/styles.css`. Not done: visual check in the running app.
+
+- [x] T09 `[gui]` `[bug]` - Chat and generation profile pickers move to the top of the AI Activity widget; both profiles are checked automatically in the background (15 s doubling, capped at 1 h) and the manual "Check generation profile" button is gone. Fix: the chat and generation controllers kept their own stale profile lists (status only changed on a manual check), so Generate stayed blocked as "not ready"; both now take the app-wide list from `useProfiles` via `applyProfiles`. Evidence: `src/components/{ProfilePicker.tsx,App.tsx}`, `src/application/{chat.ts,generation/controller.ts}`. Not done: test updates run, visual check.
+
+- [ ] T10 `[ux]` `[behavior]` - Candidates open as read-only Editor tabs (one per slot) at Generate without changing the active tab; choosing a candidate in the Explorer Draft tab activates and focuses it (owner, 2026-11-07); the candidate card list is removed and a banner holds status, Review and Discard. Evidence: `src/components/{candidateTabs.ts,GenerationPane.tsx,Explorer.tsx}`, `src/application/navigation/resources.ts`, `tests/generation-ui.test.tsx` (5 pass), eslint clean, `tsc` clean. Not done: full vitest rerun after the file split, visual check in the running app, `scripts/gate.sh` (`cargo fmt --check` fails on `diary-logging` `codec.rs`/`codec/tests.rs`, untouched by this task).
+
 ### Proof and docs
 
 - [ ] Z01 - Full gate (`scripts/gate.sh`) passes.
 - [ ] Z02 - Smokes for touched areas pass.
-- [ ] Z03 - Affected docs, phase plan, roadmap and changelog are updated.
+- [ ] Z03 - Affected docs, phase plan, roadmap and changelog are updated. Done so far: `ux-gui.md`, `ux-terms.md`, `ux-information-architecture.md` (T01–T10).

@@ -104,13 +104,16 @@ export function useAppControllers(bridge: Bridge) {
   const exportState = useExport(exporter);
   const generationState = useGeneration(generator);
   const chatContext = useCallback(() => {
-    const r = model.resources.active;
+    const a = model.resources.active;
+    // Candidates are transient suggestions; chat context stays the saved Entry.
+    const r = a?.kind === "candidate" ? model.resources.authentic : a;
     const date = r?.date ?? model.resources.selectedDate;
     if (!r || !date) return { document: null, chip: "No document" };
     const what = r.kind === "authentic" ? `Entry ${date}` : `Source ${r.label}`;
     return {
       document: {
-        kind: r.kind,
+        kind:
+          r.kind === "source" ? ("source" as const) : ("authentic" as const),
         date,
         unsaved: r.dirty,
         body: r.buffer.getText(),

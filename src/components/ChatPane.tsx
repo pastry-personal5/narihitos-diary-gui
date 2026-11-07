@@ -1,3 +1,4 @@
+import sendIcon from "../assets/send.png";
 import { useState, useSyncExternalStore } from "react";
 import { CHAT_MESSAGE, type ChatController } from "../application/chat";
 import { activitySummary, useChat, useTick, type ChatContext } from "./useChat";
@@ -53,19 +54,6 @@ export function ChatPane({
   return (
     <aside aria-label="AI Chat" className="chat">
       <h2>AI Chat</h2>
-      <label htmlFor="chat-profile">Profile</label>
-      <select
-        id="chat-profile"
-        value={s.profile ?? ""}
-        disabled={running || s.profiles.length === 0}
-        onChange={(e) => void controller.selectProfile(e.target.value)}
-      >
-        {s.profiles.map((p) => (
-          <option key={p.alias} value={p.alias}>
-            {p.alias}
-          </option>
-        ))}
-      </select>
       <button
         disabled={running || (!s.chat && !s.pending)}
         onClick={() => void controller.newChat()}
@@ -149,30 +137,52 @@ export function ChatPane({
           )}
         </p>
       )}
-      <label htmlFor="chat-message">Message</label>
-      <textarea
-        id="chat-message"
-        value={draft}
-        aria-describedby="chat-reason"
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          // Enter during IME composition confirms text; it never sends.
-          if (
-            e.key === "Enter" &&
-            (e.metaKey || e.ctrlKey) &&
-            !e.nativeEvent.isComposing
-          ) {
-            e.preventDefault();
-            submit();
-          }
-        }}
-      />
-      <p id="chat-reason">
-        {reason ?? `Sends ${context().chip}. Cmd+Enter sends.`}
-      </p>
-      <button disabled={!!reason} title={reason ?? "Send"} onClick={submit}>
-        Send
-      </button>
+      <div className="chat-composer">
+        <label htmlFor="chat-message" className="visually-hidden">
+          Message
+        </label>
+        <textarea
+          id="chat-message"
+          value={draft}
+          placeholder="Message the assistant"
+          aria-describedby="chat-reason"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter during IME composition confirms text; it never sends.
+            if (
+              e.key === "Enter" &&
+              (e.metaKey || e.ctrlKey) &&
+              !e.nativeEvent.isComposing
+            ) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <div className="chat-composer-bar">
+          <p id="chat-reason">
+            {reason ?? `Sends ${context().chip}. Cmd+Enter sends.`}
+          </p>
+          <button
+            className="chat-send"
+            aria-label="Send"
+            disabled={!!reason}
+            title={reason ?? "Send"}
+            onClick={submit}
+          >
+            <span
+              aria-hidden="true"
+              className="symbol"
+              style={{
+                width: 24,
+                height: 24,
+                maskImage: `url(${sendIcon})`,
+                WebkitMaskImage: `url(${sendIcon})`,
+              }}
+            />
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }

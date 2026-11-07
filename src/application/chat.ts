@@ -154,7 +154,12 @@ export class ChatController {
   }
 
   async loadProfiles() {
-    const list = (await this.bridge.listProfiles?.().catch(() => [])) ?? [];
+    this.applyProfiles(
+      (await this.bridge.listProfiles?.().catch(() => [])) ?? [],
+    );
+  }
+  /** Takes the app-wide profile list, so background checks reach the picker. */
+  applyProfiles(list: ProfileInfo[]) {
     const usable = list.filter((p) => p.capabilities.chat.available);
     const keep = usable.some((p) => p.alias === this.state.profile);
     this.set({

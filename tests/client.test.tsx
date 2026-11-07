@@ -62,7 +62,7 @@ describe("scaffold shell", () => {
       "AI Chat",
     ])
       expect(screen.getByLabelText(name)).toBeTruthy();
-    expect(await screen.findByText("Version v1.0.0")).toBeTruthy();
+    expect(screen.queryByText(/^Version/)).toBeNull();
     expect(
       screen
         .getByRole("button", { name: "Create Empty" })

@@ -15,13 +15,48 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  CandidateCards,
+  CandidateBanner,
   GenerationControls,
   GenerationDialog,
 } from "../src/components/GenerationPane";
 import { GenerationController } from "../src/application/generation/controller";
 import { generationServer } from "./generation-fake";
+import {
+  candidateKey,
+  useCandidateTabs,
+} from "../src/components/candidateTabs";
 import { useGeneration } from "../src/components/useGeneration";
+import { ResourceCoordinator } from "../src/application/navigation/resources";
+import { SessionBudget } from "../src/application/navigation/budget";
+import { useSyncExternalStore } from "react";
+function coordinator() {
+  const r = new ResourceCoordinator({} as Bridge, new SessionBudget(), {
+    sourceGuard: async () => "cancel",
+    notice: vi.fn(),
+    savedDatesChanged: vi.fn(),
+  } as never);
+  const host = document.createElement("div");
+  document.body.append(host);
+  r.attach(host);
+  return r;
+}
+/** Candidate tabs as the app wires them: one tab per slot plus the active tab's banner. */
+function Tabs({ c, r }: { c: GenerationController; r: ResourceCoordinator }) {
+  useCandidateTabs(c, r);
+  useSyncExternalStore(r.subscribe, () => `${r.resources.size}:${r.activeKey}`);
+  return (
+    <>
+      <div role="tablist">
+        {[...r.resources.values()].map((x) => (
+          <button key={x.key} role="tab">
+            {x.label}
+          </button>
+        ))}
+      </div>
+      <CandidateBanner controller={c} resources={r} />
+    </>
+  );
+}
 const controllers: GenerationController[] = [];
 async function setup() {
   const server = generationServer();
@@ -82,78 +117,47 @@ describe("generation interaction", () => {
       { import_id: "i", source_id: "b" },
     ]);
   });
-  it("provisional_then_final and cards_survive_date_change without focus or selection changes", async () => {
+  it("opens one read-only tab per candidate, streams then finalizes text without moving focus", async () => {
     const { server, c } = await setup();
+    const r = coordinator();
     await c.start("2026-11-06", "ko-KR", 3);
-    const app = render(
+    render(
       <>
         <button>Editor focus</button>
-        <CandidateCards controller={c} date="2026-11-06" />
+        <Tabs c={c} r={r} />
       </>,
     );
     const focus = screen.getByRole("button", { name: "Editor focus" });
     focus.focus();
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
     expect(
-      screen.getByText("Candidate 1 · running · provisional"),
+      screen.getByText(/Candidate 1 · running · provisional/),
     ).not.toBeNull();
-    const preview = screen.getByLabelText("Candidate 1 provisional text");
-    const text = preview.firstChild!;
-    document.getSelection()!.setBaseAndExtent(text, 1, text, 4);
+    const [job] = [...c.state.jobs.values()];
+    const key = candidateKey(job.job.id, 1);
     await act(async () => {
       server.snapshot().provisional = "preview expanded";
       await c.refresh();
     });
-    expect(document.activeElement).toBe(focus);
-    expect(document.getSelection()!.toString()).toBe("rev");
+    expect(r.resources.get(key)!.buffer.getText()).toBe("preview expanded");
     await act(async () => {
       server.finish();
       await c.refresh();
     });
-    expect(screen.getByLabelText("Candidate 1 text").textContent).toBe("draft");
-    expect(screen.getByText("Candidate 2 · failed")).not.toBeNull();
+    expect(r.resources.get(key)!.buffer.getText()).toBe("draft");
+    expect(r.activeKey).toBe(key);
     expect(document.activeElement).toBe(focus);
-    app.rerender(
-      <>
-        <button>Editor focus</button>
-        <CandidateCards controller={c} date="2026-11-07" />
-      </>,
-    );
-    expect(screen.queryByLabelText("Candidate 1 text")).toBeNull();
-    app.rerender(
-      <>
-        <button>Editor focus</button>
-        <CandidateCards controller={c} date="2026-11-06" />
-      </>,
-    );
-    expect(screen.getByLabelText("Candidate 1 text").textContent).toBe("draft");
-    expect(server.bridge.startGeneration).toHaveBeenCalledTimes(1);
-  });
-  it("keeps scroll while output arrives and shows New output", async () => {
-    const { server, c } = await setup();
-    await c.start("2026-11-06", "ko-KR", 3);
-    const app = render(<CandidateCards controller={c} date="2026-11-06" />);
-    const list = app.container.querySelector<HTMLElement>(".candidate-list")!;
-    Object.defineProperties(list, {
-      scrollHeight: { configurable: true, value: 1000 },
-      clientHeight: { configurable: true, value: 100 },
-    });
-    list.scrollTop = 200;
-    fireEvent.scroll(list);
-    await act(async () => {
-      server.snapshot().provisional = "new output";
-      await c.refresh();
-    });
-    expect(list.scrollTop).toBe(200);
-    expect(screen.getByRole("button", { name: "New output" })).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "New output" }));
-    expect(list.scrollTop).toBe(1000);
+    // An explicit user choice moves the active tab.
+    await r.openCandidate(candidateKey(job.job.id, 2));
+    expect(r.activeKey).toBe(candidateKey(job.job.id, 2));
   });
   it("announces completion once, labels stale results and provides keyboard cancellation", async () => {
     const { server, c } = await setup();
+    const r = coordinator();
     render(
       <>
         <Controls c={c} />
-        <CandidateCards controller={c} date="2026-11-06" />
+        <Tabs c={c} r={r} />
       </>,
     );
     await act(async () => {
@@ -257,7 +261,7 @@ it("a new App request uses the saved generation count and actual Include selecti
     target: { value: "5" },
   });
   await waitFor(() => expect(settings.user.generation_count).toBe(5));
-  fireEvent.click(screen.getByRole("button", { name: "Close Settings" }));
+  fireEvent.click(screen.getByRole("button", { name: "Go back" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Generate", exact: true }),
   );
@@ -271,31 +275,19 @@ it("a new App request uses the saved generation count and actual Include selecti
   await act(async () => app.unmount());
 });
 
-it("bounds visible preview mutations during flooding and renders no text for an off-date run", async () => {
+it("discarding results closes the candidate tabs", async () => {
   const { server, c } = await setup();
+  const r = coordinator();
   await c.start("2026-11-06", "ko-KR", 2);
-  const ui = render(<CandidateCards controller={c} date="2026-11-06" />);
-  const preview = screen.getByLabelText("Candidate 1 provisional text");
-  let mutations = 0;
-  const observer = new MutationObserver((records) => {
-    mutations += records.length;
-  });
-  observer.observe(preview, {
-    subtree: true,
-    characterData: true,
-    childList: true,
-  });
-  for (let i = 0; i < 100; i++) {
-    server.snapshot().provisional = `flood-${i}`;
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(10);
-    });
-  }
-  expect(mutations).toBeLessThanOrEqual(10);
-  observer.disconnect();
-  ui.rerender(<CandidateCards controller={c} date="2026-11-07" />);
+  render(<Tabs c={c} r={r} />);
+  expect(screen.getAllByRole("tab")).toHaveLength(2);
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(500);
+    server.finish();
+    await c.refresh();
   });
-  expect(ui.container.textContent).toBe("");
+  const [job] = [...c.state.jobs.values()];
+  await act(async () => {
+    await c.discard(job.job.id);
+  });
+  expect(screen.queryAllByRole("tab")).toHaveLength(0);
 });

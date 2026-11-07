@@ -106,7 +106,7 @@ footer {
 }
 .workspace {
   display: grid;
-  grid-template-columns: 90px 220px minmax(220px, 1fr) 240px;
+  grid-template-columns: 80px 220px minmax(220px, 1fr) 240px;
   flex: 1;
   min-height: 0;
 }
@@ -114,12 +114,24 @@ footer {
   display: none;
 }
 .icon-bar {
-  padding: 20px 8px;
+  padding: 20px 4px;
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 20px;
   font-size: 12px;
+}
+.icon-bar button {
+  width: fit-content;
+  padding: 4px;
+}
+.icon-bar button:not([aria-pressed="true"]) {
+  background: transparent;
+  border-color: transparent;
+}
+.icon-bar button:not([aria-pressed="true"]):hover {
+  background: var(--surface);
 }
 .explorer,
 .chat {
@@ -129,8 +141,70 @@ footer {
 .explorer {
   border-right: 1px solid var(--line);
 }
-.chat {
+.ai-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+.ai-widget {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.ai-widget > * + * {
+  margin-top: 8px;
+}
+.ai-column .chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chat-composer {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.chat .chat-composer textarea {
+  display: block;
+  height: 120px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: inherit;
+  outline: none;
+}
+.chat-composer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 8px 12px;
+}
+.chat-composer-bar p {
+  flex: 1;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.chat .chat-send {
+  width: auto;
+  padding: 4px;
+  border-color: transparent;
+  background: transparent;
+}
+.chat .chat-send:not(:disabled):hover {
+  background: var(--panel);
 }
 .explorer-tabs {
   display: grid;
@@ -225,6 +299,9 @@ footer {
   gap: 8px;
   padding: 20px 12px;
   border-right: 1px solid var(--line);
+}
+.settings-back {
+  align-self: flex-start;
 }
 .settings-body {
   padding: 20px;
@@ -426,43 +503,13 @@ footer {
   font-size: 12px;
 }
 .candidate-region {
-  flex: 0 1 auto;
-  min-height: 0;
-  max-height: 40%;
   display: flex;
-  flex-direction: column;
-  border-top: 1px solid var(--line);
-  background: var(--surface);
-}
-.candidate-list {
-  overflow: auto;
-  min-height: 0;
-  padding: 8px 12px;
-  overflow-anchor: none;
-}
-.candidate-heading {
-  display: flex;
-  align-items: baseline;
   flex-wrap: wrap;
-  justify-content: space-between;
+  align-items: baseline;
   gap: 8px;
-}
-.candidate-heading h2,
-.candidate-card h3 {
-  font-size: 13px;
-  margin: 8px 0;
-}
-.candidate-card {
-  padding: 8px;
-  margin-block: 8px;
-  border: 1px solid var(--line);
-}
-.candidate-text {
-  font-family: inherit;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  user-select: text;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
 }
 
 .close-status {
@@ -568,4 +615,55 @@ footer {
 }
 .editor-column {
   background: var(--bg);
+}
+
+.card {
+  max-width: 920px;
+  margin: 0 0 16px;
+  padding: 16px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.card h2,
+.card h3 {
+  margin: 0 0 12px;
+}
+.profile-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.profile-table th,
+.profile-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.profile-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.profile-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.profile-table small {
+  color: var(--muted);
+}
+.tone-success {
+  color: var(--success);
+}
+.tone-warning {
+  color: var(--warning);
+}
+.tone-danger {
+  color: var(--danger);
+}
+.tone-muted {
+  color: var(--muted);
+}
+.profile-picker {
+  display: grid;
+  gap: 4px;
 }

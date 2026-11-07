@@ -148,11 +148,9 @@ describe("toolbar symbols", () => {
       status: "unsupported",
     }));
     render(<App bridge={appBridge(load)} />);
-    await screen.findByText(/Unsupported symbol gearshape/u);
+    await screen.findByText(/Unsupported symbol command/u);
     await waitFor(() => expect(load).toHaveBeenCalled());
-    expect(screen.getAllByText(/Unsupported symbol gearshape/u)).toHaveLength(
-      1,
-    );
+    expect(screen.getAllByText(/Unsupported symbol command/u)).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
   });
   it("shows text labels without a symbol bridge", () => {

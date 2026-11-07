@@ -16,7 +16,7 @@ export interface EditorResource {
   editGeneration: number;
   key: string;
   label: string;
-  kind: "authentic" | "source";
+  kind: "authentic" | "source" | "candidate";
   date?: string;
   buffer: ResourceBuffer;
   session?: AuthenticSession;
@@ -131,7 +131,11 @@ export class ResourceCoordinator {
       const instance = ++this.resourceSerial;
       const buffer = new ResourceBuffer(
         `${key}:buffer:${instance}`,
-        kind === "authentic" ? "Authentic Markdown" : "Source Markdown",
+        kind === "authentic"
+          ? "Authentic Markdown"
+          : kind === "candidate"
+            ? "Candidate Markdown"
+            : "Source Markdown",
         this.pool,
         {
           edit: () => {
@@ -552,6 +556,38 @@ export class ResourceCoordinator {
       this.emit();
       return true;
     });
+  }
+  /** Opens or updates a read-only Candidate tab without stealing focus; the first tab opened into an empty editor becomes active. */
+  syncCandidate(key: string, label: string, date: string, text: string) {
+    const r = this.record(key, label, "candidate", date);
+    if (!r) return;
+    try {
+      if (r.buffer.getText() !== text) r.buffer.setText(text);
+      r.error = null;
+    } catch {
+      r.error = "session_limit";
+    }
+    if (!this.activeKey) this.activate(r);
+    this.emit();
+  }
+  /** Closes Candidate tabs whose key is not listed; they hold no unsaved work. */
+  keepCandidates(keep: ReadonlySet<string>) {
+    let changed = false;
+    for (const r of [...this.resources.values()]) {
+      if (r.kind !== "candidate" || keep.has(r.key)) continue;
+      r.buffer.dispose();
+      this.resources.delete(r.key);
+      changed = true;
+      if (this.activeKey === r.key) {
+        this.activeKey = null;
+        const next = [...this.resources.values()].at(-1);
+        if (next) this.activate(next);
+      }
+    }
+    if (changed) this.emit();
+  }
+  async openCandidate(key: string) {
+    return this.switchTab(key);
   }
   async openAuthentic(date: string): Promise<boolean> {
     if (this.active?.buffer.composing) {

@@ -10,7 +10,17 @@ import type {
 } from "../application/navigation/contracts";
 
 const views = ["Date tab", "Snippet tab", "Draft tab", "Entry tab"] as const;
-export function Explorer({ model }: { model: NavigationModel }) {
+import { useGeneration } from "./useGeneration";
+import { candidateKey } from "./candidateTabs";
+import type { GenerationController } from "../application/generation/controller";
+export function Explorer({
+  model,
+  generator,
+}: {
+  model: NavigationModel;
+  generator: GenerationController;
+}) {
+  const generation = useGeneration(generator);
   const [view, setView] = useState<(typeof views)[number]>("Date tab");
   const date = model.resources.selectedDate;
   const calendar = model.calendar;
@@ -369,7 +379,31 @@ export function Explorer({ model }: { model: NavigationModel }) {
           ) : (
             <p>Select a date.</p>
           )}
-          <p>No candidates are available.</p>
+          {(() => {
+            const slots = [...generation.jobs.values()]
+              .filter((job) => job.date === date)
+              .flatMap((job) => job.candidates.map((slot) => ({ job, slot })));
+            return slots.length ? (
+              <ul aria-label="Candidates">
+                {slots.map(({ job, slot }) => (
+                  <li key={candidateKey(job.job.id, slot.index)}>
+                    <button
+                      onClick={() =>
+                        void model.resources.openCandidate(
+                          candidateKey(job.job.id, slot.index),
+                        )
+                      }
+                    >
+                      Candidate {slot.index} ·{" "}
+                      {slot.status.replaceAll("_", " ")}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No candidates are available.</p>
+            );
+          })()}
         </>
       )}
       {view === "Entry tab" && (

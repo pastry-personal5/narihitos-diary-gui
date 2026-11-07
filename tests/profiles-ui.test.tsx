@@ -9,6 +9,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { checkDelay } from "../src/components/useProfiles";
 import { App } from "../src/components/App";
 import {
   AuthenticError,
@@ -67,7 +68,7 @@ function bridge(extra: Partial<Bridge>): Bridge {
 }
 async function open() {
   fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-  return screen.findByRole("list", { name: "Profile status" });
+  return screen.findByRole("table", { name: "Profile status" });
 }
 
 describe("Profile status in Settings", () => {
@@ -90,7 +91,9 @@ describe("Profile status in Settings", () => {
         })}
       />,
     );
-    const items = within(await open()).getAllByRole("listitem");
+    const items = within(await open())
+      .getAllByRole("row")
+      .slice(1);
     expect(items.map((i) => i.textContent)).toEqual([
       expect.stringContaining("not checked yet"),
       expect.stringContaining("command not found"),
@@ -102,7 +105,6 @@ describe("Profile status in Settings", () => {
       expect.stringContaining("busy"),
       expect.stringContaining("check failed"),
     ]);
-    expect(screen.getByText(/Chat and Generate are not enabled/u)).toBeTruthy();
   });
 
   it("explains an unavailable capability for a profile without an adapter", async () => {
@@ -113,6 +115,19 @@ describe("Profile status in Settings", () => {
     };
     render(<App bridge={bridge({ listProfiles: async () => [claude] })} />);
     expect((await open()).textContent).toContain("no adapter yet");
+  });
+
+  it("lists what blocks Chat and Generate in the Advanced card", async () => {
+    const p = profile("c", "unavailable", "claude");
+    p.capabilities = {
+      chat: { available: false, reason: "assets_missing" },
+      generate: { available: false, reason: "assets_missing" },
+    };
+    render(<App bridge={bridge({ listProfiles: async () => [p] })} />);
+    await open();
+    const advanced = screen.getByLabelText("Advanced");
+    expect(advanced.textContent).toContain("No profile can chat");
+    expect(advanced.textContent).toContain("No profile can generate");
   });
 
   it("shows the reason an Apple profile is unavailable", async () => {
@@ -126,10 +141,10 @@ describe("Profile status in Settings", () => {
     );
   });
 
-  it("checks one profile, showing progress, then the new status", async () => {
-    let release!: (p: ProfileInfo) => void;
+  it("checks every profile in the background after launch, showing progress", async () => {
+    const release: Record<string, (p: ProfileInfo) => void> = {};
     const checkProfile = vi.fn(
-      () => new Promise<ProfileInfo>((r) => (release = r)),
+      (alias: string) => new Promise<ProfileInfo>((r) => (release[alias] = r)),
     );
     render(
       <App
@@ -143,24 +158,28 @@ describe("Profile status in Settings", () => {
       />,
     );
     await open();
-    fireEvent.click(screen.getByRole("button", { name: "Check main" }));
-    await screen.findByText(/checking…/u);
+    await waitFor(() => expect(checkProfile).toHaveBeenCalledTimes(2));
     expect(checkProfile).toHaveBeenCalledWith("main");
+    expect(checkProfile).toHaveBeenCalledWith("other");
+    expect(screen.getAllByText(/checking…/u)).toHaveLength(2);
     expect(
       (screen.getByRole("button", { name: "Check main" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
-    // Settings stays usable and the other profile can still be checked.
-    expect(
-      (screen.getByRole("button", { name: "Check other" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(false);
-    release(profile("main", "ready"));
-    await waitFor(() => expect(screen.queryByText(/checking…/u)).toBeNull());
+    release.main(profile("main", "ready"));
+    await waitFor(() =>
+      expect(screen.getAllByText(/checking…/u)).toHaveLength(1),
+    );
     const first = within(
-      screen.getByRole("list", { name: "Profile status" }),
-    ).getAllByRole("listitem")[0];
+      screen.getByRole("table", { name: "Profile status" }),
+    ).getAllByRole("row")[1];
     expect(first.textContent).toContain("ready");
+  });
+
+  it("backs off exponentially, capped at one hour", () => {
+    expect([0, 1, 2, 3, 7, 8, 9, 40].map(checkDelay)).toEqual(
+      [15, 30, 60, 120, 1920, 3600, 3600, 3600].map((s) => s * 1000),
+    );
   });
 
   it("reports a failed check without losing the list", async () => {
@@ -175,7 +194,6 @@ describe("Profile status in Settings", () => {
       />,
     );
     await open();
-    fireEvent.click(screen.getByRole("button", { name: "Check main" }));
     await screen.findByText("The check could not be completed.");
     expect(screen.getByRole("button", { name: "Check main" })).toBeTruthy();
   });
@@ -202,7 +220,7 @@ describe("Profile status in Settings", () => {
     render(<App bridge={bridge({})} />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     await screen.findByRole("button", { name: "Reload configuration" });
-    expect(screen.queryByRole("list", { name: "Profile status" })).toBeNull();
+    expect(screen.queryByRole("table", { name: "Profile status" })).toBeNull();
   });
 });
 

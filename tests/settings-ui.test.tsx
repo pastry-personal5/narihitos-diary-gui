@@ -225,7 +225,7 @@ describe("Settings", () => {
       screen.getByRole("button", { name: "Reload configuration" }),
     );
     await screen.findByText("Configuration reloaded.");
-    fireEvent.click(screen.getByRole("button", { name: "Close Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
     await waitFor(() =>
       expect(screen.getByRole("log").textContent).toContain(
         "ayumi: folder not found",

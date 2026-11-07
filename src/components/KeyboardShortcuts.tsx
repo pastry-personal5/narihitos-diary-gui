@@ -96,7 +96,7 @@ export function KeyboardShortcuts({
     add(action, shortcut);
   };
   return (
-    <div aria-label="Keyboard Shortcuts">
+    <div className="card" aria-label="Keyboard Shortcuts">
       <h2>Keyboard Shortcuts</h2>
       {user?.keybinding_issues.length ? (
         <ul aria-label="Shortcut issues">

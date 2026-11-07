@@ -81,3 +81,10 @@ Status: Active
 - Other docs use `Draft`, `Proposal`, `Active`, `Superseded by <link>`, or `Archived`. Proposals are not decisions.
 - Archive completed phase plans, superseded designs, and concluded research; fix their links in `docs/roadmap.md`.
 - Record resolved open questions under "Decided" in `AGENTS.md`.
+
+## Documentation rules
+
+- `README.md` is user-facing; `AGENTS.md` holds contributor rules; `docs/` holds plans and design; `docs/archive/` holds inactive docs (not maintained).
+- Lowercase kebab-case filenames; each doc starts with a title, `Status:` line and a one- to three-sentence summary. Add every doc to [docs/README.md](README.md); follow [docs/development-process.md](development-process.md).
+- Update affected docs with code, `README.md` for user-visible changes, and [docs/decisions.md](decisions.md) for decisions. Link instead of copying facts. Archive completed docs with `git mv` under `docs/archive/` and fix links.
+- Save tokens: skip `node_modules/`, `dist/`, `src-tauri/target/`, `src-tauri/gen/`, lockfiles and `docs/archive/`; search with `git grep`/`rg`; start at `docs/README.md`; run affected tests while iterating and the full gate once at the end.

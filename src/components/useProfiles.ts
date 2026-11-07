@@ -53,6 +53,11 @@ export const PROFILE_STATUS_REASON_TEXT: Record<string, string> = {
 };
 /** Distinct wording for a status reason; falls back to nothing for an unknown id. */
 export const PROFILE_ERROR = "The profile status could not be read.";
+export const CHECK_BASE_MS = 15_000;
+export const CHECK_MAX_MS = 3_600_000;
+/** Wait before background check number n+1: 15 s, 30 s, 60 s ... capped at one hour. */
+export const checkDelay = (n: number) =>
+  Math.min(CHECK_BASE_MS * 2 ** n, CHECK_MAX_MS);
 const CHECK_ERROR = "The check could not be completed.";
 
 /** Read-only profile status for Settings. It never starts a run and never blocks Settings. */
@@ -65,6 +70,7 @@ export function useProfiles(
   const [checking, setChecking] = useState<string[]>([]);
   const [error, setError] = useState<string>();
   const alive = useRef(true);
+  const inFlight = useRef(new Set<string>());
   const supported = bridge.listProfiles !== undefined;
 
   useEffect(() => {
@@ -89,7 +95,9 @@ export function useProfiles(
 
   const check = useCallback(
     async (alias: string) => {
-      if (!bridge.checkProfile) return;
+      // One probe per alias at a time: background ticks and manual checks must not overlap.
+      if (!bridge.checkProfile || inFlight.current.has(alias)) return;
+      inFlight.current.add(alias);
       setChecking((c) => [...c, alias]);
       try {
         const next = await bridge.checkProfile(alias);
@@ -105,11 +113,32 @@ export function useProfiles(
               : CHECK_ERROR,
           );
       } finally {
+        inFlight.current.delete(alias);
         if (alive.current) setChecking((c) => c.filter((a) => a !== alias));
       }
     },
     [bridge],
   );
+  // Background checks: one at launch, then 15 s, 30 s, 60 s ... capped at 1 h, per profile.
+  const aliasKey = profiles?.map((p) => p.alias).join("\n");
+  useEffect(() => {
+    if (!connected || !bridge.checkProfile || !aliasKey) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let live = true;
+    aliasKey.split("\n").forEach((alias, i) => {
+      let n = 0;
+      const tick = async () => {
+        await check(alias);
+        if (live) timers[i] = setTimeout(tick, checkDelay(n++));
+      };
+      void tick();
+    });
+    return () => {
+      live = false;
+      timers.forEach(clearTimeout);
+    };
+    // Not keyed on configGeneration: a reload refetches the list and aliasKey follows it.
+  }, [bridge, connected, aliasKey, check]);
   return {
     supported,
     profiles: connected ? profiles : undefined,

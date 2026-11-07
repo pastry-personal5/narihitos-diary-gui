@@ -1,12 +1,9 @@
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { useState } from "react";
-import type { Bridge } from "../application/bridge";
-import {
-  PROFILE_REASON,
-  PROFILE_STATUS,
-  PROFILE_STATUS_REASON_TEXT,
-  useProfiles,
-} from "./useProfiles";
+import { SymbolLabel } from "./Symbol";
+import { blockers } from "./advanced";
+import { ProfileTable } from "./ProfileTable";
+import type { useProfiles } from "./useProfiles";
 import {
   RELOAD_MESSAGE,
   SETTINGS_MESSAGE,
@@ -25,17 +22,17 @@ type Model = ReturnType<typeof useSettings>;
 
 export function SettingsView({
   model,
-  bridge,
   connected,
+  profiles,
   onClose,
 }: {
   model: Model;
-  bridge: Bridge;
   connected: boolean;
+  profiles: ReturnType<typeof useProfiles>;
   onClose: () => void;
 }) {
   const { user, server, error } = model;
-  const profiles = useProfiles(bridge, connected, server?.config_generation);
+  const issues = blockers(connected, server, user, profiles.profiles);
   const [section, setSection] = useState<
     "Status" | "Writing Language" | "Keyboard Shortcuts" | "Generation"
   >("Status");
@@ -46,6 +43,19 @@ export function SettingsView({
   return (
     <section aria-label="Settings" className="settings">
       <nav aria-label="Settings sections">
+        <button
+          className="settings-back"
+          title="Close Settings"
+          aria-label="Go back"
+          onClick={onClose}
+        >
+          <SymbolLabel
+            name="chevron.backward"
+            label="Go back"
+            fallback="←"
+            size={20}
+          />
+        </button>
         {(
           [
             "Status",
@@ -62,7 +72,6 @@ export function SettingsView({
             {name}
           </button>
         ))}
-        <button onClick={onClose}>Close Settings</button>
       </nav>
       <div className="settings-body">
         {user?.read_only && (
@@ -103,98 +112,92 @@ export function SettingsView({
           <div aria-label="Status">
             <h2>Status</h2>
             {!connected || !server ? (
-              <p>
-                {model.serverError
-                  ? (SETTINGS_MESSAGE[model.serverError] ?? model.serverError)
-                  : "Connect to the server to see its configuration status."}
-              </p>
+              <div className="card">
+                <p>
+                  {model.serverError
+                    ? (SETTINGS_MESSAGE[model.serverError] ?? model.serverError)
+                    : "Connect to the server to see its configuration status."}
+                </p>
+              </div>
             ) : (
               <>
-                <p>
-                  Configuration generation {server.config_generation} · Storage{" "}
-                  {server.storage_ready ? "ready" : "unavailable"}
-                </p>
-                <h3>Sources</h3>
-                <ul aria-label="Sources">
-                  {server.sources.length === 0 && <li>None configured</li>}
-                  {server.sources.map((s) => (
-                    <li key={s.alias}>
-                      {s.alias}: {s.available ? "available" : s.reason}
-                    </li>
-                  ))}
-                </ul>
-                <h3>Agent profiles</h3>
-                <ul aria-label="Agent profiles">
-                  {server.profiles.length === 0 && <li>None configured</li>}
-                  {server.profiles.map((p) => (
-                    <li key={p.alias}>
-                      {p.alias}: {p.available ? "available" : p.reason}
-                    </li>
-                  ))}
-                </ul>
-                {profiles.supported && (
-                  <>
-                    <h3>Profile status</h3>
-                    <ul aria-label="Profile status">
-                      {profiles.profiles?.length === 0 && (
-                        <li>None configured</li>
-                      )}
-                      {profiles.profiles?.map((p) => {
-                        const busy = profiles.checking.includes(p.alias);
-                        const note = [
-                          p.capabilities.chat,
-                          p.capabilities.generate,
-                        ]
-                          .map((c) => c.reason)
-                          .find((r) => r !== null);
-                        return (
-                          <li key={p.alias}>
-                            {p.alias} ({p.type}):{" "}
-                            {busy ? "checking…" : PROFILE_STATUS[p.status]}
-                            {!busy &&
-                              p.reason &&
-                              ` · ${PROFILE_STATUS_REASON_TEXT[p.reason] ?? ""}`}
-                            {note && ` · ${PROFILE_REASON[note]}`}{" "}
-                            <button
-                              disabled={busy}
-                              aria-label={`Check ${p.alias}`}
-                              onClick={() => void profiles.check(p.alias)}
-                            >
-                              Check
-                            </button>
+                <div className="card">
+                  <h3>Server</h3>
+                  <p>
+                    Configuration generation {server.config_generation} ·
+                    Storage {server.storage_ready ? "ready" : "unavailable"}
+                  </p>
+                  {last && (
+                    <div role="status" aria-label="Last reload">
+                      <p>{RELOAD_MESSAGE[last.outcome]}</p>
+                      <ul>
+                        {last.issues.map((i) => (
+                          <li key={`${i.path}.${i.code}`}>
+                            {i.path}: {i.code}
                           </li>
-                        );
-                      })}
-                    </ul>
-                    <p>Status only. Chat and Generate are not enabled yet.</p>
-                    {profiles.error && <p role="alert">{profiles.error}</p>}
-                  </>
-                )}
-                {last && (
-                  <div role="status" aria-label="Last reload">
-                    <p>{RELOAD_MESSAGE[last.outcome]}</p>
-                    <ul>
-                      {last.issues.map((i) => (
-                        <li key={`${i.path}.${i.code}`}>
-                          {i.path}: {i.code}
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {model.serverError && (
+                    <p role="alert">
+                      {SETTINGS_MESSAGE[model.serverError] ?? model.serverError}
+                    </p>
+                  )}
+                  <button disabled={model.reloading} onClick={model.reload}>
+                    Reload configuration
+                  </button>
+                </div>
+                <div className="card">
+                  <h3>Sources</h3>
+                  <ul aria-label="Sources">
+                    {server.sources.length === 0 && <li>None configured</li>}
+                    {server.sources.map((s) => (
+                      <li key={s.alias}>
+                        {s.alias}: {s.available ? "available" : s.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="card">
+                  <h3>Agent profiles</h3>
+                  {profiles.supported ? (
+                    <ProfileTable profiles={profiles} />
+                  ) : (
+                    <ul aria-label="Agent profiles">
+                      {server.profiles.length === 0 && <li>None configured</li>}
+                      {server.profiles.map((p) => (
+                        <li key={p.alias}>
+                          {p.alias}: {p.available ? "available" : p.reason}
                         </li>
                       ))}
                     </ul>
-                  </div>
-                )}
-                {model.serverError && (
-                  <p role="alert">
-                    {SETTINGS_MESSAGE[model.serverError] ?? model.serverError}
-                  </p>
-                )}
-                <button disabled={model.reloading} onClick={model.reload}>
-                  Reload configuration
-                </button>
+                  )}
+                </div>
               </>
             )}
+            <div className="card" aria-label="Advanced">
+              <h3>Advanced</h3>
+              {issues.length === 0 ? (
+                <p>Nothing is blocking Chat or Generate.</p>
+              ) : (
+                <ul>
+                  {issues.map((i) => (
+                    <li key={i.id}>
+                      <strong>{i.affects}:</strong> {i.text}{" "}
+                      {i.fix && (
+                        <button onClick={() => setSection(i.fix!)}>
+                          Open {i.fix}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         ) : section === "Generation" ? (
-          <div aria-label="Generation settings">
+          <div className="card" aria-label="Generation settings">
             <h2>Generation</h2>
             <label htmlFor="generation-count">Candidates per generation</label>
             <select
@@ -219,7 +222,7 @@ export function SettingsView({
         ) : section === "Keyboard Shortcuts" ? (
           <KeyboardShortcuts user={user} save={model.setKeybindings} />
         ) : (
-          <div aria-label="Writing Language">
+          <div className="card" aria-label="Writing Language">
             <h2>Writing Language</h2>
             <p>
               {locale

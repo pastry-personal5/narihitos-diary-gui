@@ -1,31 +1,15 @@
 # narihitos-diary-gui
 
-Narihito's Diary, the GUI: a personal asset management app on your Mac.
+Narihito's Diary, the GUI: a personal asset management app on your Mac. A Rust server and a Tauri 2 client (TypeScript + React, CodeMirror 6) for editing diary entries, drafting them with AI from source snippets, reviewing changes paragraph by paragraph, and exporting to iCloud or Notion.
 
-The app runs a separately launched Rust server and Tauri client, with saved Authentic editing, Create Empty, autosave, Settings, a transient AI Chat, generated candidates and paragraph-by-paragraph review. iCloud export is available when an iCloud folder is configured; Notion export is available when a Notion root page and token are configured. Setup and independent launch commands are in the [contribution guide](docs/contribution-guide.md#setup-and-development). Feature delivery follows the [roadmap](docs/roadmap.md).
-
-Read-only Ayumi/Narihito date imports and timestamp-resolution choices are available through the server and typed bridge commands. Imports search source trees within shared scan limits and warn about misplaced timestamped files, including files outside the expected date directories. Listing pages stay fixed across file changes and server restarts; import again to refresh sources or apply timestamp choices. Narihito mobile snippets can be saved from the Source tab (explicit Save only; the title is left unchanged; Ayumi sources stay read-only). Verified against the mobile app's own file format on this Mac, not against the phone app or iCloud. See the [P1-M10 acceptance record](docs/archive/milestones/p1-m10/milestone-10-civil-date-imports-overview.md) and [snapshot hardening evidence](docs/archive/milestones/p1-m10/milestone-10-import-hardening-overview.md).
-
-Supported AI profiles are Codex, Claude Code, Qwen Code, and Apple's on-device Foundation Models. AI Chat is enabled: pick a ready profile in the AI Chat pane and send messages; each message carries the active editor text (including unsaved edits, shown as a context chip), the reply streams in as provisional text and Cancel stops it. The conversation is kept only in memory for the session. Settings → Status shows whether each configured profile is installed, a supported version and signed in (Check runs no AI). To generate, include eligible snippets in the Explorer, select and check a Generation profile, then use Generate. Dirty selected sources require Save, Exclude or Cancel; the saved Entry is flushed before capture. Settings → Generation saves the candidate count (1–5, default 3). Prompt templates live in [assets/prompts/](assets/prompts/README.md).
-
-The toolbar's AI activity details show runs across dates, captured profile and
-language, progress and retained result indicators. View results navigates explicitly
-through the usual save guards; dismissing an indicator retains the result.
-Temporary connection loss marks activity stale. Reconnecting within the same live
-lease discovers retained work without generating again; a server restart or expired
-lease loses transient results. Packaged macOS recovery and responsiveness evidence
-is still pending.
-
-Writing language is selected in Settings, initially uses the Mac's preferred language, and is remembered across sessions. Generation requires selected snippets and continues for its original date when you navigate away. Candidate cards show provisional text until validation, stay read-only, and are kept only for the live session. Cancel keeps completed candidates; Discard results frees their transient storage. Editing the saved Entry marks older candidates stale and requires regeneration before review. Use **Review candidate** on a finished candidate to review it against the saved Entry paragraph by paragraph: removed text is struck through in red, added text appears in green, and each change has Accept and Reject buttons. Accepting saves that paragraph at once; rejecting writes nothing; editing the Entry is paused until you choose **End review** (changing the date or regenerating ends it). If the Entry changes elsewhere, the remaining suggestions are dropped, accepted text stays, and you regenerate to review again. **Create Empty** saves a blank draft for the selected date, including without snippets.
-
-Press Shift+Command+P (or use the toolbar) for the command palette; Command+S saves the active Authentic file or explicitly saves a supported Narihito source. Shortcuts are editable in Settings → Keyboard Shortcuts, and the palette lists commands with their availability. To move a supported Narihito snippet and its owned audio to macOS Trash, use Trash in the Explorer or command palette, review the exact files and confirm. Global Messages retains results and offers a fresh confirmation for safe partial retries. Directories stay in place; the mobile producer can show an empty recovery row for a retained assets directory. Ayumi source saves remain unavailable. Export in the toolbar saves pending Authentic edits first, then writes the acknowledged entry to `YYYY/MM/YYYY-MM-DD.md` under the configured iCloud folder, asks before replacing a file changed outside the app, and lets you resolve an export whose outcome is unknown. Retained exports can be resumed after reload; confirmation dialogs identify their original entry date. Toolbar and tab controls show macOS SF Symbols when the system provides them and fall back to text labels otherwise.
-
-The [planned background AI experience](docs/architecture/ai-job-experience.md) keeps editing available with visible progress, cancellation and in-app completion feedback.
+- [User guide](docs/user-guide.md): what the app does today
+- [Setup and development](docs/contribution-guide.md#setup-and-development)
+- [Roadmap](docs/roadmap.md) and [all docs](docs/README.md)
 
 ## License
 
-Licensed under the Apache-2.0 license. See [LICENSE](LICENSE) and the [third-party notices](third-party-notices.md).
+Apache-2.0. See [LICENSE](LICENSE) and the [third-party notices](third-party-notices.md).
 
 ## Contributing
 
-Contributors and AI agents: see [AGENTS.md](AGENTS.md) and [docs/contribution-guide.md](docs/contribution-guide.md).
+See [AGENTS.md](AGENTS.md) and the [contribution guide](docs/contribution-guide.md).

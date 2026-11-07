@@ -1,5 +1,5 @@
 import { useGeneration } from "./useGeneration";
-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { ResourceCoordinator } from "../application/navigation/resources";
 import {
   GENERATION_MESSAGE,
   type GenerationController,
@@ -7,39 +7,6 @@ import {
 import { ModalDialog } from "./ModalDialog";
 import type { ReviewController } from "../application/review/controller";
 import { useReview } from "./useReview";
-/** Reuses the text node and restores a selection touching it without focusing the output. */
-function ReadOnlyText({ text, label }: { text: string; label: string }) {
-  const host = useRef<HTMLPreElement>(null);
-  useLayoutEffect(() => {
-    const element = host.current;
-    if (!element) return;
-    const selection = document.getSelection();
-    const anchor = selection?.anchorNode,
-      focus = selection?.focusNode,
-      anchorOffset = selection?.anchorOffset ?? 0,
-      focusOffset = selection?.focusOffset ?? 0;
-    const node =
-      element.firstChild ?? element.appendChild(document.createTextNode(""));
-    if (node.nodeValue === text) return;
-    const touches = anchor === node || focus === node;
-    node.nodeValue = text;
-    if (
-      touches &&
-      selection &&
-      anchor &&
-      focus &&
-      anchor.isConnected &&
-      focus.isConnected
-    )
-      selection.setBaseAndExtent(
-        anchor,
-        anchor === node ? Math.min(anchorOffset, text.length) : anchorOffset,
-        focus,
-        focus === node ? Math.min(focusOffset, text.length) : focusOffset,
-      );
-  }, [text]);
-  return <pre ref={host} aria-label={label} className="candidate-text" />;
-}
 export function GenerationControls({
   controller,
   date,
@@ -63,30 +30,6 @@ export function GenerationControls({
   return (
     <>
       <div className="generation-controls">
-        <label htmlFor="generation-profile">Generation profile</label>
-        <select
-          id="generation-profile"
-          value={s.profile ?? ""}
-          disabled={controller.running || !s.profiles.length}
-          onChange={(e) => controller.selectProfile(e.target.value)}
-        >
-          {s.profiles.map((p) => (
-            <option value={p.alias} key={p.alias}>
-              {p.alias} · {p.status.replaceAll("_", " ")}
-            </option>
-          ))}
-        </select>
-        <button
-          disabled={
-            !controller.connected ||
-            controller.running ||
-            s.checking ||
-            !s.profile
-          }
-          onClick={() => void controller.checkProfile()}
-        >
-          {s.checking ? "Checking profile…" : "Check generation profile"}
-        </button>
         {showGenerate && (
           <button
             disabled={!!reason}
@@ -183,146 +126,77 @@ export function GenerationDialog({
     </>
   );
 }
-export function CandidateCards({
+/** Status, errors and Review/Discard for the active Candidate tab. */
+export function CandidateBanner({
   controller,
-  date,
+  resources,
   review,
 }: {
   controller: GenerationController;
-  date: string | null;
+  resources: ResourceCoordinator;
   review?: ReviewController;
 }) {
   const state = useGeneration(controller);
   const reviewing = useReview(review);
-  const revision = useSyncExternalStore(
-    controller.subscribeOutput,
-    () => controller.outputRevision,
-  );
-  const host = useRef<HTMLDivElement>(null),
-    following = useRef(true);
-  const [newOutput, setNewOutput] = useState(false);
-  const jobs = [...state.jobs.values()].filter((j) => j.date === date);
-  useLayoutEffect(() => {
-    const node = host.current;
-    if (!node) return;
-    if (following.current) {
-      node.scrollTop = node.scrollHeight;
-      setNewOutput(false);
-    } else setNewOutput(true);
-  }, [revision, date]);
-  if (!jobs.length) return null;
+  const key =
+    resources.active?.kind === "candidate" ? resources.activeKey : null;
+  if (!key) return null;
+  const cut = key.lastIndexOf(":");
+  const jobId = key.slice("candidate:".length, cut),
+    index = Number(key.slice(cut + 1));
+  const job = state.jobs.get(jobId),
+    slot = job?.candidates.find((c) => c.index === index);
+  if (!job || !slot) return null;
+  const candidate = slot.id ? controller.candidate(slot.id) : undefined;
+  const mine = !!reviewing.view?.candidate_id.startsWith(`${job.job.id}-`);
   return (
-    <section className="candidate-region" aria-label={`Candidates for ${date}`}>
-      <div
-        ref={host}
-        className="candidate-list"
-        onScroll={(e) => {
-          const n = e.currentTarget;
-          following.current =
-            n.scrollHeight - n.scrollTop - n.clientHeight < 24;
-          if (following.current) setNewOutput(false);
-        }}
-      >
-        {jobs.map((job) => (
-          <article key={job.job.id} aria-label={`Generation ${job.job.id}`}>
-            <div className="candidate-heading">
-              <h2>
-                {job.date} · {job.profile} · {job.count} candidates
-              </h2>
-              {!["running", "queued"].includes(job.job.state) && (
-                <button
-                  disabled={
-                    !!reviewing.view?.candidate_id.startsWith(`${job.job.id}-`)
-                  }
-                  title={
-                    reviewing.view?.candidate_id.startsWith(`${job.job.id}-`)
-                      ? "End the review before discarding these results."
-                      : undefined
-                  }
-                  onClick={() => void controller.discard(job.job.id)}
-                >
-                  Discard results for {job.date}
-                </button>
-              )}
-            </div>
-            {job.stale_baseline && <p>Entry changed — regenerate to review</p>}
-            <div aria-busy={job.job.state === "running"}>
-              {job.candidates.map((slot) => {
-                const candidate = slot.id
-                  ? controller.candidate(slot.id)
-                  : undefined;
-                const provisional =
-                  slot.status === "running"
-                    ? controller.preview(job.job.id)
-                    : "";
-                return (
-                  <section
-                    key={slot.index}
-                    className="candidate-card"
-                    aria-label={`Candidate ${slot.index} for ${job.date}`}
-                  >
-                    <h3>
-                      Candidate {slot.index} ·{" "}
-                      {slot.status.replaceAll("_", " ")}
-                      {slot.status === "running" ? " · provisional" : ""}
-                    </h3>
-                    {candidate ? (
-                      <ReadOnlyText
-                        text={candidate.draft_markdown}
-                        label={`Candidate ${slot.index} text`}
-                      />
-                    ) : provisional ? (
-                      <ReadOnlyText
-                        text={provisional}
-                        label={`Candidate ${slot.index} provisional text`}
-                      />
-                    ) : null}
-                    {slot.status === "ready" && !candidate && (
-                      <p>Reading candidate…</p>
-                    )}
-                    {review && slot.status === "ready" && candidate && (
-                      <button
-                        disabled={
-                          job.stale_baseline ||
-                          reviewing.busy ||
-                          !!reviewing.view ||
-                          job.job.state === "running"
-                        }
-                        title={
-                          job.stale_baseline
-                            ? "Entry changed — regenerate to review"
-                            : undefined
-                        }
-                        onClick={() =>
-                          slot.id && void review?.start(job.date, slot.id)
-                        }
-                      >
-                        Review candidate {slot.index}
-                      </button>
-                    )}
-                    {slot.error_code && (
-                      <p>
-                        {GENERATION_MESSAGE[slot.error_code] ??
-                          GENERATION_MESSAGE.failed}
-                      </p>
-                    )}
-                  </section>
-                );
-              })}
-            </div>
-          </article>
-        ))}
-      </div>
-      {newOutput && (
+    <section
+      className="candidate-region"
+      aria-label={`Candidate ${index} for ${job.date}`}
+    >
+      <p>
+        Candidate {index} · {slot.status.replaceAll("_", " ")}
+        {slot.status === "running" ? " · provisional" : ""} · read-only
+      </p>
+      {job.stale_baseline && <p>Entry changed — regenerate to review</p>}
+      {slot.status === "ready" && !candidate && <p>Reading candidate…</p>}
+      {slot.error_code && (
+        <p>
+          {GENERATION_MESSAGE[slot.error_code] ?? GENERATION_MESSAGE.failed}
+        </p>
+      )}
+      {review && slot.status === "ready" && candidate && (
         <button
-          onClick={() => {
-            following.current = true;
-            if (host.current)
-              host.current.scrollTop = host.current.scrollHeight;
-            setNewOutput(false);
+          disabled={
+            job.stale_baseline ||
+            reviewing.busy ||
+            !!reviewing.view ||
+            job.job.state === "running"
+          }
+          title={
+            job.stale_baseline
+              ? "Entry changed — regenerate to review"
+              : undefined
+          }
+          onClick={async () => {
+            if (!slot.id) return;
+            // Review marks changes in the Authentic buffer, so show that tab first.
+            await resources.openAuthentic(job.date);
+            await review.start(job.date, slot.id);
           }}
         >
-          New output
+          Review candidate {index}
+        </button>
+      )}
+      {!["running", "queued"].includes(job.job.state) && (
+        <button
+          disabled={mine}
+          title={
+            mine ? "End the review before discarding these results." : undefined
+          }
+          onClick={() => void controller.discard(job.job.id)}
+        >
+          Discard results for {job.date}
         </button>
       )}
     </section>
