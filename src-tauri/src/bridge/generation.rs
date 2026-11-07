@@ -20,7 +20,7 @@ pub struct GenerationInput {
     pub locale: String,
     pub count: u8,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Progress {
     pub kind: String,
     pub job_id: String,
@@ -40,6 +40,8 @@ pub struct Progress {
     pub not_started_count: u8,
     pub phase: Option<String>,
     pub elapsed_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub silence_ms: Option<u64>,
     pub last_agent_activity_at: Option<u64>,
     pub cancellation_requested: bool,
     pub candidate_ids: Vec<String>,

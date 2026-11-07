@@ -120,14 +120,16 @@ async fn streamed_response_limit_applies_without_content_length() {
     task.join().unwrap();
 }
 #[tokio::test]
-async fn replacing_discovery_with_invalid_bytes_clears_a_previous_connection() {
+async fn invalid_discovery_does_not_prove_loss_of_the_previous_lease() {
     let (_temp, bridge, task) = fixture(|_| json_response(status()));
     assert!(bridge.connect().await.is_ok());
     task.join().unwrap();
+    bridge.connection.lock().await.session = Some("retained-session".into());
     fs::write(&bridge.path, b"invalid discovery").unwrap();
     assert_eq!(bridge.connect().await.err(), Some("invalid_discovery"));
     let c = bridge.connection.lock().await;
-    assert!(c.discovery.is_none() && c.session.is_none());
+    assert!(c.discovery.is_some());
+    assert_eq!(c.session.as_deref(), Some("retained-session"));
 }
 #[tokio::test]
 async fn redirect_is_rejected_before_any_followup_destination_request() {
@@ -189,4 +191,123 @@ fn only_unexpected_statuses_are_logged_and_tagged_by_kind() {
     assert_eq!(status_tag(S::FORBIDDEN), Some(ErrorTag::Denied));
     assert_eq!(status_tag(S::UNAUTHORIZED), Some(ErrorTag::Denied));
     assert_eq!(status_tag(S::BAD_REQUEST), Some(ErrorTag::Invalid));
+}
+
+#[tokio::test]
+async fn transient_status_failure_and_event_detach_preserve_the_owning_lease() {
+    use super::authentic::tests::{fixture, http};
+    let session = "17249746-e280-4d51-a86a-cbcb198ee101";
+    let (_t, b, task) = fixture(vec![
+        http("503 Service Unavailable", serde_json::json!({})),
+        "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+        http(
+            "200 OK",
+            serde_json::json!({"session_id":session,"heartbeat_interval_ms":5000,"lease_duration_ms":30000}),
+        ),
+    ]);
+    b.connect().await.unwrap();
+    b.connection.lock().await.session = Some(session.into());
+    b.detach_events().await;
+    assert!(b.connect().await.is_err());
+    assert_eq!(b.connection.lock().await.session.as_deref(), Some(session));
+    assert_eq!(b.open().await.unwrap().session_id, session);
+    let requests = task.join().unwrap();
+    assert_eq!(requests.len(), 4);
+    assert!(requests[2].starts_with(&format!("POST /api/v1/sessions/{session}/heartbeat ")));
+    assert!(requests.iter().all(|r| !r.starts_with("DELETE ")));
+}
+
+#[tokio::test]
+async fn authoritative_heartbeat_expiry_clears_the_old_session_identity() {
+    use super::authentic::tests::{fixture, http};
+    let (_t, b, task) = fixture(vec![http("401 Unauthorized", serde_json::json!({}))]);
+    b.connect().await.unwrap();
+    b.connection.lock().await.session = Some("17249746-e280-4d51-a86a-cbcb198ee101".into());
+    assert_eq!(b.heartbeat().await, Err("session_expired"));
+    assert!(b.connection.lock().await.session.is_none());
+    task.join().unwrap();
+}
+
+#[tokio::test]
+async fn reconciliation_commits_only_after_replayed_jobs_are_refreshed_and_never_on_overflow() {
+    use super::authentic::tests::{fixture, http};
+    use serde_json::{Value, json};
+    use std::sync::{Arc, Mutex};
+    for gap in [false, true] {
+        let session = "17249746-e280-4d51-a86a-cbcb198ee101";
+        let event = if gap {
+            "event: resync_required\ndata: {}\n\n".to_owned()
+        } else {
+            format!(
+                "event: job_changed\nid: 1\ndata: {}\n\nevent: replay_complete\ndata: {{}}\n\n",
+                json!({"instance_id":"07249746-e280-4d51-a86a-cbcb198ee101","session_id":session,"event_id":1,"job_id":"late","job_sequence":1,"kind":"job_changed","payload":{"id":"late","sequence":1,"state":"queued"}})
+            )
+        };
+        let mut replies = vec![
+            http(
+                "200 OK",
+                json!({"jobs":[],"next_cursor":null,"event_cursor":0}),
+            ),
+            format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nx-diary-reconcile: 1\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{event}",
+                event.len()
+            ),
+        ];
+        if !gap {
+            replies.push(http(
+                "200 OK",
+                json!({"id":"late","sequence":1,"state":"queued"}),
+            ));
+        }
+        let (_t, b, task) = fixture(replies);
+        b.connect().await.unwrap();
+        b.connection.lock().await.session = Some(session.into());
+        let received = Arc::new(Mutex::new(Vec::<Value>::new()));
+        let captured = received.clone();
+        let channel = tauri::ipc::Channel::new(move |body| {
+            if let tauri::ipc::InvokeResponseBody::Json(text) = body {
+                captured
+                    .lock()
+                    .unwrap()
+                    .push(serde_json::from_str(&text).unwrap());
+            }
+            Ok(())
+        });
+        b.subscribe(channel).await.unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if received.lock().unwrap().iter().any(|v| {
+                    v["event"]["kind"] == "resync_required" || v["event"]["complete"] == true
+                }) {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+        b.detach_events().await;
+        let requests = task.join().unwrap();
+        let events = received.lock().unwrap();
+        assert_eq!(events[0]["event"]["complete"], false);
+        if gap {
+            assert!(events.iter().all(|v| v["event"]["complete"] != true));
+        } else {
+            let refreshed = events
+                .iter()
+                .position(|v| v["event"]["jobs"][0]["id"] == "late")
+                .unwrap();
+            let completed = events
+                .iter()
+                .position(|v| v["event"]["complete"] == true)
+                .unwrap();
+            assert!(refreshed < completed);
+            assert!(
+                requests
+                    .last()
+                    .unwrap()
+                    .starts_with("GET /api/v1/jobs/late ")
+            );
+        }
+    }
 }

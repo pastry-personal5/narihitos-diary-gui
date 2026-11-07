@@ -46,6 +46,7 @@ export function GenerationControls({
   reason,
   showGenerate = true,
   adjacentDates = false,
+  coordinated = false,
 }: {
   controller: GenerationController;
   date: string | null;
@@ -54,6 +55,7 @@ export function GenerationControls({
   reason: string | null;
   showGenerate?: boolean;
   adjacentDates?: boolean;
+  coordinated?: boolean;
 }) {
   const s = useGeneration(controller);
   return (
@@ -127,7 +129,12 @@ export function GenerationControls({
           )}
         </p>
       )}
-      <p role="status" aria-atomic="true" className="visually-hidden">
+      <p
+        role={coordinated ? undefined : "status"}
+        aria-live={coordinated ? "off" : undefined}
+        aria-atomic="true"
+        className="visually-hidden"
+      >
         {s.announcement}
       </p>
     </>

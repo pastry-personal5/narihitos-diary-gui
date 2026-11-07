@@ -113,6 +113,9 @@ describe("ChatPane", () => {
       fireEvent.click(screen.getByRole("button", { name: "Send" }));
     });
     expect(screen.getByText("partial")).toBeTruthy();
+    expect(screen.getByRole("list").getAttribute("aria-busy")).toBe("true");
+    expect(box.closest('[aria-busy="true"]')).toBeNull();
+    expect((box as HTMLTextAreaElement).disabled).toBe(false);
     expect(screen.getByText(/Assistant \(provisional\)/)).toBeTruthy();
     expect(screen.getByText(/Waiting for output/)).toBeTruthy();
     expect(

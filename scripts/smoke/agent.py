@@ -1,4 +1,4 @@
-"""P1-M17..P1-M22: embedded assets, profile status and generation on the built server.
+"""P1-M17..P1-M23: embedded assets, profile status and generation on the built server.
 Only fake CLIs run inference-shaped fixtures; Apple is checked without inference."""
 import json
 import os
@@ -192,6 +192,33 @@ esac
             assert code == 202, (code, accepted)
             job_id = accepted['job']['id']
             assert wait_job(job_id)['state'] == 'succeeded'
+            # Simulate a frontend that lost admission/result state: discover by request identity.
+            code, jobs = call('/jobs', session=session)
+            assert code == 200, (code, jobs)
+            discovered = [j for j in jobs['jobs'] if j.get('progress', {}).get('request_id') == payload['request_id']]
+            assert len(discovered) == 1 and discovered[0]['id'] == job_id, discovered
+            projection = discovered[0]['progress']
+            assert projection['session_id'] == session and projection['profile_id'] == alias
+            assert projection['origin_date'] == DATE and projection['candidate_ids'] == [job_id + '-1']
+            assert isinstance(projection['silence_ms'], int)
+            # A fresh event consumer must catch up before claiming a usable baseline.
+            stream_request = urllib.request.Request(record['origin'] + '/api/v1/events', headers=dict(auth, **{
+                'X-Diary-Session': session, 'X-Diary-Reconcile': '1',
+                'Last-Event-ID': str(jobs['event_cursor'])}))
+            with opener.open(stream_request, timeout=5) as stream:
+                assert stream.headers.get('x-diary-reconcile') == '1'
+                frames = []
+                while True:
+                    line = stream.readline().decode()
+                    assert line, 'stream ended before replay completion'
+                    frames.append(line)
+                    if line.startswith('event: replay_complete'):
+                        break
+                encoded = ''.join(frames)
+                assert 'resync_required' not in encoded, encoded
+                assert SOURCE_SECRET not in encoded and 'Tea was nice' not in encoded
+            assert SOURCE_SECRET not in json.dumps(jobs) and 'Tea was nice' not in json.dumps(jobs)
+            assert call('/sessions/' + session + '/heartbeat', 'POST', session)[0] == 204
             code, manifest = call('/generations/' + job_id, session=session)
             assert code == 200 and manifest['progress']['ready_count'] == 1, (code, manifest)
             assert SOURCE_SECRET not in json.dumps(manifest) and 'Tea was nice' not in json.dumps(manifest)
@@ -202,6 +229,9 @@ esac
             assert call('/generations', 'POST', session, body=payload)[1]['job']['id'] == job_id
             assert (profile_home / 'runs').read_text() == '.', 'a retry ran inference again'
             assert call('/generations/' + job_id, 'DELETE', session)[0] == 200
+            retained = call('/jobs/' + job_id, session=session)[1]
+            assert 'progress' not in retained, retained
+            assert call('/candidates/' + candidate_id, session=session)[0] == 404
             code, refused = call('/generations', 'POST', session, body=payload)
             assert code == 404 and refused['error']['code'] == 'result_unavailable', (code, refused)
             assert (profile_home / 'runs').read_text() == '.'

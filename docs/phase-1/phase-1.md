@@ -167,10 +167,10 @@ Plan: [overview](../archive/milestones/p1-m22/milestone-22-candidate-generation-
 
 ### P1-M23: Background AI activity and results
 
-Status: Planned
+Status: Done
 Goal: Complete nonblocking cross-date AI progress, provisional previews, cancellation, reconnect/result discovery and accessible in-app completion feedback.
-Plan: [overview](milestone-23-background-ai-activity-results-overview.md), [work plan](milestone-23-background-ai-activity-results-architecture.md).
-Notes: Owner closes M23 on automated tests and the full gate; packaged slow-run, responsiveness, native interaction and reconnect/wake proof moves explicitly to P1-M28. Native VoiceOver proof remains exempt.
+Plan: [overview](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-overview.md), [work plan](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-architecture.md).
+Notes: Completed 2026-11-07 on automated tests, synthetic built-server smoke and the full gate; packaged slow-run, responsiveness, native interaction and reconnect/wake proof moves explicitly to P1-M28. Native VoiceOver proof remains exempt.
 
 ### P1-M24: Paragraph review and acceptance
 
@@ -197,4 +197,4 @@ Goal: Export deterministic year/month/daily projections with ascending dates, bo
 Status: Planned
 Goal: Qualify Diary v1.0.0 on the owner's Apple Silicon Mac with separate shell launch, complete workflow/recovery/native evidence and the full release gate.
 
-Notes: P1-M28 also owns the packaged AI proof moved from M23 by the owner on 2026-11-06: editing/autosave under a slow synthetic run and maximum streaming, toolbar/details and off-date results, native keyboard/reduced motion, connection recovery and activation after sleep, measured submission feedback (100 ms target), cancel acknowledgement and render/memory bounds. See the [M23 evidence limits](milestone-23-background-ai-activity-results-architecture.md#gate-and-evidence-limits). Native VoiceOver proof remains exempt.
+Notes: P1-M28 also owns the packaged AI proof moved from M23 by the owner on 2026-11-06: editing/autosave under a slow synthetic run and maximum streaming, toolbar/details and off-date results, native keyboard/reduced motion, connection recovery and activation after sleep, measured submission feedback (100 ms target), cancel acknowledgement and render/memory bounds. See the [M23 evidence limits](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-architecture.md#gate-and-evidence-limits). Native VoiceOver proof remains exempt.

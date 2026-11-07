@@ -120,4 +120,29 @@ Generation admission and reads are exposed through explicit bridge commands and 
 
 Generation `get_job`/`list_jobs` snapshots add origin date, profile/locale, baseline, current candidate, counts, phase, observed activity, elapsed time, cancellation request and ready candidate IDs; they carry no bodies. `candidate_ready` SSE events carry only the job identity/state/sequence and cause a client refetch. The explicit bridge commands are `start_generation(input)`, `get_generation(job_id)` (content-bearing result), `read_candidate(candidate_id)` and `discard_generation(job_id)`. Cancellation reuses `cancel_job`: it requests stop and retains the busy slot until the worker acknowledges terminal state, including when the active job is a chat. A late candidate cannot win cancellation. Close, expiry (including expiry first discovered by a job read) and shutdown cancel generation and erase session results.
 
+Subscription teardown detaches delivery only: the closed `subscribe_events` Stop
+action stops its native flow/task without closing the owning lease or cancelling
+AI work. Frontend subscription setup failure, transport reconnect and activation
+must use this path. Native reconnect retains the previous trusted lease through
+failed discovery reads or status transport errors, checks its heartbeat before
+resuming, and clears its identity on an authoritative expiry response. A confirmed
+replacement instance or incompatible handshake invalidates the previous identity.
+Actual window close continues through the acknowledged close flow below.
+
 Deliberate session close marks the lease closing before cancelling its active agent job, refuses fresh admissions and waits up to 30 seconds for worker acknowledgement. A timeout returns `busy`; the client keeps the window open with an error and allows retry. A successful close releases the lease and transient results before destroying the window.
+
+### Reconciliation replay boundary
+
+Updated native clients opt in with `x-diary-reconcile: 1` on the SSE request;
+the response acknowledges the same header. Legacy streams retain their existing
+event vocabulary. An opted-in stream emits one body-less `replay_complete` marker
+only after retained replay has drained successfully. A replay gap emits
+`resync_required` and closes without that marker. This negotiated extension keeps
+API v1 compatibility without sending unknown event kinds to older clients.
+
+Native subscription pages remain incomplete while replay is pending. The bridge
+collects changed job IDs from replay, refreshes those jobs through bounded fixed
+Get routes, applies the observations as staged snapshot overrides and only then
+emits the final complete baseline. The marker is consumed natively and never
+reaches the WebView. Failure, overflow or replacement subscription leaves the
+frontend stale until a subsequent complete reconciliation succeeds.

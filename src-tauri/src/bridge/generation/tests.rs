@@ -123,3 +123,23 @@ async fn discard_required_is_a_closed_visible_error() {
         "discard_required"
     );
 }
+
+#[test]
+fn generation_job_progress_survives_discovery_and_rejects_bad_counts() {
+    let v = view();
+    let mut wire = v["job"].clone();
+    wire["progress"] = v["progress"].clone();
+    let job: Job = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(serde_json::to_value(job).unwrap(), wire);
+    for (field, value) in [
+        ("ready_count", json!(5)),
+        ("candidate_ids", json!(["other-1"])),
+        ("candidate_ids", json!(["j-1", "j-1"])),
+        ("phase", json!("unknown")),
+        ("baseline_revision", json!({"sequence":0,"sha256":"bad"})),
+    ] {
+        let mut bad = wire.clone();
+        bad["progress"][field] = value;
+        assert!(serde_json::from_value::<Job>(bad).is_err(), "{field}");
+    }
+}

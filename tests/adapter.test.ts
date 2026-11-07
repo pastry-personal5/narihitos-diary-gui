@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 describe("session/channel adapter lifecycle", () => {
-  it("heartbeats without overlap, suppresses late callbacks and closes once", async () => {
+  it("heartbeats without overlap, suppresses late callbacks and detaches once", async () => {
     const observer = vi.fn();
     const stop = await tauriBridge.watch(observer);
     expect(mocks.invoke.mock.calls.map((call) => call[0])).toEqual([
@@ -48,10 +48,13 @@ describe("session/channel adapter lifecycle", () => {
     mocks.channels[0].onmessage({ kind: "disconnected" });
     expect(observer).not.toHaveBeenCalled();
     expect(
-      mocks.invoke.mock.calls.filter((call) => call[0] === "close_session"),
+      mocks.invoke.mock.calls.filter(
+        (call) =>
+          call[0] === "subscribe_events" && call[1]?.request?.action === "stop",
+      ),
     ).toHaveLength(1);
   });
-  it("closes admitted session when subscription setup fails", async () => {
+  it("detaches without closing the lease when subscription setup fails", async () => {
     mocks.invoke.mockImplementation((name: string) =>
       name === "subscribe_events"
         ? Promise.reject(new Error("invented secret"))
@@ -60,7 +63,10 @@ describe("session/channel adapter lifecycle", () => {
     await expect(tauriBridge.watch(vi.fn())).rejects.toThrow(
       "Subscription unavailable",
     );
-    expect(mocks.invoke).toHaveBeenCalledWith("close_session");
+    expect(mocks.invoke).toHaveBeenCalledWith("subscribe_events", {
+      request: { action: "stop" },
+    });
+    expect(mocks.invoke).not.toHaveBeenCalledWith("close_session");
     expect(vi.getTimerCount()).toBe(0);
   });
   it("resubscribes for snapshot refresh after a replay gap", async () => {

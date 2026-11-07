@@ -14,6 +14,7 @@ pub struct Delivery {
 #[derive(Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SubscriptionRequest {
+    Stop,
     Start {
         channel: tauri::ipc::JavaScriptChannelId,
     },
@@ -194,6 +195,7 @@ mod channel_tests {
                 sequence: 1,
                 state: crate::bridge::JobState::Running,
                 error_code: None,
+                progress: None,
             }],
             first: true,
             complete: true,

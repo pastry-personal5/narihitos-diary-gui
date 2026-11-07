@@ -270,3 +270,32 @@ it("a new App request uses the saved generation count and actual Include selecti
   ]);
   await act(async () => app.unmount());
 });
+
+it("bounds visible preview mutations during flooding and renders no text for an off-date run", async () => {
+  const { server, c } = await setup();
+  await c.start("2026-11-06", "ko-KR", 2);
+  const ui = render(<CandidateCards controller={c} date="2026-11-06" />);
+  const preview = screen.getByLabelText("Candidate 1 provisional text");
+  let mutations = 0;
+  const observer = new MutationObserver((records) => {
+    mutations += records.length;
+  });
+  observer.observe(preview, {
+    subtree: true,
+    characterData: true,
+    childList: true,
+  });
+  for (let i = 0; i < 100; i++) {
+    server.snapshot().provisional = `flood-${i}`;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+  }
+  expect(mutations).toBeLessThanOrEqual(10);
+  observer.disconnect();
+  ui.rerender(<CandidateCards controller={c} date="2026-11-07" />);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(500);
+  });
+  expect(ui.container.textContent).toBe("");
+});

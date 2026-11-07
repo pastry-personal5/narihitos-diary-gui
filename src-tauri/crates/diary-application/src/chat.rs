@@ -20,6 +20,10 @@ pub struct ActiveTurn {
     pub run: Run,
     pub shared: Shared,
     pub outcome: Outcome,
+    pub request_id: Option<String>,
+    pub origin_date: Option<String>,
+    pub started_at: u64,
+    pub finished_at: Option<u64>,
     message: String,
 }
 
@@ -66,8 +70,27 @@ impl Chat {
             run,
             shared,
             outcome: Outcome::Running,
+            request_id: None,
+            origin_date: None,
+            started_at: 0,
+            finished_at: None,
             message: message.into(),
         });
+    }
+
+    /// Capture body-less admission metadata while the caller holds the chat lock.
+    pub fn observe_admission(&mut self, request_id: String, origin_date: Option<String>, now: u64) {
+        if let Some(turn) = self.turn.as_mut() {
+            turn.request_id = Some(request_id);
+            turn.origin_date = origin_date;
+            turn.started_at = now;
+        }
+    }
+
+    pub fn observe_completion(&mut self, job_id: &str, now: u64) {
+        if let Some(turn) = self.turn.as_mut().filter(|t| t.job_id == job_id) {
+            turn.finished_at.get_or_insert(now);
+        }
     }
 
     /// Applies the run result. Returns false when `job_id` is no longer the active turn.

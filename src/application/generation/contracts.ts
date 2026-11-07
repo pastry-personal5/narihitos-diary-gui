@@ -27,6 +27,7 @@ export interface GenerationProgress {
   not_started_count: number;
   phase: string | null;
   elapsed_ms: number;
+  silence_ms?: number;
   last_agent_activity_at: number | null;
   cancellation_requested: boolean;
   candidate_ids: string[];

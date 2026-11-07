@@ -461,3 +461,21 @@ footer {
   border: 1px solid var(--line);
   background: var(--surface);
 }
+
+.ai-activity-details section {
+  max-height: 20rem;
+  overflow: auto;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+}
+.ai-activity-details ul {
+  list-style: none;
+  padding: 0;
+}
+.ai-activity-details li + li {
+  border-top: 1px solid var(--line);
+  margin-top: 0.5rem;
+}
+.ai-activity-details button {
+  margin: 0.2rem;
+}

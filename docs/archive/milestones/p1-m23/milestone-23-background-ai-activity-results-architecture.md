@@ -1,6 +1,6 @@
 # P1-M23: Background AI activity and results work plan
 
-Status: Planned
+Status: Done
 
 Implement the shared activity/results contract on the completed chat and generation workflows. Scope, owner decision and completion criteria live in the [overview](milestone-23-background-ai-activity-results-overview.md); this document specifies internal design under D17, without changing dependencies, prompts or adapter invocation.
 
@@ -110,3 +110,19 @@ Owner decision (2026-11-06): on a fresh frontend baseline in the same surviving 
 M23 closes on C01–C16 and `scripts/gate.sh` (the six required commands plus TypeScript). Extend and run the existing synthetic fake-agent integration smoke against the built server. Record test names, command outcomes and short evidence locations in the overview when implementation occurs. Qwen live proof stays **exempt: GPU throttling**.
 
 P1-M28 owns packaged proof of slow synthetic runs while editing/autosaving, toolbar/details and off-date results, native keyboard and reduced motion, reconnect/activation after sleep, 100 ms submission feedback target, maximum-stream editing responsiveness, cancel acknowledgement and actual render/memory bounds. Report measurements separately from provider latency. Native VoiceOver proof is not required; IME/key/resize obligations already assigned to M28 remain there. Passing mocks does not establish native performance, sleep behavior or adapter cancellation.
+
+## Transport compatibility decision
+
+M23 job progress fields are additive API v1 response fields, following the
+existing generation projection and the API contract allowing additive fields.
+Ordinary job records keep their basic shape. Chat discovery exposes only the
+currently retained turn; earlier turn metadata does not imply retained output.
+Native and frontend progress validation and adoption remain implementation work.
+
+Replay compatibility implementation (2026-11-07): the SSE replay-complete marker
+is opt-in through an acknowledged `x-diary-reconcile: 1` header. Legacy streams
+are unchanged; native clients consume the marker internally, re-read replayed
+job IDs and commit the baseline only afterward. The maintained API contract now
+records this negotiated additive extension. A gap never emits the marker.
+
+Implementation completed 2026-11-07; the archived overview records the passing full gate, scenario evidence and explicit P1-M28 limits.

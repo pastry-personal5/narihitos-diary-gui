@@ -7,6 +7,7 @@ import {
   importJobDto,
   resolutionDto,
 } from "./navigation-validation";
+import { jobPageDto } from "./activity-validation";
 import { streamEvent } from "../application/events";
 import { trashAckDto, trashPageDto, trashPreviewDto } from "./trash-validation";
 import { Channel, invoke } from "@tauri-apps/api/core";
@@ -114,6 +115,8 @@ export const tauriBridge: Bridge = {
       { sourceId, operationId, baseDigest, body },
       sourceSaved,
     ),
+  listJobs: (cursor) =>
+    authentic("list_jobs", { cursor: cursor ?? null }, jobPageDto),
   getJob: (jobId) => authentic("get_job", { id: jobId }, importJobDto),
   cancelJob: (jobId) => authentic("cancel_job", { id: jobId }, importJobDto),
   metadata: async () => metadataDto(await invoke<unknown>("get_app_metadata")),
@@ -206,6 +209,7 @@ export const tauriBridge: Bridge = {
     let gaps = 0;
     let generation = 0;
     let activeChannel: Channel<unknown> | undefined;
+    let scope: { instance_id: string; session_id: string } | undefined;
     async function start() {
       const own = ++generation;
       const channel = new Channel<unknown>();
@@ -242,6 +246,11 @@ export const tauriBridge: Bridge = {
             if (!disposed && own === generation)
               observer({ kind: "disconnected" });
           });
+          if (event.kind !== "disconnected")
+            scope = {
+              instance_id: event.instance_id,
+              session_id: event.session_id,
+            };
           observer(event);
           if (event.kind === "job_changed" || event.kind === "candidate_ready")
             gaps = 0;
@@ -273,11 +282,45 @@ export const tauriBridge: Bridge = {
       disposed = true;
       generation++;
       if (activeChannel) activeChannel.onmessage = () => {};
-      await invoke("close_session").catch(() => {});
+      await invoke("subscribe_events", { request: { action: "stop" } }).catch(
+        () => {},
+      );
       throw new Error("Subscription unavailable");
     }
+    const refresh = () => {
+      if (disposed || recovering || !scope) return;
+      recovering = true;
+      generation++; // reject pre-activation deliveries before checking the lease
+      observer({ kind: "resync_required", ...scope });
+      void invoke("heartbeat_session")
+        .then(() => {
+          if (!disposed) return start();
+        })
+        .catch(() => {
+          if (!disposed) observer({ kind: "disconnected" });
+        })
+        .finally(() => {
+          recovering = false;
+        });
+    };
+    const visible = () => {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "visible"
+      )
+        refresh();
+    };
+    if (typeof window !== "undefined")
+      window.addEventListener("focus", refresh);
+    if (typeof document !== "undefined")
+      document.addEventListener("visibilitychange", visible);
+    let lastHeartbeat = Date.now();
     const heartbeat = setInterval(() => {
-      if (disposed || pending) return;
+      const now = Date.now();
+      const woke = now - lastHeartbeat > 7500;
+      lastHeartbeat = now;
+      if (woke) refresh();
+      if (disposed || pending || recovering) return;
       pending = true;
       void invoke("heartbeat_session")
         .catch(() => {
@@ -292,8 +335,14 @@ export const tauriBridge: Bridge = {
       disposed = true;
       generation++;
       clearInterval(heartbeat);
+      if (typeof window !== "undefined")
+        window.removeEventListener("focus", refresh);
+      if (typeof document !== "undefined")
+        document.removeEventListener("visibilitychange", visible);
       if (activeChannel) activeChannel.onmessage = () => {};
-      await invoke("close_session").catch(() => {});
+      await invoke("subscribe_events", { request: { action: "stop" } }).catch(
+        () => {},
+      );
     };
   },
 };

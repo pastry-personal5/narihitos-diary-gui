@@ -1,3 +1,6 @@
+import { ActivityFeedback } from "./ActivityFeedback";
+import { ActivityDetails } from "./ActivityDetails";
+import { ActivityRuntime } from "../application/activity/runtime";
 import {
   useCallback,
   useEffect,
@@ -22,7 +25,7 @@ import {
 import { useGeneration } from "./useGeneration";
 import { GenerationController } from "../application/generation/controller";
 import { generationPreparation } from "../application/generation/navigation";
-import { activitySummary, useChat, useTick } from "./useChat";
+import { useChat } from "./useChat";
 import { ChatController, rememberedChat } from "../application/chat";
 import { NavigationModel } from "../application/navigation/model";
 import { saveOff } from "../application/navigation/resources";
@@ -58,7 +61,16 @@ export function App({ bridge }: { bridge: Bridge }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const settings = useSettings(bridge, connected);
   const model = useMemo(() => new NavigationModel(bridge), [bridge]);
-  const chat = useMemo(() => new ChatController(bridge), [bridge]);
+  const chat = useMemo(
+    () =>
+      new ChatController(
+        bridge,
+        Date.now,
+        () => crypto.randomUUID(),
+        model.budget,
+      ),
+    [bridge, model],
+  );
   const chatState = useChat(chat);
   const generator = useMemo(
     () =>
@@ -69,8 +81,32 @@ export function App({ bridge }: { bridge: Bridge }) {
       ),
     [bridge, model, chat],
   );
+  const activity = useMemo(
+    () =>
+      new ActivityRuntime(
+        bridge,
+        (job) => {
+          if (job.progress?.kind === "generation")
+            generator.discover(job.id, job.progress.request_id);
+          if (job.progress?.kind === "chat") chat.discover(job.progress);
+        },
+        (id, remaining) => {
+          generator.forgetResult(id);
+          if (
+            !remaining.some(
+              (job) =>
+                job.progress?.kind === "chat" &&
+                job.progress.chat_id === chat.state.chat?.chat_id,
+            )
+          )
+            chat.forgetJob(id);
+        },
+        model.budget,
+      ),
+    [bridge, generator, chat, model],
+  );
+  useEffect(() => () => activity.dispose(), [activity]);
   const generationState = useGeneration(generator);
-  const chatNow = useTick(chat.running);
   const chatContext = useCallback(() => {
     const r = model.resources.active;
     const date = r?.date ?? model.resources.selectedDate;
@@ -119,10 +155,11 @@ export function App({ bridge }: { bridge: Bridge }) {
         if (counter.current === generation) {
           model.dispose();
           generator.dispose();
+          chat.dispose();
         }
       });
     };
-  }, [model, generator]);
+  }, [model, generator, chat]);
   useEffect(() => {
     let off: (() => void) | undefined;
     let disposed = false;
@@ -215,6 +252,7 @@ export function App({ bridge }: { bridge: Bridge }) {
         model.onEvent(event);
         chat.onEvent(event);
         generator.onEvent(event);
+        activity.event(event);
         if (event.kind === "disconnected") {
           connectionEpoch.current++;
           void dispose.current?.();
@@ -434,14 +472,42 @@ export function App({ bridge }: { bridge: Bridge }) {
             </span>
           </div>
           <p className="ai-activity" aria-live="off">
-            {generator.running
-              ? generator.active
-                ? `Generating for ${generator.active.date} · candidate ${generator.active.progress.candidate_index ?? 1} of ${generator.active.count} · ${generator.active.progress.ready_count} ready · ${Math.floor(generator.active.progress.elapsed_ms / 1000)}s`
-                : `Preparing generation for ${generationState.originDate}`
-              : chatState.chat || chat.running
-                ? activitySummary(chat, chatNow)
+            {generationState.submitting
+              ? `Preparing generation for ${generationState.originDate}`
+              : chatState.submitting
+                ? "Submitting AI Chat"
                 : ""}
           </p>
+          <ActivityFeedback
+            activity={activity.store}
+            generator={generator}
+            chat={chat}
+            messages={model.messages}
+          />
+          <ActivityDetails
+            store={activity.store}
+            retry={() => latestConnect.current()}
+            view={async (job) => {
+              if (job.progress?.kind === "generation")
+                return model.chooseDate(job.progress.origin_date);
+              document
+                .querySelector<HTMLElement>('[aria-label="AI Chat"] textarea')
+                ?.focus();
+              return true;
+            }}
+            cancel={async (job) => {
+              await bridge.cancelJob(job.id);
+            }}
+            discard={async (job) => {
+              const scope = activity.store.state.scope;
+              await generator.discard(job.id);
+              if (
+                scope === activity.store.state.scope &&
+                !generator.state.jobs.has(job.id)
+              )
+                activity.forget(job.id);
+            }}
+          />
           <div className="toolbar-actions">
             <button
               disabled={!canCreate}
@@ -678,6 +744,7 @@ export function App({ bridge }: { bridge: Bridge }) {
               ))}
             </div>
             <GenerationControls
+              coordinated
               showGenerate={false}
               adjacentDates={
                 !!model.resources.selectedDate &&
@@ -768,6 +835,7 @@ export function App({ bridge }: { bridge: Bridge }) {
             reverse
           />
           <ChatPane
+            coordinated
             controller={chat}
             connected={connected}
             locale={settings.user?.writing_locale ?? null}

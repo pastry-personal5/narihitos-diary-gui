@@ -760,9 +760,11 @@ impl From<Job> for JobDto {
     }
 }
 fn job_value(s: &ServerState, session: &str, job: Job) -> Value {
-    let progress = generations::progress(s, session, &job);
+    let progress =
+        generations::progress(s, session, &job).or_else(|| chats::progress(s, session, &job));
     let mut value = serde_json::to_value(JobDto::from(job)).expect("fixed DTO");
     if let Some(Value::Object(p)) = progress {
+        value["progress"] = Value::Object(p.clone());
         value.as_object_mut().expect("object").extend(p);
     }
     value
@@ -932,10 +934,11 @@ async fn events(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Respon
         Ok(permit) => permit,
         Err(_) => return failure(StatusCode::TOO_MANY_REQUESTS, "stream_limit"),
     };
+    let reconcile = header(&headers, "x-diary-reconcile") == Some("1");
     let start = s.authentic_epoch.load(std::sync::atomic::Ordering::SeqCst);
     let stream = futures_util::stream::unfold(
-        (s, id, instance, after, false, permit, start),
-        |(s, id, instance, mut after, done, permit, mut seen)| async move {
+        (s, id, instance, after, false, permit, start, !reconcile),
+        |(s, id, instance, mut after, done, permit, mut seen, ready)| async move {
             if done {
                 return None;
             }
@@ -948,7 +951,7 @@ async fn events(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Respon
                         Ok::<_, Infallible>(
                             SseEvent::default().event("authentic_changed").data("{}"),
                         ),
-                        (s, id, instance, after, false, permit, seen),
+                        (s, id, instance, after, false, permit, seen, ready),
                     ));
                 }
                 let replay = s
@@ -963,7 +966,7 @@ async fn events(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Respon
                             Ok::<_, Infallible>(
                                 SseEvent::default().event("resync_required").data("{}"),
                             ),
-                            (s, id, instance, after, true, permit, seen),
+                            (s, id, instance, after, true, permit, seen, ready),
                         ));
                     }
                     Ok(Replay::Events(events)) => {
@@ -975,7 +978,16 @@ async fn events(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Respon
                                 .event(event.kind.as_str())
                                 .json_data(data)
                                 .expect("fixed DTO");
-                            return Some((Ok(item), (s, id, instance, after, false, permit, seen)));
+                            return Some((
+                                Ok(item),
+                                (s, id, instance, after, false, permit, seen, ready),
+                            ));
+                        }
+                        if !ready {
+                            return Some((
+                                Ok(SseEvent::default().event("replay_complete").data("{}")),
+                                (s, id, instance, after, false, permit, seen, true),
+                            ));
                         }
                     }
                 }
@@ -983,9 +995,15 @@ async fn events(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Respon
             }
         },
     );
-    Sse::new(stream)
+    let mut response = Sse::new(stream)
         .keep_alive(KeepAlive::new().interval(Duration::from_secs(10)))
-        .into_response()
+        .into_response();
+    if reconcile {
+        response
+            .headers_mut()
+            .insert("x-diary-reconcile", "1".parse().expect("fixed header"));
+    }
+    response
 }
 
 #[cfg(test)]

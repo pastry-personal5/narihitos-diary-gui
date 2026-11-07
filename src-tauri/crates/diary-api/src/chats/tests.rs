@@ -37,6 +37,7 @@ impl ProfileDirectory for Profiles {
 #[derive(Clone, Copy)]
 enum Mode_ {
     Reply,
+    NoDelta,
     Block,
     Fail(AgentErrorCode),
 }
@@ -51,9 +52,13 @@ impl AgentRunner for Runner {
         events: &mut dyn EventSink,
         cancel: &CancelToken,
     ) -> Result<AgentOutput, AgentError> {
+        if matches!(self.0, Mode_::NoDelta) {
+            return Ok(AgentOutput::Reply("final without streaming".into()));
+        }
         events.event(AgentEvent::Phase(Phase::WaitingForOutput));
         events.event(AgentEvent::Delta("par".into()));
         match self.0 {
+            Mode_::NoDelta => unreachable!("handled before protocol events"),
             Mode_::Reply => {
                 let Mode::Chat(c) = request.mode() else {
                     panic!("chat only")
@@ -187,6 +192,22 @@ async fn turn_replies_and_transcript_survives_reload_within_lease() {
     assert!(v["turn"]["provisional"].is_null());
     let (_, j) = call(&s, "GET", &format!("/api/v1/jobs/{job}"), None).await;
     assert_eq!(j["state"], "succeeded");
+    assert_eq!(j["kind"], "chat");
+    assert_eq!(j["chat_id"], chat);
+    assert_eq!(j["request_id"], "r1");
+    assert_eq!(j["session_id"], SESSION);
+    assert_eq!(j["profile_id"], "main");
+    let (_, page) = call(&s, "GET", "/api/v1/jobs", None).await;
+    let listed = &page["jobs"][0];
+    assert_eq!(listed, &j);
+    let encoded = listed.to_string();
+    assert!(!encoded.contains("hello"));
+    assert!(!encoded.contains("reply 0 true"));
+    assert!(listed.get("provisional").is_none());
+    assert!(listed.get("transcript").is_none());
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    let (_, later) = call(&s, "GET", &format!("/api/v1/jobs/{job}"), None).await;
+    assert_eq!(later["elapsed_ms"], j["elapsed_ms"]);
     // The next turn carries the first exchange.
     send(&s, &chat, "r2", "again").await;
     let mut v = until(&s, &chat, "done").await;
@@ -317,4 +338,31 @@ async fn agents_available_needs_a_runner_and_a_chat_capable_profile() {
         .unwrap();
     let (_, v) = call(&bare, "GET", "/api/v1/settings", None).await;
     assert_eq!(v["agents_available"], false);
+}
+
+#[tokio::test]
+async fn no_delta_adapter_finishes_without_fabricating_agent_activity() {
+    let s = setup(Mode_::NoDelta);
+    let chat = open(&s).await;
+    let (_, accepted) = send(&s, &chat, "no-delta", "hello").await;
+    let job = accepted["job"]["id"].as_str().unwrap();
+    let view = until(&s, &chat, "done").await;
+    assert_eq!(view["transcript"][1]["text"], "final without streaming");
+    let (_, projection) = call(&s, "GET", &format!("/api/v1/jobs/{job}"), None).await;
+    assert_eq!(projection["state"], "succeeded");
+    assert!(projection["progress"]["last_agent_activity_at"].is_null());
+    assert!(projection["progress"]["phase"].is_null());
+    assert_eq!(
+        projection["progress"]["silence_ms"],
+        projection["progress"]["elapsed_ms"]
+    );
+    call(
+        &s,
+        "POST",
+        &format!("/api/v1/sessions/{SESSION}/heartbeat"),
+        None,
+    )
+    .await;
+    let (_, after) = call(&s, "GET", &format!("/api/v1/jobs/{job}"), None).await;
+    assert_eq!(after["progress"], projection["progress"]);
 }

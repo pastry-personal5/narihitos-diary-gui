@@ -566,6 +566,7 @@ export function generationDto(value: unknown): GenerationView {
     not_started_count: count(p.not_started_count),
     phase: p.phase === null ? null : text(p.phase, 32),
     elapsed_ms: count(p.elapsed_ms),
+    ...(p.silence_ms === undefined ? {} : { silence_ms: count(p.silence_ms) }),
     last_agent_activity_at:
       p.last_agent_activity_at === null
         ? null

@@ -116,3 +116,24 @@ Packaged macOS evidence must demonstrate editing and autosave during a deliberat
 Generation implements sequential generation and body-less progress/manifest reads, bounded provisional-result reads, candidate-ready events and terminal discard. The single AI reservation stays occupied across candidates and until cancellation acknowledgement. Counts distinguish ready, failed, cancelled and not-started slots; terminal elapsed time is frozen. Slot data, preview and progress are captured under one generation lock so concurrent output cannot create inconsistent result DTOs. The client bridge validates these shapes and bounds. A generation controller independent of editor mounts retains per-date results, keeps text in bounded output buffers and shares the client payload budget. Generate shows preparation/submission immediately, blocks another chat/generation with a visible reason, and provides cancellation and one atomic completion announcement. Read-only candidate cards preserve focus, text selection and scroll while updating; stale saved baselines show a regeneration label. The complete shared activity/reconnect and packaged performance evidence remains outside this minimal UI. See [M22 evidence](../archive/milestones/p1-m22/milestone-22-candidate-generation-overview.md#evidence-record).
 
 During deliberate close, the client shows a closing status and prevents interaction while the server acknowledges cancellation. Failed close preserves the window and reports the failure. Ordinary AI work keeps editing and navigation available.
+
+## P1-M23 implementation status
+
+The application-owned activity runtime discovers chat/generation jobs through
+body-less progress and a negotiated native baseline/replay boundary. Transient
+transport loss preserves the owning lease; activation verifies it and reconciles
+before activity becomes fresh. Confirmed replacement clears transient payloads.
+Results restore silently after frontend reload, with explicit guarded View,
+presentation-only dismissal and terminal generation discard. Scoped terminal
+attention and shared Global Messages coordinate feedback.
+
+Visible chat preview publications are separate from metadata and coalesced at
+100 ms; generation retains its bounded output channel and immediately refreshes
+terminal hints. Live metadata, staged baselines, terminal history, retry context
+and retained output use the shared payload budget. Server-observed silence drives
+the 30-second waiting hint. Ordinary editing remains available, and busy semantics
+apply only to output. No system attention or decorative activity animation is
+introduced. The milestone completed its automated acceptance audit and full gate on 2026-11-07;
+see the [M23 checklist](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-overview.md).
+Packaged macOS timing, sleep/reconnect and native interaction evidence remains
+explicitly assigned to P1-M28 as described above.

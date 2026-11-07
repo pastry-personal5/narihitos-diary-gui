@@ -79,7 +79,7 @@ fn progress_locked(
         "origin_date":g.context.date().to_string(),"profile_id":g.context.profile().alias,"locale":g.context.locale().as_str(),
         "baseline_revision":g.context.baseline().map(|r|json!({"sequence":r.sequence,"sha256":r.sha256})),
         "candidate_index":g.candidate_index,"requested_count":c.requested,"finished_count":c.finished,"ready_count":c.ready,"failed_count":c.failed,"cancelled_count":c.cancelled,"not_started_count":c.not_started,
-        "phase":chats::phase(snap.phase),"elapsed_ms":g.finished_at.unwrap_or_else(||s.now()).saturating_sub(g.started_at),"last_agent_activity_at":snap.last_activity_at,"cancellation_requested":g.cancellation_requested(),
+        "phase":chats::phase(snap.phase),"elapsed_ms":g.finished_at.unwrap_or_else(||s.now()).saturating_sub(g.started_at),"last_agent_activity_at":snap.last_activity_at,"silence_ms":g.finished_at.unwrap_or_else(||s.now()).saturating_sub(snap.last_activity_at.unwrap_or(g.started_at)),"cancellation_requested":g.cancellation_requested(),
         "candidate_ids":g.slots.iter().enumerate().filter(|(_,slot)|**slot==Slot::Ready).map(|(i,_)|g.candidate_id(i)).collect::<Vec<_>>(),"error_code":g.error.map(AgentErrorCode::as_str)})
 }
 fn publish(s: &ServerState, c: &mut Coordinator, session: &str, job: &Job, ready: bool) {

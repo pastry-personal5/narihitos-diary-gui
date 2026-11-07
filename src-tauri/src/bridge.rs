@@ -4,6 +4,7 @@ mod chat;
 mod generation;
 mod imports;
 mod profiles;
+mod progress;
 mod source_trash;
 use crate::delivery::{Delivery, Flow};
 use crate::diagnostics::ClientLog;
@@ -103,6 +104,7 @@ pub enum JobState {
     Cancelled,
 }
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(try_from = "progress::WireJob")]
 pub struct Job {
     pub id: String,
     pub sequence: u64,
@@ -110,6 +112,8 @@ pub struct Job {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(deserialize_with = "job_error")]
     pub error_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub progress: Option<progress::AiProgress>,
 }
 fn job_error<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
     let code = Option::<String>::deserialize(d)?;
@@ -126,6 +130,47 @@ pub struct JobList {
     pub jobs: Vec<Job>,
     pub next_cursor: Option<String>,
     pub event_cursor: u64,
+}
+impl JobList {
+    fn validate(
+        &self,
+        cursor: Option<&str>,
+        scope: Option<(&str, &str)>,
+    ) -> Result<(), &'static str> {
+        let unique = self
+            .jobs
+            .iter()
+            .map(|j| &j.id)
+            .collect::<std::collections::HashSet<_>>();
+        if self.jobs.len() > 200
+            || unique.len() != self.jobs.len()
+            || self
+                .next_cursor
+                .as_deref()
+                .is_some_and(|id| !valid_id(id) || cursor.is_some_and(|old| id <= old))
+            || self.jobs.iter().any(|job| {
+                !valid_id(&job.id)
+                    || job.sequence == 0
+                    || scope.is_some_and(|(instance, session)| !job.owned_by(instance, session))
+            })
+        {
+            return Err("invalid_snapshot");
+        }
+        Ok(())
+    }
+}
+impl Job {
+    fn owned_by(&self, instance: &str, session: &str) -> bool {
+        match &self.progress {
+            None => true,
+            Some(progress::AiProgress::Chat(p)) => {
+                p.instance_id == instance && p.session_id == session
+            }
+            Some(progress::AiProgress::Generation(p)) => {
+                p.instance_id == instance && p.session_id == session
+            }
+        }
+    }
 }
 #[derive(Serialize)]
 pub struct Metadata {
@@ -287,13 +332,7 @@ impl Bridge {
         self.stop_events().await;
         let record = match discovery::read(&self.path) {
             Ok(record) => record,
-            Err(error) => {
-                let mut c = self.connection.lock().await;
-                c.discovery = None;
-                c.session = None;
-                c.cursor = Arc::new(std::sync::Mutex::new(Cursor::default()));
-                return Err(error);
-            }
+            Err(error) => return Err(error),
         };
         let mut c = self.connection.lock().await;
         let same = c.discovery.as_ref().is_some_and(|old| {
@@ -309,11 +348,7 @@ impl Bridge {
             .await;
         let status = match result {
             Ok(status) => status,
-            Err(e) => {
-                c.discovery = None;
-                c.session = None;
-                return Err(e);
-            }
+            Err(e) => return Err(e),
         };
         let d = c.discovery.as_ref().ok_or("disconnected")?;
         if status.instance_id != d.instance_id
@@ -341,6 +376,14 @@ impl Bridge {
             .await
     }
     pub async fn open(&self) -> Result<Lease, &'static str> {
+        let _lifecycle = self.lifecycle.lock().await;
+        let resuming = self.connection.lock().await.session.is_some();
+        if resuming {
+            match self.heartbeat().await {
+                Ok(()) | Err("session_expired") => {}
+                Err(error) => return Err(error),
+            }
+        }
         let mut c = self.connection.lock().await;
         if c.session.is_none() {
             c.session = Some(uuid::Uuid::new_v4().to_string());
@@ -381,6 +424,10 @@ impl Bridge {
             None => Ok(()),
         }
     }
+    pub async fn detach_events(&self) {
+        let _lifecycle = self.lifecycle.lock().await;
+        self.stop_events().await;
+    }
     pub async fn stop_events(&self) {
         if let Some(flow) = self.flow.lock().expect("flow poisoned").take() {
             flow.stop();
@@ -407,16 +454,14 @@ impl Bridge {
         let mut page_cursor: Option<String> = None;
         let mut watermark = None;
         let mut pages = 0;
+        let mut seen = std::collections::HashSet::new();
         loop {
             let path = page_cursor
                 .as_ref()
                 .map_or_else(|| "/jobs".into(), |id| format!("/jobs?cursor={id}"));
             let page: JobList = self.request(&c, Method::GET, &path, None).await?;
-            if page.jobs.len() > 200
-                || page.next_cursor.as_ref().is_some_and(|id| {
-                    !valid_id(id) || page_cursor.as_ref().is_some_and(|old| id <= old)
-                })
-            {
+            page.validate(page_cursor.as_deref(), Some((&instance, &session)))?;
+            if page.jobs.iter().any(|job| !seen.insert(job.id.clone())) {
                 return Err("invalid_snapshot");
             }
             let first = watermark.is_none();
@@ -429,7 +474,7 @@ impl Bridge {
                     session_id: session.clone(),
                     jobs: page.jobs,
                     first,
-                    complete: page_cursor.is_none(),
+                    complete: false,
                 },
             )
             .await?;
@@ -458,10 +503,16 @@ impl Bridge {
             .header("x-diary-trace-id", new_trace())
             .header("x-diary-instance", &instance)
             .header("last-event-id", last.to_string())
+            .header("x-diary-reconcile", "1")
             .send()
             .await
             .map_err(|_| "server_unavailable")?;
         if !response.status().is_success()
+            || response
+                .headers()
+                .get("x-diary-reconcile")
+                .and_then(|v| v.to_str().ok())
+                != Some("1")
             || response
                 .headers()
                 .get("content-type")
@@ -470,7 +521,12 @@ impl Bridge {
         {
             return Err("invalid_event_stream");
         }
+        let snapshot_client = self.client.clone();
+        let origin = d.origin.clone();
+        let token = d.token.clone();
         let task = tauri::async_runtime::spawn(async move {
+            let mut ready = false;
+            let mut dirty = std::collections::HashSet::<String>::new();
             let mut response = response;
             let mut decoder = Decoder::default();
             let outcome: Result<(), &'static str> = async {
@@ -481,6 +537,55 @@ impl Bridge {
                             .expect("cursor poisoned")
                             .decode(&frame, &instance, &session)?;
                         if let Some(event) = event {
+                            if matches!(event, BridgeEvent::ReplayComplete) {
+                                if ready {
+                                    return Err("invalid_event");
+                                }
+                                for id in dirty.drain() {
+                                    let job = progress::reconcile_job(
+                                        &snapshot_client,
+                                        &origin,
+                                        &token,
+                                        &instance,
+                                        &session,
+                                        &id,
+                                    )
+                                    .await?;
+                                    flow.send(
+                                        &channel,
+                                        BridgeEvent::JobSnapshot {
+                                            instance_id: instance.clone(),
+                                            session_id: session.clone(),
+                                            jobs: vec![job],
+                                            first: false,
+                                            complete: false,
+                                        },
+                                    )
+                                    .await?;
+                                }
+                                flow.send(
+                                    &channel,
+                                    BridgeEvent::JobSnapshot {
+                                        instance_id: instance.clone(),
+                                        session_id: session.clone(),
+                                        jobs: vec![],
+                                        first: false,
+                                        complete: true,
+                                    },
+                                )
+                                .await?;
+                                ready = true;
+                                continue;
+                            }
+                            if !ready
+                                && let BridgeEvent::JobChanged { job_id, .. }
+                                | BridgeEvent::CandidateReady { job_id, .. } = &event
+                            {
+                                if dirty.len() >= 4096 && !dirty.contains(job_id) {
+                                    return Err("snapshot_limit");
+                                }
+                                dirty.insert(job_id.clone());
+                            }
                             let resync = matches!(event, BridgeEvent::ResyncRequired { .. });
                             flow.send(&channel, event).await?;
                             if resync {
@@ -520,6 +625,10 @@ impl Bridge {
             .send()
             .await
             .map_err(|_| "server_unavailable")?;
+        if !close && response.status() == reqwest::StatusCode::UNAUTHORIZED {
+            c.session = None;
+            return Err("session_expired");
+        }
         if !response.status().is_success()
             && !(close && response.status() == reqwest::StatusCode::UNAUTHORIZED)
         {
@@ -565,10 +674,20 @@ impl Bridge {
         if cursor.as_ref().is_some_and(|id| !valid_id(id)) {
             return Err("invalid_cursor");
         }
-        let path = cursor.map_or_else(|| "/jobs".into(), |id| format!("/jobs?cursor={id}"));
-        self.request(&*self.connection.lock().await, Method::GET, &path, None)
-            .await
+        let path = cursor
+            .as_ref()
+            .map_or_else(|| "/jobs".into(), |id| format!("/jobs?cursor={id}"));
+        let c = self.connection.lock().await;
+        let page: JobList = self.request(&c, Method::GET, &path, None).await?;
+        let scope = c
+            .discovery
+            .as_ref()
+            .zip(c.session.as_ref())
+            .map(|(d, session)| (d.instance_id.as_str(), session.as_str()));
+        page.validate(cursor.as_deref(), scope)?;
+        Ok(page)
     }
+
     pub async fn job(&self, id: String, cancel: bool) -> Result<Job, &'static str> {
         if !valid_id(&id) {
             return Err("invalid_job_id");
@@ -578,13 +697,24 @@ impl Bridge {
         } else {
             format!("/jobs/{id}")
         };
-        self.request(
-            &*self.connection.lock().await,
-            if cancel { Method::POST } else { Method::GET },
-            &path,
-            None,
-        )
-        .await
+        let c = self.connection.lock().await;
+        let job: Job = self
+            .request(
+                &c,
+                if cancel { Method::POST } else { Method::GET },
+                &path,
+                None,
+            )
+            .await?;
+        if job.id != id
+            || c.discovery
+                .as_ref()
+                .zip(c.session.as_ref())
+                .is_some_and(|(d, session)| !job.owned_by(&d.instance_id, session))
+        {
+            return Err("invalid_response");
+        }
+        Ok(job)
     }
 }
 fn valid_id(id: &str) -> bool {

@@ -39,6 +39,7 @@ export interface GenerationState {
   error: string | null;
   uncertain: boolean;
   announcement: string;
+  localNotice: string | null;
 }
 export const GENERATION_MESSAGE: Record<string, string> = {
   empty_selection: "Select at least one eligible snippet.",
@@ -85,6 +86,7 @@ export class GenerationController {
     error: null,
     uncertain: false,
     announcement: "",
+    localNotice: null,
   };
   private listeners = new Set<() => void>();
   private outputListeners = new Set<() => void>();
@@ -98,6 +100,7 @@ export class GenerationController {
   private refreshWork: Promise<void> | null = null;
   private again = false;
   private refreshAll = false;
+  private urgent = false;
   private online = false;
   private scope: string | null = null;
   private epoch = 0;
@@ -165,7 +168,11 @@ export class GenerationController {
   }
   connect(online: boolean) {
     this.online = online;
-    if (online && this.state.jobs.size) this.schedule();
+    if (
+      online &&
+      (this.state.jobs.size || this.pendingReads.size || this.state.activeJob)
+    )
+      this.schedule();
     else if (!online && this.timer) {
       clearTimeout(this.timer);
       this.timer = undefined;
@@ -249,6 +256,7 @@ export class GenerationController {
       originDate: date,
       error: null,
       announcement: `Preparing generation for ${date}.`,
+      localNotice: null,
     });
     try {
       const dirty = this.preparation.dirty(selected);
@@ -388,6 +396,7 @@ export class GenerationController {
         this.cancelAfterAdmission = true;
         this.set({
           announcement: "Waiting for the admission result before cancellation.",
+          localNotice: "Waiting for the admission result before cancellation.",
         });
         return;
       }
@@ -402,6 +411,7 @@ export class GenerationController {
         dirty: null,
         originDate: null,
         announcement: "Generation cancelled before submission.",
+        localNotice: "Generation cancelled before submission.",
       });
     }
   }
@@ -422,12 +432,15 @@ export class GenerationController {
     const epoch = this.epoch;
     const work = this.fetch(epoch).finally(() => {
       if (this.refreshWork === work) this.refreshWork = null;
+      const urgent = this.urgent;
+      this.urgent = false;
       if (
         epoch === this.epoch &&
-        (this.state.activeJob || this.pendingReads.size || this.again)
+        (this.state.activeJob || this.pendingReads.size || this.again || urgent)
       ) {
         this.again = false;
-        this.schedule();
+        if (urgent) void this.refresh();
+        else this.schedule();
       }
     });
     this.refreshWork = work;
@@ -483,8 +496,12 @@ export class GenerationController {
             : this.state.announcement;
           this.set({
             jobs,
-            activeJob:
-              done && this.state.activeJob === id ? null : this.state.activeJob,
+            activeJob: done
+              ? this.state.activeJob === id
+                ? null
+                : this.state.activeJob
+              : id,
+            originDate: done ? this.state.originDate : view.date,
             announcement,
             error: null,
           });
@@ -551,22 +568,57 @@ export class GenerationController {
     try {
       await this.bridge.discardGeneration!(id);
       if (epoch !== this.epoch) return;
-      this.discarded.add(id);
-      this.pendingReads.delete(id);
-      for (const c of v.candidates)
-        if (c.id) {
-          this.candidates.delete(c.id);
-          this.candidateSizes.delete(c.id);
-        }
-      this.previews.delete(id);
-      this.budget.release(`generation:${id}`);
-      const jobs = new Map(this.state.jobs);
-      jobs.delete(id);
-      this.set({ jobs, error: null });
-      this.output();
+      this.forgetResult(id);
     } catch (e) {
       if (epoch === this.epoch) this.set({ error: code(e) });
     }
+  }
+  /** Authoritative result loss releases only this payload and invalidates pending reads. */
+  forgetResult(id: string) {
+    const v = this.state.jobs.get(id);
+    if (!v) return;
+    this.discarded.add(id);
+    this.pendingReads.delete(id);
+    for (const c of v.candidates)
+      if (c.id) {
+        this.candidates.delete(c.id);
+        this.candidateSizes.delete(c.id);
+      }
+    this.previews.delete(id);
+    this.budget.release(`generation:${id}`);
+    const jobs = new Map(this.state.jobs);
+    jobs.delete(id);
+    this.set({
+      jobs,
+      error: null,
+      activeJob: this.state.activeJob === id ? null : this.state.activeJob,
+    });
+    this.output();
+  }
+  /** Adopt a discovered retained result without starting another inference. */
+  discover(id: string, requestId?: string) {
+    if (
+      this.state.uncertain &&
+      !this.admission &&
+      requestId === this.pending?.request_id
+    ) {
+      this.pending = null;
+      if (this.requestKey) this.budget.release(this.requestKey);
+      this.requestKey = null;
+      this.set({ uncertain: false, activeJob: id, error: null });
+      if (this.cancelAfterAdmission) {
+        this.cancelAfterAdmission = false;
+        void this.cancel();
+      }
+    }
+    if (
+      this.discarded.has(id) ||
+      this.state.jobs.has(id) ||
+      this.pendingReads.has(id)
+    )
+      return;
+    this.pendingReads.add(id);
+    this.schedule();
   }
   onEvent(e: StreamEvent) {
     if (e.kind === "disconnected") {
@@ -577,8 +629,15 @@ export class GenerationController {
     if (this.scope && this.scope !== scope) this.clear();
     this.scope = scope;
     if (e.kind === "job_changed" || e.kind === "candidate_ready") {
-      if (e.job_id === this.state.activeJob || this.state.jobs.has(e.job_id))
-        this.schedule(e.job_id !== this.state.activeJob);
+      if (e.job_id === this.state.activeJob || this.state.jobs.has(e.job_id)) {
+        if (!["queued", "running"].includes(e.payload.state)) {
+          if (this.timer) clearTimeout(this.timer);
+          this.timer = undefined;
+          this.urgent = this.refreshWork !== null;
+          this.pendingReads.add(e.job_id);
+          void this.refresh();
+        } else this.schedule(e.job_id !== this.state.activeJob);
+      }
     } else if (
       e.kind === "resync_required" ||
       e.kind === "authentic_changed" ||
@@ -604,6 +663,7 @@ export class GenerationController {
     this.cancelAfterAdmission = false;
     this.admission = false;
     this.refreshAll = false;
+    this.urgent = false;
     this.again = false;
     this.refreshWork = null;
     this.previews.clear();
@@ -620,6 +680,7 @@ export class GenerationController {
       error: null,
       originDate: null,
       announcement: "",
+      localNotice: null,
     });
     this.output();
   }

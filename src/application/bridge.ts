@@ -183,6 +183,7 @@ export type SymbolResult =
   { status: "ok"; png_base64: string } | { status: "unsupported" };
 export interface Bridge
   extends NavigationBridge, TrashBridge, GenerationBridge {
+  listJobs?(cursor?: string): Promise<JobPage>;
   metadata(): Promise<AppMetadata>;
   /** Absent in fakes; symbols then fall back to their text labels. */
   getSymbol?(name: string, size: number, scale: number): Promise<SymbolResult>;
@@ -222,3 +223,10 @@ export type Connection =
   | { kind: "disconnected"; message: string }
   | { kind: "connecting" }
   | { kind: "connected"; status: Status };
+
+/** Body-less discovery page; event_cursor anchors replay after the first page. */
+export interface JobPage {
+  jobs: import("./events").SnapshotJob[];
+  next_cursor: string | null;
+  event_cursor: number;
+}

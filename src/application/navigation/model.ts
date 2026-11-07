@@ -220,7 +220,9 @@ export class NavigationModel {
       this.messages.add(`Working date: ${date}.`, "info", true);
       await this.imports.select(date);
       this.emit();
+      return true;
     }
+    return false;
   }
   async openSource(source: Source) {
     if (this.imports.sourceDisabled(source)) {

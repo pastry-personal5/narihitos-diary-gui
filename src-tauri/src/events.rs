@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 #[derive(Serialize, Clone)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum BridgeEvent {
+    ReplayComplete,
     JobSnapshot {
         instance_id: String,
         session_id: String,
@@ -94,6 +95,12 @@ impl Cursor {
         }
         if data.len() > 65536 {
             return Err("event_limit");
+        }
+        if kind == Some("replay_complete") {
+            if data != "{}" || id.is_some() {
+                return Err("invalid_event");
+            }
+            return Ok(Some(BridgeEvent::ReplayComplete));
         }
         if kind == Some("resync_required") {
             return Ok(Some(BridgeEvent::ResyncRequired {

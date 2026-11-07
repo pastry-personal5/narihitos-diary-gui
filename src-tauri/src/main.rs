@@ -496,6 +496,10 @@ async fn subscribe_events(
 ) -> Result<(), &'static str> {
     main_window(&window)?;
     match request {
+        delivery::SubscriptionRequest::Stop => {
+            state.detach_events().await;
+            Ok(())
+        }
         delivery::SubscriptionRequest::Start { channel } => {
             state
                 .subscribe(channel.channel_on(window.as_ref().clone()))

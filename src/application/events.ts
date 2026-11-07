@@ -1,4 +1,6 @@
+import { aiProgress, type AiProgress } from "./activity/progress";
 export type SnapshotJob = {
+  progress?: AiProgress;
   id: string;
   sequence: number;
   state: "queued" | "running" | "succeeded" | "failed" | "cancelled";
@@ -67,8 +69,19 @@ export function streamEvent(value: unknown): StreamEvent {
         id: job.id,
         sequence: job.sequence as number,
         state: job.state as SnapshotJob["state"],
+        ...(job.progress === undefined
+          ? {}
+          : { progress: aiProgress(job.progress, job.id) }),
       };
     });
+    for (const job of jobs) {
+      if (
+        job.progress &&
+        (job.progress.instance_id !== e.instance_id ||
+          job.progress.session_id !== e.session_id)
+      )
+        throw new Error("Invalid snapshot ownership");
+    }
     return {
       kind: "job_snapshot",
       instance_id: e.instance_id,

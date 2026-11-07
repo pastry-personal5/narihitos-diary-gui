@@ -1,3 +1,6 @@
+import { PreviewBuffer } from "./activity/preview";
+import { SessionBudget, payloadBytes } from "./navigation/budget";
+import type { ChatProgress } from "./activity/progress";
 import {
   AuthenticError,
   type Bridge,
@@ -9,6 +12,8 @@ import type { StreamEvent } from "./events";
 
 /** Plain text for the closed codes a chat action or turn may report. */
 export const CHAT_MESSAGE: Record<string, string> = {
+  session_limit:
+    "There is not enough session space. Close unused tabs or discard results, then retry reading the chat.",
   busy: "Another AI request is running. Wait for it or cancel it.",
   profile_not_ready: "That profile is not ready. Check it in Settings.",
   context:
@@ -45,12 +50,15 @@ export interface ChatState {
   /** The message being answered; shown until the server transcript contains it. */
   pending: { text: string; chip: string } | null;
   submitting: boolean;
+  uncertain: boolean;
+  cancellationRequested: boolean;
   startedAt: number | null;
   error: string | null;
   /** Text to put back in the composer after a failed or cancelled turn. */
   unsent: string | null;
   /** Latest completion, for a polite live region. */
   announcement: string;
+  localNotice: string | null;
 }
 
 const KEY = "diary.chat";
@@ -81,19 +89,35 @@ export class ChatController {
     chips: [],
     pending: null,
     submitting: false,
+    uncertain: false,
+    cancellationRequested: false,
     startedAt: null,
     error: null,
     unsent: null,
     announcement: "",
+    localNotice: null,
   };
+  private readonly output = new PreviewBuffer();
+  subscribeOutput = this.output.subscribe;
+  preview = this.output.snapshot;
   private readonly listeners = new Set<() => void>();
   private refreshing: Promise<void> | null = null;
   private again = false;
   private epoch = 0;
+  private scope: string | null = null;
+  private admission: {
+    requestId: string;
+    chatId: string | null;
+    profile: string;
+    locale: string;
+    message: string;
+    document: ChatDocumentSnapshot | null;
+  } | null = null;
   constructor(
     private readonly bridge: Bridge,
     private readonly now: () => number = Date.now,
     private readonly newId: () => string = () => crypto.randomUUID(),
+    private readonly budget = new SessionBudget(),
   ) {}
 
   subscribe = (fn: () => void) => {
@@ -103,6 +127,14 @@ export class ChatController {
     };
   };
   private set(patch: Partial<ChatState>) {
+    if (
+      Object.entries(patch).every(
+        ([key, value]) =>
+          JSON.stringify(this.state[key as keyof ChatState]) ===
+          JSON.stringify(value),
+      )
+    )
+      return;
     this.state = { ...this.state, ...patch };
     for (const l of this.listeners) l();
   }
@@ -144,6 +176,10 @@ export class ChatController {
   private async discard() {
     const id = this.state.chat?.chat_id;
     this.epoch++;
+    this.admission = null;
+    this.output.clear();
+    this.budget.release("chat-preview");
+    this.budget.release("chat");
     this.set({
       chat: null,
       chips: [],
@@ -165,60 +201,142 @@ export class ChatController {
     const { profile } = this.state;
     if (!this.available || this.running || !profile || !locale) return false;
     if (message.trim() === "") return false;
-    const epoch = this.epoch;
+    const admission = {
+      requestId: this.newId(),
+      chatId: this.state.chat?.chat_id ?? null,
+      profile,
+      locale,
+      message,
+      document: document ? { ...document } : null,
+    };
+    if (
+      !this.budget.reserveMany([
+        ["chat-preview", payloadBytes(this.preview())],
+        [
+          "chat",
+          payloadBytes({
+            chat: this.state.chat,
+            admission,
+            pending: { text: message, chip },
+          }),
+        ],
+      ])
+    ) {
+      this.set({ error: "session_limit", unsent: message });
+      return false;
+    }
+    this.admission = admission;
     this.set({
       submitting: true,
+      uncertain: false,
+      cancellationRequested: false,
+      localNotice: null,
       error: null,
       unsent: null,
       pending: { text: message, chip },
       startedAt: this.now(),
     });
+    return this.submitAdmission();
+  }
+
+  async retryAdmission(): Promise<boolean> {
+    if (!this.state.uncertain || this.state.submitting || !this.admission)
+      return false;
+    this.set({ submitting: true, error: null });
+    return this.submitAdmission();
+  }
+  private async submitAdmission(): Promise<boolean> {
+    const input = this.admission;
+    if (!input) return false;
+    const epoch = this.epoch;
     try {
-      let chat = this.state.chat;
-      if (!chat) {
-        const opened = await this.bridge.openChat!(profile, locale);
+      if (!input.chatId) {
+        const opened = await this.bridge.openChat!(input.profile, input.locale);
         if (epoch !== this.epoch) return false;
-        chat = {
-          chat_id: opened.chat_id,
-          profile,
-          type: "",
-          locale,
-          transcript: [],
-          turn: null,
-        };
-        remember(chat.chat_id);
-        this.set({ chat, chips: [] });
+        input.chatId = opened.chat_id;
+        remember(opened.chat_id);
+        this.set({
+          chat: {
+            chat_id: opened.chat_id,
+            profile: input.profile,
+            locale: input.locale,
+            type: "",
+            transcript: [],
+            turn: null,
+          },
+          chips: [],
+        });
       }
-      await this.bridge.sendChat!(
-        chat.chat_id,
-        this.newId(),
-        message,
-        document,
+      if (this.state.cancellationRequested && !this.state.uncertain) {
+        this.admission = null;
+        this.set({
+          submitting: false,
+          pending: null,
+          startedAt: null,
+          unsent: input.message,
+          cancellationRequested: false,
+          localNotice: "AI Chat cancelled before submission.",
+        });
+        return false;
+      }
+      const accepted = await this.bridge.sendChat!(
+        input.chatId,
+        input.requestId,
+        input.message,
+        input.document,
       );
       if (epoch !== this.epoch) return false;
-      this.set({ submitting: false });
+      this.admission = null;
+      this.set({ submitting: false, uncertain: false });
+      if (this.state.cancellationRequested) {
+        await this.bridge
+          .cancelJob(accepted.job_id)
+          .catch((e) => this.set({ error: code(e) }));
+      }
       await this.refresh();
       return true;
     } catch (e) {
-      if (epoch === this.epoch)
-        this.set({
-          submitting: false,
-          error: code(e),
-          unsent: message,
-          pending: null,
-          startedAt: null,
-        });
+      if (epoch !== this.epoch) return false;
+      const c = code(e);
+      const uncertain = [
+        "unavailable",
+        "disconnected",
+        "server_unavailable",
+        "invalid_response",
+        "response_limit",
+      ].includes(c);
+      if (!uncertain) this.admission = null;
+      this.set({
+        submitting: false,
+        uncertain,
+        error: c,
+        unsent: uncertain ? null : input.message,
+        pending: uncertain ? this.state.pending : null,
+        startedAt: uncertain ? this.state.startedAt : null,
+      });
       return false;
     }
   }
 
   async cancel() {
+    if (this.admission) {
+      this.set({
+        cancellationRequested: true,
+        localNotice:
+          "Waiting for the chat admission result before cancellation.",
+      });
+      return;
+    }
+    // Between admission and the first read the turn is not visible yet; read it before cancelling.
+    if (this.state.chat?.turn?.state !== "running") await this.refresh();
     const job = this.state.chat?.turn;
     if (!job || job.state !== "running") return;
+    this.set({ cancellationRequested: true });
     try {
       await this.bridge.cancelJob(job.job_id);
     } catch (e) {
-      this.set({ error: code(e) });
+      // A failed request must not leave Cancel disabled with nothing requested.
+      this.set({ cancellationRequested: false, error: code(e) });
     }
     await this.refresh();
   }
@@ -249,18 +367,44 @@ export class ChatController {
     try {
       next = await this.bridge.getChat!(before.chat_id);
     } catch (e) {
-      if (code(e) === "not_found") remember(null);
-      if (epoch === this.epoch)
-        this.set({
-          error: code(e),
-          chat: code(e) === "not_found" ? null : this.state.chat,
-          pending: null,
-          submitting: false,
-          startedAt: null,
-        });
+      if (epoch !== this.epoch) return;
+      const missing = code(e) === "not_found";
+      if (missing) {
+        remember(null);
+        this.admission = null;
+        this.output.clear();
+        this.budget.release("chat");
+        this.budget.release("chat-preview");
+      }
+      this.set({
+        error: code(e),
+        chat: missing ? null : this.state.chat,
+        pending: missing ? null : this.state.pending,
+        submitting: false,
+        uncertain: missing ? false : this.state.uncertain,
+        startedAt: missing ? null : this.state.startedAt,
+      });
       return;
     }
+
     if (epoch !== this.epoch) return;
+    if (this.state.uncertain) return;
+    if (
+      !this.budget.reserveMany([
+        ["chat-preview", payloadBytes(this.preview())],
+        [
+          "chat",
+          payloadBytes({
+            chat: next,
+            admission: this.admission,
+            pending: this.state.pending,
+          }),
+        ],
+      ])
+    ) {
+      this.set({ error: "session_limit" });
+      return;
+    }
     const wasRunning = before.turn?.state === "running" || !!this.state.pending;
     const turn = next.turn;
     const settled = turn !== null && turn.state !== "running";
@@ -268,19 +412,35 @@ export class ChatController {
     const chips = [...this.state.chips];
     while (chips.length < users) chips.push(this.state.pending?.chip ?? "");
     const failed = settled && turn.state !== "done";
+    if (settled) {
+      this.output.clear();
+      this.budget.release("chat-preview");
+    } else this.output.update(turn?.provisional ?? "");
     this.set({
-      chat: next,
+      chat: {
+        ...next,
+        turn: turn
+          ? {
+              ...turn,
+              provisional: null,
+              revision: settled ? turn.revision : 0,
+            }
+          : null,
+      },
       profile: next.profile,
       chips,
       pending: settled ? null : this.state.pending,
       startedAt: settled ? null : this.state.startedAt,
+      cancellationRequested: settled ? false : this.state.cancellationRequested,
       unsent: failed
         ? (this.state.pending?.text ?? this.state.unsent)
         : this.state.unsent,
       error:
         failed && turn.state === "failed"
           ? (turn.error_code ?? "failed")
-          : this.state.error,
+          : this.state.error === "session_limit"
+            ? null
+            : this.state.error,
       announcement:
         settled && wasRunning
           ? turn.state === "done"
@@ -292,8 +452,59 @@ export class ChatController {
     });
   }
 
+  forgetJob(id: string) {
+    if (this.state.chat?.turn?.job_id !== id) return;
+    this.dispose();
+    remember(null);
+    this.set({
+      chat: null,
+      pending: null,
+      chips: [],
+      submitting: false,
+      uncertain: false,
+      cancellationRequested: false,
+      startedAt: null,
+      unsent: null,
+      error: null,
+    });
+  }
+  dispose() {
+    this.epoch++;
+    this.admission = null;
+    this.output.clear();
+    this.budget.release("chat");
+    this.budget.release("chat-preview");
+  }
+
   /** Events carry job state only; a change while a turn is live re-reads the chat. */
   onEvent(event: StreamEvent) {
+    if (event.kind === "job_snapshot" && event.first) {
+      const scope = `${event.instance_id}/${event.session_id}`;
+      if (this.scope !== null && this.scope !== scope) {
+        this.epoch++;
+        this.admission = null;
+        this.output.clear();
+        this.budget.release("chat-preview");
+        this.budget.release("chat");
+        this.refreshing = null;
+        this.again = false;
+        this.set({
+          chat: null,
+          chips: [],
+          pending: null,
+          submitting: false,
+          uncertain: false,
+          cancellationRequested: false,
+          startedAt: null,
+          unsent: null,
+          error: null,
+          announcement: "",
+          localNotice: null,
+        });
+        remember(null);
+      }
+      this.scope = scope;
+    }
     if (!this.state.chat) return;
     if (
       event.kind === "resync_required" ||
@@ -303,6 +514,26 @@ export class ChatController {
           event.job_id === this.state.chat.turn?.job_id))
     )
       void this.refresh();
+  }
+
+  discover(progress: ChatProgress) {
+    if (
+      this.state.uncertain &&
+      this.admission?.requestId === progress.request_id
+    ) {
+      this.admission = null;
+      this.set({ uncertain: false, submitting: false, error: null });
+      if (this.state.cancellationRequested)
+        void this.bridge
+          .cancelJob(progress.job_id)
+          .catch((e) => this.set({ error: code(e) }));
+      void this.adopt(progress.chat_id);
+    } else if (
+      !this.state.uncertain &&
+      this.state.chat?.chat_id !== progress.chat_id
+    ) {
+      void this.adopt(progress.chat_id);
+    }
   }
 
   /** Re-reads a chat that survived a WebView reload or reconnect. */

@@ -386,3 +386,97 @@ it("erases candidate buffers and releases their budget on a new session", async 
   expect(budget.used).toBe(0);
   expect(server.bridge.startGeneration).toHaveBeenCalledTimes(1);
 });
+
+it("adopts a discovered active generation and reserves the busy state without inference", async () => {
+  const { server, controller } = await readyGeneration();
+  controller.discover("j");
+  await vi.advanceTimersByTimeAsync(100);
+  await controller.refresh();
+  expect(controller.state.activeJob).toBe("j");
+  expect(controller.running).toBe(true);
+  expect(server.bridge.startGeneration).not.toHaveBeenCalled();
+});
+
+it("settles lost generation admission by discovery without retrying inference", async () => {
+  const { server, controller } = await readyGeneration();
+  const original = vi
+    .mocked(server.bridge.startGeneration!)
+    .getMockImplementation()!;
+  vi.mocked(server.bridge.startGeneration!).mockImplementationOnce(
+    async (input) => {
+      await original(input);
+      throw new AuthenticError("unavailable", true);
+    },
+  );
+  await controller.start("2026-11-06", "ko-KR", 2);
+  expect(controller.state.uncertain).toBe(true);
+  controller.discover("j", "r");
+  await controller.refresh();
+  expect(controller.state.uncertain).toBe(false);
+  expect(controller.state.activeJob).toBe("j");
+  expect(server.input).toHaveLength(1);
+  expect(server.inference()).toBe(1);
+});
+
+it("releases an unavailable generation payload without deleting or rerunning server work", async () => {
+  const { server, controller, budget } = await readyGeneration();
+  await controller.start("2026-11-06", "ko-KR", 2);
+  server.finish();
+  await controller.refresh();
+  expect(budget.used).toBeGreaterThan(0);
+  controller.forgetResult("j");
+  expect(controller.state.jobs.size).toBe(0);
+  expect(budget.used).toBe(0);
+  expect(server.bridge.discardGeneration).not.toHaveBeenCalled();
+  expect(server.inference()).toBe(1);
+});
+
+it("refreshes off-date saved-baseline invalidation while keeping candidates readable without inference", async () => {
+  const { server, controller } = await readyGeneration();
+  await controller.start("2026-11-06", "ko-KR", 2);
+  server.finish();
+  await controller.refresh();
+  const original = controller.candidate("j-1");
+  server.snapshot().stale_baseline = true;
+  controller.onEvent({
+    kind: "authentic_changed",
+    instance_id: "i",
+    session_id: "s",
+  });
+  await vi.advanceTimersByTimeAsync(100);
+  await controller.refresh(true);
+  expect(controller.state.jobs.get("j")?.stale_baseline).toBe(true);
+  expect(controller.candidate("j-1")).toBe(original);
+  expect(server.bridge.startGeneration).toHaveBeenCalledTimes(1);
+});
+
+it("adopts baseline discovery delivered before the application finishes connecting", async () => {
+  const { server, controller } = await readyGeneration();
+  controller.connect(false);
+  controller.discover("j", "r");
+  expect(controller.state.jobs.size).toBe(0);
+  controller.connect(true);
+  await vi.advanceTimersByTimeAsync(100);
+  await controller.refresh();
+  expect(controller.state.jobs.has("j")).toBe(true);
+  expect(server.bridge.startGeneration).not.toHaveBeenCalled();
+});
+
+it("terminal hints bypass the preview polling delay", async () => {
+  const { server, controller } = await readyGeneration();
+  await controller.start("2026-11-06", "ko-KR", 2);
+  server.finish();
+  const final = server.snapshot().job;
+  controller.onEvent({
+    kind: "job_changed",
+    instance_id: "i",
+    session_id: "s",
+    event_id: 1,
+    job_id: "j",
+    job_sequence: final.sequence,
+    payload: final,
+  });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(controller.state.jobs.get("j")?.job.state).toBe("succeeded");
+  expect(controller.running).toBe(false);
+});

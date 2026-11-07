@@ -1,3 +1,4 @@
+import { aiProgress } from "../application/activity/progress";
 import type {
   Calendar,
   ImportPage,
@@ -410,6 +411,9 @@ export function importJobDto(v: unknown): ImportJob {
     id: id(d.id),
     sequence: num(d.sequence, 1),
     state: state as ImportJob["state"],
+    ...(d.progress === undefined
+      ? {}
+      : { progress: aiProgress(d.progress, id(d.id)) }),
     ...(error ? { error_code: error } : {}),
   };
 }

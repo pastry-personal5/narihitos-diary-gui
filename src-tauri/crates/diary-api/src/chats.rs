@@ -204,7 +204,14 @@ pub(super) async fn turn(
     {
         let mut chat = s.chat.lock().expect("chat poisoned");
         match chat.as_mut().filter(|c| c.id == chat_id) {
-            Some(chat) => chat.start(&job.id, &b.message, Run::from(run.token()), shared.clone()),
+            Some(chat) => {
+                chat.start(&job.id, &b.message, Run::from(run.token()), shared.clone());
+                chat.observe_admission(
+                    b.request_id.clone(),
+                    b.document.as_ref().map(|d| d.date.clone()),
+                    s.now(),
+                );
+            }
             None => {
                 // The chat was closed between the check and admission.
                 if let Ok(j) = c.transition(&session, s.now(), &job.id, JobState::Cancelled) {
@@ -248,6 +255,7 @@ pub(super) async fn turn(
         };
         if let Some(chat) = s.chat.lock().expect("chat poisoned").as_mut() {
             chat.finish(&job.id, result);
+            chat.observe_completion(&job.id, s.now());
         }
         let mut c = s.coordinator.lock().expect("coordinator poisoned");
         if let Ok(j) = c.transition(&session, s.now(), &job.id, terminal) {
@@ -317,3 +325,30 @@ pub(super) async fn close(
 
 #[cfg(test)]
 mod tests;
+
+/// Discovery never includes transcript, document, prompt or provisional output.
+pub(super) fn progress(
+    s: &ServerState,
+    session: &str,
+    job: &diary_application::Job,
+) -> Option<Value> {
+    let guard = s.chat.lock().expect("chat poisoned");
+    let chat = guard.as_ref().filter(|c| c.session == session)?;
+    let turn = chat.turn().filter(|t| t.job_id == job.id)?;
+    let request_id = turn.request_id.as_ref()?;
+    let snap = turn.shared.lock().expect("snapshot poisoned");
+    let code = match turn.outcome {
+        Outcome::Failed(code) => Some(code.as_str()),
+        _ => None,
+    };
+    Some(json!({
+        "kind":"chat", "job_id":job.id, "request_id":request_id,
+        "instance_id":s.instance_id, "session_id":session, "chat_id":chat.id,
+        "origin_date":turn.origin_date, "profile_id":chat.profile.alias,
+        "locale":chat.locale.as_str(), "phase":phase(snap.phase),
+        "elapsed_ms":turn.finished_at.unwrap_or_else(||s.now()).saturating_sub(turn.started_at),
+        "last_agent_activity_at":snap.last_activity_at,
+        "silence_ms":turn.finished_at.unwrap_or_else(||s.now()).saturating_sub(snap.last_activity_at.unwrap_or(turn.started_at)),
+        "cancellation_requested":turn.run.token().is_cancelled(), "error_code":code
+    }))
+}

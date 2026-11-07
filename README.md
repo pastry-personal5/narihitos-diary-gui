@@ -8,6 +8,14 @@ Read-only Ayumi/Narihito date imports and timestamp-resolution choices are avail
 
 Supported AI profiles are Codex, Claude Code, Qwen Code, and Apple's on-device Foundation Models. AI Chat is enabled: pick a ready profile in the AI Chat pane and send messages; each message carries the active editor text (including unsaved edits, shown as a context chip), the reply streams in as provisional text and Cancel stops it. The conversation is kept only in memory for the session. Settings → Status shows whether each configured profile is installed, a supported version and signed in (Check runs no AI). To generate, include eligible snippets in the Explorer, select and check a Generation profile, then use Generate. Dirty selected sources require Save, Exclude or Cancel; the saved Entry is flushed before capture. Settings → Generation saves the candidate count (1–5, default 3). Prompt templates live in [assets/prompts/](assets/prompts/README.md).
 
+The toolbar's AI activity details show runs across dates, captured profile and
+language, progress and retained result indicators. View results navigates explicitly
+through the usual save guards; dismissing an indicator retains the result.
+Temporary connection loss marks activity stale. Reconnecting within the same live
+lease discovers retained work without generating again; a server restart or expired
+lease loses transient results. Packaged macOS recovery and responsiveness evidence
+is still pending.
+
 Writing language is selected in Settings, initially uses the Mac's preferred language, and is remembered across sessions. Generation requires selected snippets and continues for its original date when you navigate away. Candidate cards show provisional text until validation, stay read-only, and are kept only for the live session. Cancel keeps completed candidates; Discard results frees their transient storage. Editing the saved Entry marks older candidates stale and requires regeneration before review. Candidate review/acceptance is unavailable. **Create Empty** saves a blank draft for the selected date, including without snippets.
 
 Press Shift+Command+P (or use the toolbar) for the command palette; Command+S saves the active Authentic file or explicitly saves a supported Narihito source. Shortcuts are editable in Settings → Keyboard Shortcuts, and the palette lists commands with their availability. To move a supported Narihito snippet and its owned audio to macOS Trash, use Trash in the Explorer or command palette, review the exact files and confirm. Global Messages retains results and offers a fresh confirmation for safe partial retries. Directories stay in place; the mobile producer can show an empty recovery row for a retained assets directory. Ayumi source saves and export remain unavailable. Toolbar and tab controls show macOS SF Symbols when the system provides them and fall back to text labels otherwise.

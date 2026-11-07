@@ -107,7 +107,8 @@ describe("ChatController", () => {
       ),
     ).toBe(true);
     expect(c.running).toBe(true);
-    expect(c.state.chat?.turn?.provisional).toBe("par");
+    expect(c.state.chat?.turn?.provisional).toBeNull();
+    expect(c.preview()).toBe("par");
     expect(c.state.pending?.text).toBe("hello");
     s.reply("hi there");
     await c.refresh();
@@ -210,4 +211,142 @@ describe("ChatController", () => {
     const c = new ChatController({} as Bridge);
     expect(c.available).toBe(false);
   });
+});
+
+it("clears chat bodies only on confirmed replacement scope without closing the new session", async () => {
+  const { s, c } = await ready();
+  const baseline = {
+    kind: "job_snapshot" as const,
+    instance_id: "i",
+    session_id: "s",
+    jobs: [],
+    first: true,
+    complete: true,
+  };
+  c.onEvent(baseline);
+  await c.adopt("c1");
+  c.onEvent({ kind: "disconnected" });
+  expect(c.state.chat?.chat_id).toBe("c1");
+  c.onEvent({ ...baseline, session_id: "replacement" });
+  expect(c.state.chat).toBeNull();
+  expect(c.running).toBe(false);
+  expect(s.bridge.closeChat).not.toHaveBeenCalled();
+});
+
+it("retries an ambiguous admission with the original ID and frozen document", async () => {
+  const { s, c } = await ready();
+  vi.mocked(s.bridge.sendChat!).mockRejectedValueOnce(
+    new AuthenticError("unavailable", true),
+  );
+  const document = { ...doc };
+  expect(await c.send("original", "en-US", document, "context")).toBe(false);
+  expect(c.state.uncertain).toBe(true);
+  expect(c.running).toBe(true);
+  document.body = "changed after submission";
+  await c.retryAdmission();
+  const calls = vi.mocked(s.bridge.sendChat!).mock.calls;
+  expect(calls[1]).toEqual(calls[0]);
+  expect(calls[1][3]?.body).toBe(doc.body);
+  expect(c.state.uncertain).toBe(false);
+});
+
+it("retains uncertain admission and busy state when a recovery read fails transiently", async () => {
+  const { s, c } = await ready();
+  vi.mocked(s.bridge.sendChat!).mockRejectedValueOnce(
+    new AuthenticError("unavailable", true),
+  );
+  await c.send("original", "en-US", doc, "context");
+  vi.mocked(s.bridge.getChat!).mockRejectedValueOnce(
+    new AuthenticError("unavailable", true),
+  );
+  await c.refresh();
+  expect(c.running).toBe(true);
+  expect(c.state.uncertain).toBe(true);
+  expect(c.state.pending?.text).toBe("original");
+});
+
+it("defers cancellation through a lost admission response and cancels the original accepted job", async () => {
+  const { s, c } = await ready();
+  vi.mocked(s.bridge.sendChat!).mockRejectedValueOnce(
+    new AuthenticError("unavailable", true),
+  );
+  await c.send("original", "en-US", doc, "context");
+  await c.cancel();
+  expect(c.running).toBe(true);
+  expect(c.state.cancellationRequested).toBe(true);
+  expect(s.bridge.cancelJob).not.toHaveBeenCalled();
+  await c.retryAdmission();
+  expect(s.bridge.cancelJob).toHaveBeenCalledWith("j1");
+  expect(c.running).toBe(false);
+});
+
+it("cancels preparation before send without inference and restores the composer text", async () => {
+  const { s, c } = await ready();
+  let opened!: (value: { chat_id: string }) => void;
+  vi.mocked(s.bridge.openChat!).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        opened = resolve;
+      }),
+  );
+  const sending = c.send("restore me", "en-US", doc, "context");
+  await c.cancel();
+  opened({ chat_id: "c1" });
+  await sending;
+  expect(s.bridge.sendChat).not.toHaveBeenCalled();
+  expect(c.state.unsent).toBe("restore me");
+  expect(c.running).toBe(false);
+});
+
+it("refuses unaccounted frozen context before starting inference", async () => {
+  const s = server();
+  const { SessionBudget } =
+    await import("../src/application/navigation/budget");
+  const budget = new SessionBudget(64);
+  const c = new ChatController(
+    s.bridge,
+    () => 0,
+    () => "r",
+    budget,
+  );
+  await c.loadProfiles();
+  expect(await c.send("text", "en-US", doc, "context")).toBe(false);
+  expect(c.state.error).toBe("session_limit");
+  expect(s.bridge.openChat).not.toHaveBeenCalled();
+  expect(budget.used).toBe(0);
+});
+
+it("keeps streamed text out of metadata notifications and clears pending output on settlement", async () => {
+  vi.useFakeTimers();
+  try {
+    const { s, c } = await ready();
+    await c.send("text", "en-US", doc, "context");
+    const metadata = vi.fn(),
+      output = vi.fn();
+    const off = c.subscribe(metadata),
+      stop = c.subscribeOutput(output);
+    for (let i = 0; i < 30; i++) {
+      s.snap.turn = {
+        ...s.snap.turn!,
+        provisional: `token-${i}`,
+        revision: i + 2,
+      };
+      await c.refresh();
+    }
+    expect(metadata).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(c.preview()).toBe("token-29");
+    expect(output.mock.calls.length).toBeLessThanOrEqual(2);
+    s.reply("final");
+    await c.refresh();
+    expect(c.preview()).toBe("");
+    expect(c.state.chat?.transcript.at(-1)?.text).toBe("final");
+    await vi.advanceTimersByTimeAsync(200);
+    expect(c.preview()).toBe("");
+    off();
+    stop();
+    c.dispose();
+  } finally {
+    vi.useRealTimers();
+  }
 });

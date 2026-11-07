@@ -147,6 +147,7 @@ export interface SourceBody {
   capabilities: SourceCapabilities;
 }
 export interface ImportJob {
+  progress?: import("../activity/progress").AiProgress;
   id: string;
   sequence: number;
   state: "queued" | "running" | "succeeded" | "failed" | "cancelled";

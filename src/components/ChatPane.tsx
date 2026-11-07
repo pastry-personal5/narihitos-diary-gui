@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { CHAT_MESSAGE, type ChatController } from "../application/chat";
 import { activitySummary, useChat, useTick, type ChatContext } from "./useChat";
 
@@ -8,18 +8,19 @@ export function ChatPane({
   locale,
   context,
   otherRun = null,
+  coordinated = false,
 }: {
   controller: ChatController;
   connected: boolean;
   locale: string | null;
   context: () => ChatContext;
   otherRun?: string | null;
+  coordinated?: boolean;
 }) {
   const s = useChat(controller);
   const [draft, setDraft] = useState("");
   const running = controller.running;
   const now = useTick(running);
-  const turn = s.chat?.turn ?? null;
   // A failed or cancelled turn puts its text back, unless the user already typed something.
   const [restored, setRestored] = useState<string | null>(null);
   if (s.unsent !== restored) {
@@ -71,7 +72,12 @@ export function ChatPane({
       >
         New chat
       </button>
-      <ol aria-label="Conversation" className="chat-log">
+      <ol
+        aria-busy={running}
+        aria-live="off"
+        aria-label="Conversation"
+        className="chat-log"
+      >
         {s.chat?.transcript.map((m, i) => {
           const userIndex = s
             .chat!.transcript.slice(0, i)
@@ -96,26 +102,52 @@ export function ChatPane({
         {running && (
           <li data-role="assistant" data-provisional="true">
             <strong>Assistant (provisional)</strong>
-            <p>{turn?.provisional || "…"}</p>
+            <ChatPreview controller={controller} />
           </li>
         )}
       </ol>
       {running && (
-        <p role="status">
-          {summary}{" "}
+        <p aria-live="off">
+          {summary}
+          {s.cancellationRequested
+            ? " · Cancellation requested; waiting for acknowledgement"
+            : ""}{" "}
           <button
-            disabled={!turn || turn.state !== "running"}
+            disabled={s.cancellationRequested || !connected}
             onClick={() => void controller.cancel()}
           >
             Cancel
           </button>
         </p>
       )}
-      <p role="status" className="visually-hidden">
+      <p
+        role={coordinated ? undefined : "status"}
+        aria-live={coordinated ? "off" : undefined}
+        className="visually-hidden"
+      >
         {s.announcement}
       </p>
+      {s.uncertain && (
+        <p>
+          Admission is uncertain. Retry uses the original message and request
+          ID.{" "}
+          <button
+            disabled={s.submitting || !connected}
+            onClick={() => void controller.retryAdmission()}
+          >
+            Recover chat submission
+          </button>
+        </p>
+      )}
       {s.error && (
-        <p role="alert">{CHAT_MESSAGE[s.error] ?? CHAT_MESSAGE.failed}</p>
+        <p role="alert">
+          {CHAT_MESSAGE[s.error] ?? CHAT_MESSAGE.failed}
+          {s.error === "session_limit" && (
+            <button onClick={() => void controller.refresh()}>
+              Retry reading chat
+            </button>
+          )}
+        </p>
       )}
       <label htmlFor="chat-message">Message</label>
       <textarea
@@ -143,4 +175,12 @@ export function ChatPane({
       </button>
     </aside>
   );
+}
+
+function ChatPreview({ controller }: { controller: ChatController }) {
+  const text = useSyncExternalStore(
+    controller.subscribeOutput,
+    controller.preview,
+  );
+  return <p>{text || "…"}</p>;
 }
