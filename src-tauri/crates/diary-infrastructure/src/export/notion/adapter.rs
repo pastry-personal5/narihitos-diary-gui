@@ -1,4 +1,4 @@
-//! The Notion destination: year page, month page and one toggle section per ISO date.
+//! The Notion destination: year page, month page and one heading-2 day range per ISO date.
 //!
 //! Every remote write is preceded by a durable step row. An ambiguous or partially applied write
 //! returns `Applied::Unknown`; the service then reads the remote back and never replays `apply`.
@@ -17,7 +17,10 @@ use diary_domain::{
     notion::{self as projection, Block, canonical},
 };
 use serde_json::Value;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex, OnceLock},
+};
 
 /// Conservative request budget beneath the documented 500 KB payload cap.
 const CHUNK_BYTES: usize = 400_000;
@@ -47,13 +50,28 @@ enum Stop {
     Unknown,
 }
 
+/// Where the heading of a date that is not on the page yet goes in the month page.
+#[derive(Default)]
+enum Slot {
+    Start,
+    After(String),
+    #[default]
+    End,
+}
+
 #[derive(Default)]
 struct Located {
     year: Option<String>,
     month: Option<String>,
-    /// Dated toggles of the month page in page order.
+    /// Dated headings of the month page in page order: (ISO date, heading ID).
     dated: Vec<(String, String)>,
+    /// The target day: its heading ID and body.
     section: Option<(String, Section)>,
+    /// The last block of the target day (its heading when the body is empty).
+    tail: Option<String>,
+    slot: Slot,
+    /// Every child ID of the month page when it was listed.
+    ids: HashSet<String>,
 }
 
 /// The Markdown after the front matter of a rendered Authentic file.
@@ -140,9 +158,11 @@ impl Notion {
     /// Section content, or a structural conflict for any block outside the projection's output
     /// set (O12): a nested page or database must never be trashed by a replace.
     fn read_blocks(&self, id: &str, depth: usize) -> Result<Section, Fail> {
-        let items = self.list(id)?;
+        self.section_of(&self.list(id)?, depth)
+    }
+    fn section_of(&self, items: &[wire::Remote], depth: usize) -> Result<Section, Fail> {
         let (mut blocks, mut lines) = (Vec::new(), String::new());
-        for r in &items {
+        for r in items {
             if projection::Kind::from_tag(&r.kind).is_none() {
                 return Err(Fail::Structural);
             }
@@ -160,9 +180,18 @@ impl Notion {
         }
         Ok(Section::new(
             blocks,
-            items.into_iter().map(|r| r.id).collect(),
+            items.iter().map(|r| r.id.clone()).collect(),
             lines,
         ))
+    }
+    /// The body of the day whose heading is `heading`, read from a fresh listing of the month.
+    fn read_range(&self, month: &str, heading: &str) -> Result<Section, Fail> {
+        let items = self.list(month)?;
+        let range = wire::partition(&items)
+            .into_iter()
+            .find(|d| items[d.heading].id == heading)
+            .ok_or(Fail::Api(Error::Malformed))?;
+        self.section_of(&items[range.heading + 1..range.end], 0)
     }
     fn look(&self, date: &DiaryDate) -> Result<Located, Fail> {
         let year = format!("{:04}", date.year());
@@ -178,22 +207,32 @@ impl Notion {
         let Some(m) = loc.month.clone() else {
             return Ok(loc);
         };
+        let items = self.list(&m)?;
+        // Old daily toggles are not migrated (owner, 2026-11-07).
+        if items.iter().any(wire::is_legacy_day) {
+            return Err(Fail::Structural);
+        }
+        loc.ids = items.iter().map(|r| r.id.clone()).collect();
         let iso = date.to_string();
-        for r in self
-            .list(&m)?
-            .into_iter()
-            .filter(|r| r.kind == "toggle" && DiaryDate::parse(r.text.trim()).is_some())
-        {
-            let day = r.text.trim().to_string();
+        let ranges = wire::partition(&items);
+        for range in &ranges {
             // Strictly ascending also rejects duplicates.
-            if loc.dated.last().is_some_and(|(prev, _)| day <= *prev) {
+            if loc.dated.last().is_some_and(|(prev, _)| range.iso <= *prev) {
                 return Err(Fail::Structural);
             }
-            loc.dated.push((day, r.id));
+            loc.dated
+                .push((range.iso.clone(), items[range.heading].id.clone()));
         }
-        if let Some((_, id)) = loc.dated.iter().find(|(d, _)| *d == iso) {
-            let section = self.read_blocks(id, 0)?;
-            loc.section = Some((id.clone(), section));
+        loc.slot = match ranges.iter().find(|d| d.iso > iso) {
+            Some(d) if d.heading == 0 => Slot::Start,
+            Some(d) => Slot::After(items[d.heading - 1].id.clone()),
+            None => Slot::End,
+        };
+        if let Some(d) = ranges.iter().find(|d| d.iso == iso) {
+            let id = items[d.heading].id.clone();
+            let section = self.section_of(&items[d.heading + 1..d.end], 0)?;
+            loc.tail = Some(items[d.end - 1].id.clone());
+            loc.section = Some((id, section));
         }
         Ok(loc)
     }
@@ -235,6 +274,8 @@ struct Run<'a> {
     n: &'a Notion,
     date: &'a str,
     wrote: bool,
+    /// Month-page children seen so far, so a reply's new blocks can be told from neighbours.
+    known: HashSet<String>,
 }
 impl Run<'_> {
     fn stop(&self) -> Stop {
@@ -288,55 +329,52 @@ impl Run<'_> {
             .call(Method::Post, "/v1/pages", Some(&wire::page(parent, title)));
         self.after(seq, r, |v| v["id"].as_str().map(str::to_string))
     }
-    fn section(
+    /// Inserts the day heading. A replace puts it right after the old day's last block (O10).
+    fn heading(
         &mut self,
         month: &str,
         date: &DiaryDate,
-        dated: &[(String, String)],
-        old: Option<&str>,
+        slot: &Slot,
+        old: Option<(&str, &str)>,
     ) -> Result<String, Stop> {
-        let iso = date.to_string();
-        // During a replace the new toggle goes directly after the old one (O10).
-        let previous = old.or_else(|| {
-            dated
-                .iter()
-                .rev()
-                .find(|(d, _)| *d < iso)
-                .map(|(_, id)| id.as_str())
-        });
-        let body = wire::append(
-            vec![wire::toggle(&iso)],
-            previous,
-            previous.is_none() && !dated.is_empty(),
-        );
+        let title = projection::day_title(*date);
+        let (after, start) = match (old, slot) {
+            (Some((_, tail)), _) => (Some(tail), false),
+            (None, Slot::Start) => (None, true),
+            (None, Slot::After(id)) => (Some(id.as_str()), false),
+            (None, Slot::End) => (None, false),
+        };
+        let body = wire::append(vec![wire::heading(&title)], after, start);
         let seq = self.begin("create_section", month, "")?;
         let r = self.n.client.call(
             Method::Patch,
             &format!("/v1/blocks/{month}/children"),
             Some(&body),
         );
-        self.after(seq, r, |v| wire::new_toggle(v, &iso, old))
+        let id = self.after(seq, r, |v| {
+            wire::new_heading(v, &title, old.map(|(heading, _)| heading))
+        })?;
+        self.known.insert(id.clone());
+        Ok(id)
     }
-    fn append(
-        &mut self,
-        toggle: &str,
-        chunk: &[Block],
-        after: Option<&str>,
-    ) -> Result<Option<String>, Stop> {
+    /// Appends one chunk to the month page after `after` and returns the chunk's last block.
+    fn append(&mut self, month: &str, chunk: &[Block], after: &str) -> Result<String, Stop> {
         let digest = hex_sha(canonical(chunk).as_bytes());
-        let seq = self.begin("append", toggle, &digest)?;
-        let body = wire::append(chunk.iter().map(wire::block).collect(), after, false);
+        let seq = self.begin("append", month, &digest)?;
+        let body = wire::append(chunk.iter().map(wire::block).collect(), Some(after), false);
         let r = self.n.client.call(
             Method::Patch,
-            &format!("/v1/blocks/{toggle}/children"),
+            &format!("/v1/blocks/{month}/children"),
             Some(&body),
         );
-        self.after(seq, r, |v| {
-            v["results"].as_array()?.last()?["id"]
-                .as_str()
-                .map(str::to_string)
-        })
-        .map(Some)
+        let known = self.known.clone();
+        let mut fresh = Vec::new();
+        let last = self.after(seq, r, |v| {
+            fresh = wire::new_ids(v, &known);
+            fresh.last().cloned()
+        })?;
+        self.known.extend(fresh);
+        Ok(last)
     }
     fn delete(&mut self, id: &str) -> Result<(), Stop> {
         let seq = self.begin("delete", id, "")?;
@@ -360,7 +398,10 @@ impl Run<'_> {
         want: &str,
     ) -> Result<(), Stop> {
         let n = self.n;
-        let old = loc.section.as_ref().map(|(id, _)| id.clone());
+        let old = loc
+            .section
+            .as_ref()
+            .map(|(id, s)| (id.clone(), s.top_ids.clone()));
         let month = match &loc.month {
             Some(m) => m.clone(),
             None => {
@@ -371,21 +412,27 @@ impl Run<'_> {
                 self.page(&year, &format!("{:04}-{:02}", date.year(), date.month()))?
             }
         };
-        let toggle = self.section(&month, date, &loc.dated, old.as_deref())?;
-        let mut after: Option<String> = None;
+        self.known = loc.ids.clone();
+        let anchor = old
+            .as_ref()
+            .zip(loc.tail.as_deref())
+            .map(|((heading, _), tail)| (heading.as_str(), tail));
+        let heading = self.heading(&month, date, &loc.slot, anchor)?;
+        let mut after = heading.clone();
         for chunk in chunks {
-            if let Some(id) = self.append(&toggle, chunk, after.as_deref())? {
-                after = Some(id);
-            }
+            after = self.append(&month, chunk, &after)?;
         }
-        if let Some(old) = old {
-            // The old section stays until the new one is complete and verified, so a crash
-            // never loses text; the two same-date sections are then a structural conflict.
-            match n.read_blocks(&toggle, 0) {
+        if let Some((old_heading, old_body)) = old {
+            // The old day stays until the new one is complete and verified, so a crash never
+            // loses text; the two same-date days are then a structural conflict.
+            match n.read_range(&month, &heading) {
                 Ok(s) if s.digest() == want => {}
                 _ => return Err(Stop::Unknown),
             }
-            self.delete(&old)?;
+            for id in &old_body {
+                self.delete(id)?;
+            }
+            self.delete(&old_heading)?;
         }
         Ok(())
     }
@@ -457,6 +504,7 @@ impl ExportAdapter for Notion {
             n: self,
             date: &iso,
             wrote: false,
+            known: HashSet::new(),
         };
         match run.go(date, loc, &chunks, &want) {
             Err(Stop::Failed) => Applied::Failed,

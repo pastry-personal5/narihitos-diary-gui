@@ -216,6 +216,10 @@ impl FakeNotion {
             .map(|n| n.children.clone())
             .unwrap_or_default()
     }
+    pub fn kind_of(&self, id: &str) -> String {
+        let st = self.state.lock().unwrap();
+        st.nodes.get(id).map_or(String::new(), |n| n.kind.clone())
+    }
     pub fn text_of(&self, id: &str) -> String {
         let st = self.state.lock().unwrap();
         st.nodes.get(id).map_or(String::new(), |n| {

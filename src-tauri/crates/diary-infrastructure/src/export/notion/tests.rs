@@ -84,6 +84,35 @@ impl Env {
         let year = self.fake.children(ROOT)[0].clone();
         self.fake.children(&year)[0].clone()
     }
+    /// The text of each day heading in the month page, in page order.
+    fn days(&self) -> Vec<String> {
+        self.fake
+            .children(&self.month())
+            .iter()
+            .filter(|c| self.fake.kind_of(c) == "heading_2")
+            .map(|c| self.fake.text_of(c))
+            .collect()
+    }
+    /// The ID of the first day heading whose text starts with `day`.
+    fn heading_id(&self, day: &str) -> String {
+        self.fake
+            .children(&self.month())
+            .into_iter()
+            .find(|c| self.fake.kind_of(c) == "heading_2" && self.fake.text_of(c).starts_with(day))
+            .unwrap()
+    }
+    /// The text of the blocks after the day's heading, up to the next day heading.
+    fn range_texts(&self, day: &str) -> Vec<String> {
+        let heading = self.heading_id(day);
+        self.fake
+            .children(&self.month())
+            .into_iter()
+            .skip_while(|c| *c != heading)
+            .skip(1)
+            .take_while(|c| self.fake.kind_of(c) != "heading_2")
+            .map(|c| self.fake.text_of(&c))
+            .collect()
+    }
     fn digest_ok(&self, date: &str, body: &str) -> bool {
         self.seen(date).digest == self.notion.digest_of(&file(body)).unwrap()
     }
@@ -98,7 +127,7 @@ fn create_builds_the_hierarchy_and_exact_content() {
     assert_eq!(e.titles(ROOT), ["2026"]);
     let year = e.fake.children(ROOT)[0].clone();
     assert_eq!(e.titles(&year), ["2026-11"]);
-    assert_eq!(e.titles(&e.month()), ["2026-11-07"]);
+    assert_eq!(e.days(), ["2026-11-07 (SAT)"]);
     assert!(e.digest_ok("2026-11-07", body));
     let steps = e.notion.steps.states("2026-11-07");
     assert_eq!(steps.len(), 4);
@@ -106,7 +135,7 @@ fn create_builds_the_hierarchy_and_exact_content() {
 }
 
 #[test]
-fn daily_sections_stay_ascending_for_first_middle_and_last_insertion() {
+fn days_stay_ascending_for_first_middle_and_last_insertion() {
     let e = env();
     for day in [
         "2026-11-10",
@@ -122,15 +151,21 @@ fn daily_sections_stay_ascending_for_first_middle_and_last_insertion() {
         );
     }
     assert_eq!(
-        e.titles(&e.month()),
+        e.days(),
         [
-            "2026-11-01",
-            "2026-11-05",
-            "2026-11-07",
-            "2026-11-10",
-            "2026-11-20"
+            "2026-11-01 (SUN)",
+            "2026-11-05 (THU)",
+            "2026-11-07 (SAT)",
+            "2026-11-10 (TUE)",
+            "2026-11-20 (FRI)"
         ]
     );
+    for day in ["01", "05", "07", "10", "20"] {
+        assert_eq!(
+            e.range_texts(&format!("2026-11-{day}")),
+            [format!("entry 2026-11-{day}")]
+        );
+    }
     // One year page and one month page only.
     assert_eq!(e.fake.children(ROOT).len(), 1);
 }
@@ -146,6 +181,10 @@ fn pagination_reads_every_page_of_a_long_month() {
     assert!(e.fake.count("list") > 9);
 }
 
+fn day_heading(text: &str) -> Value {
+    json!({"object":"block","type":"heading_2","heading_2":{"rich_text":[{"type":"text","text":{"content":text}}]}})
+}
+
 #[test]
 fn duplicate_and_disordered_hierarchy_is_a_structural_conflict() {
     let e = env();
@@ -156,6 +195,29 @@ fn duplicate_and_disordered_hierarchy_is_a_structural_conflict() {
         Some(Unavailable::Structural)
     );
 
+    // A day listed twice.
+    let e = env();
+    e.put("2026-11-07", "x\n");
+    e.fake
+        .external_block(&e.month(), &day_heading("2026-11-07"), None);
+    assert_eq!(
+        e.seen("2026-11-07").unavailable,
+        Some(Unavailable::Structural)
+    );
+
+    // An earlier day listed after a later one.
+    let e = env();
+    e.put("2026-11-07", "x\n");
+    e.fake
+        .external_block(&e.month(), &day_heading("2026-11-03"), None);
+    assert_eq!(
+        e.seen("2026-11-07").unavailable,
+        Some(Unavailable::Structural)
+    );
+}
+
+#[test]
+fn a_legacy_dated_toggle_is_a_structural_conflict() {
     let e = env();
     e.put("2026-11-07", "x\n");
     let toggle = json!({"object":"block","type":"toggle","toggle":{"rich_text":[{"type":"text","text":{"content":"2026-11-03"}}]}});
@@ -164,71 +226,79 @@ fn duplicate_and_disordered_hierarchy_is_a_structural_conflict() {
         e.seen("2026-11-07").unavailable,
         Some(Unavailable::Structural)
     );
-
-    let e = env();
-    e.put("2026-11-07", "x\n");
-    let dup = json!({"object":"block","type":"toggle","toggle":{"rich_text":[{"type":"text","text":{"content":"2026-11-07"}}]}});
-    e.fake.external_block(&e.month(), &dup, None);
     assert_eq!(
-        e.seen("2026-11-07").unavailable,
-        Some(Unavailable::Structural)
+        e.notion.apply(
+            &d("2026-11-09"),
+            &file("y\n"),
+            Write::Create,
+            &Observation::absent()
+        ),
+        Applied::Failed
     );
 }
 
 #[test]
-fn replace_inserts_a_new_section_after_the_old_one_then_removes_the_old_one() {
+fn observing_an_absent_date_never_writes() {
+    let e = env();
+    e.put("2026-11-03", "a\n");
+    e.put("2026-11-10", "b\n");
+    let before = e.fake.count("append") + e.fake.count("delete") + e.fake.count("create_page");
+    assert_eq!(e.seen("2026-11-05"), Observation::absent());
+    let after = e.fake.count("append") + e.fake.count("delete") + e.fake.count("create_page");
+    assert_eq!(before, after);
+}
+
+#[test]
+fn replace_inserts_a_new_range_after_the_old_one_then_removes_the_old_one() {
     let e = env();
     e.put("2026-11-07", "one\n\ntwo\n");
-    let old = e.fake.children(&e.month())[0].clone();
+    let old = e.heading_id("2026-11-07");
     assert_eq!(e.put("2026-11-07", "three\n"), Applied::Done);
-    // Exactly one section remains, with a new block ID (O10).
-    let sections = e.fake.children(&e.month());
-    assert_eq!(sections.len(), 1);
-    assert_ne!(sections[0], old);
-    assert!(e.fake.children(&old).is_empty());
-    let kids = e.fake.children(&sections[0]);
-    assert_eq!(kids.len(), 1);
-    assert_eq!(e.fake.text_of(&kids[0]), "three");
+    // Exactly one day remains, with a new heading ID (O10).
+    assert_eq!(e.days(), ["2026-11-07 (SAT)"]);
+    assert_ne!(e.heading_id("2026-11-07"), old);
+    assert!(!e.fake.children(&e.month()).contains(&old));
+    assert_eq!(e.range_texts("2026-11-07"), ["three"]);
     assert!(e.digest_ok("2026-11-07", "three\n"));
     // A neighbouring day keeps its position relative to the replaced one.
     e.put("2026-11-09", "later\n");
     e.put("2026-11-07", "four\n");
-    assert_eq!(e.titles(&e.month()), ["2026-11-07", "2026-11-09"]);
+    assert_eq!(e.days(), ["2026-11-07 (SAT)", "2026-11-09 (MON)"]);
+    assert_eq!(e.range_texts("2026-11-07"), ["four"]);
+    assert_eq!(e.range_texts("2026-11-09"), ["later"]);
 }
 
 #[test]
-fn a_crash_between_the_new_section_and_the_old_delete_keeps_the_old_text() {
-    // The delete of the old section is lost before it commits.
+fn a_crash_between_the_new_range_and_the_old_delete_keeps_the_old_text() {
+    // The delete of the old range is lost before it commits.
     let e = env();
     e.put("2026-11-07", "keep me\n");
-    let old = e.fake.children(&e.month())[0].clone();
     e.fake.fault("delete", Fault::Drop);
     assert_eq!(e.put("2026-11-07", "new text\n"), Applied::Unknown);
-    assert_eq!(e.fake.text_of(&e.fake.children(&old)[0]), "keep me");
-    // Both same-date sections now exist: reported, not guessed at.
-    assert_eq!(e.fake.children(&e.month()).len(), 2);
+    assert_eq!(e.range_texts("2026-11-07"), ["keep me"]);
+    // Both same-date days now exist: reported, not guessed at.
+    assert_eq!(e.days().len(), 2);
     assert_eq!(
         e.seen("2026-11-07").unavailable,
         Some(Unavailable::Structural)
     );
     assert_eq!(e.fake.count("delete"), 1);
 
-    // A refusal while the new section is being filled leaves the old one untouched too.
+    // A refusal while the new range is being filled leaves the old one untouched too.
     let e = env();
     e.put("2026-11-07", "keep me\n");
-    let old = e.fake.children(&e.month())[0].clone();
     e.fake.fault_after("append", 1, Fault::Throttle(90));
     assert_eq!(e.put("2026-11-07", "new text\n"), Applied::Unknown);
-    assert_eq!(e.fake.text_of(&e.fake.children(&old)[0]), "keep me");
+    assert_eq!(e.range_texts("2026-11-07"), ["keep me"]);
     assert_eq!(e.fake.count("delete"), 0);
 }
 
 #[test]
-fn a_foreign_block_in_a_section_is_a_structural_conflict_with_no_write() {
+fn a_foreign_block_in_a_day_is_a_structural_conflict_with_no_write() {
     let e = env();
     e.put("2026-11-07", "one\n");
-    let section = e.fake.children(&e.month())[0].clone();
-    e.fake.external_page(&section, "Notes the user keeps here");
+    e.fake
+        .external_page(&e.month(), "Notes the user keeps here");
     assert_eq!(
         e.seen("2026-11-07").unavailable,
         Some(Unavailable::Structural)
@@ -241,7 +311,7 @@ fn a_foreign_block_in_a_section_is_a_structural_conflict_with_no_write() {
         Applied::Failed
     );
     assert_eq!(e.fake.count("append") + e.fake.count("delete"), before);
-    assert!(e.fake.children(&section).len() == 2);
+    assert_eq!(e.fake.children(&e.month()).len(), 3);
 }
 
 #[test]
@@ -249,8 +319,7 @@ fn an_external_edit_between_observe_and_apply_fails_without_writing() {
     let e = env();
     e.put("2026-11-07", "one\n");
     let seen = e.seen("2026-11-07");
-    let section = e.fake.children(&e.month())[0].clone();
-    let child = e.fake.children(&section)[0].clone();
+    let child = e.fake.children(&e.month())[1].clone();
     e.fake.edit_text(&child, "changed outside");
     let before = e.fake.count("append") + e.fake.count("delete");
     assert_eq!(
@@ -298,10 +367,10 @@ fn a_short_throttle_waits_and_retries_but_a_long_one_stops_cleanly() {
 fn a_lost_reply_is_unknown_never_replayed_and_the_read_back_sees_the_commit() {
     let e = env();
     e.fake.fault("append", Fault::LoseReply);
-    // The first append is the section toggle; its reply is lost.
+    // The first append is the day heading; its reply is lost.
     assert_eq!(e.put("2026-11-07", "x\n"), Applied::Unknown);
     assert_eq!(e.fake.count("append"), 1);
-    assert_eq!(e.titles(&e.month()), ["2026-11-07"]);
+    assert_eq!(e.days(), ["2026-11-07 (SAT)"]);
 
     let e = env();
     e.fake.fault("create_page", Fault::Drop);
@@ -418,7 +487,82 @@ fn concurrent_exports_never_create_duplicate_year_or_month_pages() {
     let year = e.fake.children(ROOT)[0].clone();
     assert_eq!(e.fake.children(&year).len(), 1);
     assert_eq!(
-        e.titles(&e.month()),
-        ["2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23"]
+        e.days(),
+        [
+            "2026-11-02 (MON)",
+            "2026-11-09 (MON)",
+            "2026-11-16 (MON)",
+            "2026-11-23 (MON)"
+        ]
     );
+}
+
+#[test]
+fn a_preamble_before_the_first_day_survives_every_write() {
+    let e = env();
+    e.put("2026-11-07", "seven\n");
+    let pre = e.fake.external_block(
+        &e.month(),
+        &json!({"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"preamble"}}]}}),
+        Some(0),
+    );
+    e.put("2026-11-05", "five\n");
+    e.put("2026-11-01", "one\n");
+    e.put("2026-11-05", "five again\n");
+    assert_eq!(e.fake.children(&e.month())[0], pre);
+    assert_eq!(
+        e.days(),
+        ["2026-11-01 (SUN)", "2026-11-05 (THU)", "2026-11-07 (SAT)"]
+    );
+    assert_eq!(e.range_texts("2026-11-01"), ["one"]);
+    assert_eq!(e.range_texts("2026-11-05"), ["five again"]);
+}
+
+#[test]
+fn an_empty_body_is_a_heading_with_no_siblings() {
+    let e = env();
+    assert_eq!(e.put("2026-11-07", ""), Applied::Done);
+    assert!(e.seen("2026-11-07").present);
+    assert!(e.range_texts("2026-11-07").is_empty());
+    assert_eq!(e.put("2026-11-07", "text\n"), Applied::Done);
+    assert_eq!(e.range_texts("2026-11-07"), ["text"]);
+    assert_eq!(e.put("2026-11-07", ""), Applied::Done);
+    assert!(e.range_texts("2026-11-07").is_empty());
+    assert_eq!(e.days(), ["2026-11-07 (SAT)"]);
+}
+
+#[test]
+fn body_headings_do_not_split_the_range() {
+    let e = env();
+    assert_eq!(e.put("2026-11-07", "# A\n\n## B\n\ntext\n"), Applied::Done);
+    assert_eq!(e.days(), ["2026-11-07 (SAT)"]);
+    assert_eq!(e.range_texts("2026-11-07"), ["A", "B", "text"]);
+    assert!(e.digest_ok("2026-11-07", "# A\n\n## B\n\ntext\n"));
+}
+
+#[test]
+fn the_weekday_suffix_does_not_decide_which_day_a_heading_is() {
+    let e = env();
+    e.put("2026-11-07", "x\n");
+    e.fake
+        .external_block(&e.month(), &day_heading("2026-11-09 (FRI)"), None);
+    // The hand-typed suffix is wrong (09 is a Monday) but the date still identifies the day.
+    assert!(e.seen("2026-11-09").present);
+    assert_eq!(e.put("2026-11-09", "y\n"), Applied::Done);
+    assert_eq!(e.days(), ["2026-11-07 (SAT)", "2026-11-09 (MON)"]);
+    assert_eq!(e.range_texts("2026-11-09"), ["y"]);
+}
+
+#[test]
+fn a_hand_typed_undated_heading_two_is_absorbed_into_the_previous_day() {
+    let e = env();
+    e.put("2026-11-05", "five\n");
+    let before = e.seen("2026-11-05");
+    e.fake
+        .external_block(&e.month(), &day_heading("Notes"), None);
+    let after = e.seen("2026-11-05");
+    assert!(after.present);
+    assert_ne!(after.fingerprint, before.fingerprint);
+    assert_ne!(after.digest, before.digest);
+    assert_eq!(e.days(), ["2026-11-05 (THU)", "Notes"]);
 }

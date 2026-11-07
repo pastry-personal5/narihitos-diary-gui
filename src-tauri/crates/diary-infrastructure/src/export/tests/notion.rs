@@ -43,10 +43,16 @@ impl N {
             self.state(id).state
         );
     }
-    fn section(&self) -> String {
+    /// The blocks of the first day: everything after its heading up to the next day heading.
+    fn body(&self) -> Vec<String> {
         let year = self.fake.children(ROOT)[0].clone();
         let month = self.fake.children(&year)[0].clone();
-        self.fake.children(&month)[0].clone()
+        self.fake
+            .children(&month)
+            .into_iter()
+            .skip(1)
+            .take_while(|c| self.fake.kind_of(c) != "heading_2")
+            .collect()
     }
 }
 
@@ -57,7 +63,7 @@ fn both_targets_are_available_and_notion_creates_then_verifies_a_noop() {
     let rev = n.e.save(1, "2026-11-05", None, "one\n\ntwo\n");
     n.svc.start("s", 1, n.req(1, "2026-11-05", &rev)).unwrap();
     n.wait(1, ExportState::Succeeded);
-    assert_eq!(n.fake.children(&n.section()).len(), 2);
+    assert_eq!(n.body().len(), 2);
     assert_eq!(n.state(1).reason, None);
     let appends = n.fake.count("append");
     // Same revision again: a verified no-op writes nothing.
@@ -74,7 +80,7 @@ fn an_external_edit_needs_confirmation_before_replacement() {
     let rev = n.e.save(1, "2026-11-05", None, "one\n");
     n.svc.start("s", 1, n.req(1, "2026-11-05", &rev)).unwrap();
     n.wait(1, ExportState::Succeeded);
-    let child = n.fake.children(&n.section())[0].clone();
+    let child = n.body()[0].clone();
     n.fake.edit_text(&child, "edited in Notion");
     let rev2 = n.e.save(2, "2026-11-05", Some(&rev), "two\n");
     let Started::Preview(p) = n.svc.start("s", 1, n.req(2, "2026-11-05", &rev2)).unwrap() else {
@@ -94,7 +100,7 @@ fn an_external_edit_needs_confirmation_before_replacement() {
         )
         .unwrap();
     n.wait(2, ExportState::Succeeded);
-    let kids = n.fake.children(&n.section());
+    let kids = n.body();
     assert_eq!(kids.len(), 1);
     assert_eq!(n.fake.text_of(&kids[0]), "two");
 }
