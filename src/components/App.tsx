@@ -326,7 +326,6 @@ export function App({ bridge }: { bridge: Bridge }) {
           }}
         >
           <nav aria-label="Icon Bar" className="icon-bar">
-            <span>Icon Bar</span>
             <button
               ref={settingsButton}
               aria-pressed={settingsOpen}

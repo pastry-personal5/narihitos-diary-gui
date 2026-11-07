@@ -18,7 +18,9 @@ pub use authentic::{
 };
 pub use calendar::{Calendar, CalendarAction};
 pub use chat::{ChatDocument, ChatOpened, ChatView, TurnAccepted};
-use diary_application::diagnostics::{Component, ErrorTag, EventCode, Level, Record, TraceId};
+use diary_application::diagnostics::{
+    Component, ErrorTag, EventCode, Fault, Level, Record, TraceId,
+};
 use diary_logging::private_fs::PrivateDir;
 pub use export::{
     ConfirmExportRequest, ExportAcknowledged, ExportPage, ExportResult, StartExportRequest,
@@ -337,13 +339,28 @@ impl Bridge {
         }
         serde_json::from_slice(&bytes).map_err(|_| "invalid_response")
     }
+    /// Content-free connection-stage record: stage code, outcome level and the typed fault.
+    fn stage(&self, code: EventCode, outcome: Result<(), &'static str>) {
+        let record = match outcome {
+            Ok(()) => Record::new(code, Level::Debug),
+            Err(e) => Record::new(code, Level::Warn).fault(Fault::from_code(e)),
+        };
+        self.log.log(record.component(Component::Bridge));
+    }
     pub async fn connect(&self) -> Result<Status, &'static str> {
         let _lifecycle = self.lifecycle.lock().await;
+        self.stage(EventCode::BridgeConnectStarted, Ok(()));
         self.stop_events().await;
         let record = match discovery::read(&self.path) {
             Ok(record) => record,
-            Err(error) => return Err(error),
+            Err(error) => {
+                self.stage(EventCode::BridgeDiscoveryRead, Err(error));
+                return Err(error);
+            }
         };
+        self.stage(EventCode::BridgeDiscoveryRead, Ok(()));
+        // The discovery file and its parent are validated: attach now so later failures reach the file.
+        self.attach_log();
         let mut c = self.connection.lock().await;
         let same = c.discovery.as_ref().is_some_and(|old| {
             old.instance_id == record.instance_id && old.workspace_key == record.workspace_key
@@ -358,8 +375,12 @@ impl Bridge {
             .await;
         let status = match result {
             Ok(status) => status,
-            Err(e) => return Err(e),
+            Err(e) => {
+                self.stage(EventCode::BridgeStatusProbe, Err(e));
+                return Err(e);
+            }
         };
+        self.stage(EventCode::BridgeStatusProbe, Ok(()));
         let d = c.discovery.as_ref().ok_or("disconnected")?;
         if status.instance_id != d.instance_id
             || status.workspace_key != d.workspace_key
@@ -376,9 +397,10 @@ impl Bridge {
         {
             c.discovery = None;
             c.session = None;
+            self.stage(EventCode::BridgeConnected, Err("incompatible_server"));
             return Err("incompatible_server");
         }
-        self.attach_log();
+        self.stage(EventCode::BridgeConnected, Ok(()));
         Ok(status)
     }
     pub async fn status(&self) -> Result<Status, &'static str> {

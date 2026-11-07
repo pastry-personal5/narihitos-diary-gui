@@ -20,7 +20,7 @@ macro_rules! tag_enum {
     };
 }
 
-tag_enum!(Level { Error => "error", Warn => "warn", Info => "info" });
+tag_enum!(Level { Error => "error", Warn => "warn", Info => "info", Debug => "debug" });
 tag_enum!(Role { Server => "server", Client => "client" });
 tag_enum!(EventCode {
     ServerStarted => "server.started",
@@ -53,6 +53,10 @@ tag_enum!(EventCode {
     UiBridgeError => "ui.bridge_error",
     UiRenderError => "ui.render_error",
     ClientEventRejected => "client.event_rejected",
+    BridgeConnectStarted => "bridge.connect_started",
+    BridgeDiscoveryRead => "bridge.discovery_read",
+    BridgeStatusProbe => "bridge.status_probe",
+    BridgeConnected => "bridge.connected",
 });
 tag_enum!(ErrorTag {
     StaleRevision => "stale_revision",
@@ -64,6 +68,26 @@ tag_enum!(ErrorTag {
     Limit => "limit",
     Internal => "internal",
 });
+tag_enum!(Fault {
+    DiscoveryUnavailable => "discovery_unavailable",
+    InvalidDiscovery => "invalid_discovery",
+    UnsafeDiscovery => "unsafe_discovery",
+    ServerUnavailable => "server_unavailable",
+    ServerRejected => "server_rejected_request",
+    ClientBusy => "client_busy",
+    InvalidResponse => "invalid_response",
+    IncompatibleServer => "incompatible_server",
+    Other => "other",
+});
+impl Fault {
+    /// Maps a bridge error code to its tag; unknown codes become `Other`.
+    pub fn from_code(code: &str) -> Self {
+        match code {
+            "invalid_response_type" | "response_limit" => Self::InvalidResponse,
+            c => Self::parse(c).unwrap_or(Self::Other),
+        }
+    }
+}
 tag_enum!(StateTag {
     Saved => "saved",
     Stale => "stale",
@@ -298,6 +322,7 @@ pub struct Record {
     pub job: Option<OpaqueId>,
     pub resource: Option<ResourceDetail>,
     pub error: Option<ErrorTag>,
+    pub fault: Option<Fault>,
     pub count: Option<u32>,
     pub agent: Option<AgentDetail>,
 }
@@ -314,6 +339,7 @@ impl Record {
             job: None,
             resource: None,
             error: None,
+            fault: None,
             count: None,
             agent: None,
         }
@@ -344,6 +370,10 @@ impl Record {
     }
     pub fn error(mut self, v: ErrorTag) -> Self {
         self.error = Some(v);
+        self
+    }
+    pub fn fault(mut self, v: Fault) -> Self {
+        self.fault = Some(v);
         self
     }
     pub fn count(mut self, v: u32) -> Self {

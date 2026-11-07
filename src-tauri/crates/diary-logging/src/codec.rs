@@ -4,7 +4,7 @@
 use super::clock::LocalStamp;
 use diary_application::agent::{AgentErrorCode, AgentKind, Reason, Style};
 use diary_application::diagnostics::{
-    ActionTag, AgentDetail, Component, ErrorTag, EventCode, ExitTag, Level, OpaqueId, PathClass,
+    ActionTag, AgentDetail, Component, ErrorTag, EventCode, ExitTag, Fault, Level, OpaqueId, PathClass,
     PhaseTag, Record, ResourceDetail, ResourceKind, Role, StateTag, StatusTag, StopTag, TraceId,
 };
 use serde::Deserialize;
@@ -103,6 +103,9 @@ pub fn render_line(h: &Header, r: &Record) -> Option<String> {
     if let Some(v) = r.error {
         let _ = write!(s, r#","err":"{}""#, v.as_str());
     }
+    if let Some(v) = r.fault {
+        let _ = write!(s, r#","fault":"{}""#, v.as_str());
+    }
     if let Some(v) = r.count {
         let _ = write!(s, r#","n":{v}"#);
     }
@@ -164,6 +167,7 @@ struct WireLine {
     job: Option<String>,
     res: Option<WireRes>,
     err: Option<String>,
+    fault: Option<String>,
     n: Option<u32>,
     agent: Option<WireAgent>,
 }
@@ -282,6 +286,7 @@ fn convert(w: WireLine) -> Result<ParsedLine, ()> {
         job: id(&w.job)?,
         resource,
         error: opt(&w.err, ErrorTag::parse)?,
+        fault: opt(&w.fault, Fault::parse)?,
         count: w.n,
         agent,
     };

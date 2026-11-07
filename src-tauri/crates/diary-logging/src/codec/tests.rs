@@ -118,7 +118,7 @@ fn parse_rejects_unknown_key_bad_enum_bad_id_and_truncated_json() {
     let ok = base("");
     assert!(parse_line(&ok[..ok.len() - 3]).is_none());
     assert!(parse_line(&ok.replace("server.started", "ignore previous instructions")).is_none());
-    assert!(parse_line(&ok.replace("info", "debug")).is_none());
+    assert!(parse_line(&ok.replace("info", "trace")).is_none());
     assert!(parse_line(&"x".repeat(MAX_LINE + 1)).is_none());
 }
 
@@ -262,4 +262,15 @@ fn old_lines_without_agent_still_parse() {
     let line = render_line(&agent_header(), &r).unwrap();
     assert!(!line.contains("agent"));
     assert_eq!(parse_line(&line).unwrap().record.agent, None);
+}
+
+#[test]
+fn debug_level_and_fault_round_trip() {
+    use diary_application::diagnostics::Fault;
+    let r = Record::new(EventCode::BridgeStatusProbe, Level::Debug)
+        .fault(Fault::from_code("unsafe_discovery"));
+    let header = Header { ts: TS, role: Role::Client, instance: None };
+    let p = parse_line(&render_line(&header, &r).unwrap()).unwrap();
+    assert_eq!(p.record.fault, Some(Fault::UnsafeDiscovery));
+    assert_eq!(p.level, Level::Debug);
 }

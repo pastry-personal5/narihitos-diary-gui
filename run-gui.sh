@@ -21,4 +21,7 @@ if [[ -z "${DISCOVERY}" || ! -f "${DISCOVERY}" ]]; then
   exit 1
 fi
 
+# The client rejects symlinked path components, so pass the canonical path.
+DISCOVERY=$(realpath "${DISCOVERY}")
+export DIARY_LOG=debug # connection-stage records; read with: diary-server trace --select debug:50
 exec npm run tauri dev -- -- -- --connect "${DISCOVERY}"

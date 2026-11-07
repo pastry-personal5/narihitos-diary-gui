@@ -115,6 +115,7 @@ pub struct ClientLog {
     state: Mutex<State>,
     limiter: Mutex<Limiter>,
     attach_gate: Mutex<()>,
+    debug: bool,
 }
 
 impl ClientLog {
@@ -144,6 +145,7 @@ impl ClientLog {
                 dropped: 0,
             }),
             attach_gate: Mutex::new(()),
+            debug: std::env::var("DIARY_LOG").is_ok_and(|v| v == "debug"),
             limiter: Mutex::new(Limiter {
                 window_start: 0,
                 count: 0,
@@ -152,6 +154,10 @@ impl ClientLog {
     }
 
     pub fn log(&self, record: Record) {
+        // Debug records are opt-in (`DIARY_LOG=debug`), so default runs stay at info.
+        if record.level == Level::Debug && !self.debug {
+            return;
+        }
         let ts = self.clock.now().rfc3339();
         let header = Header {
             ts: &ts,

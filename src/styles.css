@@ -1,14 +1,28 @@
 :root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #26332e;
-  background: #f4f5f1;
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--bg);
   font-synthesis: none;
   font-size: 14px;
-  --line: #cbd2ca;
-  --surface: #fff;
-  --muted: #536158;
-  --accent: #285a46;
-  --danger: #8b2222;
+  --bg: #131414;
+  --panel: #18191a;
+  --surface: #262728;
+  --line: #2e2f30;
+  --scrim: rgb(0 0 0 / 60%);
+  --shadow: rgb(0 0 0 / 40%);
+  --text: #bfbfbf;
+  --muted: #9a9a9a;
+  --accent: #48a0c7;
+  --accent-fill: #2a7fa8;
+  --on-accent: #fff;
+  --danger: #f48771;
+  --warning: #cca700;
+  --success: #89d185;
+  --info: var(--accent);
+  --diff-del: #f85149;
+  --diff-add: #30a46c;
+  --review-bar: var(--accent);
 }
 * {
   box-sizing: border-box;
@@ -31,7 +45,7 @@ button {
 button:disabled {
   cursor: default;
   color: var(--muted);
-  background: #eef0eb;
+  background: var(--panel);
 }
 button:focus-visible,
 textarea:focus-visible {
@@ -39,9 +53,9 @@ textarea:focus-visible {
   outline-offset: 3px;
 }
 button[aria-pressed="true"] {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  border-color: var(--accent-fill);
 }
 h1 {
   font-size: 17px;
@@ -153,7 +167,7 @@ footer {
   margin: 0;
   padding: 12px 20px;
   font-size: 12px;
-  background: #f4f5f1;
+  background: var(--panel);
   border-bottom: 1px solid var(--line);
 }
 .editor-host {
@@ -256,8 +270,8 @@ footer {
   padding: 4px 1px;
 }
 .calendar-grid [aria-selected="true"] {
-  background: var(--accent);
-  color: white;
+  background: var(--accent-fill);
+  color: var(--on-accent);
 }
 .snippet-row {
   display: flex;
@@ -315,13 +329,13 @@ footer {
   flex: 1;
 }
 .message-error {
-  color: #8b2222;
+  color: var(--danger);
 }
 .message-warning {
-  color: #765500;
+  color: var(--warning);
 }
 .message-info {
-  color: #285a46;
+  color: var(--info);
 }
 
 .symbol {
@@ -350,7 +364,7 @@ footer {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgb(20 30 24 / 55%);
+  background: var(--scrim);
 }
 .modal-dialog {
   width: min(600px, 100%);
@@ -360,7 +374,7 @@ footer {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 24px;
-  box-shadow: 0 12px 48px rgb(0 0 0 / 25%);
+  box-shadow: 0 12px 48px var(--shadow);
 }
 .dialog-actions,
 .trash-activity-heading {
@@ -487,17 +501,17 @@ footer {
   align-items: center;
   gap: 0.5rem;
   padding: 0.25rem 0.5rem;
-  border-bottom: 1px solid var(--border, #8884);
+  border-bottom: 1px solid var(--line);
 }
 .cm-review-removed {
-  background: color-mix(in srgb, #e5484d 18%, transparent);
+  background: color-mix(in srgb, var(--diff-del) 18%, transparent);
   text-decoration: line-through;
-  text-decoration-color: #e5484d;
+  text-decoration-color: var(--diff-del);
 }
 .cm-review-inserted {
-  background: color-mix(in srgb, #30a46c 20%, transparent);
+  background: color-mix(in srgb, var(--diff-add) 20%, transparent);
   text-decoration: underline;
-  text-decoration-color: #30a46c;
+  text-decoration-color: var(--diff-add);
   text-decoration-style: dotted;
   white-space: pre-wrap;
 }
@@ -518,10 +532,10 @@ footer {
   font: inherit;
 }
 .cm-review-controls .cm-review-accept {
-  color: #1a7f4e;
+  color: var(--success);
 }
 .cm-review-controls .cm-review-reject {
-  color: #c4272d;
+  color: var(--danger);
 }
 .cm-review-label {
   padding: 0 0.3rem;
@@ -535,13 +549,23 @@ footer {
   display: block;
   width: 3px;
   height: 100%;
-  background: #3b82f6;
+  background: var(--review-bar);
 }
-@media (prefers-color-scheme: dark) {
-  .cm-review-controls .cm-review-accept {
-    color: #5ee0a0;
-  }
-  .cm-review-controls .cm-review-reject {
-    color: #ff8589;
-  }
+.cm-editor .cm-gutters {
+  background: var(--panel);
+  color: var(--muted);
+  border-right: 1px solid var(--line);
+}
+.cm-editor .cm-cursor {
+  border-left-color: var(--text);
+}
+
+.toolbar,
+.icon-bar,
+.explorer,
+.chat {
+  background: var(--panel);
+}
+.editor-column {
+  background: var(--bg);
 }

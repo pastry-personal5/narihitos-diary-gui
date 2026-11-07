@@ -20,7 +20,7 @@ server: ## Run the local server with the global configuration
 
 gui: ## Run the GUI app in development (DISCOVERY=/path/to/discovery.json)
 	@test -n "$(DISCOVERY)" || { echo "Set DISCOVERY to the server discovery file, for example: make gui DISCOVERY=/path/to/discovery.json"; exit 1; }
-	npm run tauri dev -- -- -- --connect "$(DISCOVERY)"
+	DIARY_LOG=debug npm run tauri dev -- -- -- --connect "$$(realpath "$(DISCOVERY)")"
 
 build: ## Frontend production build (version check, tsc, vite)
 	npm run build

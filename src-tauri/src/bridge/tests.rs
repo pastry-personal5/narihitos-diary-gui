@@ -153,8 +153,15 @@ async fn busy_error_is_allowlisted_without_forwarding_private_error_details() {
         )
     });
     assert_eq!(bridge.connect().await.err(), Some("client_busy"));
+    // The log attaches once discovery validates, so the record is in the file, not the buffer.
+    bridge.log().shutdown(std::time::Duration::from_secs(2));
+    let dir = bridge.path.parent().unwrap().join("logs/client");
+    let written: String = fs::read_dir(dir)
+        .unwrap()
+        .filter_map(|e| fs::read_to_string(e.unwrap().path()).ok())
+        .collect();
     assert_eq!(
-        bridge.log().buffered(),
+        written.matches("ui.bridge_error").count(),
         1,
         "a busy rejection leaves one traced record"
     );

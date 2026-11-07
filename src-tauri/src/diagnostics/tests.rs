@@ -100,7 +100,7 @@ fn unknown_code_extra_key_oversize_detail_and_server_only_code_rejected() {
         e
     };
     for bad in [
-        with(&|e| e.level = "debug".into()),
+        with(&|e| e.level = "trace".into()),
         with(&|e| e.trace_id = Some("not-a-trace".into())),
         with(&|e| e.detail = Some(json!({"component": "editor", "note": "x"}))),
         with(&|e| e.detail = Some(json!({"component": "nowhere"}))),

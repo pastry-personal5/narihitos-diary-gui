@@ -10,6 +10,7 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-07 — owner, P1-M29 started — Created the overview and work-plan skeletons; each owner request is recorded as a checkbox task (or sub-task) in the overview as it is raised.
 - 2026-11-07 — agent, P1-M28 delivered — Split agent.rs, export.rs, diary-api lib.rs and App.tsx plus the two large test files; replaced the argument-count suppressions with parameter structs; consolidated eight result_large_err allows into one documented crate-level allow (boxing axum Response touches ~100 sites); merged duplicate bridge validators and Entry-settle closures. Full gate, test parity (748 Rust, 333 Vitest) and export/agent/review smokes passed.
 - 2026-11-07 — owner, P1-M28 planned — Split production modules over 900 lines (export.rs, diary-api lib.rs, agent.rs, App.tsx) and the two test files over 1000 lines by feature; fix lint-suppression root causes and merge duplicated helpers; evidence is the full gate plus test-count parity and synthetic smokes; renames allowed. Dead-code removal and shortcut debt excluded.
 - 2026-11-07 — owner, milestones replanned — Release qualification moved from P1-M28 to P1-M32; added P1-M28 (simple refactoring), P1-M29 (owner-requested bug/UX/GUI fixes, behavior, refactoring, architecture changes), P1-M30 (refactoring) and P1-M31 (the same as P1-M29, again).

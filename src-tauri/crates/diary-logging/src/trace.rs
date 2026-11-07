@@ -21,7 +21,7 @@ const MAX_FILES_PER_ROLE: usize = 16;
 pub const LEGEND: &str = "ts=local time with offset; lvl=level; role=server|client; code=event (the message); \
 trace=request id shared by client and server; res=resource {kind,id,rev=revision,bytes,lines,\
 fp=keyed content fingerprint comparable only within one process run,state,path=path class}; \
-err=error tag; n=count (milliseconds for agent records); agent={kind,action,phase=last phase reached,code=error code,stop,exit,reason,status,changed,esc=escaped processes,ev=events,in/out=bytes,xn=exit number}. Logs hold no content, paths or credentials.";
+err=error tag; fault=connection fault; n=count (milliseconds for agent records); agent={kind,action,phase=last phase reached,code=error code,stop,exit,reason,status,changed,esc=escaped processes,ev=events,in/out=bytes,xn=exit number}. Logs hold no content, paths or credentials.";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Selector {
@@ -31,6 +31,8 @@ pub enum Selector {
     Resource(ResourceKind, OpaqueId),
     /// The last n warn/error records, to find a trace ID when none is known.
     Recent(u8),
+    /// The last n records of any level, including debug.
+    Debug(u8),
 }
 
 impl Selector {
@@ -43,6 +45,10 @@ impl Selector {
             "res" => {
                 let (kind, id) = rest.split_once(':')?;
                 Self::Resource(ResourceKind::parse(kind)?, OpaqueId::parse(id)?)
+            }
+            "debug" => {
+                let n: u8 = rest.parse().ok()?;
+                (1..=MAX_RECENT).contains(&n).then_some(Self::Debug(n))?
             }
             "recent" => {
                 let n: u8 = rest.parse().ok()?;
@@ -63,6 +69,7 @@ impl Selector {
                 .as_ref()
                 .is_some_and(|d| d.kind == *kind && d.id == *id),
             Self::Recent(_) => matches!(line.level, Level::Warn | Level::Error),
+            Self::Debug(_) => true,
         }
     }
 }
@@ -110,7 +117,7 @@ pub fn collect_bounded(
     // first `limit` in time order (one extra shows truncation). Keys are (epoch_ms, role
     // order, match order) so the merge is deterministic.
     let keep = match selector {
-        Selector::Recent(n) => usize::from(*n),
+        Selector::Recent(n) | Selector::Debug(n) => usize::from(*n),
         _ => limit + 1,
     };
     let mut kept: BTreeMap<(i64, u8, usize), ParsedLine> = BTreeMap::new();
@@ -139,7 +146,7 @@ pub fn collect_bounded(
                             kept.insert((line.epoch_ms, order as u8, seen), line);
                             seen += 1;
                             if kept.len() > keep {
-                                if matches!(selector, Selector::Recent(_)) {
+                                if matches!(selector, Selector::Recent(_) | Selector::Debug(_)) {
                                     kept.pop_first();
                                 } else {
                                     kept.pop_last();
@@ -154,7 +161,7 @@ pub fn collect_bounded(
     }
     report.matched = seen;
     let selected: Vec<&ParsedLine> = match selector {
-        Selector::Recent(_) => kept.values().collect(),
+        Selector::Recent(_) | Selector::Debug(_) => kept.values().collect(),
         _ => {
             report.truncated = seen > limit;
             kept.values().take(limit).collect()

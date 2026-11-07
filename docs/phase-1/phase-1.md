@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M27 are 24 theme-level milestones derived from the architecture; the owner (2026-11-07) moved release qualification to P1-M32 and inserted P1-M28–P1-M31. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Done; P1-M21 is Done; P1-M22 is Done; P1-M23 is Done; P1-M24 is Done; P1-M25–P1-M27 are Delivered; P1-M28 is Done; P1-M29–P1-M32 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M27 are 24 theme-level milestones derived from the architecture; the owner (2026-11-07) moved release qualification to P1-M32 and inserted P1-M28–P1-M31. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Done; P1-M21 is Done; P1-M22 is Done; P1-M23 is Done; P1-M24 is Done; P1-M25–P1-M27 are Delivered; P1-M28 is Done; P1-M29 is Active; P1-M30–P1-M32 remain Planned.
 
 ### P1-M1: Research
 
@@ -204,8 +204,9 @@ Plan: [overview](milestone-28-simple-refactoring-overview.md), [work plan](miles
 
 ### P1-M29: Owner-requested revisions
 
-Status: Planned
+Status: Active
 Goal: Bug fixes, UX fixes, GUI fixes, behavior changes, refactoring and architecture changes as the owner requests.
+Plan: [overview](milestone-29-owner-requested-revisions-overview.md), [work plan](milestone-29-owner-requested-revisions-architecture.md); requests are added as checkbox tasks.
 
 ### P1-M30: Refactoring
 
