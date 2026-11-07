@@ -1,18 +1,13 @@
 import { useRef, useState } from "react";
 import type { CalendarAction } from "../application/navigation/contracts";
-import trashIcon from "../assets/trash.png";
 import dateIcon from "../assets/tab-date.png";
 import snippetIcon from "../assets/tab-snippet.png";
 import draftIcon from "../assets/tab-draft.png";
 import entryIcon from "../assets/tab-entry.png";
 import { snippetLabels } from "../application/navigation/snippet-label";
 import { SymbolLabel } from "./Symbol";
+import { SnippetTable } from "./SnippetTable";
 import type { NavigationModel } from "../application/navigation/model";
-import type {
-  Source,
-  SourceItem,
-  TimeAuthority,
-} from "../application/navigation/contracts";
 
 const views = ["Date tab", "Snippet tab", "Draft tab", "Entry tab"] as const;
 const viewIcons = {
@@ -51,167 +46,8 @@ export function Explorer({
     );
   }
   const context = date ? model.imports.view(date) : null;
-  const [choice, setChoice] = useState<{
-    source: Source;
-    authority: TimeAuthority;
-  } | null>(null);
-  const groupOf = (item: SourceItem) =>
-    item.kind === "included" || item.kind === "warning"
-      ? item.source.navigation?.group_id
-      : item.group_id;
   const labels = snippetLabels(context?.page?.items ?? []);
   const groups = context?.page?.groups ?? [];
-  const localDateOf = (item: SourceItem) => {
-    const source = "source" in item ? item.source : null;
-    const local = source?.navigation?.included;
-    return local
-      ? `${local.date} (UTC${local.offset_seconds >= 0 ? "+" : "−"}${String(Math.floor(Math.abs(local.offset_seconds) / 3600)).padStart(2, "0")}:${String(Math.floor((Math.abs(local.offset_seconds) % 3600) / 60)).padStart(2, "0")})`
-      : "Needs attention";
-  };
-  const byLocalDate = (items: SourceItem[]) => {
-    const buckets = new Map<string, SourceItem[]>();
-    for (const item of items) {
-      const key = localDateOf(item);
-      const bucket = buckets.get(key) ?? [];
-      bucket.push(item);
-      buckets.set(key, bucket);
-    }
-    return [...buckets].map(([label, entries]) => (
-      <section key={label} aria-label={label}>
-        <h4>{label}</h4>
-        <ul>{entries.map(row)}</ul>
-      </section>
-    ));
-  };
-  function row(item: SourceItem, index: number) {
-    if (item.kind === "path_collision")
-      return (
-        <li key={`collision-${index}`}>
-          Path collision: {item.relative_keys.join(", ")}
-        </li>
-      );
-    const source = "source" in item ? item.source : null;
-    if (!source)
-      return (
-        <li key={`failure-${index}`}>
-          {item.kind === "failure"
-            ? `${item.relative_key || "Source root"}: ${item.code}`
-            : "Unavailable"}
-        </li>
-      );
-    const inclusion = model.imports.inclusion(source.id);
-    const warning =
-      item.kind !== "included" ||
-      source.dating.state !== "agreed" ||
-      source.duplicate_producer_id;
-    const moved = model.imports.sourceDisabled(source);
-    const trashReason = model.trashReason(source);
-    return (
-      <li key={source.id} onFocusCapture={() => model.focusSnippet(source)}>
-        <div className="snippet-row">
-          <input
-            type="checkbox"
-            aria-label={`Include ${labels.get(source.id) ?? source.relative_key}`}
-            checked={!!inclusion?.checked && source.eligible && !moved}
-            disabled={!source.eligible || !!context?.stale || moved}
-            onChange={(e) =>
-              date &&
-              model.imports.setIncluded(date, source.id, e.target.checked)
-            }
-          />
-          <button
-            disabled={!source.capabilities.read || !!context?.stale || moved}
-            title={source.relative_key}
-            onClick={() => void model.openSource(source)}
-          >
-            {labels.get(source.id) ?? source.relative_key}
-          </button>
-          <button
-            className="snippet-trash"
-            disabled={!!trashReason}
-            title={trashReason ?? "Preview this snippet and its related audio"}
-            aria-label={`Move ${labels.get(source.id) ?? source.relative_key} to Trash`}
-            onClick={() => void model.trashSource(source)}
-          >
-            <span
-              aria-hidden="true"
-              className="symbol"
-              style={{
-                width: 16,
-                height: 16,
-                maskImage: `url(${trashIcon})`,
-                WebkitMaskImage: `url(${trashIcon})`,
-              }}
-            />
-          </button>
-        </div>
-        {moved && (
-          <p>Moved to Trash. Refresh snippets before using this row again.</p>
-        )}
-        {inclusion?.invalidated && (
-          <p>Selection invalidated: {inclusion.invalidated}.</p>
-        )}
-        {item.kind === "failure" && <p>{item.code}</p>}
-        {warning && (
-          <details>
-            <summary>Metadata warning</summary>
-            <p>
-              Timestamp status: {source.dating.state.replaceAll("_", " ")}
-              {source.duplicate_producer_id ? "; duplicate producer ID" : ""}.
-            </p>
-            <p>
-              Header:{" "}
-              {source.navigation?.header?.datetime ??
-                source.header_invalid ??
-                "unavailable"}
-            </p>
-            <p>
-              Filename:{" "}
-              {source.navigation?.filename?.datetime ??
-                source.filename_invalid ??
-                "unavailable"}
-            </p>
-            {source.navigation?.authority && (
-              <p>Chosen authority: {source.navigation.authority}.</p>
-            )}
-            {(["header", "filename"] as const).map((authority) => (
-              <button
-                key={authority}
-                disabled={
-                  !source.navigation?.[authority] ||
-                  !!context?.stale ||
-                  moved ||
-                  !!context?.resolving
-                }
-                onClick={() => setChoice({ source, authority })}
-              >
-                Use {authority} time
-              </button>
-            ))}
-            {!moved && choice?.source.id === source.id && (
-              <p>
-                Use {choice.authority} time for a new import?{" "}
-                <button
-                  onClick={() => {
-                    if (date)
-                      void model.imports.resolve(
-                        date,
-                        source,
-                        choice.authority,
-                      );
-                    setChoice(null);
-                  }}
-                >
-                  Confirm authority
-                </button>{" "}
-                <button onClick={() => setChoice(null)}>Cancel</button>
-              </p>
-            )}
-          </details>
-        )}
-      </li>
-    );
-  }
   return (
     <aside aria-label="Explorer" className="explorer">
       <h2>Explorer</h2>
@@ -372,18 +208,13 @@ export function Explorer({
               {context.page && context.items.length === 0 && (
                 <p>No snippets found.</p>
               )}
-              {groups.map((group) => (
-                <details key={group.id} open>
-                  <summary>
-                    {group.alias} · {group.type}
-                  </summary>
-                  {byLocalDate(
-                    context.items.filter((item) => groupOf(item) === group.id),
-                  )}
-                </details>
-              ))}
-              {context.items.some((item) => !groupOf(item)) &&
-                byLocalDate(context.items.filter((item) => !groupOf(item)))}
+              <SnippetTable
+                model={model}
+                context={context}
+                date={date}
+                labels={labels}
+                groups={groups}
+              />
               {context.page?.next_cursor != null && (
                 <button
                   disabled={context.phase === "loading"}

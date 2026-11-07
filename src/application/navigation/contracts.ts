@@ -144,6 +144,8 @@ export interface SourceBody {
   source: Source;
   snapshot_id: string;
   body: string;
+  /** Raw metadata header text, read-only; empty when the file has none. */
+  front_matter: string;
   capabilities: SourceCapabilities;
 }
 export interface ImportJob {

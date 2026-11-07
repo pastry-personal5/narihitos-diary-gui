@@ -244,6 +244,10 @@ export class NavigationModel {
     }
     await this.resources.openSource(source);
   }
+  /** Read-only text of a listed source for the Detail overlay; does not open an editor tab. */
+  readSource(source: Source) {
+    return this.bridge.readSource(source.id, source.import_id);
+  }
   focusSnippet(source: Source) {
     if (
       this.focusedSnippet?.id === source.id &&

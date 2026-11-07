@@ -179,6 +179,8 @@ pub struct SourceBody {
     pub source: Source,
     pub snapshot_id: String,
     pub body: String,
+    #[serde(default)]
+    pub front_matter: String,
     pub capabilities: Capabilities,
 }
 fn digest_shape(s: &str) -> bool {

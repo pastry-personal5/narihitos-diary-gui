@@ -441,7 +441,7 @@ pub(super) async fn read(
         let view = st.read(&q.snapshot_id, &id, generation, &|| cancelled(&s, &session)).map_err(|e| match e { ViewError::Stale => "source_stale", ViewError::Outcome(o) => failure_code(&o) })?;
         if generation != s.config_generation.load(Ordering::SeqCst) || cancelled(&s, &session) { return Err("source_stale"); }
         if view.body.len() > diary_domain::authentic::MAX_BODY_BYTES { return Err("too_large"); }
-        let value = json!({"source":enhanced_source(&view.listing,&snapshot,false,s.source_trash.as_ref().is_some_and(|t|t.available())),"snapshot_id":q.snapshot_id,"body":view.body,"capabilities":source_capabilities(view.write, view.trash, s.source_trash.as_ref().is_some_and(|t|t.available()))});
+        let value = json!({"source":enhanced_source(&view.listing,&snapshot,false,s.source_trash.as_ref().is_some_and(|t|t.available())),"snapshot_id":q.snapshot_id,"body":view.body,"front_matter":view.raw_front_matter,"capabilities":source_capabilities(view.write, view.trash, s.source_trash.as_ref().is_some_and(|t|t.available()))});
         let bytes = serde_json::to_vec(&value).map_err(|_|"internal")?;
         if bytes.len() > 10 * 1024 * 1024 { return Err("too_large"); }
         Ok(bytes)

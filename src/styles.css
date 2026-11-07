@@ -623,8 +623,11 @@ footer {
   color: var(--muted);
   border-right: 1px solid var(--line);
 }
+.cm-editor .cm-content {
+  caret-color: #fff;
+}
 .cm-editor .cm-cursor {
-  border-left-color: var(--text);
+  border-left-color: #fff;
 }
 
 .toolbar,
@@ -686,4 +689,42 @@ footer {
 .profile-picker {
   display: grid;
   gap: 4px;
+}
+.snippet-table {
+  font-size: 10px;
+  width: 100%;
+  border-collapse: collapse;
+}
+.snippet-table th,
+.snippet-table td {
+  padding: 0 2px;
+  line-height: 1.2;
+  text-align: left;
+  vertical-align: middle;
+}
+.snippet-table td button {
+  padding: 1px 3px;
+  background: transparent;
+  border-color: transparent;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.snippet-table .snippet-trash {
+  padding: 1px;
+}
+.snippet-table tbody tr:nth-child(even) {
+  background: var(--surface);
+}
+.snippet-actions {
+  white-space: nowrap;
+}
+.snippet-text {
+  max-height: 40vh;
+  overflow: auto;
+  margin: 8px 0;
+  padding: 6px;
+  background: var(--panel);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
 }

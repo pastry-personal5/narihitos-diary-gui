@@ -20,7 +20,7 @@ export interface EditorResource {
   date?: string;
   buffer: ResourceBuffer;
   session?: AuthenticSession;
-  source?: Omit<SourceBody, "body">;
+  source?: Omit<SourceBody, "body" | "front_matter">;
   loading: boolean;
   error: string | null;
   dirty: boolean;

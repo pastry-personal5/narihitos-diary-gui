@@ -388,6 +388,8 @@ export function sourceBodyDto(v: unknown): SourceBody {
     new TextEncoder().encode(d.body).byteLength > 1024 * 1024
   )
     return bad();
+  const front = d.front_matter ?? "";
+  if (typeof front !== "string" || front.length > 64 * 1024) return bad();
   const s = source(d.source),
     snapshot = id(d.snapshot_id);
   if (s.import_id !== snapshot || !s.capabilities.read) return bad();
@@ -395,6 +397,7 @@ export function sourceBodyDto(v: unknown): SourceBody {
     source: s,
     snapshot_id: snapshot,
     body: d.body,
+    front_matter: front,
     capabilities: caps(d.capabilities),
   };
 }
