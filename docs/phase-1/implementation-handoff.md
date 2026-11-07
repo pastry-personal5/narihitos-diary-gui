@@ -113,3 +113,5 @@ closed progress drive in-app feedback. The [M23 checklist](../archive/milestones
 records targeted tests and the synthetic built-server smoke; the full seven-command gate and synthetic built-server smoke passed on 2026-11-07. Paragraph review and the review-dependent discard guards were delivered in P1-M24 (see its [checklist](../archive/milestones/p1-m24/milestone-24-paragraph-review-overview.md)). P1-M28 retains all packaged slow-run/editing/autosave, native interaction,
 wake/reconnect and measured performance obligations in the phase plan. Native
 VoiceOver proof remains exempt; no real Qwen leg ran (exempt: GPU throttling).
+
+P1-M25 delivered the destination-neutral export foundation (E7/E8 coordination only): see its [checklist](../archive/milestones/p1-m25/milestone-25-export-coordination-overview.md). It is proven against a fake destination; real File Provider and Notion behavior, export UI, cancellation and clearing an `uncertain` export remain P1-M26/M27.

@@ -8,6 +8,7 @@ pub mod agent;
 pub mod authentic;
 pub mod chat;
 pub mod diagnostics;
+pub mod export;
 pub mod generation;
 pub mod operations;
 pub mod review;

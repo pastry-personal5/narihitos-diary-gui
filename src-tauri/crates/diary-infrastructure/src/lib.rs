@@ -7,6 +7,7 @@ pub mod authentic;
 pub mod authentic_fs;
 pub mod config;
 pub mod coordination;
+pub mod export;
 pub mod ledger;
 pub mod lifecycle;
 pub mod sqlite;

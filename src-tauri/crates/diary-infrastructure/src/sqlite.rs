@@ -14,6 +14,7 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
     (3, include_str!("sqlite/0003_imports.sql")),
     (4, include_str!("sqlite/0004_import_snapshots.sql")),
     (5, include_str!("sqlite/0005_source_trash.sql")),
+    (6, include_str!("sqlite/0006_export.sql")),
 ];
 const REQUIRED_TABLES: &[&str] = &[
     "schema_migrations",
@@ -29,6 +30,10 @@ const REQUIRED_TABLES: &[&str] = &[
     "trash_plans",
     "trash_members",
     "trash_authorizations",
+    "export_operations",
+    "export_receipts",
+    "export_checkpoints",
+    "export_authorizations",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

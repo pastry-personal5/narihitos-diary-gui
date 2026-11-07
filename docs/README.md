@@ -2,9 +2,13 @@
 
 Status: Active
 
+- [P1-M25 export review follow-up](archive/milestones/p1-m25/milestone-25-export-review-overview.md): ordering, confirmation idempotency and destination binding regression fixes.
+
 This index lists the design and process docs, one line each. Read only the doc you need. The rules for writing docs are in [AGENTS.md](../AGENTS.md) under "Documentation".
 
+- [P1-M25 overview/checklist](archive/milestones/p1-m25/milestone-25-export-coordination-overview.md) and [work plan](archive/milestones/p1-m25/milestone-25-export-coordination-architecture.md): delivered export snapshot, receipts, reservations and confirmation steps against a fault-injection fake destination; no UI, no real iCloud/Notion.
 - [P1-M24 overview/checklist](archive/milestones/p1-m24/milestone-24-paragraph-review-overview.md) and [work plan](archive/milestones/p1-m24/milestone-24-paragraph-review-architecture.md): completed paragraph review and acceptance (unified-merge-style GUI, durable per-paragraph accepts), automated tests, synthetic built-server smoke, full gate and the P1-M28 packaged-evidence handoff.
+- [P1-M24 open review findings](archive/milestones/p1-m24/milestone-24-open-review-findings.md): five post-delivery review issues awaiting owner decisions (separator handling, mutex scope, typing loss, false invalidation, stale view).
 
 - [P1-M23 overview/checklist](archive/milestones/p1-m23/milestone-23-background-ai-activity-results-overview.md) and [work plan](archive/milestones/p1-m23/milestone-23-background-ai-activity-results-architecture.md): completed shared AI activity/results, live-session discovery/reconciliation, passing automated acceptance/full gate and explicit P1-M28 packaged evidence handoff.
 

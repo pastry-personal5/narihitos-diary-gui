@@ -77,6 +77,8 @@ See [README.md](README.md) for the overview and [docs/product-behavior.md](docs/
 
 - **P1-M24 approvals (owner, 2026-11-07):** Approved a pinned `pulldown-cmark` dependency in `diary-domain` (license-notice review), SHA-256 digests computed in infrastructure behind a hasher port, and closing on automated tests, a synthetic built-server smoke and the full gate with packaged native proof moved to P1-M28. See the [work plan](docs/archive/milestones/p1-m24/milestone-24-paragraph-review-architecture.md). Delivered 2026-11-07: automated tests, `python3 scripts/smoke/review.py` and the full gate passed; packaged native proof is P1-M28.
 
+- **P1-M25 approvals (owner, 2026-11-07):** Export coordination ships as backend plus `POST /exports`, `POST /exports/{id}/confirmation` and bridge commands with no UI, against a fault-injection fake destination only; closes on automated tests, a synthetic built-server smoke and the full gate. No new dependency; one additive migration. The five open P1-M24 review findings are tracked separately and do not block it. Clearing or abandoning an `uncertain` export is deferred to P1-M26/M27, and the stored snapshot body is deleted at any terminal state. Delivered 2026-11-07; production registers no destination adapter (targets `disabled`), the directory-backed fake exists only for tests and the `fault-injection` build (`DIARY_FAKE_EXPORT_DIR`). Also: coarse reload guard, gate unchanged, `job_changed` events plus polling, and no export cancellation until P1-M26. See the [overview](docs/archive/milestones/p1-m25/milestone-25-export-coordination-overview.md#owner-decisions-2026-11-07) and [corrections](docs/archive/milestones/p1-m25/milestone-25-export-coordination-architecture.md#plan-review-corrections-2026-11-07).
+
 ## Undecided — ask before inventing
 
 The [P1-M2 owner interview](docs/phase-1/milestone-02-owner-decisions.md) resolves the earlier product choices. The maintained [architecture](docs/architecture.md) resolves delegated internal design work; do not ask again about already approved choices. Ask before changing those choices or inventing new product behavior outside the delegation.
@@ -109,6 +111,7 @@ python3 scripts/smoke/agent.py                                                  
 DIARY_GENERATION_LIVE=codex DIARY_GENERATION_LIVE_HOME=/absolute/profile python3 scripts/smoke/generation-live.py # real candidate + cancel; claude/apple also supported; Qwen exempt
 python3 scripts/smoke/authentic.py                                                                                 # Authentic create/save/restart/kill-recovery smoke on the real server binary
 python3 scripts/smoke/review.py                                                                                    # Paragraph review: start/reject/accept/invalidate/kill-recovery on a fault-injection server binary
+python3 scripts/smoke/export.py # Export coordination: create/no-op/confirmation/duplicate/kill-recovery on the fault-injection server with the directory-backed fake destination
 cargo run --manifest-path src-tauri/Cargo.toml -p diary-server -- trace --config PATH --select recent:20        # redacted debugging trace of the logs
 ```
 

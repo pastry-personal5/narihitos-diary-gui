@@ -180,8 +180,9 @@ Plan: [overview](../archive/milestones/p1-m24/milestone-24-paragraph-review-over
 
 ### P1-M25: Export coordination and confirmations
 
-Status: Planned
+Status: Delivered (2026-11-07)
 Goal: Establish saved-revision export snapshots, destination reservations, authoritative receipts and checkpointed conflict confirmation and reconciliation.
+Plan: [overview](../archive/milestones/p1-m25/milestone-25-export-coordination-overview.md), [work plan](../archive/milestones/p1-m25/milestone-25-export-coordination-architecture.md); owner decisions O1–O9 recorded (2026-11-07). Delivered against a fault-injection fake destination only; real iCloud and Notion remain P1-M26/M27.
 
 ### P1-M26: iCloud export
 

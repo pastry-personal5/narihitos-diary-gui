@@ -116,6 +116,8 @@ describe("explicit command permission boundary", () => {
     "preview_source_delete",
     "confirm_source_delete",
     "list_source_deletions",
+    "start_export",
+    "confirm_export",
     "import_date",
     "list_sources",
     "resolve_source_time",

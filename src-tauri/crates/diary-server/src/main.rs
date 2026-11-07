@@ -220,6 +220,23 @@ async fn run() -> Result<(), &'static str> {
             Arc::new(diary_infrastructure::authentic::Sha256Hasher),
         );
     }
+    // Production registers no destination, so exports stay disabled while lookup, recovery and
+    // the settings-reload guard work. The directory-backed fake is fault-injection only.
+    if let Some(store) = watched_store.clone() {
+        #[cfg(feature = "fault-injection")]
+        let adapter: Option<Arc<dyn diary_application::export::ExportAdapter>> =
+            std::env::var_os("DIARY_FAKE_EXPORT_DIR").map(|dir| {
+                Arc::new(diary_infrastructure::export::fake::Fake::new(dir.into())) as _
+            });
+        #[cfg(not(feature = "fault-injection"))]
+        let adapter: Option<Arc<dyn diary_application::export::ExportAdapter>> = None;
+        if let Some(service) = workspace.exports(store, adapter) {
+            if service.recover().is_err() {
+                diagnostics.emit(Record::new(EventCode::OperationBlocked, Level::Error));
+            }
+            diary_api::ServerState::set_exports(&mut state, Arc::new(service));
+        }
+    }
     let launch_path = std::env::var_os("PATH").unwrap_or_default();
     let launch_cwd = std::env::current_dir().map_err(|_| "launch directory unavailable")?;
     diary_api::ServerState::set_startup(
@@ -264,6 +281,7 @@ async fn run() -> Result<(), &'static str> {
     );
     #[cfg(feature = "scaffold-smoke")]
     diary_api::ServerState::set_smoke_folders(&mut state, native_smoke::folders(&config));
+    diary_api::ServerState::wire_exports(&state);
     // shortcut: a tree that does not exist yet is not watched until the next start.
     let tree = config.paths.entries_root.join("assets/diary/authentic");
     let _watch = (workspace.readiness == Readiness::Ready && tree.is_dir())

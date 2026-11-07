@@ -2,6 +2,7 @@
 mod authentic;
 mod calendar;
 mod chats;
+mod exports;
 mod generations;
 mod imports;
 mod profiles;
@@ -55,6 +56,8 @@ pub struct ServerState {
     imports: Option<Arc<dyn diary_application::imports::ImportStore>>,
     source_writer: Option<Arc<dyn diary_application::source::SourceWriter>>,
     source_trash: Option<Arc<dyn diary_application::source_trash::SourceTrash>>,
+    exports: Option<Arc<dyn diary_application::export::Exports>>,
+    export_jobs: Mutex<std::collections::BTreeMap<String, (String, u64, &'static str)>>,
     profiles: Option<Arc<dyn diary_application::agent::ProfileDirectory>>,
     agent_runner: Option<Arc<dyn diary_application::agent::AgentRunner + Send + Sync>>,
     chat: Mutex<Option<diary_application::chat::Chat>>,
@@ -97,6 +100,8 @@ impl ServerState {
             imports: None,
             source_writer: None,
             source_trash: None,
+            exports: None,
+            export_jobs: Mutex::new(std::collections::BTreeMap::new()),
             profiles: None,
             agent_runner: None,
             chat: Mutex::new(None),
@@ -175,6 +180,33 @@ impl ServerState {
         Arc::get_mut(state)
             .expect("startup precedes shared use")
             .source_trash = Some(service);
+    }
+    pub fn set_exports(
+        state: &mut Arc<Self>,
+        service: Arc<dyn diary_application::export::Exports>,
+    ) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .exports = Some(service);
+    }
+    /// Call last: the notifier holds a weak reference, which forbids further `set_*` calls.
+    pub fn wire_exports(state: &Arc<Self>) {
+        let Some(service) = &state.exports else {
+            return;
+        };
+        let weak = Arc::downgrade(state);
+        service.set_notifier(Arc::new(move |r| {
+            let Some(s) = weak.upgrade() else { return };
+            let session = s
+                .export_jobs
+                .lock()
+                .expect("export jobs poisoned")
+                .get(r.operation_id.as_str())
+                .map(|m| m.0.clone());
+            if let Some(session) = session {
+                exports::sync(&s, &session, r);
+            }
+        }));
     }
     /// Called when the client lease ends (expiry, close or shutdown): agent runs belong to the lease.
     pub fn set_lease_ended(state: &mut Arc<Self>, hook: Arc<dyn Fn() + Send + Sync>) {
@@ -337,6 +369,14 @@ pub fn router(state: Arc<ServerState>) -> Router {
             post(source_trash::confirm).layer(DefaultBodyLimit::max(4096)),
         )
         .route("/api/v1/operations", get(source_trash::unfinished))
+        .route(
+            "/api/v1/exports",
+            post(exports::start).layer(DefaultBodyLimit::max(4096)),
+        )
+        .route(
+            "/api/v1/exports/{id}/confirmation",
+            post(exports::confirm).layer(DefaultBodyLimit::max(4096)),
+        )
         .route(
             "/api/v1/sources/{id}/time-resolution",
             post(imports::resolve).layer(DefaultBodyLimit::max(4096)),
@@ -730,6 +770,11 @@ async fn reload_settings(State(s): State<Arc<ServerState>>, headers: HeaderMap) 
             Ok(jobs) => jobs.iter().any(|job| !job.state.is_terminal()),
             Err(e) => return app_error(e),
         };
+    // Paused or uncertain exports survive restarts, so the ledger decides, not session jobs.
+    let busy = busy
+        || s.exports
+            .as_ref()
+            .is_some_and(|e| e.has_unfinished().unwrap_or(true));
     let Some(reloader) = s.reloader.clone() else {
         return failure(StatusCode::SERVICE_UNAVAILABLE, "unavailable");
     };
@@ -859,6 +904,9 @@ async fn cancel_job(
         Ok(id) => id,
         Err(e) => return app_error(e),
     };
+    if exports::is_export_job(&s, &job) {
+        return failure(StatusCode::UNPROCESSABLE_ENTITY, "unsupported");
+    }
     let mut c = s.coordinator.lock().expect("coordinator poisoned");
     let was_terminal = c
         .get(id, s.now(), &job)

@@ -198,3 +198,34 @@ fn snapshots_migrate_legacy_contexts_without_reconstructing_sources() {
     assert!(matches!(db.snapshot("legacy"), Err(ImportError::Stale)));
     assert_eq!(pragma(&db, "user_version"), MIGRATIONS.len() as i64);
 }
+
+// T03: the export migration is additive over the released 0005 schema.
+#[test]
+fn m25_upgrades_schema_five_keeping_rows_and_adding_export_tables() {
+    let (_t, dir, path) = private_dir();
+    dir.create(DB_FILE).unwrap();
+    let mut conn = Connection::open(path.join(DB_FILE)).unwrap();
+    migrate(&mut conn, &MIGRATIONS[..5]).unwrap();
+    conn.execute("INSERT INTO workspace_meta VALUES (1, 'kept')", [])
+        .unwrap();
+    drop(conn);
+    let db = Db::open_existing(&dir, &path.join(DB_FILE), false).unwrap();
+    assert_eq!(pragma(&db, "user_version"), 6);
+    let (kept, tables): (String, i64) = db
+        .with(|c| {
+            let kept = c
+                .query_row("SELECT workspace_id FROM workspace_meta", [], |r| r.get(0))
+                .map_err(|_| DbError::Storage)?;
+            let tables = c
+                .query_row(
+                    "SELECT count(*) FROM sqlite_master WHERE name IN \
+                     ('export_operations','export_receipts','export_checkpoints','export_authorizations')",
+                    [],
+                    |r| r.get(0),
+                )
+                .map_err(|_| DbError::Storage)?;
+            Ok((kept, tables))
+        })
+        .unwrap();
+    assert_eq!((kept.as_str(), tables), ("kept", 4));
+}

@@ -383,6 +383,25 @@ async fn list_source_deletions(
     state.list_source_deletions(cursor, limit).await
 }
 #[tauri::command]
+async fn start_export(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    request: bridge::StartExportRequest,
+) -> Result<bridge::StartExportResult, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.start_export(request).await
+}
+#[tauri::command]
+async fn confirm_export(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    operation_id: String,
+    request: bridge::ConfirmExportRequest,
+) -> Result<bridge::ExportAcknowledged, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.confirm_export(operation_id, request).await
+}
+#[tauri::command]
 async fn import_date(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -653,6 +672,8 @@ fn main() {
             preview_source_delete,
             confirm_source_delete,
             list_source_deletions,
+            start_export,
+            confirm_export,
             import_date,
             list_sources,
             resolve_source_time,

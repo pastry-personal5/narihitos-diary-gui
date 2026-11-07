@@ -39,6 +39,8 @@
     "allow-preview-source-delete",
     "allow-confirm-source-delete",
     "allow-list-source-deletions",
+    "allow-start-export",
+    "allow-confirm-export",
     "allow-import-date",
     "allow-list-sources",
     "allow-resolve-source-time",

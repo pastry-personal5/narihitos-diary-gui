@@ -123,6 +123,23 @@ impl Workspace {
             sources,
         )))
     }
+    /// The export service. Production passes no adapter, so every target is `disabled` while
+    /// lookup, recovery and the reload guard still work.
+    pub fn exports(
+        &self,
+        authentic: Arc<dyn diary_application::authentic::AuthenticStore>,
+        adapter: Option<Arc<dyn diary_application::export::ExportAdapter>>,
+    ) -> Option<crate::export::Service> {
+        let (Some(db), Readiness::Ready) = (&self.db, self.readiness) else {
+            return None;
+        };
+        Some(crate::export::Service::new(
+            db.clone(),
+            self.identity.clone(),
+            authentic,
+            adapter,
+        ))
+    }
     /// The lock proves exclusivity; recovery and inspection modes expose no ledger.
     pub fn open(lock: &WorkspaceLock) -> Result<Self, WorkspaceError> {
         open_with(lock, None)
@@ -184,6 +201,7 @@ impl Workspace {
                 KIND_REVIEW,
                 KIND_SOURCE_SAVE,
                 "source_trash",
+                diary_application::export::KIND,
             ],
         ))
     }

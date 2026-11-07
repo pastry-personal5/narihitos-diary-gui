@@ -328,13 +328,16 @@ pub(super) async fn unfinished(
         Err(_) => return error(DeleteError::Invalid),
     };
     let limit = input.limit.unwrap_or(50);
-    if input.kind != "source_trash"
+    if !matches!(input.kind.as_str(), "source_trash" | "export")
         || input.state != "unfinished"
         || limit == 0
         || limit > 100
         || input.cursor.as_ref().is_some_and(|c| c.len() > 128)
     {
         return error(DeleteError::Invalid);
+    }
+    if input.kind == "export" {
+        return super::exports::unfinished(&s, input.cursor, limit).await;
     }
     let Some(service) = s.source_trash.clone() else {
         return error(DeleteError::Unsupported);

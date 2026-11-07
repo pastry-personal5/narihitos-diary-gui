@@ -58,6 +58,8 @@ pub struct OperationState {
     pub result: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trash: Option<super::source_trash::TrashResult>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub export: Option<super::export::ExportResult>,
 }
 /// `current_revision` is part of the contract but P1-M6 conflicts do not carry it, so clients
 /// reload after a conflict.
@@ -126,6 +128,10 @@ const SERVER_CODES: &[&str] = &[
     "review_unsupported",
     "review_limit",
     "review_active",
+    "export_disabled",
+    "nothing_to_export",
+    "stale_revision",
+    "unsupported",
 ];
 const LOCAL_CODES: &[&str] = &[
     "permission_denied",
@@ -321,6 +327,12 @@ impl Bridge {
             .await?;
         if result.operation_id != operation_id
             || (result.kind.as_deref() == Some("source_trash")) != result.trash.is_some()
+            || (result.kind.as_deref() == Some("export")) != result.export.is_some()
+            || result.export.as_ref().is_some_and(|r| {
+                !r.valid()
+                    || r.operation_id != operation_id
+                    || Some(r.checkpoint) != result.checkpoint
+            })
             || result.trash.as_ref().is_some_and(|r| {
                 !r.valid()
                     || r.operation_id != operation_id

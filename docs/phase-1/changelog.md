@@ -4,7 +4,16 @@ Status: Active
 
 This log records Phase 1 decisions and material plan changes. Research recommendations remain proposals unless an owner decision is recorded.
 
+## Export review follow-up (2026-11-07)
+
+- Hardened the delivered export contract: persist intent/reserve before remote observation, return concurrent duplicate confirmation admissions without repeating writes, and reject paused-operation previews/confirmations against a changed destination root. See the [review checklist](../archive/milestones/p1-m25/milestone-25-export-review-overview.md) for regression evidence.
+
 ## Entries
+
+- 2026-11-07 — agent, P1-M25 delivered — Implemented destination-neutral export coordination: saved-revision snapshot, durable intent before any destination call, receipts and per-chunk checkpoints (migration 0006), ledger destination reservations, session-bound 60 s one-use confirmation tokens consumed atomically with the step checkpoint, recovery by read-back (never a replayed write), `POST /exports`, `POST /exports/{id}/confirmation`, typed `export` lookup and unfinished listing, `job_changed` events, bridge `start_export`/`confirm_export`, and a ledger-based settings-reload `busy`. Production registers no adapter (every target `disabled`; `exports_available` stays false); the directory-backed fake exists only for tests and the `fault-injection` build. Snapshot bound is the rendered file (body bound plus 64 KiB front matter), not the body alone. No new dependency. Plans archived under [P1-M25](../archive/milestones/p1-m25/milestone-25-export-coordination-overview.md).
+- 2026-11-07 — owner/agent, P1-M25 planned — Owner chose backend plus routes/bridge with no UI, closing on automated tests, a synthetic built-server smoke and the full gate, and allowed dependencies/schema changes. Plan needs no new dependency and one additive migration; real iCloud/Notion proof stays with P1-M26/M27. See the [overview](../archive/milestones/p1-m25/milestone-25-export-coordination-overview.md).
+- 2026-11-07 — owner/agent, P1-M25 follow-up — Owner kept the coarse reload guard (O6) and the unchanged gate (O7), chose `job_changed` events in addition to polling (O8) and deferred export cancellation to P1-M26 (O9). See the [overview](../archive/milestones/p1-m25/milestone-25-export-coordination-overview.md).
+- 2026-11-07 — owner/agent, P1-M25 plan reviewed — Corrected the plan against the code (durable state mapping, ledger reservations, reload guard including post-restart exports, fault-injection feature, receipt key, token delivery, typed lookup). Owner: M24 open findings tracked separately (O4); clearing an uncertain export deferred to P1-M26/M27 and the snapshot body dropped at terminal state (O5). See the [work plan](../archive/milestones/p1-m25/milestone-25-export-coordination-architecture.md#plan-review-corrections-2026-11-07).
 
 - 2026-11-07 — agent, P1-M23 completed — Added shared toolbar activity/results, validated body-less discovery, lease-preserving reconnect with a negotiated replay boundary, frozen same-ID admission recovery, bounded chat previews and shared payload accounting. Automated acceptance, built-server synthetic smoke and the full seven-command gate passed (312 frontend tests). Completed plans are archived; P1-M24 is next. Packaged proof remains P1-M28; real Qwen is exempt: GPU throttling.
 
