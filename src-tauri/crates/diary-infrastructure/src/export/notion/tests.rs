@@ -195,21 +195,10 @@ fn duplicate_and_disordered_hierarchy_is_a_structural_conflict() {
         Some(Unavailable::Structural)
     );
 
-    // A day listed twice.
+    // A day listed twice with different text (a bare duplicate heading is an unfinished move).
     let e = env();
     e.put("2026-11-07", "x\n");
-    e.fake
-        .external_block(&e.month(), &day_heading("2026-11-07"), None);
-    assert_eq!(
-        e.seen("2026-11-07").unavailable,
-        Some(Unavailable::Structural)
-    );
-
-    // An earlier day listed after a later one.
-    let e = env();
-    e.put("2026-11-07", "x\n");
-    e.fake
-        .external_block(&e.month(), &day_heading("2026-11-03"), None);
+    e.add_day("2026-11-07 (SAT)", &["different"]);
     assert_eq!(
         e.seen("2026-11-07").unavailable,
         Some(Unavailable::Structural)
@@ -565,4 +554,264 @@ fn a_hand_typed_undated_heading_two_is_absorbed_into_the_previous_day() {
     assert_ne!(after.fingerprint, before.fingerprint);
     assert_ne!(after.digest, before.digest);
     assert_eq!(e.days(), ["2026-11-05 (THU)", "Notes"]);
+}
+
+fn paragraph(text: &str) -> Value {
+    json!({"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":text}}]}})
+}
+impl Env {
+    /// A day added at the end of the month page by hand, whatever its date.
+    fn add_day(&self, title: &str, body: &[&str]) {
+        self.fake
+            .external_block(&self.month(), &day_heading(title), None);
+        for text in body {
+            self.fake
+                .external_block(&self.month(), &paragraph(text), None);
+        }
+    }
+}
+const ASCENDING: [&str; 5] = [
+    "2026-11-01 (SUN)",
+    "2026-11-03 (TUE)",
+    "2026-11-05 (THU)",
+    "2026-11-07 (SAT)",
+    "2026-11-09 (MON)",
+];
+fn page_with_03_last(e: &Env) {
+    for day in ["01", "05", "07"] {
+        assert_eq!(
+            e.put(&format!("2026-11-{day}"), &format!("text {day}\n")),
+            Applied::Done
+        );
+    }
+    e.add_day("2026-11-03 (TUE)", &["text 03"]);
+}
+
+#[test]
+fn observing_a_disordered_page_is_read_only_and_not_structural() {
+    let e = env();
+    page_with_03_last(&e);
+    let writes =
+        |e: &Env| e.fake.count("append") + e.fake.count("delete") + e.fake.count("create_page");
+    let before = writes(&e);
+    assert!(e.seen("2026-11-03").present);
+    assert_eq!(e.seen("2026-11-09"), Observation::absent());
+    assert_eq!(e.seen("2026-11-05").unavailable, None);
+    assert_eq!(writes(&e), before);
+}
+
+#[test]
+fn one_misplaced_day_moves_alone_and_the_requested_day_is_written() {
+    let e = env();
+    page_with_03_last(&e);
+    let (kept_05, kept_07) = (e.heading_id("2026-11-05"), e.heading_id("2026-11-07"));
+    let (appends, deletes) = (e.fake.count("append"), e.fake.count("delete"));
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Done);
+    assert_eq!(e.days(), ASCENDING);
+    for day in ["01", "03", "05", "07", "09"] {
+        assert_eq!(
+            e.range_texts(&format!("2026-11-{day}")),
+            [format!("text {day}")]
+        );
+    }
+    // The days that were in order keep their blocks; only 03 was copied and its original removed.
+    assert_eq!(e.heading_id("2026-11-05"), kept_05);
+    assert_eq!(e.heading_id("2026-11-07"), kept_07);
+    assert_eq!(
+        e.fake.count("append") - appends,
+        4,
+        "copy heading + chunk, then 09's heading + chunk"
+    );
+    assert_eq!(
+        e.fake.count("delete") - deletes,
+        2,
+        "the original's paragraph and heading"
+    );
+}
+
+#[test]
+fn an_ascending_page_costs_no_extra_requests() {
+    let e = env();
+    for day in ["01", "05", "07"] {
+        e.put(&format!("2026-11-{day}"), "x\n");
+    }
+    let (appends, deletes) = (e.fake.count("append"), e.fake.count("delete"));
+    e.put("2026-11-09", "x\n");
+    assert_eq!(e.fake.count("append") - appends, 2);
+    assert_eq!(e.fake.count("delete"), deletes);
+}
+
+#[test]
+fn a_reversed_page_moves_the_minimum() {
+    let e = env();
+    e.put("2026-11-05", "text 05\n");
+    let kept = e.heading_id("2026-11-05");
+    for (title, day) in [
+        ("2026-11-04 (WED)", "04"),
+        ("2026-11-03 (TUE)", "03"),
+        ("2026-11-02 (MON)", "02"),
+        ("2026-11-01 (SUN)", "01"),
+    ] {
+        e.add_day(title, &[&format!("text {day}")]);
+    }
+    let deletes = e.fake.count("delete");
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Done);
+    assert_eq!(
+        e.days(),
+        [
+            "2026-11-01 (SUN)",
+            "2026-11-02 (MON)",
+            "2026-11-03 (TUE)",
+            "2026-11-04 (WED)",
+            "2026-11-05 (THU)",
+            "2026-11-09 (MON)"
+        ]
+    );
+    assert_eq!(e.heading_id("2026-11-05"), kept);
+    assert_eq!(
+        e.fake.count("delete") - deletes,
+        8,
+        "four days, body and heading each"
+    );
+    for day in ["01", "02", "03", "04", "05", "09"] {
+        assert_eq!(
+            e.range_texts(&format!("2026-11-{day}")),
+            [format!("text {day}")]
+        );
+    }
+}
+
+#[test]
+fn the_requested_day_may_itself_be_the_moved_one() {
+    let e = env();
+    page_with_03_last(&e);
+    assert_eq!(e.put("2026-11-03", "rewritten\n"), Applied::Done);
+    assert_eq!(e.days(), &ASCENDING[..4]);
+    assert_eq!(e.range_texts("2026-11-03"), ["rewritten"]);
+    assert!(e.digest_ok("2026-11-03", "rewritten\n"));
+}
+
+#[test]
+fn a_crash_between_copy_and_delete_is_finished_by_the_next_export() {
+    let e = env();
+    page_with_03_last(&e);
+    e.fake.fault("delete", Fault::Drop);
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Unknown);
+    // The verified copy and the original both exist; nothing is lost.
+    assert_eq!(
+        e.days()
+            .iter()
+            .filter(|d| d.starts_with("2026-11-03"))
+            .count(),
+        2
+    );
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Done);
+    assert_eq!(e.days(), ASCENDING);
+    assert_eq!(e.range_texts("2026-11-03"), ["text 03"]);
+}
+
+#[test]
+fn a_crash_in_the_middle_of_the_delete_is_finished_by_the_next_export() {
+    let e = env();
+    for day in ["01", "05", "07"] {
+        e.put(&format!("2026-11-{day}"), "x\n");
+    }
+    e.add_day("2026-11-03 (TUE)", &["first", "second"]);
+    e.fake.fault_after("delete", 1, Fault::Drop);
+    assert_eq!(e.put("2026-11-09", "x\n"), Applied::Unknown);
+    assert_eq!(e.put("2026-11-09", "x\n"), Applied::Done);
+    assert_eq!(e.days(), ASCENDING);
+    assert_eq!(e.range_texts("2026-11-03"), ["first", "second"]);
+}
+
+#[test]
+fn a_lost_reply_on_the_copy_heading_leaves_a_repairable_empty_copy() {
+    let e = env();
+    page_with_03_last(&e);
+    e.fake.fault("append", Fault::LoseReply);
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Unknown);
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Done);
+    assert_eq!(e.days(), ASCENDING);
+    assert_eq!(e.range_texts("2026-11-03"), ["text 03"]);
+}
+
+fn assert_refused_without_writing(e: &Env) {
+    let writes =
+        |e: &Env| e.fake.count("append") + e.fake.count("delete") + e.fake.count("create_page");
+    let before = writes(e);
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Failed);
+    assert_eq!(writes(e), before);
+}
+
+#[test]
+fn a_formatted_day_is_not_moved() {
+    let e = env();
+    for day in ["01", "05", "07"] {
+        e.put(&format!("2026-11-{day}"), "x\n");
+    }
+    e.fake
+        .external_block(&e.month(), &day_heading("2026-11-03 (TUE)"), None);
+    e.fake.external_block(
+        &e.month(),
+        &json!({"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"bold"},"annotations":{"bold":true}}]}}),
+        None,
+    );
+    assert_refused_without_writing(&e);
+}
+
+#[test]
+fn a_foreign_block_in_a_moved_day_refuses() {
+    let e = env();
+    page_with_03_last(&e);
+    e.fake
+        .external_page(&e.month(), "Notes the user keeps here");
+    assert_refused_without_writing(&e);
+}
+
+#[test]
+fn two_different_texts_for_one_day_refuse() {
+    let e = env();
+    page_with_03_last(&e);
+    e.add_day("2026-11-03 (TUE)", &["a different text"]);
+    assert_refused_without_writing(&e);
+}
+
+#[test]
+fn a_moved_day_with_nested_items_keeps_an_equal_digest() {
+    let e = env();
+    for day in ["01", "05", "07"] {
+        e.put(&format!("2026-11-{day}"), "x\n");
+    }
+    e.fake
+        .external_block(&e.month(), &day_heading("2026-11-03 (TUE)"), None);
+    e.fake.external_block(
+        &e.month(),
+        &json!({"object":"block","type":"bulleted_list_item","bulleted_list_item":{
+            "rich_text":[{"type":"text","text":{"content":"a"}}],
+            "children":[{"object":"block","type":"bulleted_list_item","bulleted_list_item":{"rich_text":[{"type":"text","text":{"content":"b"}}]}}]}}),
+        None,
+    );
+    assert_eq!(e.put("2026-11-09", "x\n"), Applied::Done);
+    assert_eq!(e.days()[1], "2026-11-03 (TUE)");
+    assert!(e.digest_ok("2026-11-03", "- a\n  - b\n"));
+}
+
+#[test]
+fn a_long_month_in_small_api_pages_is_reordered() {
+    let e = env_with(2);
+    page_with_03_last(&e);
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Done);
+    assert_eq!(e.days(), ASCENDING);
+}
+
+#[test]
+fn a_preamble_never_moves_during_a_reorder() {
+    let e = env();
+    page_with_03_last(&e);
+    let pre = e
+        .fake
+        .external_block(&e.month(), &paragraph("preamble"), Some(0));
+    assert_eq!(e.put("2026-11-09", "text 09\n"), Applied::Done);
+    assert_eq!(e.fake.children(&e.month())[0], pre);
+    assert_eq!(e.days(), ASCENDING);
 }

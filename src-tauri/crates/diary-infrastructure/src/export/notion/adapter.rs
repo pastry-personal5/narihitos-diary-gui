@@ -59,12 +59,32 @@ enum Slot {
     End,
 }
 
+/// One day of a month page: its date, heading and body block IDs.
+struct Day {
+    iso: String,
+    heading: String,
+    body: Vec<String>,
+}
+
+/// A month page split into days. Duplicate dates that are only an unfinished move (one range is
+/// a prefix or suffix of the other) are reported as `twin`; any other duplicate is structural.
+struct View {
+    items: Vec<wire::Remote>,
+    /// Days in page order, without the twin.
+    ranges: Vec<wire::DayRange>,
+    days: Vec<Day>,
+    /// Indexes into `days` that must move to leave the page ascending.
+    moves: Vec<usize>,
+    twin: Option<Day>,
+}
+
 #[derive(Default)]
 struct Located {
     year: Option<String>,
     month: Option<String>,
-    /// Dated headings of the month page in page order: (ISO date, heading ID).
-    dated: Vec<(String, String)>,
+    /// Days out of order and a leftover half of an interrupted move, both repaired by `apply`.
+    moves: Vec<usize>,
+    twin: Option<Day>,
     /// The target day: its heading ID and body.
     section: Option<(String, Section)>,
     /// The last block of the target day (its heading when the body is empty).
@@ -157,20 +177,26 @@ impl Notion {
     }
     /// Section content, or a structural conflict for any block outside the projection's output
     /// set (O12): a nested page or database must never be trashed by a replace.
-    fn read_blocks(&self, id: &str, depth: usize) -> Result<Section, Fail> {
-        self.section_of(&self.list(id)?, depth)
+    fn read_blocks(&self, id: &str, depth: usize, strict: bool) -> Result<Section, Fail> {
+        self.section_of(&self.list(id)?, depth, strict)
     }
-    fn section_of(&self, items: &[wire::Remote], depth: usize) -> Result<Section, Fail> {
+    /// `strict` also refuses formatted text, which a copy would silently flatten.
+    fn section_of(
+        &self,
+        items: &[wire::Remote],
+        depth: usize,
+        strict: bool,
+    ) -> Result<Section, Fail> {
         let (mut blocks, mut lines) = (Vec::new(), String::new());
         for r in items {
-            if projection::Kind::from_tag(&r.kind).is_none() {
+            if projection::Kind::from_tag(&r.kind).is_none() || (strict && !r.plain) {
                 return Err(Fail::Structural);
             }
             let (children, sub) = if r.has_children {
                 if depth >= wire::depth_limit() {
                     return Err(Fail::Api(Error::Malformed));
                 }
-                let s = self.read_blocks(&r.id, depth + 1)?;
+                let s = self.read_blocks(&r.id, depth + 1, strict)?;
                 (s.blocks.clone(), s.fingerprint(""))
             } else {
                 (Vec::new(), String::new())
@@ -191,7 +217,86 @@ impl Notion {
             .into_iter()
             .find(|d| items[d.heading].id == heading)
             .ok_or(Fail::Api(Error::Malformed))?;
-        self.section_of(&items[range.heading + 1..range.end], 0)
+        self.section_of(&items[range.heading + 1..range.end], 0, false)
+    }
+    fn view(&self, month: &str) -> Result<View, Fail> {
+        let items = self.list(month)?;
+        // Old daily toggles are not migrated (owner, 2026-11-07).
+        if items.iter().any(wire::is_legacy_day) {
+            return Err(Fail::Structural);
+        }
+        let mut ranges = wire::partition(&items);
+        let mut seen = HashSet::new();
+        let dup: Vec<String> = ranges
+            .iter()
+            .filter(|r| !seen.insert(r.iso.clone()))
+            .map(|r| r.iso.clone())
+            .collect();
+        let mut twin = None;
+        match dup.as_slice() {
+            [] => {}
+            [iso] => {
+                let at: Vec<usize> = (0..ranges.len())
+                    .filter(|i| ranges[*i].iso == *iso)
+                    .collect();
+                let [a, b] = at[..] else {
+                    return Err(Fail::Structural);
+                };
+                let read =
+                    |r: &wire::DayRange| self.section_of(&items[r.heading + 1..r.end], 0, false);
+                let (sa, sb) = (read(&ranges[a])?, read(&ranges[b])?);
+                // The shorter range holds nothing the longer one lacks; on equal ranges the
+                // later one goes. Anything else is two different texts for one day.
+                let covers = |long: &Section, short: &Section| {
+                    long.blocks.starts_with(&short.blocks) || long.blocks.ends_with(&short.blocks)
+                };
+                let drop = if sb.blocks.len() <= sa.blocks.len() && covers(&sa, &sb) {
+                    b
+                } else if covers(&sb, &sa) {
+                    a
+                } else {
+                    return Err(Fail::Structural);
+                };
+                let r = ranges.remove(drop);
+                twin = Some(Day {
+                    iso: r.iso,
+                    heading: items[r.heading].id.clone(),
+                    body: items[r.heading + 1..r.end]
+                        .iter()
+                        .map(|i| i.id.clone())
+                        .collect(),
+                });
+            }
+            _ => return Err(Fail::Structural),
+        }
+        let days: Vec<Day> = ranges
+            .iter()
+            .map(|r| Day {
+                iso: r.iso.clone(),
+                heading: items[r.heading].id.clone(),
+                body: items[r.heading + 1..r.end]
+                    .iter()
+                    .map(|i| i.id.clone())
+                    .collect(),
+            })
+            .collect();
+        let dates: Vec<String> = days.iter().map(|d| d.iso.clone()).collect();
+        let moves = wire::plan_moves(&dates);
+        Ok(View {
+            items,
+            ranges,
+            days,
+            moves,
+            twin,
+        })
+    }
+    /// Where the heading of `iso` goes: before the first later day, else at the end.
+    fn slot_for(v: &View, iso: &str) -> Slot {
+        match v.ranges.iter().find(|d| d.iso.as_str() > iso) {
+            Some(d) if d.heading == 0 => Slot::Start,
+            Some(d) => Slot::After(v.items[d.heading - 1].id.clone()),
+            None => Slot::End,
+        }
     }
     fn look(&self, date: &DiaryDate) -> Result<Located, Fail> {
         let year = format!("{:04}", date.year());
@@ -207,33 +312,18 @@ impl Notion {
         let Some(m) = loc.month.clone() else {
             return Ok(loc);
         };
-        let items = self.list(&m)?;
-        // Old daily toggles are not migrated (owner, 2026-11-07).
-        if items.iter().any(wire::is_legacy_day) {
-            return Err(Fail::Structural);
-        }
-        loc.ids = items.iter().map(|r| r.id.clone()).collect();
+        let v = self.view(&m)?;
+        loc.ids = v.items.iter().map(|r| r.id.clone()).collect();
         let iso = date.to_string();
-        let ranges = wire::partition(&items);
-        for range in &ranges {
-            // Strictly ascending also rejects duplicates.
-            if loc.dated.last().is_some_and(|(prev, _)| range.iso <= *prev) {
-                return Err(Fail::Structural);
-            }
-            loc.dated
-                .push((range.iso.clone(), items[range.heading].id.clone()));
-        }
-        loc.slot = match ranges.iter().find(|d| d.iso > iso) {
-            Some(d) if d.heading == 0 => Slot::Start,
-            Some(d) => Slot::After(items[d.heading - 1].id.clone()),
-            None => Slot::End,
-        };
-        if let Some(d) = ranges.iter().find(|d| d.iso == iso) {
-            let id = items[d.heading].id.clone();
-            let section = self.section_of(&items[d.heading + 1..d.end], 0)?;
-            loc.tail = Some(items[d.end - 1].id.clone());
+        loc.slot = Self::slot_for(&v, &iso);
+        if let Some(d) = v.ranges.iter().find(|d| d.iso == iso) {
+            let id = v.items[d.heading].id.clone();
+            let section = self.section_of(&v.items[d.heading + 1..d.end], 0, false)?;
+            loc.tail = Some(v.items[d.end - 1].id.clone());
             loc.section = Some((id, section));
         }
+        loc.moves = v.moves;
+        loc.twin = v.twin;
         Ok(loc)
     }
     fn observation(loc: &Located) -> Observation {
@@ -390,14 +480,76 @@ impl Run<'_> {
             r => self.after(seq, r, |_| Some(id.to_string())).map(|_| ()),
         }
     }
+    /// Moves every out-of-order day to its place (copy, verify, then delete the original) and
+    /// removes a leftover half of an interrupted move. Every day to move is read strictly before
+    /// the first write, so the usual refusals write nothing.
+    fn reorder(&mut self, month: &str) -> Result<(), Stop> {
+        let n = self.n;
+        let v = n.view(month).map_err(|_| self.stop())?;
+        for &i in &v.moves {
+            let r = &v.ranges[i];
+            n.section_of(&v.items[r.heading + 1..r.end], 0, true)
+                .map_err(|_| self.stop())?;
+        }
+        if let Some(t) = v.twin {
+            self.delete_day(&t)?;
+        }
+        // shortcut: a later tie flip can pick a day not checked above; it is then refused after
+        // earlier moves, which leaves no duplicate or lost text. Upgrade if that is ever seen.
+        loop {
+            let v = n.view(month).map_err(|_| self.stop())?;
+            let Some(i) = v.moves.iter().copied().min_by_key(|i| &v.days[*i].iso) else {
+                return Ok(());
+            };
+            let (day, range) = (&v.days[i], &v.ranges[i]);
+            let section = n
+                .section_of(&v.items[range.heading + 1..range.end], 0, true)
+                .map_err(|_| self.stop())?;
+            let chunks = projection::chunk(&section.blocks, wire::encoded_size, CHUNK_BYTES);
+            if chunks
+                .iter()
+                .any(|c| c.len() == 1 && wire::encoded_size(&c[0]) > CHUNK_BYTES)
+            {
+                return Err(self.stop());
+            }
+            let date = DiaryDate::parse(&day.iso).ok_or_else(|| self.stop())?;
+            self.known = v.items.iter().map(|r| r.id.clone()).collect();
+            let heading = self.heading(month, &date, &Notion::slot_for(&v, &day.iso), None)?;
+            let mut after = heading.clone();
+            for chunk in &chunks {
+                after = self.append(month, chunk, &after)?;
+            }
+            match n.read_range(month, &heading) {
+                Ok(s) if s.digest() == section.digest() => {}
+                _ => return Err(Stop::Unknown),
+            }
+            self.delete_day(day)?;
+        }
+    }
+    /// Body blocks in order, the heading last, so a half-deleted day still has its heading.
+    fn delete_day(&mut self, day: &Day) -> Result<(), Stop> {
+        for id in &day.body {
+            self.delete(id)?;
+        }
+        self.delete(&day.heading)
+    }
     fn go(
         &mut self,
         date: &DiaryDate,
-        loc: Located,
+        mut loc: Located,
         chunks: &[Vec<Block>],
         want: &str,
     ) -> Result<(), Stop> {
         let n = self.n;
+        if let Some(month) = loc
+            .month
+            .clone()
+            .filter(|_| !loc.moves.is_empty() || loc.twin.is_some())
+        {
+            self.reorder(&month)?;
+            // The page changed, so the layout read before the reorder is stale.
+            loc = n.look(date).map_err(|_| self.stop())?;
+        }
         let old = loc
             .section
             .as_ref()
