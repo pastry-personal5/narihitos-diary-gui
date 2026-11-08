@@ -20,6 +20,7 @@ See [README.md](README.md) and [docs/product-behavior.md](docs/product-behavior.
 ## Contributing
 
 - Environment, commands, gate and code conventions (including prompt assets): [contribution guide](docs/contribution-guide.md).
+- Follow the [commit message rules](docs/contribution-guide.md#commit-messages) in the contribution guide.
 - Documentation rules and lifecycle: [development process](docs/development-process.md#documentation-rules).
 
 ## Dependencies
