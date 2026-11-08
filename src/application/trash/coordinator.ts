@@ -276,7 +276,7 @@ export class TrashCoordinator {
     this.budget.release("trash-preview");
     this.events.reserve(entry.sourceId, id);
     this.events.notice(
-      `${entry.label}: Move to Trash requested. Its result remains available in Global Messages.`,
+      `${entry.label}: Move to Trash requested. Its result remains available in Trash Recovery.`,
     );
     this.emit();
     void this.poll(entry, epoch);

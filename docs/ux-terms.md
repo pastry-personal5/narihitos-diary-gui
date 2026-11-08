@@ -21,6 +21,8 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Global Messages     | `globalMessages`     | Pane below the Tabbed Editor listing notices and global messages to the user, oldest first, newest at the bottom                                |
 | Message severity    | `messageSeverity`    | Visual level of a global message: info, success, warning or error, shown by color plus an icon and text label                                   |
 | Editor tab          | `editorTab`          | One open buffer (source, Authentic or read-only Candidate) in the Tabbed Editor; distinct from the Explorer tabs                                |
+| AI Agents           | `aiAgents`           | Configured AI providers used by AI Chat and Generate; also the Settings category for their profiles                                             |
+| AI Agent            | `aiAgent`            | One configured AI provider, such as Codex, Claude Code, Qwen Code or Apple Foundation Models                                                    |
 | AI Chat             | `aiChat`             | Transient conversation and composer; sits below the AI Activity widget                                                                          |
 | Settings            | `settings`           | Redacted configuration/capability status in cards; server config remains private YAML                                                           |
 | Settings sidebar    | `settingsSidebar`    | Category list inside Settings: Status, Server, Sources, AI Agents, Writing Language, Keyboard Shortcuts and Generation, under a Go back button  |
@@ -39,6 +41,7 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Metadata warning    | `metadataWarning`    | Per-snippet notice of parse, availability or timestamp problems, with the explicit header/filename authority choice                             |
 | Snippet checkbox    | `snippetCheckbox`    | Generation-inclusion toggle in the Snippet tab; independent of snippet focus                                                                    |
 | Pane separator      | `paneSeparator`      | Resizable, keyboard-operable boundary between Explorer, Tabbed Editor, AI Chat and Global Messages (the last resizes height)                    |
+| Trash Recovery      | `trashRecovery`      | Main Toolbar Strip button and modal dialog for saved Trash results, unfinished moves and recovery guidance; separate from Global Messages       |
 | Completion message  | `completionMessage`  | One polite in-app message per AI completion, with View results; posted to Global Messages                                                       |
 | Results badge       | `resultsBadge`       | Marker in the AI Activity widget that completed AI results await, until opened or dismissed                                                     |
 | Confirmation dialog | `confirmationDialog` | Explicit confirmation for snippet delete, discard and export replacement                                                                        |
@@ -50,6 +53,28 @@ This is the canonical vocabulary for visible user interface components, and thei
 Casing: named regions use Title Case (Standard Layout, Icon Bar, Tabbed Editor, Main Content, AI Activity); sub-parts and controls use sentence case (Date tab, Editor tab, Settings sidebar, Settings card, Command palette). "Tab" alone is ambiguous: say Explorer tab (Date, Snippet, Draft, Entry) or Editor tab.
 
 Draft and Entry are navigation terms, not two persisted asset kinds. Use these names for control labels and accessibility; use ordinary action verbs such as Save, Generate, Export, Accept and Reject for commands.
+
+## AI terminology
+
+Use **AI Agents** for the configured providers collectively and for the Settings category; use **AI Agent** for one provider. Do not use “assistant” or “AI assistant” as user-facing names for them. AI Chat names the conversation surface, AI Activity names the run-status widget, and Chat profile, Generation profile and Agent profiles retain their distinct card names. Code/API transcript roles are technical schema values, not canonical visible component names.
+
+## Trash Recovery controls
+
+Trash Recovery names both the toolbar action and the dialog it opens. Use the exact control names below; their behavior is defined in the [Trash Recovery contract](ux-gui.md#trash-recovery).
+
+| Visible term            | Code-facing name        | Meaning                                                                                        |
+| ----------------------- | ----------------------- | ---------------------------------------------------------------------------------------------- |
+| Current situation       | `recoveryStatus`        | Section explaining connection, discovery and available saved moves                             |
+| Check unfinished moves  | `checkUnfinishedMoves`  | Refresh saved unfinished operations without initiating a move                                  |
+| Next unfinished moves   | `nextUnfinishedMoves`   | Load the next page of saved unfinished operations                                              |
+| Inspect                 | `inspectTrashMove`      | Open a saved move's file-by-file result                                                        |
+| Check again             | `checkTrashMoveAgain`   | Retry a failed saved-result request                                                            |
+| Check saved result      | `checkSavedTrashResult` | Refresh the operation shown in the result dialog                                               |
+| Preview remaining files | `previewRemainingFiles` | Obtain a fresh preview before explicitly confirming eligible remaining moves                   |
+| Dismiss                 | `dismissCompletedMove`  | Remove a completed move from the visible list without restoring files                          |
+| Close Trash Recovery    | `closeTrashRecovery`    | Accessible name and tooltip of the top-right Close button; returns focus to the toolbar action |
+
+“No unfinished moves.” is an empty-state message, not an action. “Move to Trash” labels the operation list within Trash Recovery. Recovery controls do not belong in Global Messages.
 
 ## Settings categories and cards
 

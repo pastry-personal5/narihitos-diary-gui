@@ -78,7 +78,7 @@ export function TrashDialog({
       <h2>{d.phase === "result" ? "Trash result" : "Move source to Trash"}</h2>
       <p id={id}>
         {d.phase === "result"
-          ? "Each file has its own saved outcome. Closing this view keeps the operation available in Global Messages."
+          ? "Each file has its own saved outcome. Closing this view keeps the operation available in Trash Recovery."
           : "Review the exact files below. The snippet moves first, followed by its related audio."}
       </p>
       {d.phase === "preparing" && (

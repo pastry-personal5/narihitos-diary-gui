@@ -9,6 +9,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { App } from "../src/components/App";
 import { mountScratchEditor } from "../src/editor/scratch-editor";
@@ -71,6 +72,41 @@ describe("scaffold shell", () => {
     ).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Entry tab" }));
     expect(screen.getByText("No saved dates yet.")).toBeTruthy();
+  });
+  it("opens Trash Recovery from the toolbar and keeps recovery controls out of Global Messages", async () => {
+    render(<App bridge={bridge()} />);
+    const toolbar = screen.getByLabelText("Main Toolbar Strip");
+    const opener = within(toolbar).getByRole("button", {
+      name: "Trash Recovery",
+    });
+    const log = screen.getByLabelText("Global Messages");
+    expect(within(log).queryByText("Check unfinished moves")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole("dialog", { name: "Trash Recovery" });
+    const close = within(dialog).getByRole("button", {
+      name: "Close Trash Recovery",
+    });
+    expect(document.activeElement).toBe(close);
+    expect(within(dialog).getByText(/The server is disconnected/)).toBeTruthy();
+    expect(
+      within(dialog).getByRole<HTMLButtonElement>("button", {
+        name: "Check unfinished moves",
+      }).disabled,
+    ).toBe(true);
+    expect(within(dialog).getByText("Continue a partial move")).toBeTruthy();
+    expect(
+      within(dialog).getByText("Resolve an uncertain outcome"),
+    ).toBeTruthy();
+    fireEvent.keyDown(close, { key: "Escape" });
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(opener);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close Trash Recovery" }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
   it("reports disconnected and reconnects without changing scratch state", async () => {
     const adapter = bridge();

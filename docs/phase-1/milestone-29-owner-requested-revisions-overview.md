@@ -27,6 +27,8 @@ P1-M28 is Done ([overview](milestone-28-simple-refactoring-overview.md)). Decide
 
 - **T26 (owner, 2026-11-08):** Group settings by Server, Sources and AI Agents; move both profile selectors into AI Agents cards and allow Sources to reveal the active server configuration folder in Finder.
 
+- **T28 (owner, 2026-11-08):** Move Trash recovery controls from Global Messages to a spacious Trash Recovery dialog opened from the Main Toolbar Strip, with a top-right close button and detailed status/action guidance.
+
 ## Scope
 
 In scope: the requests listed in the checklist. Out of scope: anything not requested, new dependencies or build tools without approval, and release qualification (P1-M32).
@@ -116,6 +118,15 @@ None yet.
 - [x] T27 `[docs]` - Reconcile `docs/ux*` with the agreed Settings categories and profile-card moves.
   - [x] T27.1 - GUI behavior, containment diagram and canonical terms agree on category/card placement, Finder reveal and profile choices. Evidence: reviewed all three `docs/ux*` files against T26 and Settings components; stale placement assertions and local-link checks pass.
   - [x] T27.2 - Markdown formatting, local links and whitespace checks pass. Evidence: `scripts/gate.sh` G01–G07 pass (2026-11-08; outside the sandbox for local TCP fixtures).
+
+- [x] T28 `[gui]` `[behavior]` - Dedicated Trash Recovery dialog.
+  - [x] T28.1 - Toolbar opens a spacious, responsive dialog with a top-right close button, keyboard dismissal and focus restoration; Global Messages no longer contains recovery controls. Evidence: `tests/client.test.tsx`; installed headless Chrome visual/layout smoke at 1280 × 900, 780 × 600 and 500 × 500 confirms a 960 × 740 desktop dialog, viewport containment, scrollable content, visible close button and restored toolbar focus.
+  - [x] T28.2 - Explain current connection, discovery and operation states and available actions; retain inspection, explicit retry confirmation and completed dismissal. Evidence: `TrashRecovery.tsx`, `tests/trash-ui.test.tsx` covers connected/checking/error/read-only guidance and recovery → result → continuation → recovery, with no implicit confirmation. Existing partial/uncertain and completed-result tests pass.
+  - [x] T28.3 - Regression tests, affected docs and full `scripts/gate.sh` pass. Evidence: G01–G07 pass (2026-11-08; outside sandbox for local TCP fixtures), 365 frontend tests pass; README, user guide, UX contracts, decisions, work plan and changelog updated.
+
+- [x] T29 `[docs]` - Reconcile Trash Recovery across UX behavior, containment and canonical terms; use AI Agents as the canonical name for configured AI providers and the Settings category.
+  - [x] T29.1 - Toolbar, dedicated recovery dialog, status/actions, return/close behavior and absence of recovery controls in Global Messages agree across all three UX documents. Evidence: dedicated Trash Recovery section and outcome/action table in `ux-gui.md`, modal flow in `ux-information-architecture.md`, control vocabulary in `ux-terms.md`; terminology and local link/anchor checks pass.
+  - [x] T29.2 - AI Agents and singular AI Agent are defined explicitly, with existing AI Chat, AI Activity and profile-card terms retained; terminology, local links, formatting and full gate pass. Evidence: canonical component rows and AI terminology rules; local links/anchors and whitespace checks pass; `scripts/gate.sh` G01–G07 pass (2026-11-08, outside sandbox for local TCP fixtures), 365 frontend tests pass.
 
 ### Proof and docs
 

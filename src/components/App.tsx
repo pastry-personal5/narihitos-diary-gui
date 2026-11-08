@@ -22,6 +22,7 @@ import { saveOff } from "../application/navigation/resources";
 import { useProfiles } from "./useProfiles";
 import { useSettings } from "./useSettings";
 import { CommandPalette } from "./CommandPalette";
+import { TrashRecovery } from "./TrashRecovery";
 import { TrashDialog } from "./TrashDialog";
 import { ModalDialog } from "./ModalDialog";
 import { SymbolLabel, SymbolProvider } from "./Symbol";
@@ -32,6 +33,8 @@ import { useCloseRequest } from "./useCloseRequest";
 import { useConnection } from "./useConnection";
 
 export function App({ bridge }: { bridge: Bridge }) {
+  const recoveryButton = useRef<HTMLButtonElement>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const settingsButton = useRef<HTMLButtonElement>(null);
   const [explorerWidth, setExplorerWidth] = useState(220);
   const [chatWidth, setChatWidth] = useState(240);
@@ -149,6 +152,13 @@ export function App({ bridge }: { bridge: Bridge }) {
             >
               <SymbolLabel name="command" label="Command palette" />
             </button>
+            <button
+              ref={recoveryButton}
+              title="Inspect interrupted moves and saved Trash results"
+              onClick={() => setRecoveryOpen(true)}
+            >
+              Trash Recovery
+            </button>
             {active?.kind === "source" && (
               <button
                 disabled={!!handlers["editor.save"].reason || !!active.saving}
@@ -237,6 +247,15 @@ export function App({ bridge }: { bridge: Bridge }) {
               Cancel
             </button>
           </ModalDialog>
+        )}
+        {recoveryOpen && !model.sourceGuard && !model.trash.dialog && (
+          <TrashRecovery
+            coordinator={model.trash}
+            onClose={() => {
+              setRecoveryOpen(false);
+              requestAnimationFrame(() => recoveryButton.current?.focus());
+            }}
+          />
         )}
         {!model.sourceGuard && <TrashDialog coordinator={model.trash} />}
         {paletteOpen && (
@@ -421,11 +440,7 @@ export function App({ bridge }: { bridge: Bridge }) {
               change={setMessageHeight}
               reverse
             />
-            <GlobalMessages
-              messages={model.messages}
-              height={messageHeight}
-              trash={model.trash}
-            />
+            <GlobalMessages messages={model.messages} height={messageHeight} />
           </div>
           <PaneSeparator
             label="Resize AI Chat"

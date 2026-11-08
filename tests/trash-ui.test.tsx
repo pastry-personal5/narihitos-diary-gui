@@ -14,6 +14,7 @@ import { TrashCoordinator } from "../src/application/trash/coordinator";
 import { SessionBudget } from "../src/application/navigation/budget";
 import type { Bridge } from "../src/application/bridge";
 import { TrashDialog } from "../src/components/TrashDialog";
+import { TrashRecovery } from "../src/components/TrashRecovery";
 import { TrashActivity } from "../src/components/TrashActivity";
 import { App } from "../src/components/App";
 import { settingsFake } from "./settings-fake";
@@ -75,6 +76,33 @@ async function open(coordinator: TrashCoordinator) {
 }
 
 describe("Trash confirmation and recovery UI", () => {
+  it("explains connected, checking, failed and read-only recovery states", async () => {
+    const e = await setup();
+    const view = render(
+      <TrashRecovery coordinator={e.coordinator} onClose={() => {}} />,
+    );
+    expect(screen.getByText(/No recovery action is needed/)).toBeTruthy();
+    e.coordinator.discovering = true;
+    view.rerender(
+      <TrashRecovery coordinator={e.coordinator} onClose={() => {}} />,
+    );
+    expect(screen.getByText(/Checking the server for unfinished/)).toBeTruthy();
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", {
+        name: "Check unfinished moves",
+      }).disabled,
+    ).toBe(true);
+    e.coordinator.discovering = false;
+    e.coordinator.discoveryError = "unavailable";
+    e.coordinator.writable = false;
+    view.rerender(
+      <TrashRecovery coordinator={e.coordinator} onClose={() => {}} />,
+    );
+    expect(screen.getByText(/The check could not finish/)).toBeTruthy();
+    expect(
+      screen.getByText(/Storage is read-only or unavailable/),
+    ).toBeTruthy();
+  });
   it("moves focus to Cancel when a slow preparation becomes a confirmation", async () => {
     const e = await setup(),
       pending = deferred<TrashPreview>();
@@ -292,6 +320,33 @@ describe("Explorer Trash action", () => {
     connectFromSettings();
     await screen.findByText("Connected");
     fireEvent.click(screen.getByRole("button", { name: "Go back" }));
+    const recoveryButton = screen.getByRole("button", {
+      name: "Trash Recovery",
+    });
+    fireEvent.click(recoveryButton);
+    await screen.findByText("No unfinished moves.");
+    await act(async () => {
+      const partial = result(uuid(22), "needs_confirmation");
+      partial.source_id = "c".repeat(32);
+      fake.operations.set(uuid(22), partial);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Check unfinished moves" }),
+      );
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Inspect" }));
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.getByRole("dialog", { name: "Trash result" })).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Preview remaining files" }),
+    );
+    await screen.findByRole("dialog", { name: "Move source to Trash" });
+    expect(fake.bridge.confirmSourceDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("dialog", { name: "Trash Recovery" })).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close Trash Recovery" }),
+    );
+    fake.bridge.previewSourceDelete.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Snippet tab" }));
     const move = await screen.findAllByRole("button", {
       name: /^Move .+ to Trash$/,

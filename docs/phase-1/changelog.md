@@ -10,6 +10,10 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-08 — owner/agent, P1-M29 T29 — Reconcile Trash Recovery behavior, containment and control vocabulary across the UX documents; define AI Agents (singular AI Agent) as the canonical user-facing provider terminology.
+
+- 2026-11-08 — owner/agent, P1-M29 T28 — Move recovery controls out of Global Messages into a spacious Trash Recovery dialog opened from the Main Toolbar Strip, with a top-right Close button and guidance for connection, partial, uncertain and completed states. Existing file inspection and explicit retry confirmation remain available.
+
 - 2026-11-08 — Owner — P1-M29 T26: Settings groups server configuration under Server, source status and Finder reveal under Sources, and agent status plus Chat/Generation profile cards under AI Agents. Main no longer shows profile selectors.
 
 - 2026-11-08 — owner/agent, P1-M29 T25 — Removed the active-view heading below the Explorer icons for Date, Snippet, Draft and Entry; icon tooltips, accessible names and selected state remain.

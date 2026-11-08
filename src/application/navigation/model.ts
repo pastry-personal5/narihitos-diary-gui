@@ -268,7 +268,7 @@ export class NavigationModel {
     if (this.imports.sourceDisabled(source))
       return "This source moved to Trash. Refresh snippets first.";
     if (this.resources.sourceReserved(source.id))
-      return "Inspect the unfinished Move to Trash operation in Global Messages.";
+      return "Inspect the unfinished Move to Trash operation in Trash Recovery.";
     const context = this.resources.selectedDate
       ? this.imports.view(this.resources.selectedDate)
       : null;

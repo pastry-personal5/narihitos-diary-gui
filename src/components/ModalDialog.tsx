@@ -9,12 +9,14 @@ export function ModalDialog({
   onDismiss,
   children,
   focusKey,
+  className = "",
 }: {
   label: string;
   description?: string;
   onDismiss: () => void;
   children: ReactNode;
   focusKey?: string;
+  className?: string;
 }) {
   const host = useRef<HTMLDivElement>(null),
     live = useRef(false);
@@ -66,7 +68,7 @@ export function ModalDialog({
         aria-label={label}
         aria-describedby={description}
         tabIndex={-1}
-        className="modal-dialog"
+        className={`modal-dialog ${className}`}
         onKeyDown={(event) => {
           if (composing(event.nativeEvent)) return;
           if (event.key === "Escape") {
