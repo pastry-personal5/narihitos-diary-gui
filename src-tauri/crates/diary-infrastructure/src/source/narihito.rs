@@ -18,7 +18,10 @@ impl SourceAdapter for Narihito {
         }
     }
     fn unsupported(&self, parsed: &Parsed) -> Option<UnsupportedReason> {
-        if scalar(parsed, "schema_version") != Some("1") {
+        if !matches!(scalar(parsed, "schema_version"), Some("1" | "2"))
+            || (scalar(parsed, "schema_version") == Some("2")
+                && scalar(parsed, "creation_method") != Some("manual"))
+        {
             Some(UnsupportedReason::Schema)
         } else if scalar(parsed, "kind") != Some("ndm.diary-snippet") {
             Some(UnsupportedReason::Kind)
@@ -42,7 +45,10 @@ impl SourceAdapter for Narihito {
         }
     }
     fn trash_policy(&self, bytes: &[u8], rel: &str) -> Result<(), TrashReason> {
-        check(bytes, rel).map_err(|_| TrashReason::UnsupportedFormat)?;
+        let checked = check(bytes, rel).map_err(|_| TrashReason::UnsupportedFormat)?;
+        if !checked.recording {
+            return Err(TrashReason::UnsupportedFormat);
+        }
         if super::trash::TRASH_PAIR_VERIFIED {
             Ok(())
         } else {

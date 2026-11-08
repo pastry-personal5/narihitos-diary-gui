@@ -99,6 +99,9 @@ pub fn prepare_pair(
     }
     let checked =
         narihito_write::check(&original.bytes, rel).map_err(|_| PreparationError::Unsupported)?;
+    if !checked.recording {
+        return Err(PreparationError::Unsupported);
+    }
     let stem = rel
         .strip_suffix(".md")
         .ok_or(PreparationError::Unsupported)?;

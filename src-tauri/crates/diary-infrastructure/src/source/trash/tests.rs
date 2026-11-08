@@ -232,3 +232,16 @@ fn cloud_placeholder_cannot_be_reported_as_missing_audio() {
         PreparationError::Unavailable
     );
 }
+
+#[test]
+fn manual_snippet_never_prepares_a_guessed_audio_pair() {
+    use crate::source::narihito_write::tests_support::manual;
+    let (tree, audio) = fixture();
+    tree.write(REL, &manual("manual text\n"));
+    let before = fs::read(tree.temp.path().join(&audio)).unwrap();
+    assert!(matches!(
+        prepare_pair(&sources(&tree), 0, REL, &|| false),
+        Err(PreparationError::Unsupported)
+    ));
+    assert_eq!(fs::read(tree.temp.path().join(audio)).unwrap(), before);
+}

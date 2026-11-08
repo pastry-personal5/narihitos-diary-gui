@@ -5,6 +5,8 @@ from the pinned codec files (swiftc, no dependency). Proves file format only: no
 catalog or recovery, not iCloud. Skips (exit 0 with SKIP) when the submodule or swiftc is missing;
 a skip is not evidence. Run outside scripts/gate.sh.
 """
+from isolation import server_configuration
+import argparse
 import base64
 import hashlib
 import json
@@ -21,8 +23,13 @@ import urllib.request
 import uuid
 
 root = Path(__file__).resolve().parents[2]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--schema2', action='store_true', help='use the captured manual-snippet producer codec and include schema 2 fixtures')
+args = parser.parse_args()
 mobile = root / 'contrib/narihitos-diary-mobile/NarihitosDiary'
 codec = [mobile / 'Domain/DiarySnippet.swift', mobile / 'Adapters/DiarySnippetLayout.swift', mobile / 'Adapters/DiarySnippetMarkdownCodec.swift']
+if args.schema2:
+    codec = [root / 'scripts/smoke/producer/schema2' / p.name for p in codec]
 if not shutil.which('swiftc') or not all(p.exists() for p in codec):
     print('SKIP producer round trip: swiftc or the pinned mobile submodule is missing (not evidence)')
     sys.exit(0)
@@ -37,10 +44,19 @@ BASE_FIELDS = [
 ]
 
 
-def document(body, overrides=None, extra=None, mutate=None):
+STEMS = {}
+
+
+def document(body, overrides=None, extra=None, mutate=None, manual=False, time=None):
     ident = str(uuid.uuid4())
     fields = dict(BASE_FIELDS)
     fields['id'], fields['audio_filename'] = f'"{ident}"', f'"{ident}.m4a"'
+    if manual:
+        fields = {k: v for k, v in fields.items() if k in list(dict(BASE_FIELDS))[:8]}
+        fields.update(schema_version='2', creation_method='"manual"')
+    if time:
+        fields['created_at'] = fields['updated_at'] = f'"2024-02-29T{time}Z"'
+    STEMS[ident] = '2024-02-29_' + time.replace(':', '-') if time else STEM_TIME
     fields.update(overrides or {})
     lines = [f'{k}: {v}' for k, v in fields.items()] + (extra or [])
     text = '---\n' + '\n'.join(lines) + '\n---\n\n' + body
@@ -50,7 +66,7 @@ def document(body, overrides=None, extra=None, mutate=None):
 
 
 def rel(ident):
-    return f'2024/02/29/{STEM_TIME}-{ident}.md'
+    return f'2024/02/29/{STEMS[ident]}-{ident}.md'
 
 
 MATRIX = {
@@ -66,6 +82,12 @@ MATRIX = {
     'no trailing newline': dict(body='no newline'),
     'trailing newline': dict(body='one\n'),
 }
+if args.schema2:
+    MATRIX.update({
+        'manual 01:42:07': dict(body='synthetic manual 日本語\n', manual=True, time='01:42:07', overrides={'title_origin': '"apple-ai"'}, extra=['title_prompt_revision: "1"', 'title_os_version: "26"', 'unknown_flag: 7']),
+        'manual 01:42:57': dict(body='', manual=True, time='01:42:57', overrides={'title_origin': '"empty-body"'}),
+        'manual favorite': dict(body='line one\nline two\n', manual=True, overrides={'favorite': 'true'}),
+    })
 NEW_BODIES = {'unicode and emoji': 'さようなら 🎉\n', 'empty body': 'now has text', 'no trailing newline': '', 'trailing newline': 'two\n\n'}
 
 with tempfile.TemporaryDirectory(prefix='diary-producer-smoke-') as temporary:
@@ -88,7 +110,7 @@ with tempfile.TemporaryDirectory(prefix='diary-producer-smoke-') as temporary:
     for folder in [workspace, runtime, source]:
         folder.mkdir(mode=0o700)
     config = base / 'config.yaml'
-    config.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: mobile, type: narihito, root: {source}}}\n')
+    config.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: mobile, type: narihito, root: {source}}}\n')
     config.chmod(0o600)
     files, expected_before = {}, {}
     for name, spec in MATRIX.items():
@@ -179,8 +201,12 @@ with tempfile.TemporaryDirectory(prefix='diary-producer-smoke-') as temporary:
         for name, (ident, path) in files.items():
             assert rel(ident) in listing, ('not listed', name)
             item = listing[rel(ident)]
+            assert item['eligible'] is True, (name, item)
             view = read(record, session, import_id, item['id'])
             assert view['capabilities']['save'] is True, (name, view['capabilities'])
+            if name.startswith('manual'):
+                assert view['capabilities']['reason'] == 'ready', (name, view['capabilities'])
+                assert view['capabilities']['trash'] is False, (name, view['capabilities'])
             before = expected_before[name]
             new_body = NEW_BODIES.get(name, 'replaced ' + name + '\n')
             if name == '1 MiB body':
@@ -209,12 +235,15 @@ with tempfile.TemporaryDirectory(prefix='diary-producer-smoke-') as temporary:
         # Producer-style edits are read back by the GUI, which then saves again.
         edit_body = base / 'edit.txt'
         edit_body.write_text('edited by the phone\n')
-        for name, command in (('unknown scalars', ['edit', None, str(edit_body), '2099-01-01T00:00:00Z']), ('favorite', ['toggle-favorite', None, '2099-01-01T00:00:00Z'])):
+        producer_edits = [('unknown scalars', ['edit', None, str(edit_body), '2099-01-01T00:00:00Z']), ('favorite', ['toggle-favorite', None, '2099-01-01T00:00:00Z'])]
+        if args.schema2:
+            producer_edits += [('manual 01:42:07', ['edit', None, str(edit_body), '2099-01-01T00:00:00Z']), ('manual favorite', ['toggle-favorite', None, '2099-01-01T00:00:00Z'])]
+        for name, command in producer_edits:
             path = files[name][1]
             command[1] = str(path)
             subprocess.run([str(harness), *command], check=True, capture_output=True)
         import_id, listing = import_and_list(record, session, 'two')
-        for name in ('unknown scalars', 'favorite'):
+        for name, _ in producer_edits:
             ident, path = files[name]
             item = listing[rel(ident)]
             view = read(record, session, import_id, item['id'])
@@ -229,6 +258,13 @@ with tempfile.TemporaryDirectory(prefix='diary-producer-smoke-') as temporary:
         theirs = path.read_bytes()
         code, out = save(record, session, item['id'], item['digest'], 'mine\n')
         assert code == 409 and out['error']['code'] == 'external_change' and path.read_bytes() == theirs, (code, out)
+        if args.schema2:
+            ident, path = files['manual 01:42:07']
+            item = listing[rel(ident)]
+            subprocess.run([str(harness), 'edit', str(path), str(edit_body), '2099-02-01T00:00:00Z'], check=True, capture_output=True)
+            theirs = path.read_bytes()
+            code, out = save(record, session, item['id'], item['digest'], 'mine\n')
+            assert code == 409 and out['error']['code'] == 'external_change' and path.read_bytes() == theirs, (code, out)
         # Differential: whenever the GUI gate accepts a mutated document, the producer decodes it.
         mutations = {
             'bom': lambda t: '﻿' + t, 'crlf': lambda t: t.replace('\n', '\r\n'), 'no separator': lambda t: t.replace('\n---\n\n', '\n---\n', 1),

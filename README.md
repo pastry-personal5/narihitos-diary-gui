@@ -2,6 +2,8 @@
 
 Narihito's Diary, the GUI: a personal asset management app on your Mac. A Rust server and a Tauri 2 client (TypeScript + React, CodeMirror 6) for editing diary entries, drafting them with AI from source snippets, reviewing changes paragraph by paragraph, and exporting to iCloud or Notion.
 
+Narihito mobile recording snippets (schema 1) and text-only manual snippets (schema 2) support guarded body-only Source Save. Text-only snippets need no audio; their Trash action remains unavailable.
+
 Server connection status and the Connect button are in **Settings > Server**. The app connects and reconnects automatically. Explorer views use icon buttons with tooltips, without a tab-name heading below the icons. The calendar uses custom bitmap chevron buttons for Previous month and Next month, with tooltips and accessible names.
 
 - [User guide](docs/user-guide.md): what the app does today

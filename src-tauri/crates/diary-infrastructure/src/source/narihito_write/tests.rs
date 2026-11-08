@@ -232,3 +232,114 @@ fn output_revalidates() {
     let out = splice(&old, REL, body, 2_000_000_000).unwrap();
     assert_eq!(check(&out, REL).unwrap().body, body);
 }
+
+/// Schema 2 fixture matching decodeManual, with no fabricated recording metadata.
+pub(crate) fn manual(body: &str) -> Vec<u8> {
+    let text = String::from_utf8(golden("2024-02-29T01:02:03Z", body)).unwrap();
+    let mut out = String::new();
+    // Strip only front-matter fields, never body text with similar prefixes.
+    let (front, body) = text.split_once(CLOSE).unwrap();
+    for line in front.lines() {
+        let key = line.split(':').next().unwrap();
+        if REQUIRED[8..].contains(&key) {
+            continue;
+        }
+        if key == "schema_version" {
+            out.push_str("schema_version: 2\ncreation_method: \"manual\"\n");
+        } else {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    out.pop();
+    out.push_str(CLOSE);
+    out.push_str(body);
+    out.into_bytes()
+}
+
+#[test]
+fn manual_save_preserves_metadata_and_never_invents_recording_fields() {
+    for body in [
+        "",
+        "Unicode 日本語 😀\nsecond line\n",
+        "audio_filename: body text",
+    ] {
+        let old = manual(body);
+        let checked = check(&old, REL).unwrap();
+        assert!(!checked.recording);
+        assert_eq!(checked.body, body);
+        assert_eq!(splice(&old, REL, body, 0).unwrap(), old);
+        let saved = splice(&old, REL, "edited\n", 0).unwrap();
+        let next = check(&saved, REL).unwrap();
+        assert_eq!(next.body, "edited\n");
+        assert_eq!(next.updated_at, "2024-02-29T01:02:04Z");
+        let front = |bytes: &[u8]| {
+            String::from_utf8(bytes.to_vec())
+                .unwrap()
+                .split(CLOSE)
+                .next()
+                .unwrap()
+                .to_owned()
+        };
+        assert_eq!(
+            front(&saved),
+            front(&old).replace(
+                "updated_at: \"2024-02-29T01:02:03Z\"",
+                "updated_at: \"2024-02-29T01:02:04Z\""
+            )
+        );
+        assert!(check(&saved, "2024/02/29/wrong.md").is_err());
+    }
+}
+
+#[test]
+fn manual_gate_rejects_mixed_unknown_and_malformed_formats() {
+    let original = String::from_utf8(manual("hi\n")).unwrap();
+    for key in REQUIRED[8..]
+        .iter()
+        .chain(OPTIONAL_STRINGS[..5].iter())
+        .chain([
+            &"location_latitude",
+            &"location_longitude",
+            &"location_sampled_at",
+            &"location_horizontal_accuracy_m",
+            &"location_place_name",
+            &"weather_observed_at",
+            &"weather_summary",
+            &"weather_temperature_celsius",
+        ])
+    {
+        let bad = original.replace("unknown_flag: 7", &format!("{key}: \"unexpected\""));
+        assert!(check(bad.as_bytes(), REL).is_err(), "{key}");
+    }
+    for (from, to) in [
+        ("schema_version: 2", "schema_version: 3"),
+        ("schema_version: 2", "schema_version: 1"),
+        ("creation_method: \"manual\"", "creation_method: \"other\""),
+        ("creation_method: \"manual\"\n", ""),
+        ("favorite: false", "favorite: 0"),
+        ("first-sentence", "unknown"),
+        ("first-sentence", "apple-ai"),
+        ("unknown_flag: 7", "title_model_id: 7"),
+        ("unknown_flag: 7", "favorite: true"),
+        ("unknown_flag: 7", "unknown_flag: [1]"),
+        ("2024-02-29T01:02:03Z", "2024-02-30T01:02:03Z"),
+    ] {
+        assert!(
+            check(original.replace(from, to).as_bytes(), REL).is_err(),
+            "{from} -> {to}"
+        );
+    }
+    let apple = original.replace("first-sentence", "apple-ai").replace(
+        "unknown_flag: 7",
+        "title_prompt_revision: \"1\"\ntitle_os_version: \"26\"\ntitle_model_id: \"model\"",
+    );
+    assert!(check(apple.as_bytes(), REL).is_ok());
+    assert!(
+        check(
+            original.replace("first-sentence", "empty-body").as_bytes(),
+            REL
+        )
+        .is_ok()
+    );
+}

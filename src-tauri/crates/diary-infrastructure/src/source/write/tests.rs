@@ -374,3 +374,23 @@ fn save_after_restart_and_reload_uses_durable_identity() {
         .unwrap();
     assert_eq!(out.digest, e.digest());
 }
+
+#[test]
+fn manual_saves_chain_noop_reopen_and_refuse_external_changes() {
+    use crate::source::narihito_write::{check, tests_support::manual};
+    let e = env();
+    fs::write(e.file(), manual("manual\n")).unwrap();
+    let initial = e.digest();
+    assert!(e.save(1, &initial, "manual\n").unwrap().unchanged);
+    let first = e.save(2, &initial, "edited 日本語\n").unwrap();
+    assert_eq!(check(&e.bytes(), REL).unwrap().body, "edited 日本語\n");
+    let second = e.save(3, &first.digest, "twice\n").unwrap();
+    assert_eq!(check(&e.bytes(), REL).unwrap().body, "twice\n");
+    fs::write(e.file(), manual("external edit\n")).unwrap();
+    let theirs = e.bytes();
+    assert_eq!(
+        e.save(4, &second.digest, "mine\n"),
+        Err(SaveError::ExternalChange)
+    );
+    assert_eq!(e.bytes(), theirs);
+}

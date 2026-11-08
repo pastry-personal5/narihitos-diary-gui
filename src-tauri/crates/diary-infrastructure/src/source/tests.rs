@@ -361,3 +361,29 @@ fn narihito_save_true_when_enabled_and_view_drops_separator() {
     assert_eq!(view(&tree).write, Err(WriteReason::UnsupportedFormat));
     assert_eq!(view(&tree).trash, Err(TrashReason::UnsupportedFormat));
 }
+
+#[test]
+fn manual_snippets_import_with_exact_times_and_save_without_audio() {
+    use super::narihito_write::tests_support::{REL, manual};
+    let tree = Tree::new();
+    for time in ["01:42:07", "01:42:57"] {
+        let path = REL.replace("01-02-03", &time.replace(':', "-"));
+        let text = String::from_utf8(manual("manual 日本語\n"))
+            .unwrap()
+            .replace("01:02:03", time);
+        tree.write(&path, text.as_bytes());
+        let rel = normalize(&path, tree.root.insensitive).unwrap();
+        let (out, listing) = adapter::observe(&tree.root, &SourceKind::Narihito, &rel, 0).unwrap();
+        assert!(matches!(out, SourceOutcome::Ok(_)));
+        assert!(matches!(listing.dating, Dating::Agreed(_)));
+        let view =
+            adapter::read_view(&tree.root, &SourceKind::Narihito, &rel, 0, &listing.token).unwrap();
+        assert_eq!(view.body, "manual 日本語\n");
+        assert_eq!(view.write, Ok(()));
+        assert_eq!(
+            view.trash,
+            Err(diary_application::source::TrashReason::UnsupportedFormat)
+        );
+        assert!(view.raw_front_matter.contains("schema_version: 2"));
+    }
+}

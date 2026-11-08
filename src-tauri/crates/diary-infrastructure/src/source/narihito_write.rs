@@ -17,6 +17,8 @@ pub(crate) enum Unwritable {
 
 pub(crate) struct Checked {
     pub id: String,
+    /// Only schema 1 has a verified recording pair ownership contract.
+    pub recording: bool,
     pub audio_sha256: Option<String>,
     pub updated_at: String,
     /// The editor view: the text after the producer's blank separator line.
@@ -252,7 +254,7 @@ pub(crate) fn check(bytes: &[u8], rel: &str) -> Result<Checked, Unwritable> {
         entries.push((key, scalar(raw).ok_or(F)?));
     }
     let get = |k: &str| entries.iter().find(|(n, _)| *n == k).map(|(_, v)| v);
-    if REQUIRED.iter().any(|k| get(k).is_none()) {
+    if REQUIRED[..8].iter().any(|k| get(k).is_none()) {
         return Err(F);
     }
     let string = |k: &str| match get(k) {
@@ -263,15 +265,15 @@ pub(crate) fn check(bytes: &[u8], rel: &str) -> Result<Checked, Unwritable> {
         Some(Scalar::Int(i)) => Ok(*i),
         _ => Err(F),
     };
-    if int("schema_version")? != 1
+    let schema = int("schema_version")?;
+    if !matches!(schema, 1 | 2)
         || string("kind")? != "ndm.diary-snippet"
         || !matches!(get("favorite"), Some(Scalar::Bool))
     {
         return Err(F);
     }
-    let method = string("transcription_method_id")?;
     let origin = string("title_origin")?;
-    if !METHODS.contains(&method) || !ORIGINS.contains(&origin) {
+    if !ORIGINS.contains(&origin) {
         return Err(F);
     }
     let (id, created, updated) = (string("id")?, string("created_at")?, string("updated_at")?);
@@ -279,35 +281,65 @@ pub(crate) fn check(bytes: &[u8], rel: &str) -> Result<Checked, Unwritable> {
         || instant_secs(created).is_none()
         || instant_secs(updated).is_none()
         || rel != expected_rel(created, id)
-        || string("audio_filename")? != format!("{id}.m4a")
     {
         return Err(F);
     }
-    if let Some(v) = get("audio_sha256") {
-        let Scalar::Str(s) = v else { return Err(F) };
-        if s.len() != 64
-            || !s
-                .bytes()
-                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    if schema == 1 {
+        if REQUIRED.iter().any(|k| get(k).is_none()) {
+            return Err(F);
+        }
+        let method = string("transcription_method_id")?;
+        if !METHODS.contains(&method) || string("audio_filename")? != format!("{id}.m4a") {
+            return Err(F);
+        }
+        if let Some(v) = get("audio_sha256") {
+            let Scalar::Str(s) = v else { return Err(F) };
+            if s.len() != 64
+                || !s
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            {
+                return Err(F);
+            }
+        }
+        let revision = int("transcription_settings_revision")?;
+        if !(0..=301_000).contains(&int("recording_duration_ms")?)
+            || int("audio_sample_rate_hz")? <= 0
+            || int("audio_channels")? <= 0
+            || int("audio_bitrate_bps")? <= 0
+            || !(revision == 1 || (revision == 2 && method == "ndm.transcription.cohere"))
+        {
+            return Err(F);
+        }
+        string("language")?;
+        string("audio_codec")?;
+        string("transcription_language_hint")?;
+    } else {
+        // Exact decodeManual exclusions, not a fallback for recordings missing audio.
+        const CONTEXT: [&str; 8] = [
+            "location_latitude",
+            "location_longitude",
+            "location_sampled_at",
+            "location_horizontal_accuracy_m",
+            "location_place_name",
+            "weather_observed_at",
+            "weather_summary",
+            "weather_temperature_celsius",
+        ];
+        if string("creation_method")? != "manual"
+            || REQUIRED[8..]
+                .iter()
+                .chain(&CONTEXT)
+                .chain(&OPTIONAL_STRINGS[..5])
+                .any(|k| get(k).is_some())
         {
             return Err(F);
         }
     }
-    let revision = int("transcription_settings_revision")?;
-    if !(0..=301_000).contains(&int("recording_duration_ms")?)
-        || int("audio_sample_rate_hz")? <= 0
-        || int("audio_channels")? <= 0
-        || int("audio_bitrate_bps")? <= 0
-        || !(revision == 1 || (revision == 2 && method == "ndm.transcription.cohere"))
-        // shortcut: counts chars, not graphemes, so it may refuse a valid title; upgrade if
-        // title regeneration is ever approved.
-        || string("title")?.chars().count() > 30
-    {
+    // Counts Unicode scalars, conservatively stricter than producer grapheme count.
+    if string("title")?.chars().count() > 30 {
         return Err(F);
     }
-    string("language")?;
-    string("audio_codec")?;
-    string("transcription_language_hint")?;
     if OPTIONAL_STRINGS
         .iter()
         .any(|k| get(k).is_some_and(|v| !matches!(v, Scalar::Str(_))))
@@ -328,6 +360,7 @@ pub(crate) fn check(bytes: &[u8], rel: &str) -> Result<Checked, Unwritable> {
     }
     Ok(Checked {
         id: id.to_owned(),
+        recording: schema == 1,
         audio_sha256: get("audio_sha256").and_then(|v| match v {
             Scalar::Str(s) => Some(s.clone()),
             _ => None,
@@ -383,5 +416,5 @@ mod tests;
 /// Fixtures shared with the adapter and writer tests.
 #[cfg(test)]
 pub(crate) mod tests_support {
-    pub(crate) use super::tests::{REL, golden};
+    pub(crate) use super::tests::{REL, golden, manual};
 }
