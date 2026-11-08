@@ -1,3 +1,4 @@
+import type { ResourceBuffers } from "../editor/buffers";
 import type { Bridge } from "../bridge";
 import type { StreamEvent } from "../events";
 import type { Calendar, CalendarAction, Source } from "./contracts";
@@ -40,27 +41,33 @@ export class NavigationModel {
     private readonly bridge: Bridge,
     private readonly messages: GlobalMessagesStore,
     budget: SessionBudget,
+    buffers: ResourceBuffers,
   ) {
     this.imports = new ImportController(bridge, budget);
     this.catalog = new AuthenticCatalog(bridge, budget);
-    this.resources = new ResourceCoordinator(bridge, budget, {
-      notice: (text) => this.messages.add(text),
-      savedDatesChanged: () => {
-        void this.catalog.refresh();
+    this.resources = new ResourceCoordinator(
+      bridge,
+      budget,
+      {
+        notice: (text) => this.messages.add(text),
+        savedDatesChanged: () => {
+          void this.catalog.refresh();
+        },
+        sourceGuard: (resource) =>
+          new Promise((resolve) => {
+            this.sourceGuard = {
+              resource,
+              finish: (choice) => {
+                this.sourceGuard = null;
+                resolve(choice);
+                this.emit();
+              },
+            };
+            this.emit();
+          }),
       },
-      sourceGuard: (resource) =>
-        new Promise((resolve) => {
-          this.sourceGuard = {
-            resource,
-            finish: (choice) => {
-              this.sourceGuard = null;
-              resolve(choice);
-              this.emit();
-            },
-          };
-          this.emit();
-        }),
-    });
+      buffers,
+    );
     this.imports.subscribe(() => {
       const dates = new Set(
         [...this.resources.resources.values()]

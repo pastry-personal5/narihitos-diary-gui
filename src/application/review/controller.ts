@@ -21,6 +21,14 @@ export interface ReviewState {
   error: string | null;
   announcement: string;
 }
+export const EMPTY_REVIEW_STATE: ReviewState = {
+  view: null,
+  busy: false,
+  invalidated: false,
+  uncertain: false,
+  error: null,
+  announcement: "",
+};
 export const REVIEW_MESSAGE: Record<string, string> = {
   stale_baseline: "Entry changed — regenerate to review.",
   review_invalidated: "Entry changed — regenerate to review.",
@@ -51,14 +59,7 @@ const code = (e: unknown) =>
 /** One paragraph review at a time. Accepted text is saved by the server before it is shown as
  * accepted; the editor shows exactly the server's `body` and never computes offsets itself. */
 export class ReviewController {
-  state: ReviewState = {
-    view: null,
-    busy: false,
-    invalidated: false,
-    uncertain: false,
-    error: null,
-    announcement: "",
-  };
+  state: ReviewState = { ...EMPTY_REVIEW_STATE };
   private listeners = new Set<() => void>();
   private op: { hunk: string; action: string; id: string } | null = null;
   private recheck = false;

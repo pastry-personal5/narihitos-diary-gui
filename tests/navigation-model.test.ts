@@ -1,3 +1,4 @@
+import { FakeBuffers } from "./fake-buffers";
 import { SessionBudget } from "../src/application/navigation/budget";
 import { GlobalMessagesStore } from "../src/application/global-messages/store";
 import { expect, it, vi } from "vitest";
@@ -22,6 +23,7 @@ it("ignores a late Today reply after a newer calendar browse", async () => {
     bridge,
     new GlobalMessagesStore(),
     new SessionBudget(),
+    new FakeBuffers(),
   );
   const change = vi
     .spyOn(model.resources, "changeDate")

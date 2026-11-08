@@ -7,7 +7,7 @@ import { useState } from "react";
 import { SymbolLabel } from "../Symbol";
 import { blockers } from "./advanced";
 import { ProfileTable } from "../ai-agents/ProfileTable";
-import type { useProfiles } from "../ai-agents/useProfiles";
+import type { ProfileStatusModel } from "../../application/ai-agents/contracts";
 import {
   RELOAD_MESSAGE,
   SETTINGS_MESSAGE,
@@ -40,7 +40,7 @@ export function SettingsView({
   connected: boolean;
   connection: Connection;
   onConnect: () => void;
-  profiles: ReturnType<typeof useProfiles>;
+  profiles: ProfileStatusModel;
   onClose: () => void;
 }) {
   const { user, server, error } = model;

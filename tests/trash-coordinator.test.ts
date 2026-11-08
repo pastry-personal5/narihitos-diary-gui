@@ -1,3 +1,4 @@
+import { CodeMirrorBuffers } from "../src/editor/resource-buffers";
 // @vitest-environment jsdom
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { EditorView } from "@codemirror/view";
@@ -32,17 +33,23 @@ async function setup() {
     budget = new SessionBudget();
   const guard = vi.fn(async (): Promise<SourceChoice> => "cancel"),
     notice = vi.fn();
-  const resources = new ResourceCoordinator(bridge, budget, {
-    sourceGuard: guard,
-    notice,
-    savedDatesChanged: vi.fn(),
-  });
+  const buffers = new CodeMirrorBuffers(budget);
+  const resources = new ResourceCoordinator(
+    bridge,
+    budget,
+    {
+      sourceGuard: guard,
+      notice,
+      savedDatesChanged: vi.fn(),
+    },
+    buffers,
+  );
   const imports = new ImportController(bridge, budget);
   imports.connect("instance:session", 1);
   await imports.select(day);
   const host = document.createElement("div");
   document.body.append(host);
-  resources.attach(host);
+  buffers.attach(host);
   await resources.connect(true, true);
   await resources.changeDate(day);
   await resources.openSource(snippet());

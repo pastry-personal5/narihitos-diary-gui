@@ -1,3 +1,5 @@
+import { FakeBuffers } from "./fake-buffers";
+import { SessionBudget } from "../src/application/navigation/budget";
 import { describe, expect, it, vi } from "vitest";
 import { createAppControllers } from "../src/application/controllers";
 import type { Bridge } from "../src/application/bridge";
@@ -5,7 +7,11 @@ import { navigationFake } from "./navigation-fake";
 
 describe("application controller graph lifetime", () => {
   it("retains one graph through effect rehearsal and disposes every owner exactly once", async () => {
-    const graph = createAppControllers(navigationFake() as Bridge);
+    const graph = createAppControllers(
+      navigationFake() as Bridge,
+      new FakeBuffers(),
+      new SessionBudget(),
+    );
     const owners = [
       graph.model,
       graph.trash,
@@ -29,8 +35,16 @@ describe("application controller graph lifetime", () => {
   });
 
   it("disposes the replaced bridge graph even when its replacement acquires a lease", async () => {
-    const first = createAppControllers(navigationFake() as Bridge);
-    const second = createAppControllers(navigationFake() as Bridge);
+    const first = createAppControllers(
+      navigationFake() as Bridge,
+      new FakeBuffers(),
+      new SessionBudget(),
+    );
+    const second = createAppControllers(
+      navigationFake() as Bridge,
+      new FakeBuffers(),
+      new SessionBudget(),
+    );
     const oldDispose = vi.spyOn(first.model, "dispose");
     const newDispose = vi.spyOn(second.model, "dispose");
     const release = first.acquire();

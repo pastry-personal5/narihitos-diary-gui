@@ -8,9 +8,13 @@ import {
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { SessionBudget, payloadBytes } from "../application/navigation/budget";
-import type { BufferPort } from "../application/authentic/session";
+import type {
+  ResourceBufferPort,
+  ReviewDecide,
+  ResourceEditorHandlers,
+} from "../application/editor/buffers";
 import type { ReviewView } from "../application/review/contracts";
-import { type ReviewDecide, reviewExtension } from "./review-extension";
+import { reviewExtension } from "./review-extension";
 
 export class ResourceLimit extends Error {
   constructor() {
@@ -41,14 +45,8 @@ export class EditorPayloadPool {
     this.budget.release(`editor:${key}`);
   }
 }
-export interface ResourceEditorHandlers {
-  edit(): void;
-  composition(start: boolean): void;
-  save(): void;
-  limit(): void;
-}
 /** EditorState outlives its view. Each buffer port is permanently bound to one resource. */
-export class ResourceBuffer implements BufferPort {
+export class ResourceBuffer implements ResourceBufferPort {
   private state: EditorState;
   private view: EditorView | null = null;
   private readonly access = new Compartment();

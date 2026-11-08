@@ -15,7 +15,7 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 
 ## Milestones
 
-This phase plan defines the milestone order. P1-M4–P1-M27 are 24 theme-level milestones derived from the architecture; the owner (2026-11-07) moved release qualification to P1-M32 and inserted P1-M28–P1-M31. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Done; P1-M21 is Done; P1-M22 is Done; P1-M23 is Done; P1-M24 is Done; P1-M25–P1-M27 are Delivered; P1-M28 is Done; P1-M29 is Done; P1-M30 is Done; P1-M31–P1-M32 remain Planned.
+This phase plan defines the milestone order. P1-M4–P1-M27 are 24 theme-level milestones derived from the architecture; the owner (2026-11-07) moved release qualification to P1-M32 and inserted P1-M28–P1-M31. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Done; P1-M21 is Done; P1-M22 is Done; P1-M23 is Done; P1-M24 is Done; P1-M25–P1-M27 are Delivered; P1-M28 is Done; P1-M29 is Done; P1-M30 is Done; P1-M31 is Done; P1-M32 remains Planned.
 
 ### P1-M1: Research
 
@@ -218,8 +218,10 @@ Notes: Canonical feature naming, controller ownership and immutable prompt prepa
 
 ### P1-M31: Owner-requested revisions (second round)
 
-Status: Planned
+Status: Done (2026-11-09)
 Goal: Again bug fixes, UX fixes, GUI fixes, behavior changes, refactoring and architecture changes as the owner requests.
+Plan: [changeability overview/checklist](../archive/milestones/p1-m31/milestone-31-changeability-overview.md), [work plan](../archive/milestones/p1-m31/milestone-31-changeability-architecture.md).
+Notes: The owner accepted changeability refactoring as the first task set on 2026-11-09: editor/resource separation, transport-independent generation/chat policy, shared action decisions, extension contracts and dependency enforcement. Changeability refactoring is complete: all checklist tasks, the seven-lane gate and eight synthetic/native smokes pass, including ordinary GUI close. M32 retains release qualification.
 
 ### P1-M32: Personal release qualification
 

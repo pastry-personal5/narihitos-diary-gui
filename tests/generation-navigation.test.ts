@@ -1,3 +1,4 @@
+import { FakeBuffers } from "./fake-buffers";
 import { SessionBudget } from "../src/application/navigation/budget";
 import { GlobalMessagesStore } from "../src/application/global-messages/store";
 // @vitest-environment jsdom
@@ -78,6 +79,7 @@ async function setup(changeClean = false) {
     bridge,
     new GlobalMessagesStore(),
     new SessionBudget(),
+    new FakeBuffers(),
   );
   models.push(model);
   await model.connect(true, "i", 1, true);

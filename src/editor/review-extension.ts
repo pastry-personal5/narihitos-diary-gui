@@ -1,3 +1,4 @@
+import type { ReviewDecide } from "../application/editor/buffers";
 import type { Extension } from "@codemirror/state";
 import {
   Decoration,
@@ -8,8 +9,6 @@ import {
   gutter,
 } from "@codemirror/view";
 import type { ReviewHunk, ReviewView } from "../application/review/contracts";
-
-export type ReviewDecide = (hunk: string, action: "accept" | "reject") => void;
 
 const excerpt = (text: string) => {
   const flat = text.replace(/\s+/g, " ").trim();

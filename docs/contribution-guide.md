@@ -70,6 +70,28 @@ npx vitest run
 
 Do not hard-code milestone or phase numbers (such as `P1-M3`) in source code or test code: not in identifiers, strings, comments, test names, or fixture names. Name things by behavior. Milestone and phase references belong in `docs/`.
 
+### Where to make changes
+
+| Change                        | Policy and implementation locations                                                                                                                                               | Verification                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Editor behavior               | Application buffer contract in `src/application/editor/buffers.ts`; CodeMirror state/view in `src/editor`; inject the collection in `useAppControllers`                           | Fake-buffer resource policy and real-editor undo/IME/payload/save regressions                |
+| Source save or Trash recovery | `SourceMutations` owns save/retry/reservations on the existing resource; `ResourceCoordinator` owns identity and transitions; `TrashCoordinator` owns durable operation discovery | Source-save/resource/Trash tests and affected producer/native recovery smokes                |
+| Action or availability rule   | Registry and `src/application/actions/app-actions.ts`; UI supplies dialog/focus callbacks and uses the same handlers across surfaces                                              | Action guards, shortcut/palette and affected UI tests                                        |
+| Generation/chat workflow      | Application `generation/workflow.rs` or `chat/workflow.rs`; API owns auth/DTO mapping and runtime scheduling                                                                      | Direct application admission/race tests plus route/bridge and synthetic server coverage      |
+| Source format                 | Application source/import/writer/Trash ports and infrastructure format adapter; keep producer verification at mutation boundaries                                                 | Existing source/producer conformance; enabling a new producer requires its approved contract |
+| Agent or export adapter       | Existing AgentRunner/ProfileDirectory/PromptResolver or ExportAdapter ports, infrastructure implementation and server composition                                                 | Common fake-provider/destination conformance, prompt capture/rendering and recovery tests    |
+
+Give each mutable field one owner. New collaborators operate on that state or
+consume a snapshot; do not mirror queues, reservations or resource maps.
+Application TypeScript imports stay inside `src/application` and use no React,
+CodeMirror, Tauri implementation or DOM types/globals. Inject outer adapters at
+composition. Feature views can compose controls from other features, but do not
+import their presentation hooks as policy or derive public props from another
+feature's hook return type. Use explicit application contracts or shared
+subscription plumbing. `tests/frontend-boundaries.test.js` resolves import paths
+and enforces these rules as part of Vitest; existing Cargo direction and Tauri
+permission checks remain required.
+
 ## Commit messages
 
 Use [Conventional Commits](https://www.conventionalcommits.org):

@@ -1,3 +1,4 @@
+import type { ProfileStatusModel } from "../../application/ai-agents/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AuthenticError,
@@ -18,7 +19,7 @@ export function useProfiles(
   bridge: Bridge,
   connected: boolean,
   configGeneration?: number,
-) {
+): ProfileStatusModel {
   const [profiles, setProfiles] = useState<ProfileInfo[]>();
   const [checking, setChecking] = useState<string[]>([]);
   const [error, setError] = useState<string>();

@@ -26,5 +26,7 @@ P1-M30 is Done (2026-11-09): [refactoring overview/checklist](archive/milestones
 
 P1-M30 acceptance: the final seven-command gate and affected synthetic smokes
 pass, including ordinary debug GUI close and native/server Trash recovery.
-See its completion evidence for limits; P1-M31/P1-M32 remain Planned and M32's
+See its completion evidence for limits; M32's
 packaged/native release qualification is not discharged by the refactor.
+
+P1-M31 is Done (2026-11-09): [changeability refactoring overview/checklist](archive/milestones/p1-m31/milestone-31-changeability-overview.md) and [work plan](archive/milestones/p1-m31/milestone-31-changeability-architecture.md). Editor/resource policy now uses injected buffer ports; source mutation policy, generation/chat workflows and action decisions have explicit application owners. Frontend dependency checks protect the boundaries. All seven gate lanes and eight synthetic/native smokes pass, including ordinary GUI close and native/server Trash recovery. M32 remains Planned and retains packaged/native release qualification.

@@ -92,6 +92,24 @@ All three require the currently admitted owning session; imports are available o
 
 ## Jobs, events and recovery
 
+Generation admission policy lives in the application
+[generation workflow](../../src-tauri/crates/diary-application/src/generation/workflow.rs):
+StartRequest performs replay-first preflight and immutable source/profile/prompt
+capture through explicit ports, including the configuration-generation check.
+Store.start commits admission and distinguishes a simultaneous winner from a
+new job; Store.finish acknowledges terminal state and settles result accounting.
+The [chat workflow](../../src-tauri/crates/diary-application/src/chat/workflow.rs)
+similarly owns profile eligibility, preparation, admission, turn start/completion
+and close/replacement policy. These use cases contain no HTTP or Tokio types.
+
+HTTP adapters authenticate and validate DTOs, translate typed outcomes into the
+existing responses/events/diagnostics, and schedule blocking capture/execution.
+They lock the coordinator before result/chat stores when both are needed;
+blocking capture and provider execution hold neither coordination nor store
+locks. Prompt preparation retains its existing captured definitions and common
+executor. Transport contracts and persisted formats do not change when these
+internal workflow boundaries move.
+
 Job states: `queued → running → succeeded | failed | cancelled | needs_confirmation | uncertain`. Only `succeeded`, `failed` and `cancelled` are terminal. A terminal failure/cancellation reports any completed effects; it never implies rollback. `needs_confirmation` is paused and resumes only with a fresh valid confirmation; `uncertain` is quarantined and resumes only after reconciliation proves the next safe step. Cancellation is idempotent. Before a side effect it cancels outright; after admission to a file publication/remote request it requests cancellation and then reconciles. A successful HTTP 202 means admitted, never saved/exported/deleted. Query the terminal result to establish outcome. Source save and Authentic save may return a terminal 200 or 202 with the same operation handle. Durable operation IDs remain the recovery handle when instance-local job handles disappear.
 
 Application-owned resource coordinators serialize all operations that can affect the same resource: autosave, review accepts, source saves/Trash, and export steps against the same destination. Multi-resource operations reserve sorted canonical keys to avoid deadlock. Paused/uncertain work releases executing workers but retains a durable reservation against conflicting mutations; reads, status, confirmation and reconciliation remain available. After capturing saved input, exports reserve their destination, not the live Authentic editor resource; slow remote work cannot block later local autosaves. No network request, process wait or user confirmation holds a SQLite transaction or its worker. Configuration reload and startup recovery use these same reservations rather than bypassing them.

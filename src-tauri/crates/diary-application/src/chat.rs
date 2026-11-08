@@ -2,6 +2,8 @@
 //!
 //! Nothing here touches disk or logs. A turn adds its user and assistant messages together and
 //! only on success, so a failed or cancelled turn leaves the transcript as the client saw it.
+pub mod workflow;
+
 use crate::agent::{
     AgentError, AgentErrorCode, AgentOutput, ChatDocument, ChatPacket, Locale, ProfileHandle,
     PromptProvenance, Role, Run, Turn,

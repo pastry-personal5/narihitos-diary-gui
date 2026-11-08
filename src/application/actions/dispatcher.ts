@@ -1,5 +1,5 @@
 import { ACTIONS, type Handlers } from "./actions";
-import { composing, fromEvent, validate } from "./shortcut";
+import { composing, fromEvent, validate, type ShortcutEvent } from "./shortcut";
 
 export interface DispatchState {
   bindings(): Record<string, string[]>;
@@ -12,7 +12,7 @@ export interface DispatchState {
 }
 /** The window `keydown` policy: IME and suspension first, then shortcut + scope → action. */
 export function createDispatcher(state: DispatchState) {
-  return (e: KeyboardEvent) => {
+  return (e: ShortcutEvent) => {
     if (composing(e) || state.suspended()) return;
     const shortcut = fromEvent(e);
     if (!shortcut) return;

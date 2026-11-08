@@ -1,5 +1,8 @@
 //! Session-owned generation: fresh source capture, immutable context, one sequential job and
 //! explicit transient-result retention. No filesystem, serialization, prompt prose or logging.
+mod workflow;
+pub use workflow::{CaptureServices, StartRequest, StartedGeneration};
+
 use crate::{
     Coordinator, Job, JobState,
     agent::*,
@@ -22,6 +25,7 @@ const HEADER_BYTES: usize = 4096;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     EmptySelection,
+    ReviewActive,
     ChangedSource,
     InvalidInput,
     Context,

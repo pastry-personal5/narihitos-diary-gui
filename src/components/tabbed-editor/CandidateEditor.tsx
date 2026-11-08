@@ -7,8 +7,11 @@ import {
   type GenerationController,
 } from "../../application/generation/controller";
 import { ModalDialog } from "../ModalDialog";
-import type { ReviewController } from "../../application/review/controller";
-import { useReview } from "../paragraph-review/useReview";
+import {
+  EMPTY_REVIEW_STATE,
+  type ReviewController,
+} from "../../application/review/controller";
+import { useControllerSnapshot } from "../useControllerSnapshot";
 export function GenerationControls({
   controller,
   messages,
@@ -155,7 +158,7 @@ export function CandidateEditor({
   review?: ReviewController;
 }) {
   const state = useGeneration(controller);
-  const reviewing = useReview(review);
+  const reviewing = useControllerSnapshot(review, EMPTY_REVIEW_STATE);
   const key =
     resources.active?.kind === "candidate" ? resources.activeKey : null;
   const cut = key?.lastIndexOf(":") ?? -1;

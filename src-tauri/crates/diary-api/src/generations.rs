@@ -6,10 +6,7 @@ use diary_application::{
     generation::{self, Slot},
 };
 use diary_domain::authentic::DiaryDate;
-use std::{
-    hash::{Hash, Hasher},
-    sync::atomic::Ordering,
-};
+use std::sync::atomic::Ordering;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -40,22 +37,8 @@ fn error(e: generation::Error) -> Response {
         DiscardRequired => failure(StatusCode::CONFLICT, "discard_required"),
         NotFound => failure(StatusCode::NOT_FOUND, "result_unavailable"),
         Busy => failure(StatusCode::CONFLICT, "busy"),
+        ReviewActive => failure(StatusCode::CONFLICT, "review_active"),
     }
-}
-fn fingerprint(b: &Start) -> String {
-    let mut pairs: Vec<_> = b
-        .selections
-        .iter()
-        .map(|s| (&s.import_id, &s.source_id))
-        .collect();
-    pairs.sort();
-    (0u8..4)
-        .map(|k| {
-            let mut h = std::collections::hash_map::DefaultHasher::new();
-            (k, &b.date, &pairs, &b.profile, &b.locale, b.count).hash(&mut h);
-            format!("{:016x}", h.finish())
-        })
-        .collect()
 }
 pub(super) fn progress(s: &ServerState, session: &str, job: &Job) -> Option<Value> {
     let g = s
@@ -115,38 +98,33 @@ pub(super) async fn start(
     {
         return failure(StatusCode::BAD_REQUEST, "invalid_input");
     }
-    let digest = fingerprint(&b);
-    // Authenticate first, then recover an admission before any fresh source/profile/cap checks.
+    let request = generation::StartRequest {
+        request_id: b.request_id.clone(),
+        date,
+        selections: b
+            .selections
+            .into_iter()
+            .map(|s| generation::Selection {
+                import_id: s.import_id,
+                source_id: s.source_id,
+            })
+            .collect(),
+        profile: b.profile,
+        locale,
+        count: b.count,
+    };
+    let digest = request.fingerprint();
     {
         let mut c = s.coordinator.lock().expect("coordinator poisoned");
-        match c.lookup_request(&session, s.now(), &b.request_id, &digest) {
+        let store = s.generations.lock().expect("generations poisoned");
+        match request.preflight(&mut c, &store, &s.reviews, &session, s.now()) {
             Ok(Some(job)) => {
-                if s.generations
-                    .lock()
-                    .expect("generations poisoned")
-                    .get(&session, &job.id)
-                    .is_none()
-                {
-                    return failure(StatusCode::NOT_FOUND, "result_unavailable");
-                };
                 return (StatusCode::ACCEPTED, Json(json!({"job":JobDto::from(job)})))
                     .into_response();
             }
-            Err(e) => return app_error(e),
             Ok(None) => {}
+            Err(e) => return error(e),
         }
-        if c.closing(&session, s.now()).unwrap_or(true)
-            || c.active_agent(&session, s.now()).is_ok_and(|j| j.is_some())
-        {
-            return failure(StatusCode::CONFLICT, "busy");
-        }
-    }
-    // Regeneration ends the old review first (client), so a live one for the date blocks it.
-    if s.reviews.has_date(&session, &date) {
-        return failure(StatusCode::CONFLICT, "review_active");
-    }
-    if b.selections.is_empty() {
-        return failure(StatusCode::UNPROCESSABLE_ENTITY, "empty_selection");
     }
     let (Some(profiles), Some(runner), Some(imports), Some(authentic)) = (
         s.profiles.clone(),
@@ -158,49 +136,16 @@ pub(super) async fn start(
     };
     let capture_s = s.clone();
     let capture_session = session.clone();
-    let alias = b.profile.clone();
     let capture_runner = runner.clone();
     let captured = tokio::task::spawn_blocking(move || {
-        let view = profiles
-            .check(&alias)
-            .ok_or(generation::Error::ProfileNotReady)?;
-        if view.status != Some(ProfileStatus::Ready) || view.generate != Capability::Ready {
-            return Err(generation::Error::ProfileNotReady);
-        }
-        let generation = capture_s.config_generation.load(Ordering::Acquire);
-        let f = generation::capture(
-            generation::Capture {
-                prompt: capture_runner
-                    .resolve(PromptSelection {
-                        provider: view.kind,
-                        action: PromptAction::GenerateCandidate,
-                    })
-                    .map_err(|_| generation::Error::ProfileNotReady)?,
-                date,
-                selections: b
-                    .selections
-                    .into_iter()
-                    .map(|p| generation::Selection {
-                        import_id: p.import_id,
-                        source_id: p.source_id,
-                    })
-                    .collect(),
-                profile: ProfileHandle {
-                    alias: view.alias,
-                    kind: view.kind,
-                },
-                locale,
-                count: b.count,
-                config_generation: generation,
-            },
-            &*imports,
-            &*authentic,
-            &|| imports::cancelled(&capture_s, &capture_session),
-        )?;
-        if capture_s.config_generation.load(Ordering::Acquire) != generation {
-            return Err(generation::Error::ChangedSource);
-        }
-        Ok(f)
+        request.capture(generation::CaptureServices {
+            profiles: &*profiles,
+            runner: &*capture_runner,
+            imports: &*imports,
+            authentic: &*authentic,
+            configuration: &|| capture_s.config_generation.load(Ordering::Acquire),
+            cancelled: &|| imports::cancelled(&capture_s, &capture_session),
+        })
     })
     .await;
     let frozen = match captured {
@@ -232,7 +177,7 @@ pub(super) async fn start(
     };
     let job_id = Uuid::new_v4().to_string();
     let mut c = s.coordinator.lock().expect("coordinator poisoned");
-    let admitted = s.generations.lock().expect("generations poisoned").admit(
+    let admitted = s.generations.lock().expect("generations poisoned").start(
         &mut c,
         generation::Admission {
             session: &session,
@@ -243,17 +188,15 @@ pub(super) async fn start(
         },
         frozen,
     );
-    let (job, g) = match admitted {
+    let started = match admitted {
         Ok(v) => v,
         Err(e) => return error(e),
     };
-    // A simultaneous identical submission may have won while capture was running.
-    if job.id != job_id {
+    let (job, g) = (started.job, started.generation);
+    if !started.execute {
         return (StatusCode::ACCEPTED, Json(json!({"job":JobDto::from(job)}))).into_response();
     }
-    let running = c
-        .transition(&session, s.now(), &job.id, JobState::Running)
-        .expect("new admission");
+    let running = job.clone();
     publish(&s, &mut c, &session, &running, false);
     drop(c);
     let response = json!({"job":JobDto::from(running)});
@@ -270,19 +213,15 @@ pub(super) async fn start(
             last_ready = ready;
         };
         generation::execute(&g, &*runner, &|| s.now(), &mut notify);
-        let state = g
-            .lock()
-            .expect("generation poisoned")
-            .terminal
-            .expect("execution settled");
         let mut c = s.coordinator.lock().expect("coordinator poisoned");
-        if let Ok(job) = c.transition(&session, s.now(), &job.id, state) {
-            let _ = s.generations.lock().expect("generations poisoned").settle(
-                &mut c,
-                &session,
-                s.now(),
-                &job.id,
-            );
+        let completed = s.generations.lock().expect("generations poisoned").finish(
+            &mut c,
+            &session,
+            s.now(),
+            &job.id,
+            &g,
+        );
+        if let Ok(job) = completed {
             publish(&s, &mut c, &session, &job, false);
             log_finished(&s, &session, &job, &g);
         }

@@ -5,7 +5,7 @@ import {
   PROFILE_STATUS,
   PROFILE_STATUS_REASON_TEXT,
 } from "../../application/ai-agents/presentation";
-import type { useProfiles } from "./useProfiles";
+import type { ProfileStatusModel } from "../../application/ai-agents/contracts";
 
 // [SF Symbol, tone class] per status.
 const STATUS_ICON: Record<ProfileInfo["status"], [string, string]> = {
@@ -33,11 +33,7 @@ function Capability({ cap }: { cap: ProfileCapability }) {
   );
 }
 
-export function ProfileTable({
-  profiles,
-}: {
-  profiles: ReturnType<typeof useProfiles>;
-}) {
+export function ProfileTable({ profiles }: { profiles: ProfileStatusModel }) {
   const list = profiles.profiles;
   return (
     <>

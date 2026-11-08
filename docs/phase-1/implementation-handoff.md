@@ -135,3 +135,7 @@ recovery records retain their existing formats. No data conversion/reset is
 required. Multiple-prompt management and evaluation remain deferred. Consult the
 [M30 evidence record](../archive/milestones/p1-m30/milestone-30-refactoring-overview.md#evidence-record) for
 completed verification; M32's packaged/native obligations remain open.
+
+## M31 changeability handoff
+
+The [completed checklist](../archive/milestones/p1-m31/milestone-31-changeability-overview.md) and [work plan](../archive/milestones/p1-m31/milestone-31-changeability-architecture.md) record application-owned buffer/source/action policy and generation/chat workflows, plus dependency enforcement. The [editing/ownership contract](../architecture/editing-and-agents.md#client-feature-and-lifecycle-ownership) and [contributor change procedures](../contribution-guide.md#where-to-make-changes) describe the implemented extension points. All seven gate lanes and eight synthetic/native smokes pass; transport/persisted contracts, producer compatibility, effective prompts and dependencies are unchanged. M32 retains packaged/native qualification and its existing evidence obligations.

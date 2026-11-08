@@ -1,3 +1,4 @@
+import { CodeMirrorBuffers } from "../src/editor/resource-buffers";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorView } from "@codemirror/view";
@@ -76,15 +77,18 @@ function setup() {
     savedDatesChanged: vi.fn(),
   };
   // Only the ports used by the resource coordinator are implemented by this fixture.
+  const budget = new SessionBudget();
+  const buffers = new CodeMirrorBuffers(budget);
   const c = new ResourceCoordinator(
     bridge as unknown as Bridge,
-    new SessionBudget(),
+    budget,
     events,
+    buffers,
   );
   coordinators.push(c);
   const host = document.createElement("div");
   document.body.append(host);
-  c.attach(host);
+  buffers.attach(host);
   const view = () =>
     EditorView.findFromDOM(host.querySelector<HTMLElement>(".cm-editor")!)!;
   const type = (text: string) =>

@@ -1,6 +1,18 @@
 // Mirrors src-tauri/src/user_settings/keybindings.rs; shared fixtures in registry.json prove parity.
 import registry from "./registry.json";
 
+/** Structural input; browser keyboard events implement it without making policy DOM-dependent. */
+export interface ShortcutEvent {
+  code: string;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  metaKey: boolean;
+  isComposing: boolean;
+  keyCode: number;
+  repeat: boolean;
+  preventDefault(): void;
+}
 export type Scope = "app" | "snippetTree";
 const MODS = ["Control", "Option", "Shift", "Command"];
 const NAMED = [
@@ -81,7 +93,7 @@ export function keyFromCode(code: string): string | null {
   return NAMED.includes(code) ? code : null;
 }
 /** Canonical shortcut for a keydown, or `null` for modifier-only or unmapped keys. */
-export function fromEvent(e: KeyboardEvent): string | null {
+export function fromEvent(e: ShortcutEvent): string | null {
   const key = keyFromCode(e.code);
   if (!key) return null;
   const mods = [
@@ -93,7 +105,7 @@ export function fromEvent(e: KeyboardEvent): string | null {
   return canonicalize([...mods, key].join("+"));
 }
 /** IME composition must never be intercepted; WebKit may end it with keyCode 229. */
-export const composing = (e: KeyboardEvent) =>
+export const composing = (e: ShortcutEvent) =>
   e.isComposing || e.keyCode === 229;
 /** "Shift plus Command plus P" for VoiceOver. */
 export const spoken = (s: string) => s.replaceAll("+", " plus ");

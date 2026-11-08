@@ -2,6 +2,7 @@
 
 Status: Active
 
+- [P1-M31 changeability refactoring tasks](archive/milestones/p1-m31/milestone-31-changeability-overview.md) ([work plan](archive/milestones/p1-m31/milestone-31-changeability-architecture.md)): done; injected editor ports, source mutation policy, application workflows/actions and dependency enforcement, with the full gate and eight synthetic/native smokes passing.
 - [P1-M25 export review follow-up](archive/milestones/p1-m25/milestone-25-export-review-overview.md): ordering, confirmation idempotency and destination binding regression fixes.
 - [P1-M29 Owner-requested revisions](archive/milestones/p1-m29/milestone-29-owner-requested-revisions-overview.md) ([work plan](archive/milestones/p1-m29/milestone-29-owner-requested-revisions-architecture.md)): done; all recorded requests, full gate, browser visual checks and live Notion heading/reorder proof pass.
 - Notion day layout (P1-M29): design [heading days](superpowers/specs/2026-11-07-notion-heading-days-design.md) ([plan](superpowers/plans/2026-11-07-notion-heading-days.md)) and [automatic reorder](superpowers/specs/2026-11-07-notion-reorder-days-design.md) ([plan](superpowers/plans/2026-11-07-notion-reorder-days.md)).

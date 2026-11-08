@@ -78,6 +78,30 @@ notices. AIActivitiesRuntime observes jobs/results independently of mounted
 feature panes. Settings and AI Agents consume application interfaces; shared
 profile wording lives in application, outside the polling hook.
 
+The outer [controller hook](../../src/components/useAppControllers.ts) creates
+one shared SessionBudget and a [CodeMirror buffer collection](../../src/editor/resource-buffers.ts),
+then injects them into the application graph. Application code depends on
+[buffer ports](../../src/application/editor/buffers.ts), never CodeMirror or a
+DOM host. The collection selects the active retained buffer and owns attachment;
+resource identity and transition ordering stay in ResourceCoordinator. Closing
+or replacing a host does not replace save sessions or retained editor state.
+
+[SourceMutations](../../src/application/navigation/source-mutations.ts) owns
+source save/retry and Trash preparation/reservation policy, operating on each
+resource's single save state. It does not own a second resource map or transition
+queue. ResourceCoordinator applies identity changes when a moved source must
+become a detached copy. TrashCoordinator retains durable operation discovery
+and reconciliation; reservations remain separate from source observations.
+
+[Application action policy](../../src/application/actions/app-actions.ts)
+supplies the common availability decisions and commands used by toolbar,
+palette and keyboard shortcuts. Commands re-evaluate eligibility and current
+selection at invocation. React binds subscriptions, modal/focus effects and
+shortcut listeners; it does not derive policy from nested save queues.
+Profile status consumers use the application ProfileStatusModel contract, and
+shared subscription plumbing avoids importing another feature's presentation
+hook. Frontend architecture tests enforce these dependency directions.
+
 ## Prompt assets
 
 All app-authored instructions come from `assets/prompts/<agent-type>/`; the [asset contract and inventory](../../assets/prompts/README.md) define metadata, substitution and current gaps. Inspect and reuse existing files before writing new prompts. Load and validate them in infrastructure, including session, task, style and any approved repair instructions; no prompt prose or fallback prompt belongs in source code. Missing/invalid assets disable the affected action visibly. A template's presence does not establish schema compatibility, approve additional workflows or authorize hidden extra calls.

@@ -1,4 +1,5 @@
-import { SessionBudget } from "./navigation/budget";
+import type { ResourceBuffers } from "./editor/buffers";
+import type { SessionBudget } from "./navigation/budget";
 import { SourceTrashController } from "./trash/source-controller";
 import { GlobalMessagesStore } from "./global-messages/store";
 import type { Bridge } from "./bridge";
@@ -14,10 +15,13 @@ import { NavigationModel } from "./navigation/model";
 import { ReviewController } from "./review/controller";
 
 /** Session-lifetime controller graph. React owns only a lease on this graph. */
-export function createAppControllers(bridge: Bridge) {
-  const budget = new SessionBudget();
+export function createAppControllers(
+  bridge: Bridge,
+  buffers: ResourceBuffers,
+  budget: SessionBudget,
+) {
   const messages = new GlobalMessagesStore();
-  const model = new NavigationModel(bridge, messages, budget);
+  const model = new NavigationModel(bridge, messages, budget, buffers);
   const sourceTrash = new SourceTrashController(
     bridge,
     model,

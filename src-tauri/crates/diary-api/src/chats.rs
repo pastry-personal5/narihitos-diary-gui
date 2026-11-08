@@ -10,15 +10,11 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use diary_application::JobState;
-use diary_application::agent::{
-    AgentErrorCode, AgentOutput, AgentRequest, Capability, ChatDocument, DocumentKind, Locale,
-    Mode, Phase, ProfileHandle, ProfileStatus, PromptSelection, Role, Run,
-};
-use diary_application::chat::{Chat, Outcome};
+use diary_application::agent::{AgentErrorCode, ChatDocument, DocumentKind, Locale, Phase, Role};
+use diary_application::chat::{Outcome, workflow};
 use diary_domain::authentic::DiaryDate;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -60,19 +56,6 @@ pub(super) fn phase(p: Option<Phase>) -> Value {
     }))
 }
 
-/// A 256-bit request fingerprint for idempotency only. shortcut: not cryptographic (std SipHash
-/// with four prefixes); upgrade if a digest ever has to resist an adversarial client.
-fn digest(parts: &[&str]) -> String {
-    (0u8..4)
-        .map(|k| {
-            let mut h = std::collections::hash_map::DefaultHasher::new();
-            k.hash(&mut h);
-            parts.hash(&mut h);
-            format!("{:016x}", h.finish())
-        })
-        .collect()
-}
-
 fn runner(
     s: &ServerState,
 ) -> Result<Arc<dyn diary_application::agent::AgentRunner + Send + Sync>, Response> {
@@ -106,28 +89,24 @@ pub(super) async fn open(
     let Some(profiles) = s.profiles.clone() else {
         return failure(StatusCode::SERVICE_UNAVAILABLE, "unavailable");
     };
-    let alias = b.profile;
-    let view = tokio::task::spawn_blocking(move || profiles.check(&alias)).await;
-    let Ok(Some(view)) = view else {
-        return failure(StatusCode::NOT_FOUND, "not_found");
+    let chat = tokio::task::spawn_blocking(move || {
+        workflow::open(
+            &*profiles,
+            &b.profile,
+            locale,
+            Uuid::new_v4().to_string(),
+            session,
+        )
+    })
+    .await;
+    let chat = match chat {
+        Ok(Ok(chat)) => chat,
+        Ok(Err(e)) => return workflow_error(&s, e),
+        Err(_) => return failure(StatusCode::NOT_FOUND, "not_found"),
     };
-    if view.status != Some(ProfileStatus::Ready) || view.chat != Capability::Ready {
-        return failure(StatusCode::CONFLICT, "profile_not_ready");
-    }
-    let chat = Chat::new(
-        Uuid::new_v4().to_string(),
-        session,
-        ProfileHandle {
-            alias: view.alias.clone(),
-            kind: view.kind,
-        },
-        locale,
-    );
-    let response = json!({"chat_id":chat.id,"profile":view.alias,"locale":chat.locale.as_str()});
-    // One chat per lease: opening another ends the old one, including any running turn.
-    if let Some(old) = s.chat.lock().expect("chat poisoned").replace(chat) {
-        old.cancel();
-    }
+    let response =
+        json!({"chat_id":chat.id,"profile":chat.profile.alias,"locale":chat.locale.as_str()});
+    workflow::replace(&mut s.chat.lock().expect("chat poisoned"), chat);
     (StatusCode::CREATED, Json(response)).into_response()
 }
 
@@ -154,6 +133,16 @@ fn preparation_failure(
     failure(StatusCode::UNPROCESSABLE_ENTITY, error.0.as_str())
 }
 
+fn workflow_error(s: &ServerState, error: workflow::Error) -> Response {
+    match error {
+        workflow::Error::NotFound => failure(StatusCode::NOT_FOUND, "not_found"),
+        workflow::Error::ProfileNotReady => failure(StatusCode::CONFLICT, "profile_not_ready"),
+        workflow::Error::Packet(e) => failure(StatusCode::UNPROCESSABLE_ENTITY, e.0.as_str()),
+        workflow::Error::Preparation { kind, error } => preparation_failure(s, kind, error),
+        workflow::Error::Coordination(e) => app_error(e),
+    }
+}
+
 pub(super) async fn turn(
     State(s): State<Arc<ServerState>>,
     Path(chat_id): Path<String>,
@@ -171,7 +160,7 @@ pub(super) async fn turn(
     if !imports::opaque(&b.request_id) || b.message.trim().is_empty() {
         return failure(StatusCode::BAD_REQUEST, "invalid_input");
     }
-    let document = match b.document.as_ref().map(|d| {
+    let document = match b.document.map(|d| {
         let kind = match d.kind.as_str() {
             "authentic" => DocumentKind::Authentic,
             "source" => DocumentKind::Source,
@@ -181,7 +170,7 @@ pub(super) async fn turn(
             kind,
             date: DiaryDate::parse(&d.date)?,
             unsaved: d.unsaved,
-            body: d.body.clone(),
+            body: d.body,
         })
     }) {
         Some(None) => return failure(StatusCode::BAD_REQUEST, "invalid_input"),
@@ -192,76 +181,51 @@ pub(super) async fn turn(
         Ok(r) => r,
         Err(r) => return r,
     };
-    let (profile, locale, packet) = {
-        let chat = s.chat.lock().expect("chat poisoned");
-        let Some(chat) = chat
-            .as_ref()
-            .filter(|c| c.id == chat_id && c.session == session)
-        else {
-            return failure(StatusCode::NOT_FOUND, "not_found");
-        };
-        match chat.packet(&b.message, document) {
-            Ok(p) => (chat.profile.clone(), chat.locale.clone(), p),
-            Err(e) => return failure(StatusCode::UNPROCESSABLE_ENTITY, e.0.as_str()),
-        }
+    let input = workflow::TurnRequest {
+        chat_id,
+        request_id: b.request_id,
+        message: b.message,
+        document,
     };
-    let kind = profile.kind;
-    let request = AgentRequest::new(profile, locale, Mode::Chat(packet));
-    let definition = match runner.resolve(PromptSelection::for_request(&request)) {
-        Ok(prompt) => prompt,
-        Err(e) => return preparation_failure(&s, kind, e),
+    let request = match input.request(&s.chat.lock().expect("chat poisoned"), &session) {
+        Ok(request) => request,
+        Err(e) => return workflow_error(&s, e),
     };
-    let prepared = match definition.prepare(request) {
+    let prepared = match input.prepare(request, &*runner) {
         Ok(prepared) => prepared,
-        Err(e) => return preparation_failure(&s, kind, e),
+        Err(e) => return workflow_error(&s, e),
     };
-    let doc_text = b.document.as_ref().map_or("", |d| d.body.as_str());
-    let doc_meta = b.document.as_ref().map_or(String::new(), |d| {
-        format!("{}|{}|{}", d.kind, d.date, d.unsaved)
-    });
-    let key = digest(&[&chat_id, &b.message, &doc_meta, doc_text]);
-    let reserved = b.message.len() + doc_text.len() + 4096;
     let job_id = Uuid::new_v4().to_string();
     let mut c = s.coordinator.lock().expect("coordinator poisoned");
-    let job = match c.admit_agent(&session, s.now(), &b.request_id, &key, &job_id, reserved) {
+    let job = match prepared.admit(&mut c, &session, s.now(), &job_id) {
         Ok(j) => j,
-        Err(e) => return app_error(e),
+        Err(e) => return workflow_error(&s, e),
     };
     let response = json!({"job":JobDto::from(job.clone())});
     if job.state != JobState::Queued {
         return (StatusCode::ACCEPTED, Json(response)).into_response();
     }
-    let run = Run::new();
-    let shared = diary_application::run::Shared::default();
-    {
-        let mut chat = s.chat.lock().expect("chat poisoned");
-        match chat.as_mut().filter(|c| c.id == chat_id) {
-            Some(chat) => {
-                chat.start(
-                    &job.id,
-                    &b.message,
-                    Run::from(run.token()),
-                    shared.clone(),
-                    prepared.provenance().clone(),
-                );
-                chat.observe_admission(
-                    b.request_id.clone(),
-                    b.document.as_ref().map(|d| d.date.clone()),
-                    s.now(),
-                );
+    let started = prepared.start(
+        &mut c,
+        &mut s.chat.lock().expect("chat poisoned"),
+        &session,
+        s.now(),
+        &job,
+    );
+    let workflow::StartedTurn {
+        running,
+        prepared,
+        run,
+        shared,
+    } = match started {
+        workflow::StartOutcome::Running(started) => *started,
+        workflow::StartOutcome::Closed(cancelled) => {
+            if let Some(job) = cancelled {
+                imports::publish(&s, &mut c, &session, &job);
             }
-            None => {
-                // The chat was closed between the check and admission.
-                if let Ok(j) = c.transition(&session, s.now(), &job.id, JobState::Cancelled) {
-                    imports::publish(&s, &mut c, &session, &j);
-                }
-                return failure(StatusCode::NOT_FOUND, "not_found");
-            }
+            return failure(StatusCode::NOT_FOUND, "not_found");
         }
-    }
-    let running = c
-        .transition(&session, s.now(), &job.id, JobState::Running)
-        .expect("new admission");
+    };
     imports::publish(&s, &mut c, &session, &running);
     drop(c);
     tokio::task::spawn_blocking(move || {
@@ -285,15 +249,12 @@ pub(super) async fn turn(
             &move || clock_state.now(),
             &mut notify,
         );
-        let terminal = match &result {
-            Ok(AgentOutput::Reply(_)) => JobState::Succeeded,
-            Err(e) if e.0 == AgentErrorCode::Cancelled => JobState::Cancelled,
-            _ => JobState::Failed,
-        };
-        if let Some(chat) = s.chat.lock().expect("chat poisoned").as_mut() {
-            chat.finish(&job.id, result);
-            chat.observe_completion(&job.id, s.now());
-        }
+        let terminal = workflow::finish(
+            &mut s.chat.lock().expect("chat poisoned"),
+            &job.id,
+            result,
+            s.now(),
+        );
         let mut c = s.coordinator.lock().expect("coordinator poisoned");
         if let Ok(j) = c.transition(&session, s.now(), &job.id, terminal) {
             imports::publish(&s, &mut c, &session, &j);
@@ -349,14 +310,11 @@ pub(super) async fn close(
         Ok(id) => id,
         Err(r) => return r,
     };
-    let mut guard = s.chat.lock().expect("chat poisoned");
-    if guard
-        .as_ref()
-        .is_some_and(|c| c.id == chat_id && c.session == session)
-        && let Some(old) = guard.take()
-    {
-        old.cancel();
-    }
+    workflow::close(
+        &mut s.chat.lock().expect("chat poisoned"),
+        &session,
+        &chat_id,
+    );
     Json(json!({})).into_response()
 }
 

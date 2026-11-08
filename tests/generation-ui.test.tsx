@@ -1,3 +1,4 @@
+import { CodeMirrorBuffers } from "../src/editor/resource-buffers";
 import { GlobalMessagesStore } from "../src/application/global-messages/store";
 import { App } from "../src/components/App";
 import { navigationFake } from "./navigation-fake";
@@ -29,14 +30,21 @@ import { ResourceCoordinator } from "../src/application/navigation/resources";
 import { SessionBudget } from "../src/application/navigation/budget";
 import { useSyncExternalStore } from "react";
 function coordinator() {
-  const r = new ResourceCoordinator({} as Bridge, new SessionBudget(), {
-    sourceGuard: async () => "cancel",
-    notice: vi.fn(),
-    savedDatesChanged: vi.fn(),
-  } as never);
+  const budget = new SessionBudget();
+  const buffers = new CodeMirrorBuffers(budget);
+  const r = new ResourceCoordinator(
+    {} as Bridge,
+    budget,
+    {
+      sourceGuard: async () => "cancel",
+      notice: vi.fn(),
+      savedDatesChanged: vi.fn(),
+    } as never,
+    buffers,
+  );
   const host = document.createElement("div");
   document.body.append(host);
-  r.attach(host);
+  buffers.attach(host);
   return r;
 }
 /** Candidate tabs as the app wires them: one tab per slot plus the active tab's banner. */

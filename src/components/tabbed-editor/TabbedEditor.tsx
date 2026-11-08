@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import type { createAppControllers } from "../../application/controllers";
-import type { useAppActions } from "../standard-layout/useAppActions";
-import type { useSettings } from "../settings/useSettings";
+import type { createAppActions } from "../../application/actions/app-actions";
+import type { UserSettings } from "../../application/bridge";
 import { AuthenticEditor } from "./AuthenticEditor";
 import { CandidateEditor, GenerationControls } from "./CandidateEditor";
 import { GlobalMessages } from "../global-messages/GlobalMessages";
@@ -11,12 +11,12 @@ import { SymbolLabel } from "../Symbol";
 import { saveOff } from "../../application/navigation/resources";
 
 type Controllers = ReturnType<typeof createAppControllers>;
-type Actions = ReturnType<typeof useAppActions>;
+type Actions = ReturnType<typeof createAppActions>;
 interface Props {
   model: Controllers["model"];
   messages: Controllers["messages"];
   generator: Controllers["generator"];
-  settings: ReturnType<typeof useSettings>;
+  settings: { user?: UserSettings };
   generationReason: Actions["generationReason"];
   handlers: Actions["handlers"];
   active: Actions["active"];

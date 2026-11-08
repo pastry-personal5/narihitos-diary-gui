@@ -1,18 +1,9 @@
-import { useSyncExternalStore } from "react";
-import type { ReviewController } from "../../application/review/controller";
-const NONE = {
-  view: null,
-  busy: false,
-  invalidated: false,
-  uncertain: false,
-  error: null,
-  announcement: "",
-};
-const off = () => () => {};
+import {
+  EMPTY_REVIEW_STATE,
+  type ReviewController,
+} from "../../application/review/controller";
+import { useControllerSnapshot } from "../useControllerSnapshot";
 /** A missing controller (tests, fakes without review) reads as an idle review. */
 export function useReview(controller?: ReviewController) {
-  return useSyncExternalStore(
-    controller?.subscribe ?? off,
-    controller?.getSnapshot ?? (() => NONE),
-  );
+  return useControllerSnapshot(controller, EMPTY_REVIEW_STATE);
 }

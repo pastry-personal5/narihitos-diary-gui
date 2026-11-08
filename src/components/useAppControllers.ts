@@ -1,3 +1,5 @@
+import { CodeMirrorBuffers } from "../editor/resource-buffers";
+import { SessionBudget } from "../application/navigation/budget";
 import { useCallback, useEffect, useMemo, useReducer } from "react";
 import type { Bridge } from "../application/bridge";
 import { createAppControllers } from "../application/controllers";
@@ -8,7 +10,11 @@ import { useGeneration } from "./tabbed-editor/useGeneration";
 
 /** Builds the app's controllers once per bridge and owns their lifetime. */
 export function useAppControllers(bridge: Bridge) {
-  const graph = useMemo(() => createAppControllers(bridge), [bridge]);
+  const { graph, buffers } = useMemo(() => {
+    const budget = new SessionBudget();
+    const buffers = new CodeMirrorBuffers(budget);
+    return { graph: createAppControllers(bridge, buffers, budget), buffers };
+  }, [bridge]);
   const {
     model,
     messages,
@@ -43,8 +49,8 @@ export function useAppControllers(bridge: Bridge) {
     };
   }, [model]);
   const editorHost = useCallback(
-    (element: HTMLDivElement | null) => model.resources.attach(element),
-    [model],
+    (element: HTMLDivElement | null) => buffers.attach(element),
+    [buffers],
   );
   const symbols = useMemo<SymbolHost | null>(() => {
     const load = bridge.getSymbol?.bind(bridge);
@@ -70,10 +76,10 @@ export function useAppControllers(bridge: Bridge) {
     return () => {
       off();
       offTrash();
-      model.resources.attach(null);
+      buffers.attach(null);
       release();
     };
-  }, [graph, model, trash]);
+  }, [graph, model, trash, buffers]);
   return {
     model,
     messages,
