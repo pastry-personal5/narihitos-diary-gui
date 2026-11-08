@@ -89,6 +89,10 @@ None yet.
 
 - [x] T20 `[gui]` - Icon Bar: icons half as big (64 → 32 px), column narrower (80 → 48 px); idle icons use the darker `--muted` color and brighten to `--text` on hover (pressed keeps the accent fill). Evidence: `src/components/App.tsx`, `src/styles.css`. Not done: visual check in the running app.
 
+- [x] T21 `[gui]` - Move connection status text and the Connect button from the toolbar into a new Settings > Server category.
+  - [x] T21.1 - Server card preserves disconnected, connecting, connected and storage-unavailable states; Connect is disabled while connecting. Evidence: affected UI suites pass (45 tests), including Settings and client connection regressions.
+  - [x] T21.2 - UI regression coverage and the full `scripts/gate.sh` pass (2026-11-08, G01–G07; local TCP fixtures require execution outside the sandbox); affected README, user guide, UX docs and changelog updated.
+
 ### Proof and docs
 
 - [x] Z01 - Full gate (`scripts/gate.sh`) passes (2026-11-07): G01–G07 all exit 0. Fixes made on the way: `cargo fmt --all` on `diary-logging` `codec.rs`/`codec/tests.rs` (formatting only; the architecture test checks all workspace members) and the T11 default in `tests/accessibility.test.tsx`.

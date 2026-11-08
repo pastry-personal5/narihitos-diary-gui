@@ -1,3 +1,4 @@
+import { connectFromSettings } from "./server-connection";
 import { navigationFake } from "./navigation-fake";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -62,6 +63,40 @@ async function openSettings(section?: string) {
 }
 
 describe("Settings", () => {
+  it("keeps connection controls in Settings Server and disables Connect while connecting", async () => {
+    const adapter = bridge(settingsFake());
+    let finish!: (value: typeof status) => void;
+    adapter.connect = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(<App bridge={adapter} />);
+    expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+    expect(screen.queryByLabelText("Server connection status")).toBeNull();
+    await openSettings("Server");
+    expect(screen.getByLabelText("Server connection status").textContent).toBe(
+      "Server disconnected",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await screen.findByText("Connecting…");
+    expect(screen.getByRole("button", { name: "Connect" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    await act(async () => finish(status));
+    await screen.findByText("Connected");
+    expect(screen.getByRole("button", { name: "Connect" })).toHaveProperty(
+      "disabled",
+      false,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
+    expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+    expect(screen.queryByLabelText("Server connection status")).toBeNull();
+    expect(screen.getByLabelText("Save status")).toBeTruthy();
+  });
+
   it("stores the first system language once and keeps it across a restart", async () => {
     languages(["ja-JP", "en-US"]);
     const fake = settingsFake();
@@ -186,7 +221,10 @@ describe("Settings", () => {
     await screen.findByText(
       "Connect to the server to see its configuration status.",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    connectFromSettings();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Status", exact: true }),
+    );
     await screen.findByText("mobile: source_root_missing");
     fireEvent.click(
       screen.getByRole("button", { name: "Reload configuration" }),
@@ -203,8 +241,9 @@ describe("Settings", () => {
       { sources: [{ alias: "ayumi", available: true, reason: "ready" }] },
     );
     render(<App bridge={bridge(fake)} />);
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    connectFromSettings();
     await screen.findByText("Connected");
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
     expect(screen.getByRole("log").textContent).not.toContain(
       "Source import is off",
     );

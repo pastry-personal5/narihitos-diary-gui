@@ -98,7 +98,7 @@ footer {
   display: flex;
   gap: 8px;
 }
-.connection {
+.toolbar-save-status {
   margin-left: auto;
   display: flex;
   align-items: center;

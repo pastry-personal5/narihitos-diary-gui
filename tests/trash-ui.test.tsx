@@ -1,3 +1,4 @@
+import { connectFromSettings } from "./server-connection";
 // @vitest-environment jsdom
 import { useEffect, useReducer } from "react";
 import { afterEach, describe, it, expect, vi } from "vitest";
@@ -288,8 +289,9 @@ describe("Explorer Trash action", () => {
       listAuthentic: async () => ({ items: [], next_cursor: null }),
     } as unknown as Bridge;
     render(<App bridge={bridge} />);
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    connectFromSettings();
     await screen.findByText("Connected");
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
     fireEvent.click(screen.getByRole("button", { name: "Snippet tab" }));
     const move = await screen.findAllByRole("button", {
       name: /^Move .+ to Trash$/,

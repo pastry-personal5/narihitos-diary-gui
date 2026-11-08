@@ -13,7 +13,7 @@ Approach and sequencing for the [P1-M29 overview](milestone-29-owner-requested-r
 
 ## Task notes
 
-_Added per request._
+T21 moves the connection display and manual Connect action from `App.tsx` to a Server card in `SettingsView.tsx`, passing the existing connection state and callback. `useConnection` remains app-scoped. UI tests verify placement, connection states and the disabled action during connection; existing shell tests connect through Settings.
 
 ## Risks
 

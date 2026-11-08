@@ -1,3 +1,4 @@
+import { connectFromSettings } from "./server-connection";
 import { navigationFake } from "./navigation-fake";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
@@ -116,8 +117,9 @@ class FakeServer {
 
 async function open(server: FakeServer) {
   render(<App bridge={server.bridge()} />);
-  fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+  connectFromSettings();
   await screen.findByText("Connected");
+  fireEvent.click(screen.getByRole("button", { name: "Go back" }));
   await waitFor(() => expect(screen.queryByText("No file open")).toBeNull());
 }
 function editor() {

@@ -1,3 +1,4 @@
+import { connectFromSettings } from "./server-connection";
 import { navigationFake } from "./navigation-fake";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -78,15 +79,17 @@ describe("scaffold shell", () => {
       .mockRejectedValueOnce(new Error("private token must not appear"))
       .mockResolvedValueOnce(status);
     render(<App bridge={adapter} />);
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    connectFromSettings();
     await screen.findByText(/Server unavailable/);
     expect(screen.queryByText(/private token/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    connectFromSettings();
     await screen.findByText("Connected · Storage unavailable");
   });
   it("destroys CodeMirror on unmount and permits a clean remount", async () => {
     const view = render(<App bridge={bridge()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    connectFromSettings();
+    await screen.findByText("Connected · Storage unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
     await waitFor(() =>
       expect(document.querySelectorAll(".cm-editor").length).toBe(1),
     );
@@ -132,7 +135,7 @@ describe("scaffold shell", () => {
       return stop;
     };
     render(<App bridge={adapter} />);
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    connectFromSettings();
     await waitFor(() => expect(observer).toBeDefined());
     await act(async () => observer({ kind: "disconnected" }));
     await act(async () =>
@@ -151,8 +154,9 @@ describe("scaffold shell", () => {
   });
   it("tells in Global Messages how to enable source import when no source is available", async () => {
     render(<App bridge={bridge()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    connectFromSettings();
     await screen.findByText("Connected · Storage unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
     const log = screen.getByRole("log");
     await waitFor(() =>
       expect(log.textContent).toContain("Source import is off"),
@@ -169,8 +173,9 @@ describe("scaffold shell", () => {
       ),
     };
     render(<App bridge={adapter} />);
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    connectFromSettings();
     await screen.findByText("Connected · Storage unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
     expect(screen.getByRole("log").textContent).not.toContain(
       "Source import is off",
     );
@@ -184,7 +189,7 @@ describe("scaffold shell", () => {
       .fn()
       .mockRejectedValue(new Error("private token /private/path"));
     render(<App bridge={adapter} />);
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    connectFromSettings();
     await screen.findByText(/Server unavailable/);
     for (const spy of spies)
       expect(JSON.stringify(spy.mock.calls)).not.toMatch(/private/);

@@ -9,7 +9,7 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Visible term        | Code-facing name     | Meaning                                                                                                                      |
 | ------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | Standard Layout     | `standardLayout`     | The whole application window arrangement                                                                                     |
-| Main Toolbar Strip  | `mainToolbarStrip`   | App title, actions, Save status and Connection status                                                                        |
+| Main Toolbar Strip  | `mainToolbarStrip`   | App title, actions and Save status                                                                                           |
 | Main Content        | `mainContent`        | Region below the Main Toolbar Strip: Icon Bar, Explorer, Tabbed Editor and the AI column                                     |
 | Icon Bar            | `iconBar`            | Left strip of flat icon-only buttons (no visible label), including Settings                                                  |
 | Explorer            | `explorer`           | Left pane containing the four navigation tabs                                                                                |
@@ -33,7 +33,7 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Review controls     | `reviewControls`     | Per-unit Accept/Reject controls shown during Paragraph review                                                                |
 | Create Empty        | `createEmpty`        | Explicitly save an empty Authentic file for the selected date if it does not exist                                           |
 | AI Activity         | `aiActivity`         | Widget above AI Chat: Profile selector, run summary, expandable run details, Cancel and result access                        |
-| Connection status   | `connectionStatus`   | Local server connection indicator in the Main Toolbar Strip                                                                  |
+| Connection status   | `connectionStatus`   | Local server connection indicator in Settings > Server                                                                       |
 | Save status         | `saveStatus`         | Dirty/saving/saved/failed/conflict indicator based on the acknowledged revision                                              |
 | Profile selector    | `profileSelector`    | Controls at the top of the AI Activity widget for choosing the agent profile for Generate and AI Chat                        |
 | Metadata warning    | `metadataWarning`    | Per-snippet notice of parse, availability or timestamp problems, with the explicit header/filename authority choice          |

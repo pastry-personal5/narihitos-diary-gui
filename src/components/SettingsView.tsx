@@ -1,3 +1,4 @@
+import type { Connection } from "../application/bridge";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { useState } from "react";
 import { SymbolLabel } from "./Symbol";
@@ -23,18 +24,26 @@ type Model = ReturnType<typeof useSettings>;
 export function SettingsView({
   model,
   connected,
+  connection,
+  onConnect,
   profiles,
   onClose,
 }: {
   model: Model;
   connected: boolean;
+  connection: Connection;
+  onConnect: () => void;
   profiles: ReturnType<typeof useProfiles>;
   onClose: () => void;
 }) {
   const { user, server, error } = model;
   const issues = blockers(connected, server, user, profiles.profiles);
   const [section, setSection] = useState<
-    "Status" | "Writing Language" | "Keyboard Shortcuts" | "Generation"
+    | "Status"
+    | "Server"
+    | "Writing Language"
+    | "Keyboard Shortcuts"
+    | "Generation"
   >("Status");
   const [draft, setDraft] = useState("");
   const [confirmRecover, setConfirmRecover] = useState(false);
@@ -59,6 +68,7 @@ export function SettingsView({
         {(
           [
             "Status",
+            "Server",
             "Writing Language",
             "Keyboard Shortcuts",
             "Generation",
@@ -195,6 +205,25 @@ export function SettingsView({
                 </ul>
               )}
             </div>
+          </div>
+        ) : section === "Server" ? (
+          <div className="card" aria-label="Server connection">
+            <h2>Server</h2>
+            <p role="status" aria-label="Server connection status">
+              {connection.kind === "connected"
+                ? connection.status.storage_ready
+                  ? "Connected"
+                  : "Connected · Storage unavailable"
+                : connection.kind === "connecting"
+                  ? "Connecting…"
+                  : connection.message}
+            </p>
+            <button
+              onClick={onConnect}
+              disabled={connection.kind === "connecting"}
+            >
+              Connect
+            </button>
           </div>
         ) : section === "Generation" ? (
           <div className="card" aria-label="Generation settings">

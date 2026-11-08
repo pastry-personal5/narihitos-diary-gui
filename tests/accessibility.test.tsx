@@ -1,3 +1,4 @@
+import { connectFromSettings } from "./server-connection";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -103,8 +104,9 @@ async function shell(items: object[] | false = false) {
     getSymbol: async () => ({ status: "ok" as const, png_base64: "AQ==" }),
   } as unknown as Bridge;
   const view = render(<App bridge={bridge} />);
-  fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+  connectFromSettings();
   await screen.findByText("Connected");
+  fireEvent.click(screen.getByRole("button", { name: "Go back" }));
   return view;
 }
 

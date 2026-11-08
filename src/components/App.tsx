@@ -177,7 +177,7 @@ export function App({ bridge }: { bridge: Bridge }) {
               />
             </button>
           </div>
-          <div className="connection">
+          <div className="toolbar-save-status">
             <span role="status" aria-label="Save status">
               {activeView
                 ? SAVE_LABEL[activeView.queue.state]
@@ -197,23 +197,6 @@ export function App({ bridge }: { bridge: Bridge }) {
                               : "Saved"
                   : "No file open"}
             </span>
-            <span role="status">
-              {connection.kind === "connected"
-                ? connection.status.storage_ready
-                  ? "Connected"
-                  : "Connected · Storage unavailable"
-                : connection.kind === "connecting"
-                  ? "Connecting…"
-                  : connection.message}
-            </span>
-            <button
-              onClick={() => {
-                void connect();
-              }}
-              disabled={connection.kind === "connecting"}
-            >
-              Connect
-            </button>
           </div>
         </header>
         {selectedView?.createError && (
@@ -284,6 +267,8 @@ export function App({ bridge }: { bridge: Bridge }) {
                 await recheckConfiguration();
               },
             }}
+            connection={connection}
+            onConnect={() => void connect()}
             connected={connected}
             onClose={() => {
               setSettingsOpen(false);
