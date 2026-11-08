@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Messages } from "../application/navigation/messages";
 export function GlobalMessages({
   messages,
@@ -7,13 +7,14 @@ export function GlobalMessages({
   messages: Messages;
   height: number;
 }) {
+  const items = useSyncExternalStore(messages.subscribe, () => messages.items);
   const log = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
   const [away, setAway] = useState(false);
   useLayoutEffect(() => {
     const element = log.current;
     if (element && pinned.current) element.scrollTop = element.scrollHeight;
-  }, [messages.items]);
+  }, [items]);
   const jump = () => {
     const element = log.current;
     if (element) element.scrollTop = element.scrollHeight;
@@ -44,7 +45,7 @@ export function GlobalMessages({
           setAway(!atBottom);
         }}
       >
-        {messages.items.map((message) => (
+        {items.map((message) => (
           <p key={message.id} className={`message-${message.severity}`}>
             <time>{message.time}</time>{" "}
             <span aria-hidden="true">

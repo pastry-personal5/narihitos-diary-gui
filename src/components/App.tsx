@@ -192,7 +192,6 @@ export function App({ bridge }: { bridge: Bridge }) {
                 "generate.start",
                 generationReason ?? "Generate candidates",
               )}
-              aria-describedby="generation-reason"
               onClick={() => void handlers["generate.start"].run()}
             />
           </div>
@@ -422,6 +421,7 @@ export function App({ bridge }: { bridge: Bridge }) {
               ))}
             </div>
             <GenerationControls
+              messages={model.messages}
               coordinated
               showGenerate={false}
               adjacentDates={
@@ -456,6 +456,7 @@ export function App({ bridge }: { bridge: Bridge }) {
                 </button>
               )}
             <AuthenticPane
+              messages={model.messages}
               hostRef={editorHost}
               date={
                 active?.kind === "source" ? active.label : (active?.date ?? "")
@@ -488,6 +489,7 @@ export function App({ bridge }: { bridge: Bridge }) {
               }
             />
             <CandidateBanner
+              messages={model.messages}
               review={review}
               controller={generator}
               resources={model.resources}

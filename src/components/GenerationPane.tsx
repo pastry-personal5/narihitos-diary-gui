@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import type { Messages } from "../application/navigation/messages";
 import { useGeneration } from "./useGeneration";
 import type { ResourceCoordinator } from "../application/navigation/resources";
 import {
@@ -9,6 +11,7 @@ import type { ReviewController } from "../application/review/controller";
 import { useReview } from "./useReview";
 export function GenerationControls({
   controller,
+  messages,
   date,
   locale,
   count,
@@ -18,6 +21,7 @@ export function GenerationControls({
   coordinated = false,
 }: {
   controller: GenerationController;
+  messages: Messages;
   date: string | null;
   locale: string | null;
   count: number;
@@ -27,13 +31,39 @@ export function GenerationControls({
   coordinated?: boolean;
 }) {
   const s = useGeneration(controller);
+  const context = date ? `Generation for ${date}: ` : "Generation: ";
+  useEffect(() => {
+    const text =
+      reason ??
+      (locale
+        ? `${count} candidates · ${locale} · selected snippets only`
+        : null);
+    if (text) messages.add(context + text, reason ? "warning" : "info", true);
+  }, [messages, context, reason, count, locale]);
+  useEffect(() => {
+    if (adjacentDates)
+      messages.add(
+        context +
+          "Includes snippets from adjacent dates; their captured date labels will be sent.",
+        "warning",
+        true,
+      );
+  }, [messages, context, adjacentDates]);
+  useEffect(() => {
+    if (s.error && !coordinated)
+      messages.add(
+        GENERATION_MESSAGE[s.error] ?? GENERATION_MESSAGE.failed,
+        "error",
+        true,
+      );
+  }, [messages, s.error, coordinated]);
   return (
     <>
       <div className="generation-controls">
         {showGenerate && (
           <button
             disabled={!!reason}
-            aria-describedby="generation-reason"
+            title={reason ?? undefined}
             onClick={() =>
               date && locale && void controller.start(date, locale, count)
             }
@@ -55,24 +85,10 @@ export function GenerationControls({
           </button>
         )}
       </div>
-      <p id="generation-reason" className="generation-reason">
-        {reason ?? `${count} candidates · ${locale} · selected snippets only`}
-      </p>
-      {adjacentDates && (
-        <p className="generation-reason">
-          Includes snippets from adjacent dates; their captured date labels will
-          be sent.
-        </p>
-      )}
-      {s.error && (
-        <p role="alert">
-          {GENERATION_MESSAGE[s.error] ?? GENERATION_MESSAGE.failed}
-          {!s.uncertain && (
-            <button onClick={() => void controller.refresh(true)}>
-              Retry reading results
-            </button>
-          )}
-        </p>
+      {s.error && !s.uncertain && (
+        <button onClick={() => void controller.refresh(true)}>
+          Retry reading results
+        </button>
       )}
       <p
         role={coordinated ? undefined : "status"}
@@ -126,45 +142,47 @@ export function GenerationDialog({
     </>
   );
 }
-/** Status, errors and Review/Discard for the active Candidate tab. */
+/** Review/Discard controls and global feedback for the active Candidate tab. */
 export function CandidateBanner({
+  messages,
   controller,
   resources,
   review,
 }: {
   controller: GenerationController;
   resources: ResourceCoordinator;
+  messages: Messages;
   review?: ReviewController;
 }) {
   const state = useGeneration(controller);
   const reviewing = useReview(review);
   const key =
     resources.active?.kind === "candidate" ? resources.activeKey : null;
-  if (!key) return null;
-  const cut = key.lastIndexOf(":");
-  const jobId = key.slice("candidate:".length, cut),
-    index = Number(key.slice(cut + 1));
-  const job = state.jobs.get(jobId),
+  const cut = key?.lastIndexOf(":") ?? -1;
+  const jobId = key?.slice("candidate:".length, cut),
+    index = Number(key?.slice(cut + 1));
+  const job = jobId ? state.jobs.get(jobId) : undefined,
     slot = job?.candidates.find((c) => c.index === index);
+  const candidate = slot?.id ? controller.candidate(slot.id) : undefined;
+  const status =
+    job && slot
+      ? `Candidate ${index} for ${job.date} · ${slot.status.replaceAll("_", " ")}${slot.status === "running" ? " · provisional" : ""} · read-only${job.stale_baseline ? " · Entry changed — regenerate to review" : ""}${slot.status === "ready" && !candidate ? " · Reading candidate…" : ""}${slot.error_code ? ` · ${GENERATION_MESSAGE[slot.error_code] ?? GENERATION_MESSAGE.failed}` : ""}`
+      : null;
+  const severity = slot?.error_code
+    ? "error"
+    : job?.stale_baseline
+      ? "warning"
+      : "info";
+  useEffect(() => {
+    if (status) messages.add(status, severity, true);
+  }, [messages, status, severity]);
   if (!job || !slot) return null;
-  const candidate = slot.id ? controller.candidate(slot.id) : undefined;
   const mine = !!reviewing.view?.candidate_id.startsWith(`${job.job.id}-`);
   return (
     <section
       className="candidate-region"
       aria-label={`Candidate ${index} for ${job.date}`}
     >
-      <p>
-        Candidate {index} · {slot.status.replaceAll("_", " ")}
-        {slot.status === "running" ? " · provisional" : ""} · read-only
-      </p>
-      {job.stale_baseline && <p>Entry changed — regenerate to review</p>}
-      {slot.status === "ready" && !candidate && <p>Reading candidate…</p>}
-      {slot.error_code && (
-        <p>
-          {GENERATION_MESSAGE[slot.error_code] ?? GENERATION_MESSAGE.failed}
-        </p>
-      )}
       {review && slot.status === "ready" && candidate && (
         <button
           disabled={

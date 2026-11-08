@@ -65,6 +65,15 @@ describe("scaffold shell", () => {
     ])
       expect(screen.getByLabelText(name)).toBeTruthy();
     expect(screen.queryByText(/^Version/)).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Tabbed Editor" })).toBeNull();
+    const editor = screen.getByLabelText("Tabbed Editor");
+    const messages = screen.getByLabelText("Global Messages");
+    expect(
+      within(editor).queryByText("Connect to the server to open this date."),
+    ).toBeNull();
+    expect(
+      within(messages).getByText(/Connect to the server to open this date/),
+    ).toBeTruthy();
     expect(
       screen
         .getByRole("button", { name: "Create Empty" })

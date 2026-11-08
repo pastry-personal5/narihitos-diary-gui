@@ -16,7 +16,7 @@ Apache-2.0. See [LICENSE](LICENSE) and the [third-party notices](third-party-not
 
 See [AGENTS.md](AGENTS.md) and the [contribution guide](docs/contribution-guide.md).
 
-Generate uses the selected eligible diary snippets even when the Entry tab is closed. Preparation and submission errors appear in Global Messages with recovery guidance.
+Generate uses the selected eligible diary snippets even when the Entry tab is closed. Generation settings, blocked reasons, adjacent-date warnings and preparation/submission errors appear in Global Messages with recovery guidance. The editor has no visible “Tabbed Editor” title; passive editor notices also appear in Global Messages.
 
 Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat profile and Generation profile cards. Profile choices apply to new AI runs.
 

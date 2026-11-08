@@ -206,6 +206,7 @@ Plan: [overview](milestone-28-simple-refactoring-overview.md), [work plan](miles
 
 Status: Done (2026-11-08)
 Goal: Bug fixes, UX fixes, GUI fixes, behavior changes, refactoring and architecture changes as the owner requests.
+Follow-up: [editor messages checklist](milestone-29-editor-messages-overview.md), [work plan](milestone-29-editor-messages-architecture.md).
 Plan: [overview](../archive/milestones/p1-m29/milestone-29-owner-requested-revisions-overview.md), [work plan](../archive/milestones/p1-m29/milestone-29-owner-requested-revisions-architecture.md); all recorded requests are complete. Full gate, browser visual/focus/layout checks and the owner-authorized live Notion heading/reorder round trip pass. Native packaged evidence remains P1-M32.
 
 ### P1-M30: Refactoring

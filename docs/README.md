@@ -114,3 +114,5 @@ This index lists the design and process docs, one line each. Read only the doc y
 | [archive/milestones/p1-m21/milestone-21-transient-ai-chat-architecture.md](archive/milestones/p1-m21/milestone-21-transient-ai-chat-architecture.md) | P1-M21 work plan: job layer, chat service, UI findings, decisions, tests |
 | [phase-1/milestone-22-candidate-generation-overview.md](archive/milestones/p1-m22/milestone-22-candidate-generation-overview.md) | P1-M22 completed checklist, final gate, fake-child and live evidence; Qwen exempt |
 | [phase-1/milestone-22-candidate-generation-architecture.md](archive/milestones/p1-m22/milestone-22-candidate-generation-architecture.md) | P1-M22 work plan: generation service, candidate store, routes, UI findings, decisions, tests |
+
+- P1-M29 editor messages follow-up: [overview](phase-1/milestone-29-editor-messages-overview.md), [work plan](phase-1/milestone-29-editor-messages-architecture.md).

@@ -10,6 +10,8 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-08 — Owner — Reopen P1-M29 for the [editor messages follow-up](milestone-29-editor-messages-overview.md): remove the visible editor title and place passive editor/generation/candidate notices in Global Messages. Completed with focused UI regressions and all seven gate commands passing; native visual proof was not run.
+
 - 2026-11-08 — Agent, owner request — Implement unresolved M29 T34 using the reviewed design; complete toolbar layout/mask/tooltip verification and running-browser visual checks. Full gate, browser visual checks and owner-authorized live Notion heading/reorder proof pass; close M29 and archive its plans. Native WKWebView keyboard/IME evidence remains P1-M32.
 
 - 2026-11-08 — Agent, T34 plan review — Defined deterministic local ranking and examples with hidden scores, resolved the toolbar-toggle/modal conflict through a proposed non-modal overlay, and specified dismissal, focus handoff, stable selection, live availability checks, accessibility and evidence. Preserved existing unavailable-action warnings and shortcut suspension. Planning only; implementation remains deferred.

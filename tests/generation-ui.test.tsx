@@ -1,3 +1,4 @@
+import { Messages } from "../src/application/navigation/messages";
 import { App } from "../src/components/App";
 import { navigationFake } from "./navigation-fake";
 import { settingsFake } from "./settings-fake";
@@ -53,7 +54,11 @@ function Tabs({ c, r }: { c: GenerationController; r: ResourceCoordinator }) {
           </button>
         ))}
       </div>
-      <CandidateBanner controller={c} resources={r} />
+      <CandidateBanner
+        controller={c}
+        resources={r}
+        messages={controlMessages}
+      />
     </>
   );
 }
@@ -66,19 +71,24 @@ async function setup() {
   await c.loadProfiles();
   return { server, c };
 }
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => {
+  vi.useFakeTimers();
+  controlMessages = new Messages();
+});
 afterEach(() => {
   cleanup();
   controllers.forEach((c) => c.dispose());
   controllers.length = 0;
   vi.useRealTimers();
 });
+let controlMessages = new Messages();
 function Controls({ c }: { c: GenerationController }) {
   useGeneration(c);
   return (
     <>
       <GenerationControls
         controller={c}
+        messages={controlMessages}
         date="2026-11-06"
         locale="ko-KR"
         count={3}
@@ -89,6 +99,45 @@ function Controls({ c }: { c: GenerationController }) {
   );
 }
 describe("generation interaction", () => {
+  it("routes generation guidance and blockers to Global Messages only when changed", async () => {
+    const { c } = await setup();
+    const messages = new Messages();
+    const props = {
+      controller: c,
+      messages,
+      date: "2026-11-06",
+      locale: "ko-KR",
+      count: 3,
+      reason: null,
+      showGenerate: false,
+      coordinated: true,
+    };
+    const pane = render(<GenerationControls {...props} />);
+    expect(messages.items.map((m) => m.text)).toEqual([
+      "Generation for 2026-11-06: 3 candidates · ko-KR · selected snippets only",
+    ]);
+    expect(pane.container.textContent).not.toContain("selected snippets only");
+    pane.rerender(<GenerationControls {...props} />);
+    expect(messages.items).toHaveLength(1);
+    pane.rerender(<GenerationControls {...props} count={5} adjacentDates />);
+    expect(messages.items.at(-2)?.text).toContain("5 candidates");
+    expect(messages.items.at(-1)?.text).toContain("adjacent dates");
+    expect(pane.container.textContent).not.toContain("adjacent dates");
+    pane.rerender(
+      <GenerationControls
+        {...props}
+        reason="Choose a ready generation profile."
+      />,
+    );
+    expect(messages.items.at(-1)).toMatchObject({
+      text: "Generation for 2026-11-06: Choose a ready generation profile.",
+      severity: "warning",
+    });
+    expect(pane.container.textContent).not.toContain(
+      "Choose a ready generation profile",
+    );
+  });
+
   it("opens an accessible dirty dialog and sends nothing until its choice", async () => {
     const { server, c } = await setup();
     server.dirty(true);
@@ -131,8 +180,10 @@ describe("generation interaction", () => {
     focus.focus();
     expect(screen.getAllByRole("tab")).toHaveLength(3);
     expect(
-      screen.getByText(/Candidate 1 · running · provisional/),
-    ).not.toBeNull();
+      controlMessages.items.find((m) =>
+        /Candidate 1 for .* · running · provisional/.test(m.text),
+      ),
+    ).toBeTruthy();
     const [job] = [...c.state.jobs.values()];
     const key = candidateKey(job.job.id, 1);
     await act(async () => {
@@ -176,8 +227,10 @@ describe("generation interaction", () => {
       await c.refresh(true);
     });
     expect(
-      screen.getByText("Entry changed — regenerate to review"),
-    ).not.toBeNull();
+      controlMessages.items.find((m) =>
+        m.text.includes("Entry changed — regenerate to review"),
+      ),
+    ).toBeTruthy();
     expect(status.textContent).toContain("1 cancelled");
   });
 });
@@ -253,6 +306,11 @@ it.each([false, true])(
           .hasAttribute("disabled"),
       ).toBe(false),
     );
+    const log = screen.getByLabelText("Global Messages");
+    expect(
+      within(log).getByText(/3 candidates · ko-KR · selected snippets only/),
+    ).toBeTruthy();
+    expect(document.querySelector(".generation-reason")).toBeNull();
     fireEvent.click(
       screen.getByRole("button", { name: "Settings", exact: true }),
     );
@@ -264,6 +322,11 @@ it.each([false, true])(
     });
     await waitFor(() => expect(settings.user.generation_count).toBe(5));
     fireEvent.click(screen.getByRole("button", { name: "Go back" }));
+    await waitFor(() =>
+      expect(
+        within(log).getByText(/5 candidates · ko-KR · selected snippets only/),
+      ).toBeTruthy(),
+    );
     if (closed)
       fireEvent.click(screen.getByRole("button", { name: `Close ${day}` }));
     fireEvent.click(

@@ -1,9 +1,11 @@
-import { useState, type ReactNode } from "react";
+import type { Messages } from "../application/navigation/messages";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Action } from "../application/authentic/saveQueue";
 import type { SessionView } from "../application/authentic/session";
 
 /** The Tabbed Editor: Draft and Entry are two labels over the same buffer, so switching keeps edits. */
 export function AuthenticPane({
+  messages,
   hostRef,
   date,
   view,
@@ -13,6 +15,7 @@ export function AuthenticPane({
   readOnlyReason,
   banner,
 }: {
+  messages: Messages;
   hostRef: (element: HTMLDivElement | null) => void;
   date: string;
   view: SessionView | null;
@@ -27,10 +30,23 @@ export function AuthenticPane({
   const queue = view?.queue;
   const failed = queue?.state === "save_failed";
   const conflict = queue?.state === "external_conflict";
+  useEffect(() => {
+    if (readOnlyReason) messages.add(readOnlyReason, "info", true);
+  }, [messages, readOnlyReason]);
+  useEffect(() => {
+    if (error)
+      messages.add(
+        `Could not load ${date || "this date"} (${error}).`,
+        "error",
+        true,
+      );
+  }, [messages, date, error]);
+  useEffect(() => {
+    if (notice) messages.add(notice, "warning", true);
+  }, [messages, notice]);
   return (
     <section aria-label="Tabbed Editor" className="editor-pane">
       <div className="pane-heading">
-        <h2>Tabbed Editor</h2>
         <div role="group" aria-label="Authentic views">
           {(["Draft", "Entry"] as const).map((name) => (
             <button
@@ -46,13 +62,6 @@ export function AuthenticPane({
           {label} · {date}
         </span>
       </div>
-      {readOnlyReason ? <p className="notice">{readOnlyReason}</p> : null}
-      {error ? (
-        <p role="alert" className="notice">
-          Could not load this date ({error}).
-        </p>
-      ) : null}
-      {notice ? <p className="notice">{notice}</p> : null}
       {failed || conflict ? (
         <div role="alert" className="notice">
           <p>

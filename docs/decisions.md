@@ -6,6 +6,8 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 ## Decided
 
+- **Editor messages (owner, 2026-11-08):** Remove the visible “Tabbed Editor” title, retaining its accessible region name. Generation configuration, blockers, adjacent-date warnings and passive editor/candidate notices belong in Global Messages. Keep editing, retry/cancel, review/discard and save-conflict recovery controls available. See the [follow-up checklist](phase-1/milestone-29-editor-messages-overview.md).
+
 - **Settings categories (owner, 2026-11-08, P1-M29 T26):** Server owns connection and configuration reload; Sources owns source availability and revealing the active configuration folder in Finder; AI Agents owns agent status and separate Chat/Generation profile cards. The native Finder action accepts no path from the webview and returns no private path to it.
 
 - **Technical stack:** Tauri 2 (Rust backend), TypeScript + React, CodeMirror 6.

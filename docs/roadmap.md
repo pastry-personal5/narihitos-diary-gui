@@ -13,3 +13,5 @@ Completed: [P1-M1 Research](archive/milestones/p1-m1/milestone-01-research-overv
 P1-M2 owns architecture clarifications, review/interviews and background-AI design. P1-M3 assembles and validates the skeleton only; complete settings/logging/AI activity features remain in their later implementation milestones.
 
 P1-M29 is Done (2026-11-08): all recorded requests, the full gate, browser visual checks and live Notion heading/reorder proof pass; see the [M29 checklist](archive/milestones/p1-m29/milestone-29-owner-requested-revisions-overview.md).
+
+P1-M29’s owner-requested [editor messages follow-up](phase-1/milestone-29-editor-messages-overview.md) is Done (2026-11-08): focused UI tests and all seven gate commands pass; later milestones remain Planned.
