@@ -6,6 +6,7 @@ const COMMANDS: &[&str] = &[
     "close_session",
     "get_settings",
     "reload_settings",
+    "reveal_configuration_folder",
     "get_user_settings",
     "update_user_settings",
     "get_job",

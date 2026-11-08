@@ -221,6 +221,7 @@ export interface Bridge
   getSymbol?(name: string, size: number, scale: number): Promise<SymbolResult>;
   serverSettings(): Promise<ServerSettings>;
   reloadSettings(): Promise<ReloadResult>;
+  revealConfigurationFolder?(): Promise<void>;
   /** Absent in fakes; Settings then omits the profile status list. */
   listProfiles?(): Promise<ProfileInfo[]>;
   checkProfile?(alias: string): Promise<ProfileInfo>;

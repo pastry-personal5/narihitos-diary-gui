@@ -328,6 +328,14 @@ async fn run() -> Result<(), &'static str> {
             adapter.clone(),
         )),
     );
+    diary_api::ServerState::set_configuration_folder(
+        &mut state,
+        std::fs::canonicalize(&path)
+            .map_err(|_| "configuration unavailable")?
+            .parent()
+            .ok_or("configuration unavailable")?
+            .to_path_buf(),
+    );
     diary_api::ServerState::set_reloader(
         &mut state,
         Arc::new(

@@ -11,6 +11,7 @@
     "allow-close-session",
     "allow-get-settings",
     "allow-reload-settings",
+    "allow-reveal-configuration-folder",
     "allow-get-user-settings",
     "allow-update-user-settings",
     "allow-get-job",

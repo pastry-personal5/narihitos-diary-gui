@@ -680,6 +680,38 @@ impl Bridge {
         )
         .await
     }
+    pub async fn reveal_configuration_folder(&self) -> Result<(), &'static str> {
+        #[derive(Deserialize)]
+        struct Folder {
+            folder: PathBuf,
+        }
+        let value: Folder = self
+            .request(
+                &*self.connection.lock().await,
+                Method::GET,
+                "/settings/configuration-folder",
+                None,
+            )
+            .await?;
+        if !value.folder.is_absolute() || !value.folder.is_dir() {
+            return Err("unavailable");
+        }
+        let status = std::process::Command::new("/usr/bin/open")
+            .arg("-a")
+            .arg("Finder")
+            .arg("--")
+            .arg(value.folder)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map_err(|_| "unavailable")?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err("unavailable")
+        }
+    }
     pub async fn reload_settings(&self) -> Result<ReloadResult, &'static str> {
         let result: ReloadResult = self
             .request(

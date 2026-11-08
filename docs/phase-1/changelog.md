@@ -10,6 +10,8 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-08 — Owner — P1-M29 T26: Settings groups server configuration under Server, source status and Finder reveal under Sources, and agent status plus Chat/Generation profile cards under AI Agents. Main no longer shows profile selectors.
+
 - 2026-11-08 — owner/agent, P1-M29 T25 — Removed the active-view heading below the Explorer icons for Date, Snippet, Draft and Entry; icon tooltips, accessible names and selected state remain.
 
 - 2026-11-08 — owner, P1-M29 T21 — Move the connection status and Connect button from the toolbar to a new Settings > Server category; preserve background connection and reconnection.

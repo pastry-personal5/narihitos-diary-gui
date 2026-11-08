@@ -1,3 +1,6 @@
+import type { ChatController } from "../application/chat";
+import type { GenerationController } from "../application/generation/controller";
+import { ProfilePicker } from "./ProfilePicker";
 import type { Connection } from "../application/bridge";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { useState } from "react";
@@ -23,6 +26,8 @@ type Model = ReturnType<typeof useSettings>;
 
 export function SettingsView({
   model,
+  chat,
+  generator,
   connected,
   connection,
   onConnect,
@@ -30,6 +35,8 @@ export function SettingsView({
   onClose,
 }: {
   model: Model;
+  chat: ChatController;
+  generator: GenerationController;
   connected: boolean;
   connection: Connection;
   onConnect: () => void;
@@ -41,6 +48,8 @@ export function SettingsView({
   const [section, setSection] = useState<
     | "Status"
     | "Server"
+    | "Sources"
+    | "AI Agents"
     | "Writing Language"
     | "Keyboard Shortcuts"
     | "Generation"
@@ -69,6 +78,8 @@ export function SettingsView({
           [
             "Status",
             "Server",
+            "Sources",
+            "AI Agents",
             "Writing Language",
             "Keyboard Shortcuts",
             "Generation",
@@ -121,71 +132,6 @@ export function SettingsView({
         {section === "Status" ? (
           <div aria-label="Status">
             <h2>Status</h2>
-            {!connected || !server ? (
-              <div className="card">
-                <p>
-                  {model.serverError
-                    ? (SETTINGS_MESSAGE[model.serverError] ?? model.serverError)
-                    : "Connect to the server to see its configuration status."}
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="card">
-                  <h3>Server</h3>
-                  <p>
-                    Configuration generation {server.config_generation} ·
-                    Storage {server.storage_ready ? "ready" : "unavailable"}
-                  </p>
-                  {last && (
-                    <div role="status" aria-label="Last reload">
-                      <p>{RELOAD_MESSAGE[last.outcome]}</p>
-                      <ul>
-                        {last.issues.map((i) => (
-                          <li key={`${i.path}.${i.code}`}>
-                            {i.path}: {i.code}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {model.serverError && (
-                    <p role="alert">
-                      {SETTINGS_MESSAGE[model.serverError] ?? model.serverError}
-                    </p>
-                  )}
-                  <button disabled={model.reloading} onClick={model.reload}>
-                    Reload configuration
-                  </button>
-                </div>
-                <div className="card">
-                  <h3>Sources</h3>
-                  <ul aria-label="Sources">
-                    {server.sources.length === 0 && <li>None configured</li>}
-                    {server.sources.map((s) => (
-                      <li key={s.alias}>
-                        {s.alias}: {s.available ? "available" : s.reason}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="card">
-                  <h3>Agent profiles</h3>
-                  {profiles.supported ? (
-                    <ProfileTable profiles={profiles} />
-                  ) : (
-                    <ul aria-label="Agent profiles">
-                      {server.profiles.length === 0 && <li>None configured</li>}
-                      {server.profiles.map((p) => (
-                        <li key={p.alias}>
-                          {p.alias}: {p.available ? "available" : p.reason}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </>
-            )}
             <div className="card" aria-label="Advanced">
               <h3>Advanced</h3>
               {issues.length === 0 ? (
@@ -207,23 +153,133 @@ export function SettingsView({
             </div>
           </div>
         ) : section === "Server" ? (
-          <div className="card" aria-label="Server connection">
-            <h2>Server</h2>
-            <p role="status" aria-label="Server connection status">
-              {connection.kind === "connected"
-                ? connection.status.storage_ready
-                  ? "Connected"
-                  : "Connected · Storage unavailable"
-                : connection.kind === "connecting"
-                  ? "Connecting…"
-                  : connection.message}
-            </p>
-            <button
-              onClick={onConnect}
-              disabled={connection.kind === "connecting"}
-            >
-              Connect
-            </button>
+          <div>
+            <div className="card" aria-label="Server connection">
+              <h2>Server</h2>
+              <p role="status" aria-label="Server connection status">
+                {connection.kind === "connected"
+                  ? connection.status.storage_ready
+                    ? "Connected"
+                    : "Connected · Storage unavailable"
+                  : connection.kind === "connecting"
+                    ? "Connecting…"
+                    : connection.message}
+              </p>
+              <button
+                onClick={onConnect}
+                disabled={connection.kind === "connecting"}
+              >
+                Connect
+              </button>
+            </div>
+
+            {server ? (
+              <div className="card">
+                <h3>Server</h3>
+                <p>
+                  Configuration generation {server.config_generation} · Storage{" "}
+                  {server.storage_ready ? "ready" : "unavailable"}
+                </p>
+                {last && (
+                  <div role="status" aria-label="Last reload">
+                    <p>{RELOAD_MESSAGE[last.outcome]}</p>
+                    <ul>
+                      {last.issues.map((i) => (
+                        <li key={`${i.path}.${i.code}`}>
+                          {i.path}: {i.code}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {model.serverError && (
+                  <p role="alert">
+                    {SETTINGS_MESSAGE[model.serverError] ?? model.serverError}
+                  </p>
+                )}
+                <button disabled={model.reloading} onClick={model.reload}>
+                  Reload configuration
+                </button>
+              </div>
+            ) : (
+              <div className="card">
+                <p>
+                  {model.serverError
+                    ? (SETTINGS_MESSAGE[model.serverError] ?? model.serverError)
+                    : "Connect to the server to see its configuration status."}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : section === "Sources" ? (
+          <div>
+            <h2>Sources</h2>
+            {server ? (
+              <div className="card">
+                <h3>Sources</h3>
+                <ul aria-label="Sources">
+                  {server.sources.length === 0 && <li>None configured</li>}
+                  {server.sources.map((s) => (
+                    <li key={s.alias}>
+                      {s.alias}: {s.available ? "available" : s.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="card">
+                <p>Connect to the server to see its sources.</p>
+              </div>
+            )}
+            <div className="card" aria-label="Server configuration folder">
+              <h3>Server configuration</h3>
+              <p>
+                Edit sources in the server configuration file, then reload
+                configuration in Server.
+              </p>
+              <button
+                disabled={!connected || model.revealing}
+                onClick={() => void model.revealConfigurationFolder()}
+              >
+                {model.revealing
+                  ? "Opening Finder…"
+                  : "Reveal configuration folder in Finder"}
+              </button>
+              {model.revealError && (
+                <p role="alert">
+                  Could not open the server configuration folder in Finder.
+                  Check the server connection and try again.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : section === "AI Agents" ? (
+          <div>
+            <h2>AI Agents</h2>
+            <ProfilePicker chat={chat} generator={generator} />
+            {profiles.supported ? (
+              <div className="card">
+                <h3>Agent profiles</h3>
+                <ProfileTable profiles={profiles} />
+              </div>
+            ) : server ? (
+              <div className="card">
+                <h3>Agent profiles</h3>
+                <ul aria-label="Agent profiles">
+                  {server.profiles.length === 0 && <li>None configured</li>}
+                  {server.profiles.map((p) => (
+                    <li key={p.alias}>
+                      {p.alias}: {p.available ? "available" : p.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="card">
+                <h3>Agent profiles</h3>
+                <p>Connect to the server to see its agent profiles.</p>
+              </div>
+            )}
           </div>
         ) : section === "Generation" ? (
           <div className="card" aria-label="Generation settings">

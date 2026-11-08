@@ -146,3 +146,5 @@ Get routes, applies the observations as staged snapshot overrides and only then
 emits the final complete baseline. The marker is consumed natively and never
 reaches the WebView. Failure, overflow or replacement subscription leaves the
 frontend stale until a subsequent complete reconciliation succeeds.
+
+The main-window-only `reveal_configuration_folder` command calls authenticated, session-bound `GET /settings/configuration-folder`. The server supplies the canonical folder of its launch configuration (`unavailable` if not configured). The native bridge opens that absolute directory in Finder with fixed arguments to `/usr/bin/open`, without a shell or webview-supplied path; it returns only success or a closed error. The directory is never returned to React or logged; ordinary `/settings` stays redacted.

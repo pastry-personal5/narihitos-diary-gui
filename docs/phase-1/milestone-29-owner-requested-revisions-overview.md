@@ -25,6 +25,8 @@ P1-M28 is Done ([overview](milestone-28-simple-refactoring-overview.md)). Decide
 
 - **T17–T19 (owner, 2026-11-07):** The Notion export reorders out-of-order day headings automatically, with no prompt; originals are deleted only after the copy is verified. Spec: [reorder days](../superpowers/specs/2026-11-07-notion-reorder-days-design.md).
 
+- **T26 (owner, 2026-11-08):** Group settings by Server, Sources and AI Agents; move both profile selectors into AI Agents cards and allow Sources to reveal the active server configuration folder in Finder.
+
 ## Scope
 
 In scope: the requests listed in the checklist. Out of scope: anything not requested, new dependencies or build tools without approval, and release qualification (P1-M32).
@@ -105,6 +107,15 @@ None yet.
 - [x] T24 `[bug]` - Add typed generation preparation/admission diagnostics with stage, count and closed error tags. Evidence: controller tests (25 pass) verify stages, failure tags, redaction and nonblocking diagnostic rejection; native diagnostic tests validate allowlists and reject private fields. Logging/contribution docs updated; full `scripts/gate.sh` G01–G07 pass (2026-11-08; local TCP fixtures outside the sandbox).
 
 - [x] T25 `[gui]` - Remove the active view heading (Date tab, Snippet tab, Draft tab and Entry tab) below the Explorer icons; retain icon tooltips, accessible names and selected state. Evidence: `src/components/Explorer.tsx` diff; gate G01, G02 and G04–G07 pass; G03 passes on rerun outside the sandbox for local TCP fixtures (2026-11-08).
+
+- [x] T26 `[gui]` `[behavior]` - Settings categories and profile cards (owner, 2026-11-08).
+  - [x] T26.1 - Server configuration/reload card is in Server; source status is in Sources; Agent profiles and separate Chat profile / Generation profile cards are in AI Agents, removed from Main. Evidence: Settings/profile UI suites, including independent profile choices retained when Settings closes and reopens.
+  - [x] T26.2 - Sources reveals the active server configuration folder in Finder through an authenticated native action, with pending and error feedback. Evidence: API test verifies session/token enforcement, configured/unavailable folder and redacted ordinary settings; Settings UI test verifies disconnected, pending and sanitized error states. Native Finder interaction has not been manually checked.
+  - [x] T26.3 - Affected README, user guide, UX, architecture, decisions and changelog updated. Evidence: `scripts/gate.sh` G01–G07 pass (2026-11-08; run outside the sandbox for local TCP fixtures); 363 frontend tests pass.
+
+- [x] T27 `[docs]` - Reconcile `docs/ux*` with the agreed Settings categories and profile-card moves.
+  - [x] T27.1 - GUI behavior, containment diagram and canonical terms agree on category/card placement, Finder reveal and profile choices. Evidence: reviewed all three `docs/ux*` files against T26 and Settings components; stale placement assertions and local-link checks pass.
+  - [x] T27.2 - Markdown formatting, local links and whitespace checks pass. Evidence: `scripts/gate.sh` G01–G07 pass (2026-11-08; outside the sandbox for local TCP fixtures).
 
 ### Proof and docs
 

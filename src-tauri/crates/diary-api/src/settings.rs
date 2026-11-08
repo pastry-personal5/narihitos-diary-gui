@@ -86,3 +86,26 @@ pub(crate) async fn reload_settings(
     *s.last_reload.lock().expect("reload state poisoned") = result.clone();
     Json(result).into_response()
 }
+
+/// Native-only consumer: this path is never returned to the webview or diagnostic logs.
+pub(crate) async fn configuration_folder(
+    State(s): State<Arc<ServerState>>,
+    headers: HeaderMap,
+) -> Response {
+    let id = match session(&headers) {
+        Ok(id) => id,
+        Err(e) => return app_error(e),
+    };
+    if let Err(e) = s
+        .coordinator
+        .lock()
+        .expect("coordinator poisoned")
+        .list(id, s.now(), None, 1)
+    {
+        return app_error(e);
+    }
+    match s.configuration_folder.as_ref().and_then(|p| p.to_str()) {
+        Some(folder) => Json(json!({"folder":folder})).into_response(),
+        None => failure(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+    }
+}

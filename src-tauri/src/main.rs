@@ -629,6 +629,14 @@ fn log_client_event(
         Reject::Invalid => "invalid_event",
     })
 }
+#[tauri::command]
+async fn reveal_configuration_folder(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+) -> Result<(), &'static str> {
+    main_window(&window)?;
+    state.reveal_configuration_folder().await
+}
 fn main() {
     let mut args = std::env::args_os().skip(1);
     if args.next().as_deref() != Some(std::ffi::OsStr::new("--connect")) {
@@ -671,6 +679,7 @@ fn main() {
             close_session,
             get_settings,
             reload_settings,
+            reveal_configuration_folder,
             get_user_settings,
             update_user_settings,
             get_job,

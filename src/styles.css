@@ -720,10 +720,6 @@ footer {
 .tone-muted {
   color: var(--muted);
 }
-.profile-picker {
-  display: grid;
-  gap: 4px;
-}
 .snippet-table {
   font-size: 10px;
   width: 100%;

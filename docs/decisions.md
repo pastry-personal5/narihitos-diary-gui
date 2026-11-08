@@ -6,6 +6,8 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 ## Decided
 
+- **Settings categories (owner, 2026-11-08, P1-M29 T26):** Server owns connection and configuration reload; Sources owns source availability and revealing the active configuration folder in Finder; AI Agents owns agent status and separate Chat/Generation profile cards. The native Finder action accepts no path from the webview and returns no private path to it.
+
 - **Technical stack:** Tauri 2 (Rust backend), TypeScript + React, CodeMirror 6.
 - **Product scope:** [product-behavior.md](product-behavior.md).
 - **Interaction model:** [ux-gui.md](ux-gui.md). Component vocabulary is in [ux-terms.md](ux-terms.md) and the layout containment model in [ux-information-architecture.md](ux-information-architecture.md).

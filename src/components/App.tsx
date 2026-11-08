@@ -10,7 +10,6 @@ import { Explorer } from "./Explorer";
 import { GlobalMessages } from "./GlobalMessages";
 import { PaneSeparator } from "./PaneSeparator";
 import { ChatPane } from "./ChatPane";
-import { ProfilePicker } from "./ProfilePicker";
 import {
   CandidateBanner,
   GenerationControls,
@@ -259,6 +258,8 @@ export function App({ bridge }: { bridge: Bridge }) {
         )}
         {settingsOpen && (
           <SettingsView
+            chat={chat}
+            generator={generator}
             profiles={profiles}
             model={{
               ...settings,
@@ -437,7 +438,6 @@ export function App({ bridge }: { bridge: Bridge }) {
           />
           <div className="ai-column">
             <section aria-label="AI Activity" className="ai-widget">
-              <ProfilePicker chat={chat} generator={generator} />
               <p className="ai-activity" aria-live="off">
                 {generationState.submitting
                   ? `Preparing generation for ${generationState.originDate}`

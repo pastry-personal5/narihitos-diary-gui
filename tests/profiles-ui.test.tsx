@@ -68,7 +68,14 @@ function bridge(extra: Partial<Bridge>): Bridge {
 }
 async function open() {
   fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-  return screen.findByRole("table", { name: "Profile status" });
+  fireEvent.click(
+    screen.getByRole("button", { name: "AI Agents", exact: true }),
+  );
+  const table = await screen.findByRole("table", { name: "Profile status" });
+  await waitFor(() =>
+    expect(within(table).getAllByRole("row").length).toBeGreaterThan(1),
+  );
+  return table;
 }
 
 describe("Profile status in Settings", () => {
@@ -125,6 +132,14 @@ describe("Profile status in Settings", () => {
     };
     render(<App bridge={bridge({ listProfiles: async () => [p] })} />);
     await open();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Status", exact: true }),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("Advanced").textContent).toContain(
+        "No profile can chat",
+      ),
+    );
     const advanced = screen.getByLabelText("Advanced");
     expect(advanced.textContent).toContain("No profile can chat");
     expect(advanced.textContent).toContain("No profile can generate");
@@ -176,6 +191,37 @@ describe("Profile status in Settings", () => {
     expect(first.textContent).toContain("ready");
   });
 
+  it("keeps independent profile choices when Settings closes and reopens", async () => {
+    render(
+      <App
+        bridge={bridge({
+          listProfiles: async () => [
+            profile("first", "ready"),
+            profile("second", "ready"),
+          ],
+        })}
+      />,
+    );
+    await open();
+    const chat = screen.getByRole("combobox", { name: "Chat profile" });
+    const generation = screen.getByRole("combobox", {
+      name: "Generation profile",
+    });
+    fireEvent.change(chat, { target: { value: "second" } });
+    await waitFor(() => expect(chat).toHaveProperty("value", "second"));
+    expect(generation).toHaveProperty("value", "first");
+    fireEvent.change(generation, { target: { value: "second" } });
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
+    expect(screen.queryByRole("combobox", { name: "Chat profile" })).toBeNull();
+    await open();
+    expect(
+      screen.getByRole("combobox", { name: "Chat profile" }),
+    ).toHaveProperty("value", "second");
+    expect(
+      screen.getByRole("combobox", { name: "Generation profile" }),
+    ).toHaveProperty("value", "second");
+  });
+
   it("backs off exponentially, capped at one hour", () => {
     expect([0, 1, 2, 3, 7, 8, 9, 40].map(checkDelay)).toEqual(
       [15, 30, 60, 120, 1920, 3600, 3600, 3600].map((s) => s * 1000),
@@ -210,7 +256,13 @@ describe("Profile status in Settings", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "AI Agents", exact: true }),
+    );
     await screen.findByText("The profile status could not be read.");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Server", exact: true }),
+    );
     expect(
       screen.getByRole("button", { name: "Reload configuration" }),
     ).toBeTruthy();
@@ -219,6 +271,9 @@ describe("Profile status in Settings", () => {
   it("omits the list when the bridge has no profile commands", async () => {
     render(<App bridge={bridge({})} />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Server", exact: true }),
+    );
     await screen.findByRole("button", { name: "Reload configuration" });
     expect(screen.queryByRole("table", { name: "Profile status" })).toBeNull();
   });

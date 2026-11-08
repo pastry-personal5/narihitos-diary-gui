@@ -524,3 +524,61 @@ mod authentic_routes;
 mod diagnostics;
 mod reload;
 mod replay;
+
+#[tokio::test]
+async fn configuration_folder_requires_an_active_session_and_configured_location() {
+    for configured in [false, true] {
+        let mut s = state();
+        if configured {
+            ServerState::set_configuration_folder(&mut s, "/private/server config".into());
+        }
+        s.coordinator
+            .lock()
+            .unwrap()
+            .open(SESSION, s.now())
+            .unwrap();
+        let app = router(s);
+        let path = "/api/v1/settings/configuration-folder";
+        assert!(
+            !app.clone()
+                .oneshot(request("GET", path))
+                .await
+                .unwrap()
+                .status()
+                .is_success()
+        );
+        let mut wrong = owned_request("GET", path);
+        wrong
+            .headers_mut()
+            .insert("authorization", "Bearer wrong".parse().unwrap());
+        assert_eq!(
+            app.clone().oneshot(wrong).await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
+        );
+        let response = app
+            .clone()
+            .oneshot(owned_request("GET", path))
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            if configured {
+                StatusCode::OK
+            } else {
+                StatusCode::SERVICE_UNAVAILABLE
+            }
+        );
+        if configured {
+            let value: Value =
+                serde_json::from_slice(&to_bytes(response.into_body(), 10240).await.unwrap())
+                    .unwrap();
+            assert_eq!(value, json!({"folder":"/private/server config"}));
+            let response = app
+                .oneshot(owned_request("GET", "/api/v1/settings"))
+                .await
+                .unwrap();
+            let body = to_bytes(response.into_body(), 10240).await.unwrap();
+            assert!(!String::from_utf8_lossy(&body).contains("/private/server config"));
+        }
+    }
+}

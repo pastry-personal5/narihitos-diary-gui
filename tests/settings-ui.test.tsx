@@ -217,15 +217,18 @@ describe("Settings", () => {
       issues: [{ path: "server", code: "restart_required" }],
     };
     render(<App bridge={bridge(fake)} />);
-    await openSettings();
+    await openSettings("Server");
     await screen.findByText(
       "Connect to the server to see its configuration status.",
     );
     connectFromSettings();
     fireEvent.click(
-      screen.getByRole("button", { name: "Status", exact: true }),
+      screen.getByRole("button", { name: "Sources", exact: true }),
     );
     await screen.findByText("mobile: source_root_missing");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Server", exact: true }),
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Reload configuration" }),
     );
@@ -247,7 +250,7 @@ describe("Settings", () => {
     expect(screen.getByRole("log").textContent).not.toContain(
       "Source import is off",
     );
-    await openSettings();
+    await openSettings("Server");
     fake.server = {
       ...fake.server,
       sources: [
@@ -481,4 +484,72 @@ it("close_failure_keeps_window_available and reports the server failure", async 
   expect(
     screen.getByText(/The server could not confirm closing/u),
   ).toBeTruthy();
+});
+
+it("groups configuration and profiles in their requested categories and reveals the folder", async () => {
+  const adapter = bridge(
+    settingsFake(
+      { writing_locale: "en-US" },
+      {
+        sources: [{ alias: "mobile", available: true, reason: "ready" }],
+        profiles: [{ alias: "main", available: true, reason: "ready" }],
+      },
+    ),
+  );
+  let finish!: () => void;
+  adapter.revealConfigurationFolder = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  render(<App bridge={adapter} />);
+  expect(screen.queryByLabelText("Chat profile")).toBeNull();
+  expect(screen.queryByLabelText("Generation profile")).toBeNull();
+  await openSettings("Sources");
+  expect(
+    screen.getByRole("button", {
+      name: "Reveal configuration folder in Finder",
+    }),
+  ).toHaveProperty("disabled", true);
+  connectFromSettings();
+  await screen.findByText("Connected");
+  fireEvent.click(screen.getByRole("button", { name: "Status", exact: true }));
+  expect(screen.queryByRole("heading", { name: "Server" })).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Sources" })).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Agent profiles" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Sources", exact: true }));
+  await screen.findByText("mobile: available");
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Reveal configuration folder in Finder",
+    }),
+  );
+  expect(
+    screen.getByRole("button", { name: "Opening Finder…" }),
+  ).toHaveProperty("disabled", true);
+  expect(adapter.revealConfigurationFolder).toHaveBeenCalledTimes(1);
+  await act(async () => finish());
+  adapter.revealConfigurationFolder = vi
+    .fn()
+    .mockRejectedValue(new Error("/private/secret"));
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Reveal configuration folder in Finder",
+    }),
+  );
+  await screen.findByText(/Could not open the server configuration folder/u);
+  expect(document.body.textContent).not.toContain("/private/secret");
+  fireEvent.click(
+    screen.getByRole("button", { name: "AI Agents", exact: true }),
+  );
+  expect(screen.getByRole("heading", { name: "Chat profile" })).toBeTruthy();
+  expect(
+    screen.getByRole("heading", { name: "Generation profile" }),
+  ).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Agent profiles" })).toBeTruthy();
+  expect(screen.getByText("main: available")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Go back" }));
+  expect(screen.queryByLabelText("Chat profile")).toBeNull();
+  expect(screen.queryByLabelText("Generation profile")).toBeNull();
 });

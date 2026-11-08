@@ -35,6 +35,8 @@ export function useSettings(bridge: Bridge, connected: boolean) {
   const [server, setServer] = useState<ServerSettings>();
   const [error, setError] = useState<string>();
   const [serverError, setServerError] = useState<string>();
+  const [revealing, setRevealing] = useState(false);
+  const [revealError, setRevealError] = useState(false);
   const [reloading, setReloading] = useState(false);
   const alive = useRef(true);
   const revision = useRef<string | undefined>(undefined);
@@ -134,6 +136,20 @@ export function useSettings(bridge: Bridge, connected: boolean) {
     error,
     serverError,
     reloading,
+    revealing,
+    revealError,
+    revealConfigurationFolder: async () => {
+      setRevealing(true);
+      setRevealError(false);
+      try {
+        if (!bridge.revealConfigurationFolder) throw new Error("unavailable");
+        await bridge.revealConfigurationFolder();
+      } catch {
+        if (alive.current) setRevealError(true);
+      } finally {
+        if (alive.current) setRevealing(false);
+      }
+    },
     setWriting: (tag: string) => update("writing", tag),
     setGenerationCount: (count: number) => update("generation", { count }),
     setKeybindings: (value: unknown) => update("keybindings", value),

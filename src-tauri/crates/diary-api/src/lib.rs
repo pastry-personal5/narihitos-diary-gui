@@ -60,6 +60,7 @@ pub struct ServerState {
     workspace_key: String,
     development: bool,
     startup: Mutex<diary_application::StartupSummary>,
+    configuration_folder: Option<std::path::PathBuf>,
     reloader: Option<Arc<dyn diary_application::ConfigReloader>>,
     config_generation: std::sync::atomic::AtomicU64,
     last_reload: Mutex<Value>,
@@ -104,6 +105,7 @@ impl ServerState {
             workspace_key,
             development,
             startup: Mutex::new(diary_application::StartupSummary::default()),
+            configuration_folder: None,
             reloader: None,
             config_generation: std::sync::atomic::AtomicU64::new(1),
             last_reload: Mutex::new(Value::Null),
@@ -281,6 +283,12 @@ impl ServerState {
             .get_mut()
             .expect("startup state poisoned") = summary;
     }
+    /// Records the active configuration folder for the native Finder action.
+    pub fn set_configuration_folder(state: &mut Arc<Self>, folder: std::path::PathBuf) {
+        Arc::get_mut(state)
+            .expect("startup precedes shared use")
+            .configuration_folder = Some(folder);
+    }
     /// Enables `POST /settings/reload`; without it the route answers `unavailable`.
     pub fn set_reloader(
         state: &mut Arc<Self>,
@@ -326,6 +334,10 @@ pub fn router(state: Arc<ServerState>) -> Router {
         .route("/api/v1/sessions/{id}/heartbeat", post(heartbeat))
         .route("/api/v1/sessions/{id}", delete(close_session))
         .route("/api/v1/settings", get(settings))
+        .route(
+            "/api/v1/settings/configuration-folder",
+            get(configuration_folder),
+        )
         .route("/api/v1/settings/reload", post(reload_settings))
         .route("/api/v1/jobs", get(list_jobs))
         .route("/api/v1/jobs/{id}", get(get_job))
