@@ -61,7 +61,7 @@ export function ActivityDetails({
           {retry && <button onClick={retry}>Reconnect</button>}
         </p>
       )}
-      <section aria-label="AI activity details">
+      <section aria-label="AI Activities details">
         {records.length === 0 && (
           <p>
             No AI activities yet. Send a message in AI Chat or select snippets

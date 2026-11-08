@@ -88,7 +88,7 @@ describe("scaffold shell", () => {
       screen.getByLabelText("Main Toolbar Strip"),
     ).getByRole("button", { name: "AI Activities" });
     expect(screen.queryByLabelText("AI Activity")).toBeNull();
-    expect(screen.getByLabelText("AI activity status").textContent).toContain(
+    expect(screen.getByLabelText("AI Activities status").textContent).toContain(
       "unavailable",
     );
     opener.focus();
@@ -207,10 +207,12 @@ describe("scaffold shell", () => {
     expect(parent.childElementCount).toBe(0);
     parent.remove();
   });
-  it("is read-only and reports no open file while disconnected", async () => {
+  it("is read-only without a toolbar save status while disconnected", async () => {
     render(<App bridge={bridge()} />);
     expect(document.querySelector(".cm-editor")).toBeNull();
-    expect(screen.getByText("No file open")).toBeTruthy();
+    expect(
+      within(screen.getByLabelText("Main Toolbar Strip")).queryByRole("status"),
+    ).toBeNull();
     expect(screen.queryByText("Saved")).toBeNull();
   });
   it("ignores a settings reply that arrives after the subscription disconnects", async () => {

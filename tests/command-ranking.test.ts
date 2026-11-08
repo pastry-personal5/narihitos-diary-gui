@@ -22,10 +22,10 @@ describe("command recommendations", () => {
     expect(labels(entries, "save")[0]).toBe("Save");
     expect(
       labels(
-        [entry("Open recent AI activity"), entry("Open AI activity")],
+        [entry("Open recent AI Activities"), entry("Open AI Activities")],
         "open ai",
       ),
-    ).toEqual(["Open AI activity", "Open recent AI activity"]);
+    ).toEqual(["Open AI Activities", "Open recent AI Activities"]);
   });
   it("normalizes whitespace, case and NFC; tokens use distinct ordered words", () => {
     expect(labels([entry("Open Settings")], "  OPEN   SET  ")).toEqual([

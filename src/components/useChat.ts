@@ -4,11 +4,11 @@ import { STAGE_TEXT, type ChatController } from "../application/chat";
 
 export interface ChatContext {
   document: ChatDocumentSnapshot | null;
-  /** What this message will carry, for example "Entry 2026-11-06, unsaved edits included". */
+  /** What this message will carry, for example "Entry on 2026-11-06, unsaved edits included". */
   chip: string;
 }
 
-/** One-line AI activity text for the toolbar; empty when nothing is running. */
+/** One-line AI Chat activity summary; empty when nothing is running. */
 export function activitySummary(c: ChatController, now: number): string {
   const { chat, startedAt } = c.state;
   if (!c.running) return "";

@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from "react";
 import type { Bridge } from "../application/bridge";
 import { AuthenticPane } from "./AuthenticPane";
 import { SettingsView } from "./SettingsView";
-import { SAVE_LABEL } from "./useAuthentic";
 import { Explorer } from "./Explorer";
 import { GlobalMessages } from "./GlobalMessages";
 import { PaneSeparator } from "./PaneSeparator";
@@ -194,27 +193,6 @@ export function App({ bridge }: { bridge: Bridge }) {
               )}
               onClick={() => void handlers["generate.start"].run()}
             />
-          </div>
-          <div className="toolbar-save-status">
-            <span role="status" aria-label="Save status">
-              {activeView
-                ? SAVE_LABEL[activeView.queue.state]
-                : active?.kind === "source"
-                  ? active.detached
-                    ? "Detached copy · read-only"
-                    : !active.source?.capabilities.save
-                      ? "Source is read-only"
-                      : active.saving
-                        ? "Saving…"
-                        : active.saveError === "external_change"
-                          ? "Changed on disk"
-                          : active.saveError
-                            ? "Save failed"
-                            : active.dirty
-                              ? "Unsaved changes"
-                              : "Saved"
-                  : "No file open"}
-            </span>
           </div>
         </header>
         {selectedView?.createError && (

@@ -115,7 +115,7 @@ describe("ChatController", () => {
     expect(c.running).toBe(false);
     expect(c.state.chat?.transcript.at(-1)?.text).toBe("hi there");
     expect(c.state.chips).toEqual(["Entry 2026-11-06, unsaved edits included"]);
-    expect(c.state.announcement).toBe("AI reply ready.");
+    expect(c.state.announcement).toBe("AI Agent reply ready.");
     expect(s.calls).toEqual(["open:main", "send"]);
   });
 

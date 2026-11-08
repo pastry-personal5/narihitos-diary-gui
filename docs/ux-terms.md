@@ -9,7 +9,7 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Visible term        | Code-facing name     | Meaning                                                                                                                                         |
 | ------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Standard Layout     | `standardLayout`     | The whole application window arrangement                                                                                                        |
-| Main Toolbar Strip  | `mainToolbarStrip`   | App title, distinct custom bitmap icon buttons (named with tooltips) and Save status                                                            |
+| Main Toolbar Strip  | `mainToolbarStrip`   | App title, distinct custom bitmap icon buttons (named with tooltips)                                                                            |
 | Main Content        | `mainContent`        | Region below the Main Toolbar Strip: Icon Bar, Explorer, Tabbed Editor and the AI column                                                        |
 | Icon Bar            | `iconBar`            | Left strip of flat icon-only buttons (no visible label), including Settings                                                                     |
 | Explorer            | `explorer`           | Left pane containing the four navigation tabs                                                                                                   |
@@ -36,7 +36,7 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Create Empty        | `createEmpty`        | Explicitly save an empty Authentic file for the selected date if it does not exist                                                              |
 | AI Activities       | `aiActivity`         | Toolbar button and modal dialog: run details, guidance, Cancel and result access                                                                |
 | Connection status   | `connectionStatus`   | Local server connection indicator in Settings > Server                                                                                          |
-| Save status         | `saveStatus`         | Dirty/saving/saved/failed/conflict indicator based on the acknowledged revision                                                                 |
+| Save status         | `saveStatus`         | Dirty/saving/saved/failed/conflict feedback in Global Messages, based on the acknowledged revision                                              |
 | Profile selector    | `profileSelector`    | Selection control inside the Chat profile or Generation profile card in Settings > AI Agents                                                    |
 | Metadata warning    | `metadataWarning`    | Per-snippet notice of parse, availability or timestamp problems, with the explicit header/filename authority choice                             |
 | Snippet checkbox    | `snippetCheckbox`    | Generation-inclusion toggle in the Snippet tab; independent of snippet focus                                                                    |
@@ -54,9 +54,11 @@ Casing: named regions use Title Case (Standard Layout, Icon Bar, Tabbed Editor, 
 
 Draft and Entry are navigation terms, not two persisted asset kinds. Use these names for control labels and accessibility; use ordinary action verbs such as Save, Generate, Export, Accept and Reject for commands.
 
+AI Chat context (`aiChatContext`) is the thin-bordered box at the top left of the AI Chat composer: a decorative bitmap icon followed by the document label, including unsaved-edit guidance or No document. It identifies the context attached to the next message.
+
 ## AI terminology
 
-Use **AI Agents** for the configured providers collectively and for the Settings category; use **AI Agent** for one provider. Do not use “assistant” or “AI assistant” as user-facing names for them. AI Chat names the conversation surface, AI Activities names the activity dialog, and Chat profile, Generation profile and Agent profiles retain their distinct card names. Code/API transcript roles are technical schema values, not canonical visible component names.
+Use **AI Agents** for the configured providers collectively and for the Settings category; use **AI Agent** for one provider. Do not use “assistant” or “AI assistant” as user-facing names for them. AI Chat names the conversation surface, AI Activities names the activity dialog, and Chat profile, Generation profile and Agent profiles retain their distinct card names. AI Chat labels completed replies **AI Agent** and streaming replies **AI Agent (provisional)**; reply announcements also use AI Agent. Code/API transcript roles such as `assistant` are technical schema values, not canonical visible component names.
 
 ## Trash Recovery controls
 

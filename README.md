@@ -16,7 +16,7 @@ Apache-2.0. See [LICENSE](LICENSE) and the [third-party notices](third-party-not
 
 See [AGENTS.md](AGENTS.md) and the [contribution guide](docs/contribution-guide.md).
 
-Generate uses the selected eligible diary snippets even when the Entry tab is closed. Generation settings, blocked reasons, adjacent-date warnings and preparation/submission errors appear in Global Messages with recovery guidance. Draft and Entry use distinct custom bitmap buttons with tooltips and selected states; Jump to latest in Global Messages uses a matching bitmap button. The editor has no visible “Tabbed Editor” title; passive editor notices also appear in Global Messages.
+Generate uses the selected eligible diary snippets even when the Entry tab is closed. Generation settings, blocked reasons, adjacent-date warnings and preparation/submission errors appear in Global Messages with recovery guidance. Draft and Entry use distinct custom bitmap buttons with tooltips and selected states; Jump to latest in Global Messages uses a matching bitmap button. The editor has no visible “Tabbed Editor” title; passive editor and save notices appear in Global Messages. The toolbar has no save-status text.
 
 Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat profile and Generation profile cards. Profile choices apply to new AI runs.
 
@@ -29,3 +29,17 @@ Use **AI Activities** in the Main Toolbar Strip to inspect AI work, cancel a run
 The Command palette toolbar button toggles a search overlay with ranked command recommendations, current shortcut hints and unavailable reasons. Use arrows and Enter or click a command; Escape and outside interaction close it. See the [keyboard contract](docs/architecture/keyboard-shortcuts.md#command-palette-overlay).
 
 Closing the main window of an app launched with `run-gui.sh` waits for save/session cleanup, exits the client and stops that launch’s development processes. The independently started diary server keeps running.
+
+In AI Chat, send `/clear` to clear the conversation context and start a fresh chat. Wait for an active reply to finish or cancel it first. Enter sends a message; Shift+Enter adds a new line.
+
+AI Chat labels replies **AI Agent**, using **AI Agent (provisional)** while a reply streams. UI and accessibility labels follow the [canonical UX terms](docs/ux-terms.md).
+
+The AI Chat composer shows the next message’s document context in a thin-bordered box with a bitmap icon at the top left.
+
+AI Chat’s Send button is a thin white up arrow inside a blue circle.
+
+The empty AI Chat input shows a dimmed “Chat with AI” placeholder that disappears when typing.
+
+AI Chat uses a very dark gray background with a darker input area.
+
+The server connection starts automatically without a startup delay after frontend reload. Failed attempts retry within one second; returning to the window or recovering the network prompts an immediate retry.

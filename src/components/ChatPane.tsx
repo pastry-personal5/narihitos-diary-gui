@@ -1,4 +1,5 @@
-import sendIcon from "../assets/send.png";
+import chatContextIcon from "../assets/controls/chat-context.png";
+import sendIcon from "../assets/controls/chat-send.png";
 import { useState, useSyncExternalStore } from "react";
 import { CHAT_MESSAGE, type ChatController } from "../application/chat";
 import { activitySummary, useChat, useTick, type ChatContext } from "./useChat";
@@ -28,23 +29,32 @@ export function ChatPane({
     setRestored(s.unsent);
     if (s.unsent !== null) setDraft((d) => (d === "" ? (s.unsent ?? "") : d));
   }
-  const reason = !controller.available
-    ? "AI Chat is unavailable."
-    : !connected
-      ? "The server is disconnected."
-      : otherRun
-        ? `An AI run is active for ${otherRun}; wait for it or cancel it.`
-        : !s.profile
-          ? "No chat-capable profile is configured."
-          : !locale
-            ? "Choose a Writing Language in Settings."
-            : running
-              ? "A reply is in progress."
-              : draft.trim() === ""
-                ? "Write a message first."
+  const clearCommand = draft.trim() === "/clear";
+  const reason = clearCommand
+    ? running
+      ? "A reply is in progress."
+      : null
+    : !controller.available
+      ? "AI Chat is unavailable."
+      : !connected
+        ? "The server is disconnected."
+        : otherRun
+          ? `An AI run is active for ${otherRun}; wait for it or cancel it.`
+          : !s.profile
+            ? "No chat-capable profile is configured."
+            : !locale
+              ? "Choose a Writing Language in Settings."
+              : running
+                ? "A reply is in progress."
                 : null;
   function submit() {
     if (reason) return;
+    if (clearCommand) {
+      setDraft("");
+      void controller.newChat();
+      return;
+    }
+    if (!draft.trim()) return;
     const ctx = context();
     const text = draft;
     setDraft("");
@@ -54,12 +64,6 @@ export function ChatPane({
   return (
     <aside aria-label="AI Chat" className="chat">
       <h2>AI Chat</h2>
-      <button
-        disabled={running || (!s.chat && !s.pending)}
-        onClick={() => void controller.newChat()}
-      >
-        New chat
-      </button>
       <ol
         aria-busy={running}
         aria-live="off"
@@ -72,7 +76,7 @@ export function ChatPane({
             .filter((x) => x.role === "user").length;
           return (
             <li key={i} data-role={m.role}>
-              <strong>{m.role === "user" ? "You" : "Assistant"}</strong>
+              <strong>{m.role === "user" ? "You" : "AI Agent"}</strong>
               {m.role === "user" && s.chips[userIndex] && (
                 <small className="chat-chip"> {s.chips[userIndex]}</small>
               )}
@@ -89,7 +93,7 @@ export function ChatPane({
         )}
         {running && (
           <li data-role="assistant" data-provisional="true">
-            <strong>Assistant (provisional)</strong>
+            <strong>AI Agent (provisional)</strong>
             <ChatPreview controller={controller} />
           </li>
         )}
@@ -138,21 +142,42 @@ export function ChatPane({
         </p>
       )}
       <div className="chat-composer">
+        <div
+          id="chat-context"
+          aria-label="AI Chat context"
+          className="chat-context"
+        >
+          <span
+            aria-hidden="true"
+            className="bitmap-icon"
+            style={{
+              width: 16,
+              height: 16,
+              maskImage: `url(${chatContextIcon})`,
+              WebkitMaskImage: `url(${chatContextIcon})`,
+            }}
+          />
+          <span>{context().chip}</span>
+        </div>
         <label htmlFor="chat-message" className="visually-hidden">
           Message
         </label>
         <textarea
           id="chat-message"
+          placeholder="Chat with AI"
           value={draft}
-          placeholder="Message the assistant"
-          aria-describedby="chat-reason"
+          aria-describedby="chat-context chat-reason"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             // Enter during IME composition confirms text; it never sends.
             if (
               e.key === "Enter" &&
-              (e.metaKey || e.ctrlKey) &&
-              !e.nativeEvent.isComposing
+              !e.shiftKey &&
+              !e.metaKey &&
+              !e.ctrlKey &&
+              !e.altKey &&
+              !e.nativeEvent.isComposing &&
+              e.nativeEvent.keyCode !== 229
             ) {
               e.preventDefault();
               submit();
@@ -160,26 +185,25 @@ export function ChatPane({
           }}
         />
         <div className="chat-composer-bar">
-          <p id="chat-reason">
-            {reason ?? `Sends ${context().chip}. Cmd+Enter sends.`}
-          </p>
+          <p id="chat-reason">{reason}</p>
           <button
             className="chat-send"
             aria-label="Send"
-            disabled={!!reason}
+            disabled={!!reason || !draft.trim()}
             title={reason ?? "Send"}
             onClick={submit}
           >
-            <span
-              aria-hidden="true"
-              className="bitmap-icon"
-              style={{
-                width: 24,
-                height: 24,
-                maskImage: `url(${sendIcon})`,
-                WebkitMaskImage: `url(${sendIcon})`,
-              }}
-            />
+            <span aria-hidden="true" className="chat-send-circle">
+              <span
+                className="bitmap-icon"
+                style={{
+                  width: 20,
+                  height: 20,
+                  maskImage: `url(${sendIcon})`,
+                  WebkitMaskImage: `url(${sendIcon})`,
+                }}
+              />
+            </span>
           </button>
         </div>
       </div>

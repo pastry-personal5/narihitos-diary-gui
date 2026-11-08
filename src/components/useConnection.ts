@@ -26,8 +26,10 @@ export function useConnection(
   },
 ) {
   const mounted = useRef(true);
+  const attempts = useRef(0);
   const activeGeneration = useRef<number | null>(null);
   const connectionEpoch = useRef(0);
+  const pendingConnection = useRef<number | null>(null);
   const dispose = useRef<(() => Promise<void>) | undefined>(undefined);
   const [version, setVersion] = useState<string>();
   const [connection, setConnection] = useState<Connection>({
@@ -39,6 +41,7 @@ export function useConnection(
     let disposed = false;
     const epoch = connectionEpoch;
     mounted.current = true;
+    attempts.current = 0;
     void bridge
       .metadata()
       .then((metadata) => {
@@ -49,12 +52,12 @@ export function useConnection(
       disposed = true;
       mounted.current = false;
       epoch.current++;
+      pendingConnection.current = null;
       void dispose.current?.();
       dispose.current = undefined;
     };
   }, [bridge]);
-  // Connect in the background after launch and after any drop: 0.5s, 1s, 2s … capped at 30s.
-  const attempts = useRef(0);
+  // Connect immediately after launch/reload/drop; failed attempts wait at most one second.
   const latestConnect = useRef(() => {});
   useEffect(() => {
     latestConnect.current = () => void connect();
@@ -62,9 +65,23 @@ export function useConnection(
   useEffect(() => {
     if (connection.kind === "connected") attempts.current = 0;
     if (closePending || connection.kind !== "disconnected") return;
-    const delay = Math.min(30_000, 500 * 2 ** attempts.current++);
-    const timer = setTimeout(() => latestConnect.current(), delay);
-    return () => clearTimeout(timer);
+    const attempt = attempts.current++;
+    const delay =
+      attempt === 0 ? 0 : Math.min(1000, 100 * 2 ** Math.min(attempt - 1, 4));
+    const retry = () => latestConnect.current();
+    const visible = () => {
+      if (document.visibilityState === "visible") retry();
+    };
+    const timer = setTimeout(retry, delay);
+    window.addEventListener("focus", retry);
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", retry);
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", visible);
+    };
   }, [connection, closePending]);
   useEffect(() => {
     if (!connected) return;
@@ -79,12 +96,22 @@ export function useConnection(
     if (advice) model.messages.add(advice, "warning", true);
   }
   async function connect() {
+    if (
+      !mounted.current ||
+      closePending ||
+      pendingConnection.current === connectionEpoch.current
+    )
+      return;
     const epoch = ++connectionEpoch.current;
+    pendingConnection.current = epoch;
     const current = () => mounted.current && connectionEpoch.current === epoch;
+    let ready = false;
     setConnection({ kind: "connecting" });
     try {
-      await dispose.current?.();
+      const previousStop = dispose.current;
       dispose.current = undefined;
+      await previousStop?.();
+      if (!current()) return;
       const status = await bridge.connect();
       if (!current()) return;
       const stop = await bridge.watch((event) => {
@@ -102,11 +129,10 @@ export function useConnection(
           void model.connect(false, "", 0, false);
           setConnection({
             kind: "disconnected",
-            message:
-              "Connection interrupted. Reconnect to refresh server state.",
+            message: "Connection interrupted. Reconnecting automatically.",
           });
         }
-        if (event.kind === "resync_required")
+        if (event.kind === "resync_required" && ready)
           void bridge
             .status()
             .then((fresh) => {
@@ -121,7 +147,7 @@ export function useConnection(
                 void model.connect(false, "", 0, false);
                 setConnection({
                   kind: "disconnected",
-                  message: "Server unavailable. Reconnect to refresh state.",
+                  message: "Server unavailable. Reconnecting automatically.",
                 });
               }
             });
@@ -137,7 +163,6 @@ export function useConnection(
           await stop();
           return;
         }
-        setConnection({ kind: "connected", status });
         generator.connect(true);
         void generator.loadProfiles();
         void chat.loadProfiles().then(() => {
@@ -152,20 +177,28 @@ export function useConnection(
           server.config_generation,
           status.storage_ready,
         );
+        if (!current()) return;
+        ready = true;
+        setConnection({ kind: "connected", status });
       }
     } catch (error) {
       if (current()) {
-        await dispose.current?.();
+        generator.connect(false);
+        const failedStop = dispose.current;
         dispose.current = undefined;
+        await failedStop?.();
+        if (!current()) return;
         void model.connect(false, "", 0, false);
         setConnection({
           kind: "disconnected",
           message:
             error === "client_busy"
               ? "Another Diary client is connected. Close it before reconnecting."
-              : "Server unavailable. Check the separate server process and discovery path.",
+              : "Server unavailable. Retrying automatically; check the separate server process and discovery path.",
         });
       }
+    } finally {
+      if (pendingConnection.current === epoch) pendingConnection.current = null;
     }
   }
   /** After a settings reload: re-advise sources and reconnect the model if the config changed. */

@@ -49,8 +49,8 @@
     },
     {
       "id": "ai.activity.open",
-      "label": "Open AI activity",
-      "info": "Opens AI activity details in the Main Toolbar Strip.",
+      "label": "Open AI Activities",
+      "info": "Opens the AI Activities dialog with run details and results.",
       "scope": "app",
       "defaults": []
     },

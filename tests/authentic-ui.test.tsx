@@ -169,8 +169,8 @@ describe("Authentic editing", () => {
     expect(createEmpty().getAttribute("title")).toMatch(/already exists/);
     type("a");
     type("b");
-    expect(screen.getByText("Unsaved changes")).toBeTruthy();
-    await waitFor(() => expect(screen.getByText("Saved")).toBeTruthy(), {
+    expect(screen.getByText(/Unsaved changes\./)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(/Saved\./)).toBeTruthy(), {
       timeout: 3000,
     });
     expect(server.saves).toHaveLength(1);
@@ -198,7 +198,7 @@ describe("Authentic editing", () => {
     await open(server);
     await waitFor(() => expect(editor().state.doc.toString()).toBe("kept"));
     expect(createEmpty().hasAttribute("disabled")).toBe(true);
-    expect(screen.getByText("Saved")).toBeTruthy();
+    expect(screen.queryByLabelText("Save status")).toBeNull();
   });
 
   it("changing the date waits for the slow save and saves to the original date", async () => {
@@ -241,7 +241,7 @@ describe("Authentic editing", () => {
     expect(date()).toBe(original);
     expect(await server.closeHandler!()).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Retry save" }));
-    await waitFor(() => expect(screen.getByText("Saved")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Saved\./)).toBeTruthy());
     expect(server.files.get(original)?.body).toBe("x");
     expect(await server.closeHandler!()).toBe(true);
   });
@@ -286,7 +286,7 @@ describe("Authentic editing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm discard" }));
     await waitFor(() => expect(editor().state.doc.toString()).toBe("v3"));
-    expect(screen.getByText("Saved")).toBeTruthy();
+    expect(screen.queryByLabelText("Save status")).toBeNull();
   });
 });
 

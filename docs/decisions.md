@@ -6,6 +6,22 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 ## Decided
 
+- **Automatic server reconnection (owner, 2026-11-08):** Connect immediately after frontend reload and retry failed connections promptly, with a one-second retry cap and activation/network recovery triggers. Preserve native lease reuse, single-client ownership and discovery validation. Fresh-launch review retains the immediate attempt under Strict Mode and reports connected only after initialization completes; early resync cannot bypass readiness.
+
+- **AI Chat backgrounds (owner, 2026-11-08):** Use very dark gray for the whole AI Chat surface and darker gray for the input composer.
+
+- **AI Chat placeholder (owner, 2026-11-08):** Show a dimmed “Chat with AI” native placeholder in the empty input, disappearing immediately when typing. This supersedes the earlier request for no composer placeholder.
+
+- **AI Chat keyboard (owner, 2026-11-08):** Enter sends, Shift+Enter adds a newline, and the composer displays no keyboard shortcut hints. Preserve IME composition safety.
+
+- **AI Chat context (owner, 2026-11-08):** Show the next message’s context at the top left inside the composer in a thin-bordered box containing a bitmap icon followed by text. See [canonical vocabulary](ux-terms.md).
+
+- **AI Chat speaker (owner, 2026-11-08):** Use AI Agent for chat replies, including provisional output and announcements; follow canonical UX terms throughout related UI and accessibility labels. Technical transcript roles remain schema values.
+
+- **Chat reset (owner, 2026-11-08):** Replace New chat with the local `/clear` command and remove the composer placeholder and empty-message warning. Preserve the active-turn reset guard.
+
+- **Toolbar save status (owner, 2026-11-08):** Remove the top-right save-status text; save notifications use Global Messages. See the [follow-up checklist](phase-1/milestone-29-editor-messages-overview.md#toolbar-save-status-follow-up-2026-11-08).
+
 - **Editor messages (owner, 2026-11-08):** Remove the visible “Tabbed Editor” title, retaining its accessible region name. Generation configuration, blockers, adjacent-date warnings and passive editor/candidate notices belong in Global Messages. Keep editing, retry/cancel, review/discard and save-conflict recovery controls available. See the [follow-up checklist](phase-1/milestone-29-editor-messages-overview.md).
 
 - **Settings categories (owner, 2026-11-08, P1-M29 T26):** Server owns connection and configuration reload; Sources owns source availability and revealing the active configuration folder in Finder; AI Agents owns agent status and separate Chat/Generation profile cards. The native Finder action accepts no path from the webview and returns no private path to it.

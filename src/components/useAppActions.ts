@@ -140,7 +140,7 @@ export function useAppActions({
           );
       },
     },
-    "ai.activity.open": { reason: later("AI activity"), run: () => {} },
+    "ai.activity.open": { reason: later("AI Activities"), run: () => {} },
     "ai.run.cancel": {
       reason: generator.running || chat.running ? null : "No AI run is active.",
       run: () => (generator.running ? generator.cancel() : chat.cancel()),

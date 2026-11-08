@@ -154,7 +154,9 @@ it("keeps named textual progress available with reduced motion", () => {
         discard={vi.fn()}
       />,
     );
-    const details = screen.getByRole("region", { name: "AI activity details" });
+    const details = screen.getByRole("region", {
+      name: "AI Activities details",
+    });
     expect(details.textContent).toContain("Writing Language: ko-KR");
     expect(details.textContent).toContain("Receiving the response");
     expect(

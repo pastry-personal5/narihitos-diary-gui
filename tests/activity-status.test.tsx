@@ -22,7 +22,8 @@ it("shows brief live activity and never claims stale work is still running", () 
     );
   baseline([]);
   const ui = render(<ActivityStatus store={store} />);
-  const status = () => screen.getByLabelText("AI activity status").textContent;
+  const status = () =>
+    screen.getByLabelText("AI Activities status").textContent;
   expect(status()).toBe("AI idle");
   ui.rerender(
     <ActivityStatus store={store} preparing="Sending AI Chat message" />,
@@ -58,6 +59,6 @@ it("shows brief live activity and never claims stale work is still running", () 
   );
   expect(status()).toBe("AI idle · 1 unread results");
   expect(
-    screen.getByLabelText("AI activity status").getAttribute("aria-live"),
+    screen.getByLabelText("AI Activities status").getAttribute("aria-live"),
   ).toBe("off");
 });

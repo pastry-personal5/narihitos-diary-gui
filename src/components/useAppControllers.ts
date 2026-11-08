@@ -113,7 +113,8 @@ export function useAppControllers(bridge: Bridge) {
     const r = a?.kind === "candidate" ? model.resources.authentic : a;
     const date = r?.date ?? model.resources.selectedDate;
     if (!r || !date) return { document: null, chip: "No document" };
-    const what = r.kind === "authentic" ? `Entry ${date}` : `Source ${r.label}`;
+    const what =
+      r.kind === "authentic" ? `Entry on ${date}` : `Source ${r.label}`;
     return {
       document: {
         kind:

@@ -449,7 +449,7 @@ export class ChatController {
       announcement:
         settled && wasRunning
           ? turn.state === "done"
-            ? "AI reply ready."
+            ? "AI Agent reply ready."
             : turn.state === "cancelled"
               ? "AI request cancelled."
               : "AI request failed."

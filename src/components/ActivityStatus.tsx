@@ -26,7 +26,7 @@ export function ActivityStatus({
           ? `AI idle · ${unread} unread results`
           : "AI idle");
   return (
-    <span aria-label="AI activity status" aria-live="off">
+    <span aria-label="AI Activities status" aria-live="off">
       {message}
     </span>
   );

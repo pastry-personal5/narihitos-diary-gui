@@ -94,7 +94,7 @@ describe("Settings", () => {
     fireEvent.click(screen.getByRole("button", { name: "Go back" }));
     expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
     expect(screen.queryByLabelText("Server connection status")).toBeNull();
-    expect(screen.getByLabelText("Save status")).toBeTruthy();
+    expect(screen.queryByLabelText("Save status")).toBeNull();
   });
 
   it("stores the first system language once and keeps it across a restart", async () => {
@@ -317,7 +317,9 @@ describe("Command palette and Keyboard Shortcuts", () => {
 
   it("lists unavailable actions with a reason and posts it when run", async () => {
     languages(["en-US"]);
-    render(<App bridge={bridge(settingsFake({ revision: "r0" }))} />);
+    const adapter = bridge(settingsFake({ revision: "r0" }));
+    adapter.connect = vi.fn().mockRejectedValue(new Error("offline"));
+    render(<App bridge={adapter} />);
     press({ code: "KeyP", metaKey: true, shiftKey: true });
     await palette();
     fireEvent.change(screen.getByLabelText("Filter actions"), {

@@ -62,3 +62,7 @@ Unit tests for registry defaults, the four `source.trash` defaults, override mer
 The Main Toolbar Strip button toggles the Command palette; its shortcut opens it. The non-modal overlay sits below the toolbar, focuses an empty search field, and leaves the toggle reachable. Search updates recommendations immediately. Matching uses normalized labels: exact, label prefix, ordered word prefixes, then substring. Within a match tier, available commands precede unavailable ones, then labels and stable action IDs break ties. Empty search uses availability, label and ID. Scores and rank numbers are never displayed.
 
 Arrow keys select commands while focus stays in the search combobox; Enter or a pointer click runs the selected command once. Unavailable commands retain their reason and show the existing warning if attempted. Execution rechecks current availability and preserves save guards, previews and confirmations. IME composition never runs, navigates or dismisses commands; held Enter does not repeat execution. Escape restores invoker focus; outside pointer/focus dismisses without stealing the destination. Commands hand focus to Settings or their dialog. Another modal or shortcut capture closes the palette, and app shortcuts remain suspended while it is open. Reopening resets search and selection.
+
+## AI Chat composer
+
+Unmodified Enter sends the message or runs `/clear`. Shift+Enter inserts a newline. Enter during IME composition confirms text without sending. Empty or blocked submission remains unavailable. The composer displays no shortcut hints.

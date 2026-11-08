@@ -8,6 +8,9 @@
   --bg: #1f1f1f;
   --panel: #181818;
   --surface: #2b2b2b;
+  --ai-chat-bg: #141414;
+  --ai-chat-input-bg: #0c0c0c;
+  --ai-chat-placeholder: #808080;
   --line: #2b2b2b;
   --scrim: rgb(0 0 0 / 60%);
   --shadow: rgb(0 0 0 / 40%);
@@ -135,18 +138,9 @@ p {
   background: transparent;
   opacity: 0.5;
 }
-.toolbar-save-status,
 footer {
   font-size: 12px;
   color: var(--muted);
-}
-.toolbar-save-status {
-  flex: 0 1 220px;
-  margin-left: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: 420px;
 }
 .workspace {
   display: grid;
@@ -191,9 +185,10 @@ footer {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--panel);
+  background: var(--ai-chat-bg);
 }
 .ai-column .chat {
+  background: var(--ai-chat-bg);
   flex: 1;
   min-height: 0;
   display: flex;
@@ -211,7 +206,23 @@ footer {
   margin-top: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--ai-chat-input-bg);
+}
+.chat-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin: 8px 8px 0;
+  padding: 4px 6px;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.chat-context .bitmap-icon {
+  flex-shrink: 0;
 }
 .chat .chat-composer textarea {
   display: block;
@@ -222,6 +233,10 @@ footer {
   background: transparent;
   color: inherit;
   outline: none;
+}
+.chat .chat-composer textarea::placeholder {
+  color: var(--ai-chat-placeholder);
+  opacity: 1;
 }
 .chat-composer-bar {
   display: flex;
@@ -241,8 +256,23 @@ footer {
   border-color: transparent;
   background: transparent;
 }
-.chat .chat-send:not(:disabled):hover {
-  background: var(--panel);
+.chat-send-circle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+.chat-send:not(:disabled):hover .chat-send-circle {
+  background: var(--accent);
+}
+.chat-send:not(:disabled):active .chat-send-circle {
+  background: var(--accent-fill);
+}
+.chat-send:disabled .chat-send-circle {
+  opacity: 0.45;
 }
 .snippet-trash {
   width: auto;
