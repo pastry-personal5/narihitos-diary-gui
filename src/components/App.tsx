@@ -1,6 +1,7 @@
 import settingsIcon from "../assets/settings.png";
 import { ActivityFeedback } from "./ActivityFeedback";
-import { ActivityDetails } from "./ActivityDetails";
+import { AIActivitiesDialog } from "./AIActivitiesDialog";
+import { ActivityStatus } from "./ActivityStatus";
 import { useEffect, useRef, useState } from "react";
 import type { Bridge } from "../application/bridge";
 import { AuthenticPane } from "./AuthenticPane";
@@ -33,6 +34,7 @@ import { useCloseRequest } from "./useCloseRequest";
 import { useConnection } from "./useConnection";
 
 export function App({ bridge }: { bridge: Bridge }) {
+  const [activitiesOpen, setActivitiesOpen] = useState(false);
   const recoveryButton = useRef<HTMLButtonElement>(null);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const settingsButton = useRef<HTMLButtonElement>(null);
@@ -158,6 +160,12 @@ export function App({ bridge }: { bridge: Bridge }) {
               onClick={() => setRecoveryOpen(true)}
             >
               Trash Recovery
+            </button>
+            <button
+              title="View AI Activities and results"
+              onClick={() => setActivitiesOpen(true)}
+            >
+              AI Activities
             </button>
             {active?.kind === "source" && (
               <button
@@ -294,6 +302,57 @@ export function App({ bridge }: { bridge: Bridge }) {
               setSettingsOpen(false);
               void generator.loadProfiles();
               requestAnimationFrame(() => settingsButton.current?.focus());
+            }}
+          />
+        )}
+        <ActivityFeedback
+          activity={activity.store}
+          generator={generator}
+          chat={chat}
+          messages={model.messages}
+        />
+        {activitiesOpen && (
+          <AIActivitiesDialog
+            onClose={() => setActivitiesOpen(false)}
+            store={activity.store}
+            retry={() => latestConnect.current()}
+            view={async (job) => {
+              if (job.progress?.kind === "generation") {
+                // Let the modal release focus before navigation can ask about unsaved text.
+                setActivitiesOpen(false);
+                await new Promise<void>((resolve) =>
+                  requestAnimationFrame(() => resolve()),
+                );
+                try {
+                  const opened = await model.chooseDate(
+                    job.progress.origin_date,
+                  );
+                  if (!opened) setActivitiesOpen(true);
+                  return opened;
+                } catch (error) {
+                  setActivitiesOpen(true);
+                  throw error;
+                }
+              }
+              setActivitiesOpen(false);
+              requestAnimationFrame(() => {
+                document
+                  .querySelector<HTMLElement>('[aria-label="AI Chat"] textarea')
+                  ?.focus();
+              });
+              return true;
+            }}
+            cancel={async (job) => {
+              await bridge.cancelJob(job.id);
+            }}
+            discard={async (job) => {
+              const scope = activity.store.state.scope;
+              await generator.discard(job.id);
+              if (
+                scope === activity.store.state.scope &&
+                !generator.state.jobs.has(job.id)
+              )
+                activity.forget(job.id);
             }}
           />
         )}
@@ -452,47 +511,6 @@ export function App({ bridge }: { bridge: Bridge }) {
             reverse
           />
           <div className="ai-column">
-            <section aria-label="AI Activity" className="ai-widget">
-              <p className="ai-activity" aria-live="off">
-                {generationState.submitting
-                  ? `Preparing generation for ${generationState.originDate}`
-                  : chatState.submitting
-                    ? "Submitting AI Chat"
-                    : ""}
-              </p>
-              <ActivityFeedback
-                activity={activity.store}
-                generator={generator}
-                chat={chat}
-                messages={model.messages}
-              />
-              <ActivityDetails
-                store={activity.store}
-                retry={() => latestConnect.current()}
-                view={async (job) => {
-                  if (job.progress?.kind === "generation")
-                    return model.chooseDate(job.progress.origin_date);
-                  document
-                    .querySelector<HTMLElement>(
-                      '[aria-label="AI Chat"] textarea',
-                    )
-                    ?.focus();
-                  return true;
-                }}
-                cancel={async (job) => {
-                  await bridge.cancelJob(job.id);
-                }}
-                discard={async (job) => {
-                  const scope = activity.store.state.scope;
-                  await generator.discard(job.id);
-                  if (
-                    scope === activity.store.state.scope &&
-                    !generator.state.jobs.has(job.id)
-                  )
-                    activity.forget(job.id);
-                }}
-              />
-            </section>
             <ChatPane
               coordinated
               controller={chat}
@@ -508,7 +526,17 @@ export function App({ bridge }: { bridge: Bridge }) {
           </div>
         </div>
         <footer>
-          Authentic files save automatically · Exports are unavailable.
+          <span>Authentic files save automatically</span>
+          <ActivityStatus
+            store={activity.store}
+            preparing={
+              generationState.submitting
+                ? `Preparing generation for ${generationState.originDate}`
+                : chatState.submitting
+                  ? "Sending AI Chat message"
+                  : undefined
+            }
+          />
         </footer>
       </main>
     </SymbolProvider>

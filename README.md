@@ -21,3 +21,5 @@ Generate uses the selected eligible diary snippets even when the Entry tab is cl
 Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat profile and Generation profile cards. Profile choices apply to new AI runs.
 
 Open **Trash Recovery** in the Main Toolbar Strip to check interrupted moves, inspect each file’s saved result and review the next steps. Its dialog explains partial and uncertain outcomes; retrying remaining files requires a new preview and confirmation.
+
+Use **AI Activities** in the Main Toolbar Strip to inspect AI work, cancel a run or open its results in a spacious modal. Bitmap info buttons explain progress and temporary results. Closing the modal keeps work running; the bottom status line shows a brief activity summary.

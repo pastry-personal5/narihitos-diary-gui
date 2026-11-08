@@ -29,6 +29,8 @@ P1-M28 is Done ([overview](milestone-28-simple-refactoring-overview.md)). Decide
 
 - **T28 (owner, 2026-11-08):** Move Trash recovery controls from Global Messages to a spacious Trash Recovery dialog opened from the Main Toolbar Strip, with a top-right close button and detailed status/action guidance.
 
+- **T30 (owner, 2026-11-08):** Move AI Activities into a spacious modal opened from the Main Toolbar Strip, with a top-right close button, plain-language guidance, bitmap info buttons opening explanation overlays, and a brief current-activity summary in the bottom status line. This supersedes T08’s widget placement.
+
 ## Scope
 
 In scope: the requests listed in the checklist. Out of scope: anything not requested, new dependencies or build tools without approval, and release qualification (P1-M32).
@@ -127,6 +129,12 @@ None yet.
 - [x] T29 `[docs]` - Reconcile Trash Recovery across UX behavior, containment and canonical terms; use AI Agents as the canonical name for configured AI providers and the Settings category.
   - [x] T29.1 - Toolbar, dedicated recovery dialog, status/actions, return/close behavior and absence of recovery controls in Global Messages agree across all three UX documents. Evidence: dedicated Trash Recovery section and outcome/action table in `ux-gui.md`, modal flow in `ux-information-architecture.md`, control vocabulary in `ux-terms.md`; terminology and local link/anchor checks pass.
   - [x] T29.2 - AI Agents and singular AI Agent are defined explicitly, with existing AI Chat, AI Activity and profile-card terms retained; terminology, local links, formatting and full gate pass. Evidence: canonical component rows and AI terminology rules; local links/anchors and whitespace checks pass; `scripts/gate.sh` G01–G07 pass (2026-11-08, outside sandbox for local TCP fixtures), 365 frontend tests pass.
+
+- [x] T30 `[gui]` `[behavior]` - Dedicated AI Activities window and brief bottom status.
+  - [x] T30.1 - Toolbar opens a spacious viewport-bounded modal; close/Escape/focus work, and controls are removed from above AI Chat. Evidence: `tests/client.test.tsx`; headless Chrome layout/focus smoke at 1280 × 900, 780 × 600 and 500 × 500 (960 × 740 desktop, no horizontal overflow, body scrolling on the smallest window).
+  - [x] T30.2 - Friendly status, result and cancellation guidance; bitmap info buttons open dismissible explanation overlays. Existing cancel, view, dismiss, discard and reconnect actions remain available. Evidence: `tests/activity-details.test.tsx` and `tests/client.test.tsx` verify actions, sanitized failure feedback, stale-state disabling, both info overlays and focus return.
+  - [x] T30.3 - Status line reflects submission, running, waiting, stopping and disconnected observations; completion feedback remains active with the modal closed. Evidence: `tests/activity-status.test.tsx`, existing `tests/activity-feedback.test.tsx`; `ActivityFeedback` stays mounted in App independently of the dialog.
+  - [x] T30.4 - Regression tests, layout smoke, affected docs and full gate pass. Evidence: `scripts/gate.sh` G01–G07 pass (2026-11-08; local TCP fixtures outside the sandbox), 368 frontend tests; browser smoke and maintained UX, architecture, README, user guide, decisions and changelog updates.
 
 ### Proof and docs
 

@@ -73,6 +73,59 @@ describe("scaffold shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Entry tab" }));
     expect(screen.getByText("No saved dates yet.")).toBeTruthy();
   });
+  it("opens AI Activities and its bitmap explanations with keyboard focus restoration", async () => {
+    render(<App bridge={bridge()} />);
+    const opener = within(
+      screen.getByLabelText("Main Toolbar Strip"),
+    ).getByRole("button", { name: "AI Activities" });
+    expect(screen.queryByLabelText("AI Activity")).toBeNull();
+    expect(screen.getByLabelText("AI activity status").textContent).toContain(
+      "unavailable",
+    );
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole("dialog", { name: "AI Activities" });
+    const close = within(dialog).getByRole("button", {
+      name: "Close AI Activities",
+    });
+    expect(document.activeElement).toBe(close);
+    expect(within(dialog).getByText(/No AI activities yet/)).toBeTruthy();
+    const info = within(dialog).getByRole("button", {
+      name: "About progress and cancellation",
+    });
+    expect(info.querySelector(".bitmap-icon")?.getAttribute("style")).toContain(
+      "state-details.png",
+    );
+    fireEvent.click(info);
+    const explanation = screen.getByRole("dialog", {
+      name: "Progress and cancellation",
+    });
+    expect(explanation.textContent).toContain("not an estimate");
+    fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
+    expect(document.activeElement?.getAttribute("aria-label")).toBe(
+      "Close explanation",
+    );
+    fireEvent.keyDown(explanation, { key: "Escape" });
+    await waitFor(() => expect(document.activeElement).toBe(info));
+    expect(screen.getByRole("dialog", { name: "AI Activities" })).toBeTruthy();
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "About results and session storage",
+      }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Results and session storage" })
+        .textContent,
+    ).toContain("Authentic file");
+    fireEvent.click(screen.getByRole("button", { name: "Close explanation" }));
+    fireEvent.keyDown(close, { key: "Escape" });
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+    fireEvent.click(opener);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close AI Activities" }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
   it("opens Trash Recovery from the toolbar and keeps recovery controls out of Global Messages", async () => {
     render(<App bridge={bridge()} />);
     const toolbar = screen.getByLabelText("Main Toolbar Strip");

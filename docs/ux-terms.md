@@ -23,7 +23,7 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Editor tab          | `editorTab`          | One open buffer (source, Authentic or read-only Candidate) in the Tabbed Editor; distinct from the Explorer tabs                                |
 | AI Agents           | `aiAgents`           | Configured AI providers used by AI Chat and Generate; also the Settings category for their profiles                                             |
 | AI Agent            | `aiAgent`            | One configured AI provider, such as Codex, Claude Code, Qwen Code or Apple Foundation Models                                                    |
-| AI Chat             | `aiChat`             | Transient conversation and composer; sits below the AI Activity widget                                                                          |
+| AI Chat             | `aiChat`             | Transient conversation and composer; fills the AI column                                                                                        |
 | Settings            | `settings`           | Redacted configuration/capability status in cards; server config remains private YAML                                                           |
 | Settings sidebar    | `settingsSidebar`    | Category list inside Settings: Status, Server, Sources, AI Agents, Writing Language, Keyboard Shortcuts and Generation, under a Go back button  |
 | Writing Language    | `writingLanguage`    | Persistent AI prose locale, initially the Mac's preferred language                                                                              |
@@ -34,7 +34,7 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Paragraph review    | `paragraphReview`    | Review mode for paragraph or indivisible Markdown structure changes                                                                             |
 | Review controls     | `reviewControls`     | Per-unit Accept/Reject controls shown during Paragraph review                                                                                   |
 | Create Empty        | `createEmpty`        | Explicitly save an empty Authentic file for the selected date if it does not exist                                                              |
-| AI Activity         | `aiActivity`         | Widget above AI Chat: run summary, expandable run details, Cancel and result access                                                             |
+| AI Activities       | `aiActivity`         | Toolbar button and modal dialog: run details, guidance, Cancel and result access                                                                |
 | Connection status   | `connectionStatus`   | Local server connection indicator in Settings > Server                                                                                          |
 | Save status         | `saveStatus`         | Dirty/saving/saved/failed/conflict indicator based on the acknowledged revision                                                                 |
 | Profile selector    | `profileSelector`    | Selection control inside the Chat profile or Generation profile card in Settings > AI Agents                                                    |
@@ -43,20 +43,20 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Pane separator      | `paneSeparator`      | Resizable, keyboard-operable boundary between Explorer, Tabbed Editor, AI Chat and Global Messages (the last resizes height)                    |
 | Trash Recovery      | `trashRecovery`      | Main Toolbar Strip button and modal dialog for saved Trash results, unfinished moves and recovery guidance; separate from Global Messages       |
 | Completion message  | `completionMessage`  | One polite in-app message per AI completion, with View results; posted to Global Messages                                                       |
-| Results badge       | `resultsBadge`       | Marker in the AI Activity widget that completed AI results await, until opened or dismissed                                                     |
+| Results badge       | `resultsBadge`       | Marker in the AI Activities dialog and bottom status line that completed AI results await, until opened or dismissed                            |
 | Confirmation dialog | `confirmationDialog` | Explicit confirmation for snippet delete, discard and export replacement                                                                        |
 | Settings card       | `settingsCard`       | Titled group in a Settings category (Server, Sources, Agent profiles, Chat profile, Generation profile, Advanced, Generation, Writing Language) |
 | Profile table       | `profileTable`       | Agent profiles with status SF Symbol, reason and per-row Check; refreshed by background checks                                                  |
 | Advanced card       | `advancedCard`       | Settings card listing what currently blocks Chat, Generate or saving                                                                            |
 | Export preview      | `exportPreview`      | Fresh preview shown before replacing externally changed iCloud/Notion output                                                                    |
 
-Casing: named regions use Title Case (Standard Layout, Icon Bar, Tabbed Editor, Main Content, AI Activity); sub-parts and controls use sentence case (Date tab, Editor tab, Settings sidebar, Settings card, Command palette). "Tab" alone is ambiguous: say Explorer tab (Date, Snippet, Draft, Entry) or Editor tab.
+Casing: named regions use Title Case (Standard Layout, Icon Bar, Tabbed Editor, Main Content, AI Activities); sub-parts and controls use sentence case (Date tab, Editor tab, Settings sidebar, Settings card, Command palette). "Tab" alone is ambiguous: say Explorer tab (Date, Snippet, Draft, Entry) or Editor tab.
 
 Draft and Entry are navigation terms, not two persisted asset kinds. Use these names for control labels and accessibility; use ordinary action verbs such as Save, Generate, Export, Accept and Reject for commands.
 
 ## AI terminology
 
-Use **AI Agents** for the configured providers collectively and for the Settings category; use **AI Agent** for one provider. Do not use “assistant” or “AI assistant” as user-facing names for them. AI Chat names the conversation surface, AI Activity names the run-status widget, and Chat profile, Generation profile and Agent profiles retain their distinct card names. Code/API transcript roles are technical schema values, not canonical visible component names.
+Use **AI Agents** for the configured providers collectively and for the Settings category; use **AI Agent** for one provider. Do not use “assistant” or “AI assistant” as user-facing names for them. AI Chat names the conversation surface, AI Activities names the activity dialog, and Chat profile, Generation profile and Agent profiles retain their distinct card names. Code/API transcript roles are technical schema values, not canonical visible component names.
 
 ## Trash Recovery controls
 
@@ -98,4 +98,4 @@ Use these exact category names in the Settings sidebar, in this order. A categor
 | Server configuration                  | `serverConfiguration`       | Card in Sources containing the action to reveal the active configuration folder                                         |
 | Reveal configuration folder in Finder | `revealConfigurationFolder` | Open the folder containing the active server configuration file in macOS Finder                                         |
 
-Profile choices are configured in Settings > AI Agents. AI Activity in Main contains run status and result access.
+Profile choices are configured in Settings > AI Agents. AI Activities in the Main Toolbar Strip opens run status and result access.

@@ -10,6 +10,8 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-08 — Owner — P1-M29 T30: move AI activity controls from above Chat to a spacious AI Activities modal opened from the toolbar; add plain-language guidance, bitmap info overlays and a brief bottom status summary.
+
 - 2026-11-08 — owner/agent, P1-M29 T29 — Reconcile Trash Recovery behavior, containment and control vocabulary across the UX documents; define AI Agents (singular AI Agent) as the canonical user-facing provider terminology.
 
 - 2026-11-08 — owner/agent, P1-M29 T28 — Move recovery controls out of Global Messages into a spacious Trash Recovery dialog opened from the Main Toolbar Strip, with a top-right Close button and guidance for connection, partial, uncertain and completed states. Existing file inspection and explicit retry confirmation remain available.

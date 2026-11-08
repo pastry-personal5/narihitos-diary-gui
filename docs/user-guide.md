@@ -12,7 +12,7 @@ Read-only Ayumi/Narihito date imports and timestamp-resolution choices are avail
 
 Supported AI profiles are Codex, Claude Code, Qwen Code, and Apple's on-device Foundation Models. AI Chat is enabled: pick a ready Chat profile in Settings → AI Agents and send messages; each message carries the active editor text (including unsaved edits, shown as a context chip), the reply streams in as provisional text and Cancel stops it. The conversation is kept only in memory for the session. Settings → AI Agents shows whether each configured profile is installed, a supported version and signed in (Check runs no AI). To generate, include eligible snippets in the Explorer, select a Generation profile in Settings → AI Agents (readiness is checked in the background), then use Generate. Dirty selected sources require Save, Exclude or Cancel; the saved Entry is flushed before capture. Settings → Generation saves the candidate count (1–5, default 3). Prompt templates live in [assets/prompts/](../assets/prompts/README.md).
 
-The toolbar's AI activity details show runs across dates, captured profile and
+**AI Activities** in the Main Toolbar Strip opens a spacious modal showing runs across dates, captured profile and
 language, progress and retained result indicators. View results navigates explicitly
 through the usual save guards; dismissing an indicator retains the result.
 Temporary connection loss marks activity stale. Reconnecting within the same live
@@ -27,3 +27,5 @@ Press Shift+Command+P (or use the toolbar) for the command palette; Command+S sa
 The [planned background AI experience](architecture/ai-job-experience.md) keeps editing available with visible progress, cancellation and in-app completion feedback.
 
 Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat profile and Generation profile cards. Profile choices apply to new AI runs.
+
+The AI Activities window has a top-right Close button and supports Escape. Bitmap (i) buttons open further explanations. Close an explanation to return to its info button. Closing AI Activities keeps work running, and the bottom status line shows what is running or waiting. Use Reconnect when observations are out of date. Profile choices remain in Settings → AI Agents.

@@ -75,6 +75,8 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 - **UX terminology (owner, 2026-11-08):** Use AI Agents for the configured providers and Settings category, and AI Agent for one provider. AI Chat, AI Activity and the profile-card names retain their component meanings. See [canonical UX terms](ux-terms.md#ai-terminology).
 
+- **AI Activities (owner, 2026-11-08):** Replace the widget above AI Chat with an AI Activities toolbar button and spacious modal, friendly guidance and bitmap info overlays. Keep a brief activity summary in the bottom status line and background completion messages independent of the modal. Supersedes the T08 placement; see [revision checklist](phase-1/milestone-29-owner-requested-revisions-overview.md).
+
 ## Undecided
 
 The [P1-M2 owner interview](phase-1/milestone-02-owner-decisions.md) resolves the earlier product choices. The maintained [architecture](architecture.md) resolves delegated internal design work; do not ask again about already approved choices. Ask before changing those choices or inventing new product behavior outside the delegation.
