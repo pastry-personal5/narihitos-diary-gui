@@ -6,6 +6,8 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 ## Decided
 
+- **Snippet detail Close (owner, 2026-11-08):** Place a custom bitmap Close button at the top right of the source snippet detail overlay. Preserve modal keyboard dismissal and focus behavior. See [UX behavior](ux-gui.md).
+
 - **Automatic server reconnection (owner, 2026-11-08):** Connect immediately after frontend reload and retry failed connections promptly, with a one-second retry cap and activation/network recovery triggers. Preserve native lease reuse, single-client ownership and discovery validation. Fresh-launch review retains the immediate attempt under Strict Mode and reports connected only after initialization completes; early resync cannot bypass readiness.
 
 - **AI Chat backgrounds (owner, 2026-11-08):** Use very dark gray for the whole AI Chat surface and darker gray for the input composer.

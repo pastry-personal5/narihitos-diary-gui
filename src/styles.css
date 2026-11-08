@@ -837,6 +837,17 @@ footer {
   overflow-wrap: anywhere;
   font-size: 12px;
 }
+.snippet-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.snippet-detail-header h3 {
+  min-width: 0;
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
 
 .trash-recovery-dialog,
 .ai-activities-dialog {

@@ -2,6 +2,10 @@
 
 Status: Done (2026-11-08)
 
+## Snippet detail Close bitmap follow-up
+
+Extend the existing app-owned bitmap generator with a Close X mask in `src/assets/controls/`. Use `ToolbarButton` beside the snippet detail title in a flex header, allowing long names to wrap without displacing the button. Retain the Close accessible name, tooltip, initial focus and existing modal dismissal/focus restoration. Remove the bottom text button. Verify reproducibility and existing UI behavior with the full gate; no dependency or build-tool changes.
+
 Implementation plan for the [editor messages checklist](milestone-29-editor-messages-overview.md).
 
 Remove only the visible heading from `AuthenticPane`, retaining the region label and Draft/Entry controls. Pass the app-owned `Messages` store into the editor and generation controls. Effects publish passive messages on meaningful input changes, with consecutive-message deduplication. Generation errors already flow through `ActivityFeedback`; avoid a second error announcement in integrated controls. Preserve actionable save-conflict explanations, confirmations, retry, cancel and review controls. Route candidate lifecycle/stale/error notices to Global Messages while retaining candidate review/discard controls. Subscribe the log directly to its store so notices emitted during initial mount are immediately visible.

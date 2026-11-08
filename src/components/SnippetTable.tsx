@@ -10,6 +10,7 @@ import type {
 } from "../application/navigation/contracts";
 import type { NavigationModel } from "../application/navigation/model";
 import { ModalDialog } from "./ModalDialog";
+import { ToolbarButton } from "./ToolbarButton";
 import detailsIcon from "../assets/state-details.png";
 import readyIcon from "../assets/state-ready.png";
 import problemIcon from "../assets/state-problem.png";
@@ -273,7 +274,16 @@ export function SnippetTable({
       </table>
       {info && (
         <ModalDialog label="Snippet details" onDismiss={close}>
-          <h3>{info.name}</h3>
+          <header className="snippet-detail-header">
+            <h3>{info.name}</h3>
+            <ToolbarButton
+              action="close"
+              label="Close"
+              title="Close"
+              data-initial-focus
+              onClick={close}
+            />
+          </header>
           <p>
             Source:{" "}
             {info.group
@@ -308,9 +318,6 @@ export function SnippetTable({
               source={info.source}
             />
           )}
-          <button data-initial-focus onClick={close}>
-            Close
-          </button>
         </ModalDialog>
       )}
     </>

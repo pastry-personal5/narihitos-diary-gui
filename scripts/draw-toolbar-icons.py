@@ -64,6 +64,7 @@ NAVIGATION_ICONS = {
 }
 
 CONTROL_ICONS = {
+    "close": path((6, 6), (18, 18)) + path((18, 6), (6, 18)),
     "chat-send": path((12, 19), (12, 5)) + path((6, 11), (12, 5), (18, 11)),
     "chat-context": path((13, 3), (5, 3), (5, 21), (19, 21), (19, 9), (13, 3))
         + path((13, 3), (13, 9), (19, 9))

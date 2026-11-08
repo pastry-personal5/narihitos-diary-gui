@@ -2,6 +2,15 @@
 
 Status: Done (2026-11-08)
 
+## Snippet detail Close bitmap follow-up (2026-11-08)
+
+Owner request: move Close to the top right of the source snippet detail overlay as a custom bitmap button.
+
+- [x] T67 - Place an original Close PNG button beside the detail title at the upper right, retaining initial focus, dismissal and focus restoration.
+- [x] T68 - Verify the generated asset and existing UI behavior, update the UX contract and pass the full gate.
+
+Evidence for T67–T68: the 96×96 RGBA Close mask is transparent, antialiased and reproducible byte-for-byte. The header retains initial focus and the existing modal dismissal/focus restoration. Sixteen focused UI tests and all 391 UI tests pass. All seven gate commands pass, with Rust tests rerun successfully outside the sandbox after loopback permission failures. README, UX and owner decisions updated (2026-11-08). Native visual proof was not run.
+
 Owner-requested follow-up (2026-11-08) to the [completed revisions](../archive/milestones/p1-m29/milestone-29-owner-requested-revisions-overview.md). Remove the visible “Tabbed Editor” title and move passive editor and generation messages into Global Messages.
 
 ## Owner decision

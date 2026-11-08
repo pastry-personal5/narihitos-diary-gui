@@ -10,6 +10,7 @@ import generate from "../assets/toolbar/generate.png";
 import jumpToLatest from "../assets/controls/jump-to-latest.png";
 import draft from "../assets/controls/draft.png";
 import entry from "../assets/controls/entry.png";
+import close from "../assets/controls/close.png";
 
 const ICONS = {
   createEmpty,
@@ -23,6 +24,7 @@ const ICONS = {
   jumpToLatest,
   draft,
   entry,
+  close,
 };
 
 /** Toolbar and pane actions share distinct app-owned bitmap masks. */
