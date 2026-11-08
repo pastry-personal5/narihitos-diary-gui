@@ -7,6 +7,9 @@ import trashRecovery from "../assets/toolbar/trash-recovery.png";
 import aiActivities from "../assets/toolbar/ai-activities.png";
 import save from "../assets/toolbar/save.png";
 import generate from "../assets/toolbar/generate.png";
+import jumpToLatest from "../assets/controls/jump-to-latest.png";
+import draft from "../assets/controls/draft.png";
+import entry from "../assets/controls/entry.png";
 
 const ICONS = {
   createEmpty,
@@ -17,9 +20,12 @@ const ICONS = {
   aiActivities,
   save,
   generate,
+  jumpToLatest,
+  draft,
+  entry,
 };
 
-/** Main Toolbar Strip actions always use distinct app-owned bitmap masks. */
+/** Toolbar and pane actions share distinct app-owned bitmap masks. */
 export function ToolbarButton({
   action,
   label,

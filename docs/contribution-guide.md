@@ -20,7 +20,7 @@ cargo run --manifest-path src-tauri/Cargo.toml -p diary-server -- --config /abso
 npm run tauri dev -- -- --connect /absolute/private/runtime/WORKSPACE_KEY/discovery.json
 ```
 
-The client opens every component of the `--connect` path without following symlinks. A symlinked component (for example `~/work` pointing at a volume) fails with `discovery_unavailable`; pass the `realpath`. `run-gui.sh` and `make gui` do this.
+The client opens every component of the `--connect` path without following symlinks. A symlinked component (for example `~/work` pointing at a volume) fails with `discovery_unavailable`; pass the `realpath`. `run-gui.sh` and `make gui` do this. `run-gui.sh` isolates its development process group and cleans up npm, Tauri, Cargo and Vite after the client exits; TERM is followed by KILL after a two-second grace period if needed. Closing the main window preserves save/session acknowledgement before exiting the app. The independently launched server is unaffected. Launcher INT/TERM/HUP also clean up its owned group; forced interruption can lose client-only edits.
 
 The server prints only the discovery path. Do not print or copy discovery contents: they contain a credential. The [configuration contract](architecture/configuration-and-exports.md#configuration-schema-and-validation) defines private permissions and roots. On start the server initializes an empty `paths.entries_root` (private `.diary` with the lock, `state.sqlite3` and `workspace.json`) and reopens an initialized one. A folder that has files but no `.diary`, or unexpected files in `.diary`, is refused or reported `inspection_required` without modification; a lost or damaged database starts in read-only `recovery` mode (`storage_ready` false). Never point `entries_root` at a folder you have not inspected, and never delete `.diary` files to "fix" recovery. Sources, durable saves, agents and exports remain unavailable; the editor is disposable scratch text.
 
@@ -110,7 +110,7 @@ Smoke tests and the log trace tool: [docs/smoke-tests.md](smoke-tests.md).
 
 ## Agent and code conventions
 
-- Main Toolbar Strip actions must use `ToolbarButton` with a distinct custom PNG per action, an accessible name and a tooltip. Preserve shortcut hints, pending labels and disabled reasons. Regenerate app-owned toolbar masks with `python3 scripts/draw-toolbar-icons.py` (standard library only); do not substitute native symbols or reuse another action’s icon.
+- Main Toolbar Strip actions must use `ToolbarButton` with a distinct custom PNG per action, an accessible name and a tooltip. Preserve shortcut hints, pending labels and disabled reasons. Regenerate app-owned toolbar, pane control and calendar navigation masks with `python3 scripts/draw-toolbar-icons.py` (standard library only); do not substitute native symbols or reuse another action’s icon.
 
 - Format with `cargo fmt` and `prettier`; do not hand-format.
 - Keep `cargo clippy -D warnings` and `eslint --max-warnings 0` clean.

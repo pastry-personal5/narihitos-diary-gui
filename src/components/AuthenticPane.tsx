@@ -2,6 +2,7 @@ import type { Messages } from "../application/navigation/messages";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Action } from "../application/authentic/saveQueue";
 import type { SessionView } from "../application/authentic/session";
+import { ToolbarButton } from "./ToolbarButton";
 
 /** The Tabbed Editor: Draft and Entry are two labels over the same buffer, so switching keeps edits. */
 export function AuthenticPane({
@@ -49,13 +50,14 @@ export function AuthenticPane({
       <div className="pane-heading">
         <div role="group" aria-label="Authentic views">
           {(["Draft", "Entry"] as const).map((name) => (
-            <button
+            <ToolbarButton
               key={name}
+              action={name === "Draft" ? "draft" : "entry"}
+              label={name}
+              title={name}
               aria-pressed={label === name}
               onClick={() => setLabel(name)}
-            >
-              {name}
-            </button>
+            />
           ))}
         </div>
         <span>

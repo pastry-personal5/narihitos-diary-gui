@@ -102,7 +102,8 @@ p {
   gap: 6px;
   min-width: 0;
 }
-.toolbar-button {
+.toolbar-button,
+.calendar-month-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -114,19 +115,23 @@ p {
   border-radius: 10px;
   background: transparent;
 }
-.toolbar-button .bitmap-icon {
+.toolbar-button .bitmap-icon,
+.calendar-month-button .bitmap-icon {
   width: 24px;
   height: 24px;
 }
-.toolbar-button:hover:not(:disabled) {
+.toolbar-button:hover:not(:disabled),
+.calendar-month-button:hover:not(:disabled) {
   background: var(--surface);
   color: var(--on-accent);
 }
-.toolbar-button:active:not(:disabled) {
+.toolbar-button:active:not(:disabled),
+.calendar-month-button:active:not(:disabled) {
   background: var(--accent-fill);
   color: var(--on-accent);
 }
-.toolbar-button:disabled {
+.toolbar-button:disabled,
+.calendar-month-button:disabled {
   background: transparent;
   opacity: 0.5;
 }
@@ -285,6 +290,9 @@ footer {
   font-size: 12px;
   color: var(--muted);
 }
+.pane-heading .toolbar-button .bitmap-icon {
+  color: inherit;
+}
 .notice {
   margin: 0;
   padding: 12px 20px;
@@ -381,10 +389,14 @@ footer {
 }
 .calendar-heading {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   margin-top: 10px;
+}
+.calendar-heading strong {
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 .calendar-grid {
   display: grid;

@@ -736,9 +736,11 @@ fn main() {
                     let _ = webview.eval("document.querySelector('.cm-content')?.focus()");
                 }
             }
-            #[cfg(feature = "scaffold-smoke")]
             if matches!(event, tauri::WindowEvent::Destroyed) {
+                #[cfg(feature = "scaffold-smoke")]
                 eprintln!("SMOKE main_window_destroyed");
+                // Main-window destruction follows the acknowledged close above. Exit even
+                // if auxiliary windows remain so the dev CLI can stop its frontend tree.
                 window.app_handle().exit(0);
             }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

@@ -15,3 +15,9 @@ P1-M2 owns architecture clarifications, review/interviews and background-AI desi
 P1-M29 is Done (2026-11-08): all recorded requests, the full gate, browser visual checks and live Notion heading/reorder proof pass; see the [M29 checklist](archive/milestones/p1-m29/milestone-29-owner-requested-revisions-overview.md).
 
 P1-M29’s owner-requested [editor messages follow-up](phase-1/milestone-29-editor-messages-overview.md) is Done (2026-11-08): focused UI tests and all seven gate commands pass; later milestones remain Planned.
+
+P1-M29’s custom month navigation bitmap follow-up is Done (2026-11-08), with all seven gate commands passing; see the [follow-up checklist](phase-1/milestone-29-editor-messages-overview.md#month-navigation-bitmap-follow-up-2026-11-08). Later milestones remain Planned.
+
+P1-M29’s Jump to latest, Draft and Entry bitmap follow-up is Done (2026-11-08), with all seven gate commands passing; see the [follow-up checklist](phase-1/milestone-29-editor-messages-overview.md#message-and-editor-bitmap-follow-up-2026-11-08). Later milestones remain Planned.
+
+P1-M29’s GUI process cleanup follow-up is Done (2026-11-08), with synthetic process regressions, ordinary native close proof and all seven gate commands passing; see the [follow-up checklist](phase-1/milestone-29-editor-messages-overview.md#gui-process-cleanup-follow-up-2026-11-08). Later milestones remain Planned.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draw the original toolbar PNG masks with only the Python standard library.
+"""Draw the original app PNG masks with the Python standard library.
 
 24-unit geometry is rasterized at 4x with antialiased, round-ended strokes.
 These app-owned drawings contain no font glyphs or third-party icon artwork.
@@ -58,6 +58,24 @@ ICONS = {
     "generate": star(10, 14, 7) + star(19, 5, 3) + star(20, 19, 2),
 }
 
+NAVIGATION_ICONS = {
+    "previous-month": path((15, 5), (8, 12), (15, 19)),
+    "next-month": path((9, 5), (16, 12), (9, 19)),
+}
+
+CONTROL_ICONS = {
+    "jump-to-latest": path((12, 3), (12, 16))
+        + path((7, 11), (12, 16), (17, 11))
+        + path((5, 20), (19, 20)),
+    "draft": path((12, 3), (4, 3), (4, 21), (14, 21))
+        + path((10, 17), (11, 12), (19, 4), (22, 7), (14, 15), (10, 17))
+        + path((17, 6), (20, 9)),
+    "entry": path((13, 3), (4, 3), (4, 21), (20, 21), (20, 10))
+        + path((8, 8), (11, 8)) + path((8, 13), (11, 13))
+        + path((8, 17), (16, 17))
+        + path((14, 7), (17, 10), (22, 4)),
+}
+
 
 def distance(x, y, a, b):
     dx, dy = b[0]-a[0], b[1]-a[1]
@@ -86,3 +104,11 @@ if __name__ == '__main__':
     ROOT.mkdir(parents=True, exist_ok=True)
     for name, segments in ICONS.items():
         (ROOT / f'{name}.png').write_bytes(draw(segments))
+    navigation = ROOT.parent / 'navigation'
+    navigation.mkdir(parents=True, exist_ok=True)
+    for name, segments in NAVIGATION_ICONS.items():
+        (navigation / f'{name}.png').write_bytes(draw(segments))
+    controls = ROOT.parent / 'controls'
+    controls.mkdir(parents=True, exist_ok=True)
+    for name, segments in CONTROL_ICONS.items():
+        (controls / f'{name}.png').write_bytes(draw(segments))

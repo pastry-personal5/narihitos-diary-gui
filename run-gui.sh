@@ -26,4 +26,30 @@ fi
 # The client rejects symlinked path components, so pass the canonical path.
 DISCOVERY=$(realpath "${DISCOVERY}")
 export DIARY_LOG=debug # connection-stage records; read with: diary-server trace --select debug:50
-exec npm run tauri dev -- -- -- --connect "${DISCOVERY}"
+
+# Job control gives this launch its own process group, including npm, Tauri,
+# Cargo and the frontend server. Never match process names or kill the server.
+set -m
+GUI_PID=
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM HUP
+  if [[ -n "${GUI_PID}" ]]; then
+    kill -TERM -- "-${GUI_PID}" 2>/dev/null || true
+    # Give normal handlers time to drain; escalate only within our own group.
+    for ((attempt = 0; attempt < 40; attempt++)); do
+      kill -0 -- "-${GUI_PID}" 2>/dev/null || break
+      sleep 0.05
+    done
+    kill -KILL -- "-${GUI_PID}" 2>/dev/null || true
+    wait "${GUI_PID}" 2>/dev/null || true
+  fi
+  exit "${status}"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+npm run tauri -- dev --exit-on-panic -- -- --connect "${DISCOVERY}" &
+GUI_PID=$!
+wait "${GUI_PID}"

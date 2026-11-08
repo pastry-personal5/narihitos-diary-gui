@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Messages } from "../application/navigation/messages";
+import { ToolbarButton } from "./ToolbarButton";
 export function GlobalMessages({
   messages,
   height,
@@ -25,7 +26,14 @@ export function GlobalMessages({
     <section aria-label="Global Messages" style={{ height }}>
       <div className="messages-heading">
         <h2>Global Messages</h2>
-        {away && <button onClick={jump}>Jump to latest</button>}
+        {away && (
+          <ToolbarButton
+            action="jumpToLatest"
+            label="Jump to latest"
+            title="Jump to latest"
+            onClick={jump}
+          />
+        )}
       </div>
       {messages.removed > 0 && (
         <p>{messages.removed} older session messages removed.</p>

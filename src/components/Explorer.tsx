@@ -4,6 +4,8 @@ import dateIcon from "../assets/tab-date.png";
 import snippetIcon from "../assets/tab-snippet.png";
 import draftIcon from "../assets/tab-draft.png";
 import entryIcon from "../assets/tab-entry.png";
+import previousMonthIcon from "../assets/navigation/previous-month.png";
+import nextMonthIcon from "../assets/navigation/next-month.png";
 import { snippetLabels } from "../application/navigation/snippet-label";
 import { SymbolLabel } from "./Symbol";
 import { SnippetTable } from "./SnippetTable";
@@ -102,23 +104,45 @@ export function Explorer({
             <>
               <div className="calendar-heading">
                 <button
+                  type="button"
+                  className="calendar-month-button"
+                  aria-label="Previous month"
+                  title="Previous month"
                   disabled={!calendar.previous_month}
                   onClick={() =>
                     void model.browse(calendar.anchor, "previous_month")
                   }
                 >
-                  Previous month
+                  <span
+                    aria-hidden="true"
+                    className="bitmap-icon"
+                    style={{
+                      maskImage: `url(${previousMonthIcon})`,
+                      WebkitMaskImage: `url(${previousMonthIcon})`,
+                    }}
+                  />
                 </button>
                 <strong>
                   {calendar.year}-{String(calendar.month).padStart(2, "0")}
                 </strong>
                 <button
+                  type="button"
+                  className="calendar-month-button"
+                  aria-label="Next month"
+                  title="Next month"
                   disabled={!calendar.next_month}
                   onClick={() =>
                     void model.browse(calendar.anchor, "next_month")
                   }
                 >
-                  Next month
+                  <span
+                    aria-hidden="true"
+                    className="bitmap-icon"
+                    style={{
+                      maskImage: `url(${nextMonthIcon})`,
+                      WebkitMaskImage: `url(${nextMonthIcon})`,
+                    }}
+                  />
                 </button>
               </div>
               <div
