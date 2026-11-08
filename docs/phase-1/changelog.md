@@ -10,6 +10,8 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-08 — owner/agent, P1-M29 T25 — Removed the active-view heading below the Explorer icons for Date, Snippet, Draft and Entry; icon tooltips, accessible names and selected state remain.
+
 - 2026-11-08 — owner, P1-M29 T21 — Move the connection status and Connect button from the toolbar to a new Settings > Server category; preserve background connection and reconnection.
 
 - 2026-11-07 — owner, Notion export reorders out-of-order days automatically (P1-M29 T17–T19) — With no prompt, `apply` moves misplaced day headings into ascending order (copy, verify digest, then delete the original; moved days get new block IDs). Formatted text, foreign blocks, legacy toggles and differing duplicate days refuse before any write; an interrupted move is cleaned up by the next export only when its leftover is an identical copy or a bare heading; other leftovers stay a structural conflict for hand repair.

@@ -73,7 +73,6 @@ export function Explorer({
           </button>
         ))}
       </div>
-      <h3>{view}</h3>
       {view === "Date tab" && (
         <>
           <label>

@@ -104,6 +104,8 @@ None yet.
 
 - [x] T24 `[bug]` - Add typed generation preparation/admission diagnostics with stage, count and closed error tags. Evidence: controller tests (25 pass) verify stages, failure tags, redaction and nonblocking diagnostic rejection; native diagnostic tests validate allowlists and reject private fields. Logging/contribution docs updated; full `scripts/gate.sh` G01–G07 pass (2026-11-08; local TCP fixtures outside the sandbox).
 
+- [x] T25 `[gui]` - Remove the active view heading (Date tab, Snippet tab, Draft tab and Entry tab) below the Explorer icons; retain icon tooltips, accessible names and selected state. Evidence: `src/components/Explorer.tsx` diff; gate G01, G02 and G04–G07 pass; G03 passes on rerun outside the sandbox for local TCP fixtures (2026-11-08).
+
 ### Proof and docs
 
 - [x] Z01 - Full gate (`scripts/gate.sh`) passes (2026-11-07): G01–G07 all exit 0. Fixes made on the way: `cargo fmt --all` on `diary-logging` `codec.rs`/`codec/tests.rs` (formatting only; the architecture test checks all workspace members) and the T11 default in `tests/accessibility.test.tsx`.
