@@ -83,7 +83,7 @@ struct Job {
     expected: Observation,
 }
 
-struct Inner {
+struct ExportCoordinatorState {
     db: Arc<Db>,
     identity: Identity,
     authentic: Arc<dyn AuthenticStore>,
@@ -99,16 +99,16 @@ struct Inner {
 }
 
 #[derive(Clone)]
-pub struct Service(Arc<Inner>);
+pub struct ExportCoordinator(Arc<ExportCoordinatorState>);
 
-impl Service {
+impl ExportCoordinator {
     pub fn new(
         db: Arc<Db>,
         identity: Identity,
         authentic: Arc<dyn AuthenticStore>,
         adapters: Vec<Arc<dyn ExportAdapter>>,
     ) -> Self {
-        Self(Arc::new(Inner {
+        Self(Arc::new(ExportCoordinatorState {
             db,
             identity,
             authentic,
@@ -133,7 +133,7 @@ impl Service {
     }
 }
 
-impl Inner {
+impl ExportCoordinatorState {
     fn hit(&self, point: &str) -> Result<(), ExportError> {
         #[cfg(any(test, feature = "fault-injection"))]
         {
@@ -256,7 +256,7 @@ impl Inner {
     }
 }
 
-impl Exports for Service {
+impl Exports for ExportCoordinator {
     fn available(&self, target: Target) -> bool {
         self.0.adapter(target).is_ok() && self.0.ready.load(Ordering::SeqCst)
     }

@@ -5,7 +5,6 @@ use crate::config::Profile;
 use diary_application::agent::{AgentKind, ProfileHandle};
 
 pub mod apple;
-pub mod assets;
 pub mod claude;
 pub mod codex;
 pub mod engine;
@@ -14,6 +13,7 @@ pub mod output;
 pub mod packet;
 pub mod process;
 pub mod profiles;
+pub mod prompts;
 pub mod qwen;
 pub mod registry;
 

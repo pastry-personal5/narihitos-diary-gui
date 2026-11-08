@@ -42,16 +42,22 @@ enum Mode_ {
     Fail(AgentErrorCode),
 }
 struct Runner(Mode_);
+impl PromptResolver for Runner {
+    fn resolve(&self, selection: PromptSelection) -> Result<ResolvedPrompt, AgentError> {
+        Ok(crate::test_prompts::definition(selection))
+    }
+}
 impl AgentRunner for Runner {
     fn check(&self, _: &ProfileHandle) -> ProfileCheck {
         unreachable!("not used")
     }
-    fn run(
+    fn run_prepared(
         &self,
-        request: AgentRequest,
+        prepared: PreparedAgentRun,
         events: &mut dyn EventSink,
         cancel: &CancelToken,
     ) -> Result<AgentOutput, AgentError> {
+        let request = prepared.into_request();
         if matches!(self.0, Mode_::NoDelta) {
             return Ok(AgentOutput::Reply("final without streaming".into()));
         }
@@ -365,4 +371,75 @@ async fn no_delta_adapter_finishes_without_fabricating_agent_activity() {
     .await;
     let (_, after) = call(&s, "GET", &format!("/api/v1/jobs/{job}"), None).await;
     assert_eq!(after["progress"], projection["progress"]);
+}
+
+struct RevisionRunner(std::sync::atomic::AtomicUsize);
+impl PromptResolver for RevisionRunner {
+    fn resolve(&self, selection: PromptSelection) -> Result<ResolvedPrompt, AgentError> {
+        Ok(crate::test_prompts::definition_at(
+            selection,
+            if self.0.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+                'a'
+            } else {
+                'b'
+            },
+        ))
+    }
+}
+impl AgentRunner for RevisionRunner {
+    fn check(&self, _: &ProfileHandle) -> ProfileCheck {
+        ProfileStatus::Ready.into()
+    }
+    fn run_prepared(
+        &self,
+        prepared: PreparedAgentRun,
+        _: &mut dyn EventSink,
+        _: &CancelToken,
+    ) -> Result<AgentOutput, AgentError> {
+        // Replace the resolver while the current prepared turn is still running.
+        self.0.store(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(AgentOutput::Reply(prepared.task().into()))
+    }
+}
+#[tokio::test]
+async fn chat_retains_current_turn_definition_and_resolves_again_for_next_turn() {
+    let mut s = setup(Mode_::Reply);
+    ServerState::set_agent_runner(&mut s, Arc::new(RevisionRunner(Default::default())));
+    let chat = open(&s).await;
+    assert_eq!(send(&s, &chat, "r1", "first").await.0, StatusCode::ACCEPTED);
+    let first = until(&s, &chat, "done").await;
+    assert!(first.to_string().contains("fixture:a"));
+    assert_eq!(
+        s.chat
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .turn()
+            .unwrap()
+            .prompt
+            .revision
+            .as_str(),
+        "a".repeat(64)
+    );
+    assert_eq!(
+        send(&s, &chat, "r2", "second").await.0,
+        StatusCode::ACCEPTED
+    );
+    let second = until(&s, &chat, "done").await;
+    assert!(second.to_string().contains("fixture:b"));
+    assert_eq!(
+        s.chat
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .turn()
+            .unwrap()
+            .prompt
+            .revision
+            .as_str(),
+        "b".repeat(64)
+    );
+    assert!(second.get("prompt").is_none());
 }

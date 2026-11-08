@@ -1,5 +1,6 @@
 """P1-M17..P1-M23: embedded assets, profile status and generation on the built server.
 Only fake CLIs run inference-shaped fixtures; Apple is checked without inference."""
+from isolation import server_configuration
 import json
 import os
 from pathlib import Path
@@ -61,7 +62,7 @@ esac
     file.parent.mkdir(parents=True)
     file.write_text('---\nid: "2026-11-06_00-00-00-123"\ncreated_at: "2026-11-06T00:00:00.123Z"\ntags: []\n---\n' + SOURCE_SECRET + '. I had tea.\n')
     config = base / 'config.yaml'
-    config.write_text(
+    config.write_text(server_configuration() +
         f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\n'
         f'sources:\n  - {{alias: smoke-readable, type: ayumi, root: {source}}}\n'
         f'agents:\n  profiles:\n'

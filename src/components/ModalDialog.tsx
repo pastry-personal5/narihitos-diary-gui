@@ -53,7 +53,7 @@ export function ModalDialog({
           invoker?.isConnected && !invoker.matches(":disabled")
             ? invoker
             : document.querySelector<HTMLElement>(
-                '[aria-label="Explorer views"] [aria-pressed="true"]',
+                '[aria-label="Explorer tabs"] [aria-pressed="true"]',
               );
         target?.focus();
       });

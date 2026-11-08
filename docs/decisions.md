@@ -6,6 +6,8 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 ## Decided
 
+- **M30 refactoring and Phase 2 prompts (owner, 2026-11-08):** Broad refactoring, directory/module/function/variable renames and incompatible API changes are authorized for M30; align represented UI concepts with canonical UX terms. Multiple-prompt management and evaluation belong to Phase 2 / Diary v2.0.0. M30 prepares immutable prompt identity/resolution and execution boundaries while preserving v1 product semantics. This supersedes M28's compatibility restrictions for M30; dependency/build-tool changes and deletion of user data still require separate authorization. Delivered 2026-11-09 with the full gate and affected synthetic/native smokes passing; packaged release evidence remains M32. See the [M30 acceptance record](archive/milestones/p1-m30/milestone-30-refactoring-overview.md).
+
 - **Snippet detail Close (owner, 2026-11-08):** Place a custom bitmap Close button at the top right of the source snippet detail overlay. Preserve modal keyboard dismissal and focus behavior. See [UX behavior](ux-gui.md).
 
 - **Automatic server reconnection (owner, 2026-11-08):** Connect immediately after frontend reload and retry failed connections promptly, with a one-second retry cap and activation/network recovery triggers. Preserve native lease reuse, single-client ownership and discovery validation. Fresh-launch review retains the immediate attempt under Strict Mode and reports connected only after initialization completes; early resync cannot bypass readiness.
@@ -22,9 +24,9 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 - **Chat reset (owner, 2026-11-08):** Replace New chat with the local `/clear` command and remove the composer placeholder and empty-message warning. Preserve the active-turn reset guard.
 
-- **Toolbar save status (owner, 2026-11-08):** Remove the top-right save-status text; save notifications use Global Messages. See the [follow-up checklist](phase-1/milestone-29-editor-messages-overview.md#toolbar-save-status-follow-up-2026-11-08).
+- **Toolbar save status (owner, 2026-11-08):** Remove the top-right save-status text; save notifications use Global Messages. See the [follow-up checklist](archive/milestones/p1-m29/milestone-29-editor-messages-overview.md#toolbar-save-status-follow-up-2026-11-08).
 
-- **Editor messages (owner, 2026-11-08):** Remove the visible “Tabbed Editor” title, retaining its accessible region name. Generation configuration, blockers, adjacent-date warnings and passive editor/candidate notices belong in Global Messages. Keep editing, retry/cancel, review/discard and save-conflict recovery controls available. See the [follow-up checklist](phase-1/milestone-29-editor-messages-overview.md).
+- **Editor messages (owner, 2026-11-08):** Remove the visible “Tabbed Editor” title, retaining its accessible region name. Generation configuration, blockers, adjacent-date warnings and passive editor/candidate notices belong in Global Messages. Keep editing, retry/cancel, review/discard and save-conflict recovery controls available. See the [follow-up checklist](archive/milestones/p1-m29/milestone-29-editor-messages-overview.md).
 
 - **Settings categories (owner, 2026-11-08, P1-M29 T26):** Server owns connection and configuration reload; Sources owns source availability and revealing the active configuration folder in Finder; AI Agents owns agent status and separate Chat/Generation profile cards. The native Finder action accepts no path from the webview and returns no private path to it.
 

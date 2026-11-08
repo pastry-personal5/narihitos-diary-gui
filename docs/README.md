@@ -115,4 +115,6 @@ This index lists the design and process docs, one line each. Read only the doc y
 | [phase-1/milestone-22-candidate-generation-overview.md](archive/milestones/p1-m22/milestone-22-candidate-generation-overview.md) | P1-M22 completed checklist, final gate, fake-child and live evidence; Qwen exempt |
 | [phase-1/milestone-22-candidate-generation-architecture.md](archive/milestones/p1-m22/milestone-22-candidate-generation-architecture.md) | P1-M22 work plan: generation service, candidate store, routes, UI findings, decisions, tests |
 
-- P1-M29 editor messages follow-up: [overview](phase-1/milestone-29-editor-messages-overview.md), [work plan](phase-1/milestone-29-editor-messages-architecture.md).
+- P1-M29 editor messages follow-up: [overview](archive/milestones/p1-m29/milestone-29-editor-messages-overview.md), [work plan](archive/milestones/p1-m29/milestone-29-editor-messages-architecture.md).
+
+- P1-M30 refactoring (Done): [overview/checklist](archive/milestones/p1-m30/milestone-30-refactoring-overview.md), [work plan](archive/milestones/p1-m30/milestone-30-refactoring-architecture.md). Canonical UX naming, state/lifecycle boundaries and prompt preparation for Phase 2 / v2.0.0.

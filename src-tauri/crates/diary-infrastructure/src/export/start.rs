@@ -1,7 +1,7 @@
 //! Export start: admission, step tokens and re-preview.
 use super::*;
 
-impl Inner {
+impl ExportCoordinatorState {
     /// A new step on an existing operation; the input hash is the operation's.
     pub(super) fn step(
         &self,

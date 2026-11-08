@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { PreviewBuffer } from "../src/application/activity/preview";
+import { PreviewBuffer } from "../src/application/ai-activities/preview";
 afterEach(() => vi.useRealTimers());
 it("bounds visible flooding to ten publications per second and clears terminal text immediately", async () => {
   vi.useFakeTimers();

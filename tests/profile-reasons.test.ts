@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { PROFILE_STATUS_REASONS, profileDto } from "../src/adapters/validation";
-import { PROFILE_STATUS_REASON_TEXT } from "../src/components/useProfiles";
+import { PROFILE_STATUS_REASON_TEXT } from "../src/application/ai-agents/presentation";
 
 // The Rust test `api_visible_reasons_match_the_shared_list` ties this file to the server's set.
 const shared: string[] = JSON.parse(

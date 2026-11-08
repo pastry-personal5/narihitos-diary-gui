@@ -1,5 +1,8 @@
 //! Events, outputs, the runner port and the cancel-epoch run guard.
-use super::{AgentError, AgentErrorCode, AgentRequest, ProfileCheck, ProfileHandle};
+use super::{
+    AgentError, AgentErrorCode, AgentRequest, PreparedAgentRun, ProfileCheck, ProfileHandle,
+    PromptResolver, PromptSelection,
+};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -55,15 +58,28 @@ impl CancelToken {
     }
 }
 
-pub trait AgentRunner {
+pub trait AgentRunner: PromptResolver {
     /// Non-inference check; adapters bound it to 5 seconds.
     fn check(&self, profile: &ProfileHandle) -> ProfileCheck;
+    fn run_prepared(
+        &self,
+        prepared: PreparedAgentRun,
+        events: &mut dyn EventSink,
+        cancel: &CancelToken,
+    ) -> Result<AgentOutput, AgentError>;
+    /// Standalone invocation without a GUI/session. Admitted jobs use captured definitions instead.
     fn run(
         &self,
         request: AgentRequest,
         events: &mut dyn EventSink,
         cancel: &CancelToken,
-    ) -> Result<AgentOutput, AgentError>;
+    ) -> Result<AgentOutput, AgentError> {
+        if cancel.is_cancelled() {
+            return Err(AgentErrorCode::Cancelled.into());
+        }
+        let prompt = self.resolve(PromptSelection::for_request(&request))?;
+        self.run_prepared(prompt.prepare(request)?, events, cancel)
+    }
 }
 
 /// One admitted run. Cancellation commits once; afterwards events drop and success cannot win.

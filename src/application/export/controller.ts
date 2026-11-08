@@ -124,10 +124,6 @@ export class ExportController {
     this.disposed = true;
     this.stopTicker();
   }
-  /** Undoes `dispose`: StrictMode runs an effect's cleanup and then its setup again. */
-  revive() {
-    this.disposed = false;
-  }
   private stopTicker() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;

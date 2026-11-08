@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 import { render, act, cleanup } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
-import { ActivityFeedback } from "../src/components/ActivityFeedback";
-import { ActivityStore } from "../src/application/activity/store";
-import { Messages } from "../src/application/navigation/messages";
-import type { ChatController } from "../src/application/chat";
+import { AIActivityFeedback } from "../src/components/ai-activities/AIActivityFeedback";
+import { AIActivitiesStore } from "../src/application/ai-activities/store";
+import { GlobalMessagesStore } from "../src/application/global-messages/store";
+import type { AIChatController } from "../src/application/ai-chat/controller";
 import type { GenerationController } from "../src/application/generation/controller";
 import { generationView } from "./generation-fixtures";
 afterEach(cleanup);
 it("restores silently and announces a later terminal transition once without tick noise", () => {
-  const activity = new ActivityStore(),
-    messages = new Messages();
+  const activity = new AIActivitiesStore(),
+    messages = new GlobalMessagesStore();
   const v = generationView(),
     job = { ...v.job, progress: v.progress };
   const snapshot = (jobs: (typeof job)[]) =>
@@ -30,10 +30,10 @@ it("restores silently and announces a later terminal transition once without tic
   const chat = {
     subscribe,
     state: { submitting: false },
-  } as unknown as ChatController;
+  } as unknown as AIChatController;
   snapshot([job]);
   render(
-    <ActivityFeedback
+    <AIActivityFeedback
       activity={activity}
       messages={messages}
       generator={generator}
@@ -57,8 +57,8 @@ it("restores silently and announces a later terminal transition once without tic
 });
 
 it("announces waiting and cancellation once without repeated silence ticks", () => {
-  const activity = new ActivityStore(),
-    messages = new Messages(),
+  const activity = new AIActivitiesStore(),
+    messages = new GlobalMessagesStore(),
     v = generationView();
   const job = { ...v.job, progress: { ...v.progress, silence_ms: 0 } };
   activity.event({
@@ -77,9 +77,9 @@ it("announces waiting and cancellation once without repeated silence ticks", () 
   const chat = {
     subscribe,
     state: { submitting: false },
-  } as unknown as ChatController;
+  } as unknown as AIChatController;
   render(
-    <ActivityFeedback
+    <AIActivityFeedback
       activity={activity}
       messages={messages}
       generator={generator}
@@ -118,8 +118,8 @@ it("announces waiting and cancellation once without repeated silence ticks", () 
 });
 
 it("reports generation preparation and admission failures once in Global Messages", () => {
-  const activity = new ActivityStore(),
-    messages = new Messages();
+  const activity = new AIActivitiesStore(),
+    messages = new GlobalMessagesStore();
   const subscribe = () => () => {};
   const generator = {
     subscribe,
@@ -128,14 +128,14 @@ it("reports generation preparation and admission failures once in Global Message
   const chat = {
     subscribe,
     state: { submitting: false },
-  } as unknown as ChatController;
+  } as unknown as AIChatController;
   const props = { activity, messages, generator, chat };
-  const view = render(<ActivityFeedback {...props} />);
+  const view = render(<AIActivityFeedback {...props} />);
   expect(messages.items).toHaveLength(1);
   expect(messages.items[0]).toMatchObject({
     severity: "error",
     text: "The selected sources changed. Refresh the import and confirm your selection.",
   });
-  view.rerender(<ActivityFeedback {...props} />);
+  view.rerender(<AIActivityFeedback {...props} />);
   expect(messages.items).toHaveLength(1);
 });

@@ -45,17 +45,21 @@ pub struct Selection {
 
 /// Body-bearing context intentionally has no Debug implementation.
 #[derive(Clone)]
-pub struct Frozen {
+pub struct GenerationContext {
     date: DiaryDate,
     profile: ProfileHandle,
+    prompt: ResolvedPrompt,
     locale: Locale,
     count: u8,
     baseline: Option<AuthenticRevision>,
     items: Vec<SnippetItem>,
 }
-impl Frozen {
+impl GenerationContext {
     pub fn date(&self) -> DiaryDate {
         self.date
+    }
+    pub fn prompt(&self) -> &ResolvedPrompt {
+        &self.prompt
     }
     pub fn profile(&self) -> &ProfileHandle {
         &self.profile
@@ -79,6 +83,7 @@ impl Frozen {
     }
     fn bytes(&self) -> usize {
         HEADER_BYTES
+            + self.prompt.retained_bytes()
             + self
                 .items
                 .iter()
@@ -94,6 +99,7 @@ impl Frozen {
     }
 }
 pub struct Capture {
+    pub prompt: ResolvedPrompt,
     pub date: DiaryDate,
     pub selections: Vec<Selection>,
     pub profile: ProfileHandle,
@@ -108,7 +114,15 @@ pub fn capture(
     imports: &dyn ImportStore,
     authentic: &dyn AuthenticStore,
     cancelled: &dyn Fn() -> bool,
-) -> Result<Frozen, Error> {
+) -> Result<GenerationContext, Error> {
+    if input.prompt.selection()
+        != (PromptSelection {
+            provider: input.profile.kind,
+            action: PromptAction::GenerateCandidate,
+        })
+    {
+        return Err(Error::ProfileNotReady);
+    }
     if !(1..=5).contains(&input.count) {
         return Err(Error::InvalidInput);
     }
@@ -229,7 +243,8 @@ pub fn capture(
     if cancelled() {
         return Err(Error::Unavailable);
     }
-    Ok(Frozen {
+    Ok(GenerationContext {
+        prompt: input.prompt,
         date: input.date,
         profile: input.profile,
         locale: input.locale,
@@ -261,7 +276,7 @@ pub struct Generation {
     pub job_id: String,
     pub request_id: String,
     pub session: String,
-    pub context: Frozen,
+    pub context: GenerationContext,
     pub run: Run,
     pub shared: crate::run::Shared,
     pub slots: Vec<Slot>,
@@ -339,7 +354,7 @@ impl Store {
         &mut self,
         coordinator: &mut Coordinator,
         a: Admission<'_>,
-        frozen: Frozen,
+        frozen: GenerationContext,
     ) -> Result<(Job, Shared), Error> {
         if let Some(job) = coordinator.lookup_request(a.session, a.now, a.request_id, a.digest)? {
             let existing = self.get(a.session, &job.id).ok_or(Error::NotFound)?;
@@ -476,14 +491,21 @@ pub fn execute(
                     },
                 );
                 *g.shared.lock().expect("snapshot poisoned") = crate::run::Snapshot::default();
-                Some((request, Run::from(g.run.token()), g.shared.clone()))
+                Some((
+                    request,
+                    g.context.prompt.clone(),
+                    Run::from(g.run.token()),
+                    g.shared.clone(),
+                ))
             }
         };
-        let Some((request, run, shared)) = next else {
+        let Some((request, prompt, run, shared)) = next else {
             break;
         };
         notify();
-        let result = crate::run::execute(runner, request, &run, &shared, clock, notify);
+        let result = prompt.prepare(request).and_then(|prepared| {
+            crate::run::execute(runner, prepared, &run, &shared, clock, notify)
+        });
         {
             let mut g = generation.lock().expect("generation poisoned");
             let result = if g.cancellation_requested() {

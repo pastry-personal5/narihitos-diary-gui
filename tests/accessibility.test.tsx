@@ -9,7 +9,6 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { App } from "../src/components/App";
-import { today } from "../src/components/useAuthentic";
 import type { Bridge } from "../src/application/bridge";
 import { navigationFake } from "./navigation-fake";
 import { settingsFake } from "./settings-fake";
@@ -24,7 +23,11 @@ const status = {
   capabilities: ["status", "sessions", "jobs", "events"],
 };
 afterEach(cleanup);
-// Snippets default to included only on the selected day, which starts as today.
+// Match the synthetic server calendar's civil date; production dates come from the server.
+function today() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
 const local = {
   date: today(),
   datetime: `${today()}T00:00:00`,

@@ -26,11 +26,11 @@ File format: a `---` front matter block with `provider`, `model`, and
   and retry/repair prompts follow this rule. User messages and captured source
   data are request data. Code may define schemas, validate data, load templates,
   and substitute placeholders; it must not contain instruction prose or fallback prompts.
-- Loading lives in `diary-infrastructure` (`agent::assets`). The files are embedded with
+- Loading lives in `diary-infrastructure` (`agent::prompts::{catalog,parser,renderer}`). The files are embedded with
   `include_str!`, so shell launch never depends on the current directory and the loader reads
   no path. Each asset parses on its own; one bad file disables only its action.
-  A future native bridge receives the same asset-derived instructions.
-- Front matter has exactly `provider`, `model` and `reasoning_effort`; unknown or duplicate keys
+  Provider protocols receive prepared task/session parts and effective settings only.
+- Each source asset is bounded to 64 KiB. Front matter has exactly `provider`, `model` and `reasoning_effort`; unknown or duplicate keys
   are malformed. CLI types pass `model` and `reasoning_effort` through unchanged; Apple requires
   `default` / `not-applicable`. Only `{{locale}}` and `{{data}}` are valid. `generate-candidate`
   and `chat` contain `{{data}}` exactly once and `{{locale}}` at least once;
@@ -38,12 +38,37 @@ File format: a `---` front matter block with `provider`, `model`, and
 - Missing or malformed assets produce a typed per-action capability reason
   (`assets_missing`, `assets_invalid`), never a hard-coded prompt or another agent's template.
 
+## Immutable preparation
+
+The application-owned PromptResolver resolves a provider/action bundled default
+to an immutable ResolvedPrompt. Infrastructure hashes length-prefixed exact task
+and optional Apple session bytes (including front matter) into PromptRevision;
+PromptId remains distinct from the provider/profile/model/style. Parsing keeps
+AgentExecutionSettings separate from PromptTemplate content, with asset-only
+precedence and the same verified pins. Rendered task plus session parts are
+bounded to 512 KiB; JSON request packets retain their existing 256 KiB bound and
+single-pass substitution. Oversize input fails without truncation.
+
+A chat turn captures before admission; a generation job captures once for all
+sequential candidates. PreparedAgentRun carries schema versions, request profile,
+locale, provenance, rendered parts and effective settings. Apple session/task
+assets are captured together. Preparation and `run_prepared` can be called
+without a GUI/session; the standalone runner helper uses that same execution
+pipeline. No prompt management, history, persistence or evaluator is exposed.
+See the [maintained architecture](../../docs/architecture/editing-and-agents.md#prompt-assets).
+
+The [pre-M30 render fixture](../../src-tauri/crates/diary-infrastructure/tests/fixtures/prompt-render-baseline.json)
+records independently generated SHA-256/byte-length expectations for every
+embedded part in en-US and ko-KR. Tests compare current rendering, including
+newline normalization; request encoding and fake-provider tests additionally
+exercise complete preparation, cancellation, validation and output bounds.
+
 ## Inventory and acceptance gaps
 
 | Agent type                | Files                                                                                                                                                                                          | Outstanding coverage                                                                                                                       |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `apple-foundation-models` | [generate-candidate.md](apple-foundation-models/generate-candidate.md), [chat.md](apple-foundation-models/chat.md), [session-instructions.md](apple-foundation-models/session-instructions.md) | Native guided output and runtime proof (P1-M20)                                                                                            |
-| `codex`                   | [generate-candidate.md](codex/generate-candidate.md), [chat.md](codex/chat.md)                                                                                                                 | P1-M17 must verify the `gpt-5.6-luna` / `medium` pins before sending anything                                                              |
+| `apple-foundation-models` | [generate-candidate.md](apple-foundation-models/generate-candidate.md), [chat.md](apple-foundation-models/chat.md), [session-instructions.md](apple-foundation-models/session-instructions.md) | P1-M20 runtime proof recorded below; packaged qualification remains P1-M32                                                                 |
+| `codex`                   | [generate-candidate.md](codex/generate-candidate.md), [chat.md](codex/chat.md)                                                                                                                 | `gpt-5.6-luna` / `medium` pins accepted in P1-M17; packaged qualification remains P1-M32                                                   |
 | `claude`                  | [generate-candidate.md](claude/generate-candidate.md), [chat.md](claude/chat.md)                                                                                                               | Pins `claude-sonnet-4-6` / `low` proven by the P1-M18 live run on one installed version                                                    |
 | `qwen`                    | [generate-candidate.md](qwen/generate-candidate.md), [chat.md](qwen/chat.md)                                                                                                                   | Model pin `qwen3.6:35b-a3b` (no effort control; `reasoning_effort: not-applicable`) proven by the P1-M19 live run on one installed version |
 

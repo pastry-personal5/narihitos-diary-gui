@@ -1,5 +1,6 @@
 """Normal-binary HTTP integration after the separate native enablement review."""
 import hashlib
+from isolation import server_configuration
 import json
 import os
 from pathlib import Path
@@ -29,7 +30,7 @@ def verify_server(root, producer, worker, audio, member):
         preserved = {p: hashlib.sha256(p.read_bytes()).digest() for p in [neighbor, neighbor_audio]}
         (base / 'target-relative').write_text(relative)
         config = base / 'config.yaml'
-        config.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: fixture, type: narihito, root: {source}}}\n')
+        config.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: fixture, type: narihito, root: {source}}}\n')
         config.chmod(0o600)
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         process = None

@@ -298,16 +298,6 @@ it("narrates each step and reports progress every 2 seconds when verbose", async
   }
 });
 
-it("keeps working after StrictMode's dispose-then-remount", async () => {
-  const { c } = setup({
-    startExport: vi.fn(async () => preview()),
-  });
-  c.dispose();
-  c.revive();
-  await c.start("2026-11-05", "notion");
-  expect(c.getSnapshot().phase).toBe("preview");
-});
-
 describe("Notion export", () => {
   const notionResult = (state: ExportResult["state"], reason: string | null) =>
     ({ ...result(state, reason), target: "notion" }) as ExportResult;

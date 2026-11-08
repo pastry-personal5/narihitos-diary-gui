@@ -54,7 +54,7 @@ impl Style {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct SnippetItem {
     pub id: String,
     pub instant_utc: String,
@@ -63,7 +63,7 @@ pub struct SnippetItem {
     pub body: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct GenerationPacket {
     style: Style,
     target_date: DiaryDate,
@@ -105,7 +105,7 @@ pub enum DocumentKind {
     Authentic,
     Source,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ChatDocument {
     pub kind: DocumentKind,
     pub date: DiaryDate,
@@ -117,13 +117,13 @@ pub enum Role {
     User,
     Assistant,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Turn {
     pub role: Role,
     pub text: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ChatPacket {
     document: Option<ChatDocument>,
     transcript: Vec<Turn>,
@@ -160,7 +160,7 @@ impl ChatPacket {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Mode {
     Chat(ChatPacket),
     Candidate {
@@ -171,7 +171,7 @@ pub enum Mode {
 }
 
 /// Immutable after construction (private fields).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct AgentRequest {
     profile: ProfileHandle,
     locale: Locale,
@@ -196,5 +196,54 @@ impl AgentRequest {
     }
     pub fn mode(&self) -> &Mode {
         &self.mode
+    }
+}
+
+// Request bodies are never rendered by diagnostics or assertion formatting.
+impl std::fmt::Debug for SnippetItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SnippetItem").finish_non_exhaustive()
+    }
+}
+
+// Request bodies are never rendered by diagnostics or assertion formatting.
+impl std::fmt::Debug for GenerationPacket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GenerationPacket").finish_non_exhaustive()
+    }
+}
+
+// Request bodies are never rendered by diagnostics or assertion formatting.
+impl std::fmt::Debug for ChatDocument {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChatDocument").finish_non_exhaustive()
+    }
+}
+
+// Request bodies are never rendered by diagnostics or assertion formatting.
+impl std::fmt::Debug for Turn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Turn").finish_non_exhaustive()
+    }
+}
+
+// Request bodies are never rendered by diagnostics or assertion formatting.
+impl std::fmt::Debug for ChatPacket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChatPacket").finish_non_exhaustive()
+    }
+}
+
+// Request bodies are never rendered by diagnostics or assertion formatting.
+impl std::fmt::Debug for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Mode").finish_non_exhaustive()
+    }
+}
+
+// Request bodies are never rendered by diagnostics or assertion formatting.
+impl std::fmt::Debug for AgentRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentRequest").finish_non_exhaustive()
     }
 }

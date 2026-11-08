@@ -6,7 +6,7 @@ This defines client state ownership, paragraph review and runtime-selectable age
 
 ## Editor and client state
 
-React owns layout, active date/tab, focus, snippet inclusion, command availability and rendered status through reducers/context. A dedicated CodeMirror module owns one EditorState per resource ID, including undo/selection/scroll and extensions. Use one active EditorView and switch retained states; destroy the view/subscriptions on unmount. Keep streamed text and keystroke document storage outside global React state. Client application state machines depend on a typed bridge port; Vitest can use a fake without loading Tauri.
+React owns layout, focus and view subscriptions. Application controllers own active dates, retained Editor tabs, snippet inclusion, command availability and run/result state. A dedicated CodeMirror module owns one EditorState per resource ID, including undo/selection/scroll and extensions. Use one active EditorView and switch retained states; destroy the view/subscriptions on unmount. Keep streamed text and keystroke document storage outside global React state. Client application state machines depend on a typed bridge port; Vitest can use a fake without loading Tauri.
 
 Draft and Entry both resolve `AuthenticId`/date to the same buffer, view state and ordered save queue. Source buffers have explicit Save and a base observation token. Candidate buffers are read-only, transient and never eligible for save/export as Authentic. A focused snippet opens its buffer independently of its checkbox; checking it changes only generation inclusion. Multiple Explorer paths to one resource activate its existing buffer/tab rather than create competing editors.
 
@@ -32,7 +32,7 @@ The baseline stays fixed while expected saved revision advances for the review's
 
 ## Agent port and profiles
 
-The application owns `AgentRunner`: `check(profile) -> ProfileStatus`, `run(AgentRequest, event_sink, cancellation) -> AgentResult`. `AgentRequest` includes mode, immutable context, schema version, limits and selected profile handle; no frontend command strings. Codex, Claude Code, Qwen Code and Apple Foundation Models implement this same port. CLI adapters use one-shot processes for chat turns and each candidate; Apple uses a fresh native model session per run. Persistent model sessions across turns and direct cloud-provider APIs are outside this design. Selecting another alias starts a new chat session or generation; never silently switch profile/model after a failure.
+The application owns `PromptResolver::resolve(PromptSelection) -> ResolvedPrompt`, `ResolvedPrompt::prepare(AgentRequest) -> PreparedAgentRun` and `AgentRunner`: `check(profile) -> ProfileCheck`, `run_prepared(PreparedAgentRun, event_sink, cancellation) -> AgentOutput`. Its standalone `run(AgentRequest, ...)` helper resolves/prepares at invocation and calls the same execution engine; admitted chat/generation work uses its captured definition. `AgentRequest` includes mode, immutable context, schema version, limits and selected profile handle; no frontend command strings. Codex, Claude Code, Qwen Code and Apple Foundation Models implement this same port. CLI adapters use one-shot processes for chat turns and each candidate; Apple uses a fresh native model session per run. Persistent model sessions across turns and direct cloud-provider APIs are outside this design. Selecting another alias starts a new chat session or generation; never silently switch profile/model after a failure.
 
 Profile states distinguish `missing`, `unsupported_version`, `unavailable`, `available_auth_unknown`, `unauthenticated`, `ready`, `busy`, `failed`. Read version/status only through verified non-inference checks, bounded to 5 seconds. Never read/copy login files or use a model turn as an auth probe. A missing optional CLI or unavailable system model disables only that profile. CLI adapter compatibility starts with exact versions/protocol fixtures from [agent research](../research/agent-assisted-diary-composition.md); unknown versions remain unsupported until checked, rather than assuming a universal minimum-version comparison proves compatibility.
 
@@ -56,9 +56,61 @@ Each admitted chat turn or candidate creates a fresh session with asset-loaded i
 
 Map context exhaustion, unavailable assets, unsupported language, refusal/guardrails, rate limiting and decoding failure to redacted typed outcomes. Apple's [error reference](https://developer.apple.com/documentation/foundationmodels/languagemodelsession/generationerror) varies by SDK; validate the actual error API for the approved build. Context failure offers reduced selection or a new chat; never silently truncate, summarize or retry through another provider. The common byte bounds are upper bounds, not a promise that the native model accepts that much input.
 
+## Client feature and lifecycle ownership
+
+The composition root [App](../../src/components/App.tsx) uses one application
+[controller graph](../../src/application/controllers.ts) per bridge. The graph
+constructs NavigationModel, GlobalMessagesStore, SourceTrashController /
+TrashCoordinator, AIChatController, GenerationController, ReviewController,
+ExportController and AIActivitiesRuntime. Graph-specific leases defer final
+teardown through React StrictMode rehearsal; replacement of a bridge disposes
+the old graph independently. Hooks subscribe and translate input rather than
+constructing another business-state lifecycle.
+
+StandardLayout, MainToolbarStrip and MainContent own window structure and pane
+widths. TabbedEditor composes open Editor tabs, the retained CodeMirror host,
+CandidateEditor, ReviewControls and Global Messages; hiding Settings or opening
+AI Activities does not replace controllers. Navigation owns calendar/import
+selection and retained resources, receives a message sink, and publishes source
+move reconciliation. SourceTrashController coordinates deletion guards and
+recovery separately from navigation. GlobalMessagesStore owns only bounded
+notices. AIActivitiesRuntime observes jobs/results independently of mounted
+feature panes. Settings and AI Agents consume application interfaces; shared
+profile wording lives in application, outside the polling hook.
+
 ## Prompt assets
 
 All app-authored instructions come from `assets/prompts/<agent-type>/`; the [asset contract and inventory](../../assets/prompts/README.md) define metadata, substitution and current gaps. Inspect and reuse existing files before writing new prompts. Load and validate them in infrastructure, including session, task, style and any approved repair instructions; no prompt prose or fallback prompt belongs in source code. Missing/invalid assets disable the affected action visibly. A template's presence does not establish schema compatibility, approve additional workflows or authorize hidden extra calls.
+
+P1-M30 implementation: [application prompt contracts](../../src-tauri/crates/diary-application/src/agent/prompt.rs)
+separate app-authored logical PromptId, exact-content PromptRevision,
+PromptAction, provider/default PromptSelection and AgentExecutionSettings.
+Infrastructure [prompt modules](../../src-tauri/crates/diary-infrastructure/src/agent/prompts/mod.rs)
+own the embedded catalog, strict parser, single-pass renderer and SHA-256
+revision computation. The digest length-prefixes exact task and paired session
+asset bytes, including metadata. A ResolvedPrompt retains an immutable renderer
+and defaults; preparation needs no catalog or GUI bootstrap. PreparedAgentRun
+captures provenance, profile, locale, action through its immutable request,
+schema-1 input/output versions, bounded rendered parts and effective settings.
+No template or rendered-content type implements Debug/serialization; request
+packet Debug implementations redact bodies. Diagnostics retain closed fields
+and do not log prompts or arbitrary identity strings.
+
+Chat resolves/prepares before admitting each new turn and keeps provenance with
+that turn. Generation resolves once during source capture, accounts for retained
+definition bytes in its reservation and renders every sequential style from the
+same definition. Candidate provenance belongs to its parent generation context.
+Provider protocols receive only prepared task/session parts and settings; Apple
+cannot fetch another session asset during execution. Missing/invalid required
+parts fail before inference without fallback. The existing runner/supervisor,
+version probes, cancellation epoch and output validators remain the single
+execution path. No command, HTTP/SSE JSON, permission, producer or durable format
+changed. Revision history, prompt management/selection UI and evaluation policy,
+datasets, scoring and persistence remain Phase 2 / Diary v2.0.0 work. Synthetic
+byte-equivalence and capture tests do not prove output quality or satisfy M32's
+native/live release obligations.
+
+The following milestone-specific status paragraphs record delivery history:
 
 P1-M16 status: the loader, `generate-candidate`/`chat` assets for Codex and Apple, the port types, packet bounds, the generation validator and the per-action capability model exist as libraries only (no adapter, route or UI). Claude assets and adapter followed in P1-M18; Qwen assets, adapter and live proof remain pending.
 

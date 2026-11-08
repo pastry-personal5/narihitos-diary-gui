@@ -1,3 +1,5 @@
+import { SessionBudget } from "../src/application/navigation/budget";
+import { GlobalMessagesStore } from "../src/application/global-messages/store";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Bridge } from "../src/application/bridge";
@@ -72,7 +74,11 @@ async function setup(changeClean = false) {
       },
     ),
   } as unknown as Bridge;
-  const model = new NavigationModel(bridge);
+  const model = new NavigationModel(
+    bridge,
+    new GlobalMessagesStore(),
+    new SessionBudget(),
+  );
   models.push(model);
   await model.connect(true, "i", 1, true);
   await model.resources.openSource(sources()[0]);

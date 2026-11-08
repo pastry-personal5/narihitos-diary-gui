@@ -7,11 +7,11 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { ActivityDetails } from "../src/components/ActivityDetails";
-import { ActivityStore } from "../src/application/activity/store";
+import { AIActivityDetails } from "../src/components/ai-activities/AIActivityDetails";
+import { AIActivitiesStore } from "../src/application/ai-activities/store";
 import { generationView } from "./generation-fixtures";
 it("exposes frozen details, preserves unread on refused navigation", async () => {
-  const store = new ActivityStore();
+  const store = new AIActivitiesStore();
   const v = generationView();
   store.event({
     kind: "job_snapshot",
@@ -23,7 +23,7 @@ it("exposes frozen details, preserves unread on refused navigation", async () =>
   });
   const view = vi.fn().mockResolvedValue(false);
   render(
-    <ActivityDetails
+    <AIActivityDetails
       store={store}
       view={view}
       cancel={vi.fn()}
@@ -42,7 +42,7 @@ it("exposes frozen details, preserves unread on refused navigation", async () =>
 
 afterEach(cleanup);
 it("shows the silence hint at thirty seconds only for a fresh active observation", () => {
-  const store = new ActivityStore(),
+  const store = new AIActivitiesStore(),
     v = generationView();
   const baseline = (silence_ms: number) =>
     store.event({
@@ -55,7 +55,7 @@ it("shows the silence hint at thirty seconds only for a fresh active observation
     });
   baseline(29_999);
   const ui = render(
-    <ActivityDetails
+    <AIActivityDetails
       store={store}
       view={vi.fn()}
       cancel={vi.fn()}
@@ -65,7 +65,7 @@ it("shows the silence hint at thirty seconds only for a fresh active observation
   expect(ui.container.textContent).not.toContain("Still waiting");
   baseline(30_000);
   ui.rerender(
-    <ActivityDetails
+    <AIActivityDetails
       store={store}
       view={vi.fn()}
       cancel={vi.fn()}
@@ -76,7 +76,7 @@ it("shows the silence hint at thirty seconds only for a fresh active observation
 });
 
 it("ignores an old-session View acknowledgement and never moves editor focus on completion", async () => {
-  const store = new ActivityStore(),
+  const store = new AIActivitiesStore(),
     v = generationView();
   const active = { ...v.job, progress: v.progress };
   const baseline = (session: string, terminal = false) =>
@@ -99,7 +99,7 @@ it("ignores an old-session View acknowledgement and never moves editor focus on 
   render(
     <>
       <textarea aria-label="Editor" defaultValue="keep caret" />
-      <ActivityDetails
+      <AIActivityDetails
         store={store}
         view={() =>
           new Promise((r) => {
@@ -136,7 +136,7 @@ it("keeps named textual progress available with reduced motion", () => {
     removeEventListener() {},
   }));
   try {
-    const store = new ActivityStore(),
+    const store = new AIActivitiesStore(),
       v = generationView();
     store.event({
       kind: "job_snapshot",
@@ -147,7 +147,7 @@ it("keeps named textual progress available with reduced motion", () => {
       jobs: [{ ...v.job, progress: v.progress }],
     });
     render(
-      <ActivityDetails
+      <AIActivityDetails
         store={store}
         view={vi.fn()}
         cancel={vi.fn()}
@@ -169,7 +169,7 @@ it("keeps named textual progress available with reduced motion", () => {
 });
 
 it("keeps explicit cancel, discard and reconnect actions with error feedback", async () => {
-  const store = new ActivityStore(),
+  const store = new AIActivitiesStore(),
     v = generationView();
   const job = { ...v.job, progress: v.progress };
   store.event({
@@ -186,7 +186,7 @@ it("keeps explicit cancel, discard and reconnect actions with error feedback", a
   const discard = vi.fn().mockResolvedValue(undefined),
     retry = vi.fn();
   const ui = render(
-    <ActivityDetails
+    <AIActivityDetails
       store={store}
       view={vi.fn()}
       cancel={cancel}
@@ -204,7 +204,7 @@ it("keeps explicit cancel, discard and reconnect actions with error feedback", a
   expect(ui.container.textContent).not.toContain("private provider message");
   store.event({ kind: "disconnected" });
   ui.rerender(
-    <ActivityDetails
+    <AIActivityDetails
       store={store}
       view={vi.fn()}
       cancel={cancel}
@@ -227,7 +227,7 @@ it("keeps explicit cancel, discard and reconnect actions with error feedback", a
     jobs: [{ ...job, sequence: 4, state: "cancelled" }],
   });
   ui.rerender(
-    <ActivityDetails
+    <AIActivityDetails
       store={store}
       view={vi.fn()}
       cancel={cancel}

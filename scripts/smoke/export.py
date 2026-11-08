@@ -4,6 +4,7 @@ directory-backed fake destination; leg 5 uses the real macOS iCloud adapter on a
 in-memory fake service (no network). create, verified no-op, external-change confirmation, duplicate confirmation,
 disabled target, and kill/restart recovery by read-back. Synthetic data, private scratch dir.
 No real iCloud or Notion contact happens. The live Notion round trip is notion-live.py."""
+from isolation import server_configuration
 import json
 import os
 from pathlib import Path
@@ -30,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
         folder.mkdir(exist_ok=True, mode=0o700)
         folder.chmod(0o700)
     config = base / 'config.yaml'
-    config.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\n')
+    config.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\n')
     config.chmod(0o600)
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     file = remote / f'{DATE}.md'
@@ -184,7 +185,7 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     icloud = base / 'icloud'
     icloud.mkdir(mode=0o700)
     real_cfg = base / 'real.yaml'
-    real_cfg.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\n  icloud_entries_root: {icloud}\n')
+    real_cfg.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\n  icloud_entries_root: {icloud}\n')
     real_cfg.chmod(0o600)
     target_file = icloud.resolve() / DATE[:4] / DATE[5:7] / f'{DATE}.md'
     server, record = start(destination=False, cfg=real_cfg)
@@ -244,7 +245,7 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     # 6. Notion over the file-backed fake: hierarchy, no-op, external edit, kill and recovery.
     page = '0123456789abcdef0123456789abcdef'
     notion_cfg = base / 'notion.yaml'
-    notion_cfg.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nnotion:\n  root_page_id: {page}\n  token: smoke-notion-token\n')
+    notion_cfg.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nnotion:\n  root_page_id: {page}\n  token: smoke-notion-token\n')
     notion_cfg.chmod(0o600)
     remote_state = base / 'notion-state.json'
 

@@ -1,4 +1,4 @@
-import { aiProgress } from "../application/activity/progress";
+import { aiProgress } from "../application/ai-activities/progress";
 import type {
   Calendar,
   ImportPage,

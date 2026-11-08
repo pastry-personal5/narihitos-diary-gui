@@ -8,7 +8,7 @@ const ROOT: &str = "0123456789abcdef0123456789abcdef";
 struct N {
     e: Env,
     fake: Arc<FakeNotion>,
-    svc: Service,
+    svc: ExportCoordinator,
 }
 fn n() -> N {
     let e = env();

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { ToolbarButton } from "../src/components/ToolbarButton";
+import { ToolbarButton } from "../src/components/standard-layout/ToolbarButton";
 import { App } from "../src/components/App";
 import {
   SymbolLabel,

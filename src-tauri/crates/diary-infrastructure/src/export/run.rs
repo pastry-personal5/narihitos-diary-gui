@@ -1,7 +1,7 @@
 //! The background export step: spawn, run and cancel.
 use super::*;
 
-impl Inner {
+impl ExportCoordinatorState {
     pub(super) fn spawn(self: &Arc<Self>, job: Job) {
         let inner = self.clone();
         std::thread::spawn(move || {

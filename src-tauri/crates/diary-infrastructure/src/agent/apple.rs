@@ -4,8 +4,7 @@
 //! launch. Availability is a helper command (no session, no inference) and is rechecked before each
 //! run. Native errors arrive as closed codes; no native text reaches argv, logs or `AgentError`.
 use super::{
-    assets::{PromptAssets, SESSION},
-    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream, probe_fault},
+    engine::{Adapter, AgentProtocolContext, Collected, Invocation, Protocol, Stream, probe_fault},
     host::{Host, RunDir},
     process::{Exit, Outcome},
     profiles::{Entry, ProfileTable},
@@ -304,7 +303,12 @@ impl Stream for AppleStream {
             _ => self.bad = true,
         }
     }
-    fn conclude(&mut self, o: &Outcome, _: &Invocation, _: &Prompt) -> Result<(), AgentError> {
+    fn conclude(
+        &mut self,
+        o: &Outcome,
+        _: &Invocation,
+        _: &AgentExecutionSettings,
+    ) -> Result<(), AgentError> {
         // The terminal line decides; the exit code is advisory.
         if let Some(code) = &self.error {
             let (c, r) = map_native(code);
@@ -334,8 +338,6 @@ impl Stream for AppleStream {
     }
 }
 
-use super::assets::Prompt;
-
 impl Protocol for Apple {
     fn kind(&self) -> AgentKind {
         AgentKind::AppleFoundationModels
@@ -349,26 +351,17 @@ impl Protocol for Apple {
     fn env(&self, host: &Host, exe: &Path, _: &Path, tmp: &Path) -> Vec<(OsString, OsString)> {
         host.env(exe, tmp, Vec::new())
     }
-    fn stdin(
-        &self,
-        assets: &PromptAssets,
-        rendered: String,
-        locale: &Locale,
-        chat: bool,
-    ) -> Result<Vec<u8>, Reason> {
-        let session = assets
-            .get(AgentKind::AppleFoundationModels, SESSION)
-            .map_err(|_| Reason::AssetsInvalid)?;
+    fn stdin(&self, prepared: &PreparedAgentRun) -> Result<Vec<u8>, Reason> {
+        let session = prepared.session().ok_or(Reason::AssetsInvalid)?;
         serde_json::to_vec(&serde_json::json!({
-            "instructions": session.render(locale, None),
-            "prompt": rendered,
-            "locale": locale.as_str(),
-            "mode": if chat { "chat" } else { "generate" },
-        }))
-        .map_err(|_| Reason::AssetsInvalid)
+            "instructions": session,
+            "prompt": prepared.task(),
+            "locale": prepared.request().locale().as_str(),
+            "mode": if matches!(prepared.request().mode(), Mode::Chat(_)) { "chat" } else { "generate" },
+        })).map_err(|_| Reason::AssetsInvalid)
     }
     /// Availability, never inference: the helper's `availability` command.
-    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), Reason> {
+    fn version(&self, ctx: &AgentProtocolContext, cancel: &CancelToken) -> Result<(), Reason> {
         let (o, text) = ctx
             .probe(&["availability"], cancel)
             .ok_or(Reason::SpawnFailed)?;
@@ -380,7 +373,12 @@ impl Protocol for Apple {
             a => Err(a.reason.unwrap_or(Reason::ModelUnavailableUnknown)),
         }
     }
-    fn invocation(&self, _: &RunDir, _: &Prompt, _: bool) -> Result<Invocation, AgentError> {
+    fn invocation(
+        &self,
+        _: &RunDir,
+        _: &AgentExecutionSettings,
+        _: bool,
+    ) -> Result<Invocation, AgentError> {
         // Fixed argv: no model, effort, path or user text.
         Ok(Invocation {
             argv: vec![OsString::from("run")],

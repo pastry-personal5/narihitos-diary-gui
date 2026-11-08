@@ -2,9 +2,9 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { PaneSeparator } from "../src/components/PaneSeparator";
-import { GlobalMessages } from "../src/components/GlobalMessages";
-import { Messages } from "../src/application/navigation/messages";
+import { PaneSeparator } from "../src/components/standard-layout/PaneSeparator";
+import { GlobalMessages } from "../src/components/global-messages/GlobalMessages";
+import { GlobalMessagesStore } from "../src/application/global-messages/store";
 afterEach(cleanup);
 it("resizes separators with keyboard bounds and the correct direction", () => {
   function Fixture() {
@@ -32,7 +32,7 @@ it("resizes separators with keyboard bounds and the correct direction", () => {
   expect(separator.getAttribute("aria-valuenow")).toBe("190");
 });
 it("keeps a scrolled-up message log in place and offers an explicit jump", () => {
-  const messages = new Messages(() => "10:00");
+  const messages = new GlobalMessagesStore(() => "10:00");
   messages.add("First");
   const ui = render(<GlobalMessages messages={messages} height={160} />);
   const log = screen.getByRole("log");
@@ -54,7 +54,7 @@ it("keeps a scrolled-up message log in place and offers an explicit jump", () =>
   expect(log.scrollTop).toBe(1000);
 });
 it("bounds retained messages and suppresses adjacent duplicate notices", () => {
-  const messages = new Messages(() => "10:00");
+  const messages = new GlobalMessagesStore(() => "10:00");
   messages.add("same", "info", true);
   messages.add("same", "info", true);
   expect(messages.items).toHaveLength(1);

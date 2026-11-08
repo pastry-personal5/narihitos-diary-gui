@@ -1,3 +1,5 @@
+import { SessionBudget } from "../src/application/navigation/budget";
+import { GlobalMessagesStore } from "../src/application/global-messages/store";
 import { expect, it, vi } from "vitest";
 import type { Bridge } from "../src/application/bridge";
 import { NavigationModel } from "../src/application/navigation/model";
@@ -16,7 +18,11 @@ it("ignores a late Today reply after a newer calendar browse", async () => {
     ...nav,
     listAuthentic: async () => ({ items: [], next_cursor: null }),
   } as unknown as Bridge;
-  const model = new NavigationModel(bridge);
+  const model = new NavigationModel(
+    bridge,
+    new GlobalMessagesStore(),
+    new SessionBudget(),
+  );
   const change = vi
     .spyOn(model.resources, "changeDate")
     .mockResolvedValue(true);

@@ -1,4 +1,5 @@
 """P1-M10 synthetic real-server import, resolution, restart and redaction smoke."""
+from isolation import server_configuration
 import json
 import os
 from pathlib import Path
@@ -23,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix='diary-import-smoke-') as temporary:
         folder.mkdir(exist_ok=True, mode=0o700)
         folder.chmod(0o700)
     config = base / 'config.yaml'
-    config.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: smoke, type: ayumi, root: {source}}}\n')
+    config.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: smoke, type: ayumi, root: {source}}}\n')
     config.chmod(0o600)
     file = source / f'2024/02/29/{STEM}.md'
     file.parent.mkdir(parents=True)

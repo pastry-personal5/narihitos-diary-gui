@@ -1,51 +1,47 @@
-import { ToolbarButton } from "./ToolbarButton";
+import { TabbedEditor } from "./tabbed-editor/TabbedEditor";
+import { StandardLayout } from "./standard-layout/StandardLayout";
+import { MainToolbarStrip } from "./standard-layout/MainToolbarStrip";
+import { ToolbarButton } from "./standard-layout/ToolbarButton";
 import settingsIcon from "../assets/settings.png";
-import { ActivityFeedback } from "./ActivityFeedback";
-import { AIActivitiesDialog } from "./AIActivitiesDialog";
-import { ActivityStatus } from "./ActivityStatus";
+import { AIActivityFeedback } from "./ai-activities/AIActivityFeedback";
+import { AIActivitiesDialog } from "./ai-activities/AIActivitiesDialog";
+import { AIActivityStatus } from "./ai-activities/AIActivityStatus";
 import { useEffect, useRef, useState } from "react";
 import type { Bridge } from "../application/bridge";
-import { AuthenticPane } from "./AuthenticPane";
-import { SettingsView } from "./SettingsView";
-import { Explorer } from "./Explorer";
-import { GlobalMessages } from "./GlobalMessages";
-import { PaneSeparator } from "./PaneSeparator";
-import { ChatPane } from "./ChatPane";
-import {
-  CandidateBanner,
-  GenerationControls,
-  GenerationDialog,
-} from "./GenerationPane";
-import { useCandidateTabs } from "./candidateTabs";
-import { ExportDialog } from "./ExportDialog";
-import { ReviewBar } from "./ReviewBar";
-import { saveOff } from "../application/navigation/resources";
-import { useProfiles } from "./useProfiles";
-import { useSettings } from "./useSettings";
-import { CommandPalette } from "./CommandPalette";
-import { TrashRecovery } from "./TrashRecovery";
-import { TrashDialog } from "./TrashDialog";
+import { SettingsView } from "./settings/SettingsView";
+import { Explorer } from "./explorer/Explorer";
+import { MainContent } from "./standard-layout/MainContent";
+import { AIChat } from "./ai-chat/AIChat";
+import { GenerationDialog } from "./tabbed-editor/CandidateEditor";
+import { useCandidateTabs } from "./tabbed-editor/useCandidateTabs";
+import { ExportDialog } from "./export/ExportDialog";
+import { useProfiles } from "./ai-agents/useProfiles";
+import { useSettings } from "./settings/useSettings";
+import { CommandPalette } from "./standard-layout/CommandPalette";
+import { TrashRecovery } from "./trash-recovery/TrashRecovery";
+import { TrashDialog } from "./trash-recovery/TrashDialog";
 import { ModalDialog } from "./ModalDialog";
-import { SymbolLabel, SymbolProvider } from "./Symbol";
+import { SymbolProvider } from "./Symbol";
 import { ACTIONS } from "../application/actions/actions";
-import { useAppActions } from "./useAppActions";
+import { useAppActions } from "./standard-layout/useAppActions";
 import { useAppControllers } from "./useAppControllers";
-import { useCloseRequest } from "./useCloseRequest";
-import { useConnection } from "./useConnection";
+import { useCloseRequest } from "./standard-layout/useCloseRequest";
+import { useConnection } from "./standard-layout/useConnection";
 
 export function App({ bridge }: { bridge: Bridge }) {
   const [activitiesOpen, setActivitiesOpen] = useState(false);
   const recoveryButton = useRef<HTMLButtonElement>(null);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const settingsButton = useRef<HTMLButtonElement>(null);
-  const [explorerWidth, setExplorerWidth] = useState(220);
-  const [chatWidth, setChatWidth] = useState(240);
   const [messageHeight, setMessageHeight] = useState(160);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const controllers = useAppControllers(bridge);
   const {
     model,
+    messages,
+    sourceTrash,
+    trash,
     chat,
     chatState,
     review,
@@ -58,7 +54,7 @@ export function App({ bridge }: { bridge: Bridge }) {
     editorHost,
     symbols,
   } = controllers;
-  const closePending = useCloseRequest(bridge, model, generator);
+  const closePending = useCloseRequest(bridge, model, generator, messages);
   const {
     connection,
     connected,
@@ -94,6 +90,8 @@ export function App({ bridge }: { bridge: Bridge }) {
     hint,
   } = useAppActions({
     model,
+    messages,
+    sourceTrash,
     connection,
     settings,
     generator,
@@ -109,92 +107,83 @@ export function App({ bridge }: { bridge: Bridge }) {
           Closing… waiting for the server.
         </p>
       )}
-      <main
-        inert={closePending}
-        aria-label="Standard Layout"
-        className="standard-layout"
-      >
-        <header aria-label="Main Toolbar Strip" className="toolbar">
-          <div className="toolbar-title">
-            <h1>Narihito’s Diary</h1>
-          </div>
-          <div className="toolbar-actions">
-            <ToolbarButton
-              action="createEmpty"
-              label="Create Empty"
-              disabled={!canCreate}
-              title={hint("authentic.create_empty", createReason)}
-              onClick={() => void handlers["authentic.create_empty"].run()}
-            />
-            <ToolbarButton
-              action="exportIcloud"
-              label={exportState.phase === "working" ? "Exporting…" : "Export"}
-              disabled={!!exportReason}
-              title={hint("export.start", exportReason ?? "Export to iCloud")}
-              onClick={() => void handlers["export.start"].run()}
-            />
-            <ToolbarButton
-              action="exportNotion"
-              label="Notion"
-              disabled={!!exportReason}
-              title={hint(
-                "export.start.notion",
-                exportReason ?? "Export to Notion",
-              )}
-              onClick={() => void handlers["export.start.notion"].run()}
-            />
-            <ToolbarButton
-              action="commandPalette"
-              label="Command palette"
-              id="palette-toggle"
-              aria-expanded={paletteOpen}
-              aria-controls={paletteOpen ? "command-palette" : undefined}
-              title={hint("palette.open", "Open command palette")}
-              onClick={() => {
-                if (paletteOpen) setPaletteOpen(false);
-                else if (
-                  !document.querySelector('[aria-modal="true"], [data-capture]')
-                )
-                  setPaletteOpen(true);
-              }}
-            />
-            <ToolbarButton
-              action="trashRecovery"
-              label="Trash Recovery"
-              ref={recoveryButton}
-              title="Trash Recovery: inspect interrupted moves and saved results"
-              onClick={() => setRecoveryOpen(true)}
-            />
-            <ToolbarButton
-              action="aiActivities"
-              label="AI Activities"
-              title="View AI Activities and results"
-              onClick={() => setActivitiesOpen(true)}
-            />
-            {active?.kind === "source" && (
-              <ToolbarButton
-                action="save"
-                label="Save"
-                disabled={!!handlers["editor.save"].reason || !!active.saving}
-                title={hint(
-                  "editor.save",
-                  handlers["editor.save"].reason ?? "Save source",
-                )}
-                onClick={() => void handlers["editor.save"].run()}
-              />
+      <StandardLayout closing={closePending}>
+        <MainToolbarStrip>
+          <ToolbarButton
+            action="createEmpty"
+            label="Create Empty"
+            disabled={!canCreate}
+            title={hint("authentic.create_empty", createReason)}
+            onClick={() => void handlers["authentic.create_empty"].run()}
+          />
+          <ToolbarButton
+            action="exportIcloud"
+            label={exportState.phase === "working" ? "Exporting…" : "Export"}
+            disabled={!!exportReason}
+            title={hint("export.start", exportReason ?? "Export to iCloud")}
+            onClick={() => void handlers["export.start"].run()}
+          />
+          <ToolbarButton
+            action="exportNotion"
+            label="Notion"
+            disabled={!!exportReason}
+            title={hint(
+              "export.start.notion",
+              exportReason ?? "Export to Notion",
             )}
+            onClick={() => void handlers["export.start.notion"].run()}
+          />
+          <ToolbarButton
+            action="commandPalette"
+            label="Command palette"
+            id="palette-toggle"
+            aria-expanded={paletteOpen}
+            aria-controls={paletteOpen ? "command-palette" : undefined}
+            title={hint("palette.open", "Open command palette")}
+            onClick={() => {
+              if (paletteOpen) setPaletteOpen(false);
+              else if (
+                !document.querySelector('[aria-modal="true"], [data-capture]')
+              )
+                setPaletteOpen(true);
+            }}
+          />
+          <ToolbarButton
+            action="trashRecovery"
+            label="Trash Recovery"
+            ref={recoveryButton}
+            title="Trash Recovery: inspect interrupted moves and saved results"
+            onClick={() => setRecoveryOpen(true)}
+          />
+          <ToolbarButton
+            action="aiActivities"
+            label="AI Activities"
+            title="View AI Activities and results"
+            onClick={() => setActivitiesOpen(true)}
+          />
+          {active?.kind === "source" && (
             <ToolbarButton
-              action="generate"
-              label={generationState.submitting ? "Submitting…" : "Generate"}
-              disabled={!!generationReason}
+              action="save"
+              label="Save"
+              disabled={!!handlers["editor.save"].reason || !!active.saving}
               title={hint(
-                "generate.start",
-                generationReason ?? "Generate candidates",
+                "editor.save",
+                handlers["editor.save"].reason ?? "Save source",
               )}
-              onClick={() => void handlers["generate.start"].run()}
+              onClick={() => void handlers["editor.save"].run()}
             />
-          </div>
-        </header>
+          )}
+          <ToolbarButton
+            action="generate"
+            label={generationState.submitting ? "Submitting…" : "Generate"}
+            disabled={!!generationReason}
+            title={hint(
+              "generate.start",
+              generationReason ?? "Generate candidates",
+            )}
+            onClick={() => void handlers["generate.start"].run()}
+          />
+        </MainToolbarStrip>
         {selectedView?.createError && (
           <p role="alert" className="notice">
             Create Empty could not be confirmed ({selectedView.createError}).{" "}
@@ -235,16 +224,16 @@ export function App({ bridge }: { bridge: Bridge }) {
             </button>
           </ModalDialog>
         )}
-        {recoveryOpen && !model.sourceGuard && !model.trash.dialog && (
+        {recoveryOpen && !model.sourceGuard && !trash.dialog && (
           <TrashRecovery
-            coordinator={model.trash}
+            coordinator={trash}
             onClose={() => {
               setRecoveryOpen(false);
               requestAnimationFrame(() => recoveryButton.current?.focus());
             }}
           />
         )}
-        {!model.sourceGuard && <TrashDialog coordinator={model.trash} />}
+        {!model.sourceGuard && <TrashDialog coordinator={trash} />}
         {paletteOpen && (
           <CommandPalette
             entries={ACTIONS.map((a) => ({
@@ -257,7 +246,7 @@ export function App({ bridge }: { bridge: Bridge }) {
             onRun={(id) => {
               setPaletteOpen(false);
               const h = handlers[id];
-              if (h.reason) model.messages.add(h.reason, "warning");
+              if (h.reason) messages.add(h.reason, "warning");
               else void h.run();
             }}
           />
@@ -284,11 +273,11 @@ export function App({ bridge }: { bridge: Bridge }) {
             }}
           />
         )}
-        <ActivityFeedback
+        <AIActivityFeedback
           activity={activity.store}
           generator={generator}
           chat={chat}
-          messages={model.messages}
+          messages={messages}
         />
         {activitiesOpen && (
           <AIActivitiesDialog
@@ -337,179 +326,75 @@ export function App({ bridge }: { bridge: Bridge }) {
         )}
         <GenerationDialog controller={generator} />
         <ExportDialog controller={exporter} />
-        <div
-          className="workspace"
+        <MainContent
           hidden={settingsOpen}
-          style={{
-            gridTemplateColumns: `48px ${explorerWidth}px 6px minmax(220px, 1fr) 6px ${chatWidth}px`,
-          }}
-        >
-          <nav aria-label="Icon Bar" className="icon-bar">
-            <button
-              ref={settingsButton}
-              aria-label="Settings"
-              aria-pressed={settingsOpen}
-              onClick={() => setSettingsOpen((open) => !open)}
-              title={hint("settings.open", "Settings")}
-            >
-              <span
-                aria-hidden="true"
-                className="bitmap-icon"
-                style={{
-                  width: 32,
-                  height: 32,
-                  maskImage: `url(${settingsIcon})`,
-                  WebkitMaskImage: `url(${settingsIcon})`,
-                }}
-              />
-            </button>
-          </nav>
-          <Explorer model={model} generator={generator} />
-          <PaneSeparator
-            label="Resize Explorer"
-            orientation="vertical"
-            value={explorerWidth}
-            min={160}
-            max={480}
-            change={setExplorerWidth}
-          />
-          <div className="editor-column">
-            <div role="tablist" aria-label="Open editor resources">
-              {[...model.resources.resources.values()].map((resource) => (
-                <span key={resource.key}>
-                  <button
-                    role="tab"
-                    aria-selected={model.resources.activeKey === resource.key}
-                    onClick={() => void model.resources.switchTab(resource.key)}
-                  >
-                    {resource.label}
-                  </button>
-                  <button
-                    aria-label={`Close ${resource.label}`}
-                    onClick={() => void model.resources.closeTab(resource.key)}
-                  >
-                    <SymbolLabel
-                      name="xmark"
-                      label={`Close ${resource.label}`}
-                      fallback="×"
-                      size={12}
-                    />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <GenerationControls
-              messages={model.messages}
-              coordinated
-              showGenerate={false}
-              adjacentDates={
-                !!model.resources.selectedDate &&
-                model.imports
-                  .eligible(model.resources.selectedDate)
-                  .some(
-                    (source) =>
-                      !!source.navigation?.included &&
-                      source.navigation.included.date !==
-                        model.resources.selectedDate,
-                  )
-              }
-              controller={generator}
-              date={model.resources.selectedDate}
-              locale={settings.user?.writing_locale ?? null}
-              count={settings.user?.generation_count ?? 3}
-              reason={generationReason}
-            />
-            {active?.kind === "source" && (
+          iconBar={
+            <nav aria-label="Icon Bar" className="icon-bar">
               <button
-                disabled={!!handlers["source.refresh"].reason}
-                onClick={() => void handlers["source.refresh"].run()}
+                ref={settingsButton}
+                aria-label="Settings"
+                aria-pressed={settingsOpen}
+                onClick={() => setSettingsOpen((open) => !open)}
+                title={hint("settings.open", "Settings")}
               >
-                <SymbolLabel name="arrow.clockwise" label="Refresh source" />
+                <span
+                  aria-hidden="true"
+                  className="bitmap-icon"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    maskImage: `url(${settingsIcon})`,
+                    WebkitMaskImage: `url(${settingsIcon})`,
+                  }}
+                />
               </button>
-            )}
-            {(active?.error || activeView?.loadError) &&
-              active?.kind === "authentic" && (
-                <button onClick={() => void model.resources.retryActiveLoad()}>
-                  Retry loading
-                </button>
-              )}
-            <AuthenticPane
-              messages={model.messages}
-              hostRef={editorHost}
-              date={
-                active?.kind === "source" ? active.label : (active?.date ?? "")
-              }
-              view={activeView ?? null}
-              error={active?.error ?? activeView?.loadError ?? null}
-              notice={
-                active?.detached
-                  ? "The original moved to Trash. This detached copy retains your unsaved text and cannot be saved to the original."
-                  : active?.stale
-                    ? "This source requires a fresh import."
-                    : null
-              }
-              banner={<ReviewBar controller={review} />}
-              dispatch={(action) => model.resources.dispatch(action)}
-              readOnlyReason={
-                active?.kind === "candidate"
-                  ? "Candidate · read-only suggestion"
-                  : active?.kind === "source"
-                    ? active.detached
-                      ? "Detached copy · read-only"
-                      : active.source?.capabilities.save
-                        ? null
-                        : saveOff(active.source?.capabilities.reason ?? "")
-                    : !connected
-                      ? "Connect to the server to open this date."
-                      : !storage
-                        ? "Storage is unavailable: files are read-only."
-                        : null
-              }
+            </nav>
+          }
+          explorer={
+            <Explorer
+              model={model}
+              sourceTrash={sourceTrash}
+              generator={generator}
             />
-            <CandidateBanner
-              messages={model.messages}
+          }
+          tabbedEditor={
+            <TabbedEditor
+              model={model}
+              messages={messages}
+              generator={generator}
+              settings={settings}
+              generationReason={generationReason}
+              handlers={handlers}
+              active={active}
+              activeView={activeView}
+              editorHost={editorHost}
               review={review}
-              controller={generator}
-              resources={model.resources}
-            />
-            <PaneSeparator
-              label="Resize Global Messages"
-              orientation="horizontal"
-              value={messageHeight}
-              min={80}
-              max={320}
-              change={setMessageHeight}
-              reverse
-            />
-            <GlobalMessages messages={model.messages} height={messageHeight} />
-          </div>
-          <PaneSeparator
-            label="Resize AI Chat"
-            orientation="vertical"
-            value={chatWidth}
-            min={160}
-            max={480}
-            change={setChatWidth}
-            reverse
-          />
-          <div className="ai-column">
-            <ChatPane
-              coordinated
-              controller={chat}
               connected={connected}
-              locale={settings.user?.writing_locale ?? null}
-              context={chatContext}
-              otherRun={
-                generator.running
-                  ? (generationState.originDate ?? "generation")
-                  : null
-              }
+              storage={storage}
+              messageHeight={messageHeight}
+              setMessageHeight={setMessageHeight}
             />
-          </div>
-        </div>
+          }
+          aiChat={
+            <div className="ai-column">
+              <AIChat
+                coordinated
+                controller={chat}
+                connected={connected}
+                locale={settings.user?.writing_locale ?? null}
+                context={chatContext}
+                otherRun={
+                  generator.running
+                    ? (generationState.originDate ?? "generation")
+                    : null
+                }
+              />
+            </div>
+          }
+        />
         <footer>
           <span>Authentic files save automatically</span>
-          <ActivityStatus
+          <AIActivityStatus
             store={activity.store}
             preparing={
               generationState.submitting
@@ -520,7 +405,7 @@ export function App({ bridge }: { bridge: Bridge }) {
             }
           />
         </footer>
-      </main>
+      </StandardLayout>
     </SymbolProvider>
   );
 }

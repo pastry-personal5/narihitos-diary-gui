@@ -1,6 +1,7 @@
 """P1-M24 paragraph review on the built diary-server: start, reject, durable accept, restart
 recovery by operation ID, invalidation and the discard/regeneration guards.
 Only the fake CLI runs inference-shaped fixtures; uses synthetic data and a private scratch dir."""
+from isolation import server_configuration
 import json
 import os
 from pathlib import Path
@@ -38,7 +39,7 @@ with tempfile.TemporaryDirectory(prefix='diary-review-smoke-') as temporary:
     file.parent.mkdir(parents=True)
     file.write_text('---\nid: "2026-11-06_00-00-00-123"\ncreated_at: "2026-11-06T00:00:00.123Z"\ntags: []\n---\nSYNTHETIC_REVIEW_SOURCE. I had tea.\n')
     config = base / 'config.yaml'
-    config.write_text(
+    config.write_text(server_configuration() +
         f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\n'
         f'sources:\n  - {{alias: smoke-readable, type: ayumi, root: {source}}}\n'
         f'agents:\n  profiles:\n    - {{alias: main, type: codex, profile_home: {home}, executable: {fake}}}\n')

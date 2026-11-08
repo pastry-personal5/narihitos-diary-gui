@@ -3,7 +3,7 @@ import { StrictMode } from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Bridge } from "../src/application/bridge";
-import { useConnection } from "../src/components/useConnection";
+import { useConnection } from "../src/components/standard-layout/useConnection";
 
 function setup() {
   const stop = vi.fn(async () => {});
@@ -17,8 +17,9 @@ function setup() {
     serverSettings: async () => ({ config_generation: 1, sources: [] }),
   } as unknown as Bridge;
   const controllers = {
+    messages: { add: vi.fn() },
+    trash: { connect: vi.fn(async () => {}) },
     model: {
-      messages: { add: vi.fn() },
       connect: vi.fn(async () => {}),
       browse: vi.fn(),
       onEvent: vi.fn(),

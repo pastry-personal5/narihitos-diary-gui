@@ -3,8 +3,8 @@
 use super::registry::Agents;
 use crate::config::{Config, Profile};
 use diary_application::agent::{
-    Action, AgentKind, AgentRunner, ProfileCheck, ProfileDirectory, ProfileHandle, ProfileStatus,
-    ProfileView,
+    AgentKind, AgentRunner, ProfileCheck, ProfileDirectory, ProfileHandle, ProfileStatus,
+    ProfileView, PromptAction,
 };
 use std::{
     collections::HashMap,
@@ -115,7 +115,7 @@ impl ProfileService {
         c.1.get(alias).copied()
     }
     fn view(&self, e: &Entry, check: Option<ProfileCheck>) -> ProfileView {
-        let assets = self.agents.assets();
+        let catalog = self.agents.catalog();
         let registered = self.agents.registered(e.kind);
         ProfileView {
             alias: e.alias.clone(),
@@ -130,8 +130,8 @@ impl ProfileService {
             } else {
                 None
             },
-            chat: assets.capability(e.kind, Action::Chat, registered),
-            generate: assets.capability(e.kind, Action::Generate, registered),
+            chat: catalog.capability(e.kind, PromptAction::Chat, registered),
+            generate: catalog.capability(e.kind, PromptAction::GenerateCandidate, registered),
         }
     }
 }

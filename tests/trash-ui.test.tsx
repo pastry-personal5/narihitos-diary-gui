@@ -13,9 +13,9 @@ import {
 import { TrashCoordinator } from "../src/application/trash/coordinator";
 import { SessionBudget } from "../src/application/navigation/budget";
 import type { Bridge } from "../src/application/bridge";
-import { TrashDialog } from "../src/components/TrashDialog";
-import { TrashRecovery } from "../src/components/TrashRecovery";
-import { TrashActivity } from "../src/components/TrashActivity";
+import { TrashDialog } from "../src/components/trash-recovery/TrashDialog";
+import { TrashRecovery } from "../src/components/trash-recovery/TrashRecovery";
+import { TrashActivity } from "../src/components/trash-recovery/TrashActivity";
 import { App } from "../src/components/App";
 import { settingsFake } from "./settings-fake";
 import { day, sourceId, result, trashFake, deferred, uuid } from "./trash-fake";

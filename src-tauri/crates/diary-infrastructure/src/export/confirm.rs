@@ -1,7 +1,7 @@
 //! External-change confirmation and success recording.
 use super::*;
 
-impl Inner {
+impl ExportCoordinatorState {
     pub(super) fn confirm(
         self: &Arc<Self>,
         session: &str,

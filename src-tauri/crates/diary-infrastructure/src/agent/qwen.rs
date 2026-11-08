@@ -4,8 +4,7 @@
 //! only through the M16 validators. The CLI silently falls back to the profile's configured model
 //! when `--model` is unknown, so the `system.init` record must report the asset's model.
 use super::{
-    assets::Prompt,
-    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream, probe_fault},
+    engine::{Adapter, AgentProtocolContext, Collected, Invocation, Protocol, Stream, probe_fault},
     host::{GENERATION_SCHEMA, Host, RunDir, classify},
     process::{Exit, Outcome},
     profiles::ProfileTable,
@@ -177,7 +176,12 @@ impl Stream for QwenStream {
     fn record(&mut self, rec: &[u8], chat: bool, run: &Run, sink: &mut dyn EventSink) {
         QwenStream::record(self, rec, chat, run, sink)
     }
-    fn conclude(&mut self, o: &Outcome, _: &Invocation, prompt: &Prompt) -> Result<(), AgentError> {
+    fn conclude(
+        &mut self,
+        o: &Outcome,
+        _: &Invocation,
+        prompt: &AgentExecutionSettings,
+    ) -> Result<(), AgentError> {
         if self.init_mismatch(&prompt.model) {
             self.mismatched = true;
             return Err(AgentErrorCode::Unavailable.into());
@@ -269,7 +273,7 @@ impl Protocol for Qwen {
             ],
         )
     }
-    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), Reason> {
+    fn version(&self, ctx: &AgentProtocolContext, cancel: &CancelToken) -> Result<(), Reason> {
         let (o, text) = ctx
             .probe(&["--version"], cancel)
             .ok_or(Reason::SpawnFailed)?;
@@ -292,7 +296,7 @@ impl Protocol for Qwen {
     fn invocation(
         &self,
         _: &RunDir,
-        prompt: &Prompt,
+        prompt: &AgentExecutionSettings,
         chat: bool,
     ) -> Result<Invocation, AgentError> {
         Ok(Invocation {

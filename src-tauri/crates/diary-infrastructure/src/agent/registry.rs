@@ -1,8 +1,8 @@
 //! The one `AgentRunner` the rest of the code holds: dispatches on `profile.kind` to the registered
 //! adapters, shares one `Host` (cancel/shutdown/busy) and one set of prompt assets.
 use super::{
-    apple::AppleAdapter, assets::PromptAssets, claude::ClaudeAdapter, codex::CodexAdapter,
-    host::Host, profiles::ProfileTable, qwen::QwenAdapter,
+    apple::AppleAdapter, claude::ClaudeAdapter, codex::CodexAdapter, host::Host,
+    profiles::ProfileTable, prompts::EmbeddedPromptCatalog, qwen::QwenAdapter,
 };
 use diary_application::agent::*;
 use std::sync::Arc;
@@ -11,7 +11,7 @@ pub type Runner = Arc<dyn AgentRunner + Send + Sync>;
 
 pub struct Agents {
     host: Arc<Host>,
-    assets: PromptAssets,
+    catalog: EmbeddedPromptCatalog,
     runners: Vec<(AgentKind, Runner)>,
 }
 
@@ -42,15 +42,15 @@ impl Agents {
     pub fn new(host: Arc<Host>, runners: Vec<(AgentKind, Runner)>) -> Self {
         Self {
             host,
-            assets: PromptAssets::embedded(),
+            catalog: EmbeddedPromptCatalog::embedded(),
             runners,
         }
     }
     pub fn registered(&self, kind: AgentKind) -> bool {
         self.runners.iter().any(|(k, _)| *k == kind)
     }
-    pub fn assets(&self) -> &PromptAssets {
-        &self.assets
+    pub fn catalog(&self) -> &EmbeddedPromptCatalog {
+        &self.catalog
     }
     pub fn shutdown(&self) {
         self.host.shutdown();
@@ -73,6 +73,17 @@ impl AgentRunner for Agents {
             None => ProfileStatus::Unavailable.into(),
         }
     }
+    fn run_prepared(
+        &self,
+        prepared: PreparedAgentRun,
+        events: &mut dyn EventSink,
+        cancel: &CancelToken,
+    ) -> Result<AgentOutput, AgentError> {
+        match self.runner(prepared.request().profile().kind) {
+            Some(r) => r.run_prepared(prepared, events, cancel),
+            None => Err(AgentErrorCode::Unavailable.into()),
+        }
+    }
     fn run(
         &self,
         request: AgentRequest,
@@ -83,5 +94,12 @@ impl AgentRunner for Agents {
             Some(r) => r.run(request, events, cancel),
             None => Err(AgentErrorCode::Unavailable.into()),
         }
+    }
+}
+impl PromptResolver for Agents {
+    fn resolve(&self, selection: PromptSelection) -> Result<ResolvedPrompt, AgentError> {
+        self.runner(selection.provider)
+            .ok_or(AgentErrorCode::Unavailable)?
+            .resolve(selection)
     }
 }

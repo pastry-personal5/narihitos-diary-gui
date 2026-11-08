@@ -479,3 +479,48 @@ fn lease_end_cancels_in_flight_work_but_not_later_runs() {
     r.set("scenario", "");
     assert!(run(&r, chat_request()).is_ok());
 }
+
+#[test]
+fn prepared_execution_reuses_supervision_validation_and_cancel_without_session_bootstrap() {
+    let r = rig();
+    let prepare = |request: AgentRequest| {
+        r.adapter
+            .resolve(PromptSelection::for_request(&request))
+            .unwrap()
+            .prepare(request)
+            .unwrap()
+    };
+    let prepared = prepare(generate_request());
+    assert_eq!(prepared.settings().model, "gpt-5.6-luna");
+    assert_eq!(prepared.settings().reasoning_effort, "medium");
+    assert_eq!(prepared.input_contract_version(), 1);
+    assert_eq!(prepared.output_contract_version(), 1);
+    assert!(matches!(
+        r.adapter
+            .run_prepared(prepared, &mut Sink::default(), &CancelToken::default()),
+        Ok(AgentOutput::Candidate(_))
+    ));
+    for scenario in ["malformed", "fenced", "flood"] {
+        r.set("scenario", scenario);
+        assert_eq!(
+            code(r.adapter.run_prepared(
+                prepare(generate_request()),
+                &mut Sink::default(),
+                &CancelToken::default()
+            )),
+            AgentErrorCode::InvalidOutput
+        );
+    }
+    let owner = Run::new();
+    owner.request_cancel();
+    let mut sink = Sink::default();
+    assert_eq!(
+        code(
+            r.adapter
+                .run_prepared(prepare(chat_request()), &mut sink, &owner.token())
+        ),
+        AgentErrorCode::Cancelled
+    );
+    assert!(sink.0.is_empty());
+    assert!(!r.host.is_busy());
+}

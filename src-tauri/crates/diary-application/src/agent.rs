@@ -6,8 +6,11 @@ mod capability;
 mod error;
 mod kind;
 mod packet;
+mod prompt;
 mod run;
 mod status;
+#[cfg(test)]
+pub(crate) mod test_prompts;
 #[cfg(test)]
 mod tests;
 
@@ -15,6 +18,7 @@ pub use capability::*;
 pub use error::*;
 pub use kind::*;
 pub use packet::*;
+pub use prompt::*;
 pub use run::*;
 pub use status::*;
 

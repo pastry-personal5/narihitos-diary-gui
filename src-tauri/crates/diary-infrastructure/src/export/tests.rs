@@ -14,7 +14,7 @@ struct Env {
     store: Arc<dyn AuthenticStore>,
     remote: PathBuf,
     fake: Arc<Fake>,
-    svc: Service,
+    svc: ExportCoordinator,
 }
 fn env() -> Env {
     let temp = tempfile::tempdir().unwrap();
@@ -112,7 +112,7 @@ impl Env {
             },
         )
     }
-    fn restart(&self) -> Service {
+    fn restart(&self) -> ExportCoordinator {
         let svc = self
             .ws
             .exports(self.store.clone(), Some(self.fake.clone()))

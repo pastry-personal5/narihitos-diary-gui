@@ -11,7 +11,7 @@ import { useState } from "react";
 import {
   CommandPalette,
   type PaletteEntry,
-} from "../src/components/CommandPalette";
+} from "../src/components/standard-layout/CommandPalette";
 afterEach(cleanup);
 const entries: PaletteEntry[] = [
   { id: "save", label: "Save", reason: null, shortcuts: ["Command+S"] },

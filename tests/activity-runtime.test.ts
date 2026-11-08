@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { ActivityRuntime } from "../src/application/activity/runtime";
+import { AIActivitiesRuntime } from "../src/application/ai-activities/runtime";
 import type { Bridge } from "../src/application/bridge";
 import { generationView } from "./generation-fixtures";
 const view = generationView();
@@ -23,7 +23,7 @@ it("discovers unknown jobs without inference and suppresses old-session reads", 
       }),
   );
   const discovered = vi.fn();
-  const runtime = new ActivityRuntime(
+  const runtime = new AIActivitiesRuntime(
     { getJob } as unknown as Bridge,
     discovered,
   );
@@ -39,7 +39,7 @@ it("discovers unknown jobs without inference and suppresses old-session reads", 
 it("backs failed reads off while retaining metadata", async () => {
   vi.useFakeTimers();
   const getJob = vi.fn().mockRejectedValue(new Error("offline"));
-  const runtime = new ActivityRuntime({ getJob } as unknown as Bridge);
+  const runtime = new AIActivitiesRuntime({ getJob } as unknown as Bridge);
   runtime.event(baseline);
   await vi.advanceTimersByTimeAsync(29_000);
   expect(getJob).toHaveBeenCalledTimes(1);
@@ -58,7 +58,7 @@ it("discard prevents an in-flight read and a replayed baseline from restoring me
       }),
   );
   const discovered = vi.fn();
-  const runtime = new ActivityRuntime(
+  const runtime = new AIActivitiesRuntime(
     { getJob } as unknown as Bridge,
     discovered,
   );
@@ -75,7 +75,7 @@ it("discard prevents an in-flight read and a replayed baseline from restoring me
 it("bounds flooding hints to one metadata read per second and bypasses delay for terminal hints", async () => {
   vi.useFakeTimers();
   const getJob = vi.fn().mockResolvedValue(job);
-  const runtime = new ActivityRuntime({ getJob } as unknown as Bridge);
+  const runtime = new AIActivitiesRuntime({ getJob } as unknown as Bridge);
   runtime.event(baseline);
   await Promise.resolve();
   for (let i = 0; i < 100; i++)
@@ -111,7 +111,7 @@ it("authoritative result loss releases its payload but failed reads retain it", 
     .mockRejectedValueOnce(new Error("offline"))
     .mockResolvedValue({ ...job, progress: undefined });
   const unavailable = vi.fn();
-  const runtime = new ActivityRuntime(
+  const runtime = new AIActivitiesRuntime(
     { getJob } as unknown as Bridge,
     () => {},
     unavailable,
@@ -130,7 +130,7 @@ it("serializes same-sequence progress reads and drops results overtaken by recon
   vi.useFakeTimers();
   const resolvers: ((value: typeof job) => void)[] = [];
   const getJob = vi.fn(() => new Promise<typeof job>((r) => resolvers.push(r)));
-  const runtime = new ActivityRuntime({ getJob } as unknown as Bridge);
+  const runtime = new AIActivitiesRuntime({ getJob } as unknown as Bridge);
   runtime.event(baseline);
   for (let i = 0; i < 5; i++)
     runtime.event({

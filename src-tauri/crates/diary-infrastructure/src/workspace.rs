@@ -129,7 +129,7 @@ impl Workspace {
         &self,
         authentic: Arc<dyn diary_application::authentic::AuthenticStore>,
         adapter: Option<Arc<dyn diary_application::export::ExportAdapter>>,
-    ) -> Option<crate::export::Service> {
+    ) -> Option<crate::export::ExportCoordinator> {
         self.exports_with(authentic, adapter.into_iter().collect())
     }
     /// The export service with one adapter per configured target.
@@ -137,11 +137,11 @@ impl Workspace {
         &self,
         authentic: Arc<dyn diary_application::authentic::AuthenticStore>,
         adapters: Vec<Arc<dyn diary_application::export::ExportAdapter>>,
-    ) -> Option<crate::export::Service> {
+    ) -> Option<crate::export::ExportCoordinator> {
         let (Some(db), Readiness::Ready) = (&self.db, self.readiness) else {
             return None;
         };
-        Some(crate::export::Service::new(
+        Some(crate::export::ExportCoordinator::new(
             db.clone(),
             self.identity.clone(),
             authentic,

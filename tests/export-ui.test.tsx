@@ -10,7 +10,7 @@ import {
 } from "@testing-library/react";
 import type { Bridge } from "../src/application/bridge";
 import { ExportController } from "../src/application/export/controller";
-import { ExportDialog } from "../src/components/ExportDialog";
+import { ExportDialog } from "../src/components/export/ExportDialog";
 
 afterEach(cleanup);
 it("identifies the date, starts focus on Cancel and declines with Escape", async () => {

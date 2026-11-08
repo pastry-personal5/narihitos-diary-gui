@@ -201,13 +201,18 @@ fn reason_ids_are_unique_snake_case() {
 #[test]
 fn fake_runner_honors_the_port() {
     struct Fake;
+    impl PromptResolver for Fake {
+        fn resolve(&self, selection: PromptSelection) -> Result<ResolvedPrompt, AgentError> {
+            Ok(crate::agent::test_prompts::definition(selection))
+        }
+    }
     impl AgentRunner for Fake {
         fn check(&self, _: &ProfileHandle) -> ProfileCheck {
             ProfileStatus::Ready.into()
         }
-        fn run(
+        fn run_prepared(
             &self,
-            _: AgentRequest,
+            _: PreparedAgentRun,
             _: &mut dyn EventSink,
             c: &CancelToken,
         ) -> Result<AgentOutput, AgentError> {

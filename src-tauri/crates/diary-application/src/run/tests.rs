@@ -1,19 +1,23 @@
 use super::*;
 use crate::agent::{
-    AgentErrorCode, AgentKind, ChatPacket, Locale, Mode, ProfileCheck, ProfileHandle,
+    AgentErrorCode, AgentKind, AgentRequest, ChatPacket, Locale, Mode, ProfileCheck, ProfileHandle,
+    PromptResolver, PromptSelection, ResolvedPrompt,
 };
 use crate::{Coordinator, Error, JobState, Limits};
 use std::cell::Cell;
 
-fn request() -> AgentRequest {
-    AgentRequest::new(
+fn request() -> PreparedAgentRun {
+    let request = AgentRequest::new(
         ProfileHandle {
             alias: "p".into(),
             kind: AgentKind::Codex,
         },
         Locale::parse("en-US").unwrap(),
         Mode::Chat(ChatPacket::new(None, vec![], "hi".into()).unwrap()),
-    )
+    );
+    crate::agent::test_prompts::definition(PromptSelection::for_request(&request))
+        .prepare(request)
+        .unwrap()
 }
 
 /// Replays a script of (clock advance, event), then returns the given result.
@@ -24,16 +28,22 @@ struct Script {
     cancel_after: Option<usize>,
     run: Option<Run>,
 }
+impl PromptResolver for Script {
+    fn resolve(&self, selection: PromptSelection) -> Result<ResolvedPrompt, AgentError> {
+        Ok(crate::agent::test_prompts::definition(selection))
+    }
+}
 impl AgentRunner for Script {
     fn check(&self, _: &ProfileHandle) -> ProfileCheck {
         unreachable!("not used")
     }
-    fn run(
+    fn run_prepared(
         &self,
-        _: AgentRequest,
+        prepared: PreparedAgentRun,
         sink: &mut dyn EventSink,
         _: &crate::agent::CancelToken,
     ) -> Result<AgentOutput, AgentError> {
+        let _ = prepared.into_request();
         for (i, (dt, e)) in self.events.iter().enumerate() {
             self.clock.set(self.clock.get() + dt);
             if self.cancel_after == Some(i) {

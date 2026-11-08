@@ -101,3 +101,16 @@ Use these exact category names in the Settings sidebar, in this order. A categor
 | Reveal configuration folder in Finder | `revealConfigurationFolder` | Open the folder containing the active server configuration file in macOS Finder                                         |
 
 Profile choices are configured in Settings > AI Agents. AI Activities in the Main Toolbar Strip opens run status and result access.
+
+## Implementation map
+
+M30 groups views under `src/components/{standard-layout,explorer,tabbed-editor,
+paragraph-review,global-messages,ai-chat,ai-activities,ai-agents,settings,
+trash-recovery,export}`. Matching state/use cases live under `src/application`;
+bridge validation remains under `src/adapters`, and CodeMirror integration under
+`src/editor`. Main Content, Tabbed Editor and AI Chat use the matching
+`main-content`, `tabbed-editor` and `ai-chat` CSS selectors. Editor tabs and
+Explorer tabs name their accessible groups; Review controls names the React
+control group. The technical `cm-review-bar` is a decorative gutter marker.
+Transport jobs, HTTP sessions, transcript role `assistant`, source identities,
+provider kinds and generation styles retain their distinct technical meanings.

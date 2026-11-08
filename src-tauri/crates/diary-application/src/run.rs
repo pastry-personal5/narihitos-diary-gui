@@ -4,8 +4,8 @@
 //! notifications. Provisional text is never an `AgentOutput`; clients read it by query and
 //! rebuild it after a gap, so the event stream carries no text.
 use crate::agent::{
-    AgentError, AgentEvent, AgentOutput, AgentRequest, AgentRunner, EventSink, MAX_TEXT_BYTES,
-    Phase, Run,
+    AgentError, AgentEvent, AgentOutput, AgentRunner, EventSink, MAX_TEXT_BYTES, Phase,
+    PreparedAgentRun, Run,
 };
 use std::sync::{Arc, Mutex};
 
@@ -103,7 +103,7 @@ impl EventSink for Pump<'_> {
 /// through [`Run::finish`], so a cancel committed first always wins over a late success.
 pub fn execute(
     runner: &dyn AgentRunner,
-    request: AgentRequest,
+    prepared: PreparedAgentRun,
     run: &Run,
     shared: &Shared,
     clock: &dyn Fn() -> u64,
@@ -118,7 +118,7 @@ pub fn execute(
         pending: String::new(),
         last_flush: start,
     };
-    let result = runner.run(request, &mut pump, &run.token());
+    let result = runner.run_prepared(prepared, &mut pump, &run.token());
     pump.flush();
     run.finish(result)
 }

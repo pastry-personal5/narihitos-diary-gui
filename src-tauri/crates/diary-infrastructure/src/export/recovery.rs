@@ -1,7 +1,7 @@
 //! Abandoning uncertain exports and crash recovery.
 use super::*;
 
-impl Inner {
+impl ExportCoordinatorState {
     /// A read-back equal to the saved revision proves the write and resolves the export;
     /// otherwise the user may abandon it after a fresh preview. The remote is never touched.
     pub(super) fn abandon(

@@ -79,10 +79,12 @@ with tempfile.TemporaryDirectory(prefix='diary-trash-build-') as build_temp:
     target = ROOT / 'src-tauri/target/trash-harness'
     output = run(['cargo', 'test', '--quiet', '--manifest-path', str(ROOT / 'src-tauri/Cargo.toml'),
                   '-p', 'diary-infrastructure', '--features', 'fault-injection', '--target-dir', str(target),
-                  '--no-run', '--message-format=json'])
+                  '--lib', '--no-run', '--message-format=json'])
     binaries = [json.loads(line)['executable'] for line in output.splitlines()
                 if line.startswith('{') and json.loads(line).get('reason') == 'compiler-artifact'
-                and json.loads(line).get('executable') and json.loads(line).get('profile', {}).get('test')]
+                and json.loads(line).get('executable') and json.loads(line).get('profile', {}).get('test')
+                and json.loads(line).get('target', {}).get('name') == 'diary_infrastructure'
+                and 'lib' in json.loads(line).get('target', {}).get('kind', [])]
     assert len(binaries) == 1
     worker = binaries[0]
     evidence = []

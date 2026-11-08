@@ -25,8 +25,12 @@ fn profile() -> ProfileHandle {
         kind: AgentKind::Codex,
     }
 }
-fn frozen(count: u8) -> Frozen {
-    Frozen {
+fn frozen(count: u8) -> GenerationContext {
+    GenerationContext {
+        prompt: crate::agent::test_prompts::definition(PromptSelection {
+            provider: AgentKind::Codex,
+            action: PromptAction::GenerateCandidate,
+        }),
         date: date(),
         profile: profile(),
         locale: Locale::parse("en-US").unwrap(),
@@ -46,7 +50,7 @@ fn coordinator() -> Coordinator {
     c.open("s", 0).unwrap();
     c
 }
-fn admit(store: &mut Store, coord: &mut Coordinator, id: &str, f: Frozen) -> Shared {
+fn admit(store: &mut Store, coord: &mut Coordinator, id: &str, f: GenerationContext) -> Shared {
     let (job, g) = store
         .admit(
             coord,
@@ -86,16 +90,22 @@ impl Fake {
         }
     }
 }
+impl PromptResolver for Fake {
+    fn resolve(&self, selection: PromptSelection) -> Result<ResolvedPrompt, AgentError> {
+        Ok(crate::agent::test_prompts::definition(selection))
+    }
+}
 impl AgentRunner for Fake {
     fn check(&self, _: &ProfileHandle) -> ProfileCheck {
         ProfileStatus::Ready.into()
     }
-    fn run(
+    fn run_prepared(
         &self,
-        r: AgentRequest,
+        prepared: PreparedAgentRun,
         sink: &mut dyn EventSink,
         _: &CancelToken,
     ) -> Result<AgentOutput, AgentError> {
+        let r = prepared.into_request();
         self.calls.borrow_mut().push(r);
         sink.event(AgentEvent::Delta("PRIVATE_PREVIEW".into()));
         if let Some(run) = &self.cancel {
@@ -501,6 +511,10 @@ impl AuthenticStore for Authentic {
 }
 fn input(ids: &[&str]) -> Capture {
     Capture {
+        prompt: crate::agent::test_prompts::definition(PromptSelection {
+            provider: AgentKind::Codex,
+            action: PromptAction::GenerateCandidate,
+        }),
         date: date(),
         selections: ids
             .iter()

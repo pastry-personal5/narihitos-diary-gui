@@ -1,4 +1,4 @@
-import { aiProgress, type AiProgress } from "./activity/progress";
+import { aiProgress, type AiProgress } from "./ai-activities/progress";
 export type SnapshotJob = {
   progress?: AiProgress;
   id: string;

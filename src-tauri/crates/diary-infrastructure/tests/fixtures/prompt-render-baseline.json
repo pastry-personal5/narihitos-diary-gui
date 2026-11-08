@@ -1,0 +1,115 @@
+{
+  "source": "git HEAD assets/prompts; parser trims leading newlines and one trailing newline; single-pass replacements",
+  "data": "fixture-data",
+  "algorithm": "SHA-256 over UTF-8 rendered bytes",
+  "entries": [
+    {
+      "asset": "assets/prompts/apple-foundation-models/chat.md",
+      "locale": "en-US",
+      "sha256": "c9911e624056d1f03f8249615bd5aaab92117281a9939f5944dc0db40baa0474",
+      "bytes": 894
+    },
+    {
+      "asset": "assets/prompts/apple-foundation-models/chat.md",
+      "locale": "ko-KR",
+      "sha256": "48277d5d3f854f119bd7591e4da499bf0667632f9ec61c37a485d22b1bd8e9d7",
+      "bytes": 894
+    },
+    {
+      "asset": "assets/prompts/apple-foundation-models/generate-candidate.md",
+      "locale": "en-US",
+      "sha256": "339f899d0238b8e76ef41e5aefd344f485814c3548a708e7104de9594ac43455",
+      "bytes": 2202
+    },
+    {
+      "asset": "assets/prompts/apple-foundation-models/generate-candidate.md",
+      "locale": "ko-KR",
+      "sha256": "9ccbccb2b8ced83c896fa33199d1a81f3f474ca8f99de9f6b7670e1497b1fa5d",
+      "bytes": 2202
+    },
+    {
+      "asset": "assets/prompts/apple-foundation-models/session-instructions.md",
+      "locale": "en-US",
+      "sha256": "54cd48471859b8424b61794078ff099935764a6f8b2ace55ef158f7e919e13a1",
+      "bytes": 218
+    },
+    {
+      "asset": "assets/prompts/apple-foundation-models/session-instructions.md",
+      "locale": "ko-KR",
+      "sha256": "4e083304c04d3cec784fb8bc9c808ed311e7aeb6c3c43e85e9d8767f9e225b9c",
+      "bytes": 218
+    },
+    {
+      "asset": "assets/prompts/claude/chat.md",
+      "locale": "en-US",
+      "sha256": "c9911e624056d1f03f8249615bd5aaab92117281a9939f5944dc0db40baa0474",
+      "bytes": 894
+    },
+    {
+      "asset": "assets/prompts/claude/chat.md",
+      "locale": "ko-KR",
+      "sha256": "48277d5d3f854f119bd7591e4da499bf0667632f9ec61c37a485d22b1bd8e9d7",
+      "bytes": 894
+    },
+    {
+      "asset": "assets/prompts/claude/generate-candidate.md",
+      "locale": "en-US",
+      "sha256": "034dc07836e131aa810431784c5d1a4d71cebfb51d81971972b3df1dd206545e",
+      "bytes": 2246
+    },
+    {
+      "asset": "assets/prompts/claude/generate-candidate.md",
+      "locale": "ko-KR",
+      "sha256": "e7cf50e3001d1bb5d4c3f42a8b3ee190469a84b9bd0efb38db488c8b80751bb2",
+      "bytes": 2246
+    },
+    {
+      "asset": "assets/prompts/codex/chat.md",
+      "locale": "en-US",
+      "sha256": "c9911e624056d1f03f8249615bd5aaab92117281a9939f5944dc0db40baa0474",
+      "bytes": 894
+    },
+    {
+      "asset": "assets/prompts/codex/chat.md",
+      "locale": "ko-KR",
+      "sha256": "48277d5d3f854f119bd7591e4da499bf0667632f9ec61c37a485d22b1bd8e9d7",
+      "bytes": 894
+    },
+    {
+      "asset": "assets/prompts/codex/generate-candidate.md",
+      "locale": "en-US",
+      "sha256": "034dc07836e131aa810431784c5d1a4d71cebfb51d81971972b3df1dd206545e",
+      "bytes": 2246
+    },
+    {
+      "asset": "assets/prompts/codex/generate-candidate.md",
+      "locale": "ko-KR",
+      "sha256": "e7cf50e3001d1bb5d4c3f42a8b3ee190469a84b9bd0efb38db488c8b80751bb2",
+      "bytes": 2246
+    },
+    {
+      "asset": "assets/prompts/qwen/chat.md",
+      "locale": "en-US",
+      "sha256": "c9911e624056d1f03f8249615bd5aaab92117281a9939f5944dc0db40baa0474",
+      "bytes": 894
+    },
+    {
+      "asset": "assets/prompts/qwen/chat.md",
+      "locale": "ko-KR",
+      "sha256": "48277d5d3f854f119bd7591e4da499bf0667632f9ec61c37a485d22b1bd8e9d7",
+      "bytes": 894
+    },
+    {
+      "asset": "assets/prompts/qwen/generate-candidate.md",
+      "locale": "en-US",
+      "sha256": "ef331ecffcd6af9e464afca4a0c39cf7eddf62ac5ad5d158dd0619dd73b946e7",
+      "bytes": 2405
+    },
+    {
+      "asset": "assets/prompts/qwen/generate-candidate.md",
+      "locale": "ko-KR",
+      "sha256": "aba640f03715600a1b527d653d0d0a14ae545bb16b4b5a0c7ee5433922b2a151",
+      "bytes": 2405
+    }
+  ]
+}

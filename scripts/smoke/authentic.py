@@ -1,5 +1,6 @@
 """P1-M6/P1-M7 native smoke: create, save, restart, reload, watcher event and recover a killed save
 through the real diary-server binary. Builds a separate fault-injection binary; synthetic content only."""
+from isolation import server_configuration
 import json
 import os
 from pathlib import Path
@@ -25,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix='diary-authentic-smoke-') as temporary:
         folder.mkdir(exist_ok=True, mode=0o700)
         folder.chmod(0o700)
     config = base / 'config.yaml'
-    config.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: smoke-readable, type: narihito, root: {source}}}\n')
+    config.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: smoke-readable, type: narihito, root: {source}}}\n')
     config.chmod(0o600)
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     processes = []

@@ -3,6 +3,7 @@
 Needs a macOS GUI session and System Events accessibility permission. Uses only
 an isolated temporary server/workspace; never reads the user's configuration.
 """
+from isolation import server_configuration
 import json
 import os
 from pathlib import Path
@@ -55,7 +56,7 @@ def main():
         for name in ('workspace', 'runtime'):
             (base / name).mkdir(mode=0o700)
         config = base / 'config.yaml'
-        config.write_text(f'schema_version: 1\npaths:\n  entries_root: {base / "workspace"}\n  runtime_root: {base / "runtime"}\nsources: []\n')
+        config.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {base / "workspace"}\n  runtime_root: {base / "runtime"}\nsources: []\n')
         config.chmod(0o600)
         launcher = None
         owned = set()

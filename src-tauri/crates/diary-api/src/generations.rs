@@ -159,6 +159,7 @@ pub(super) async fn start(
     let capture_s = s.clone();
     let capture_session = session.clone();
     let alias = b.profile.clone();
+    let capture_runner = runner.clone();
     let captured = tokio::task::spawn_blocking(move || {
         let view = profiles
             .check(&alias)
@@ -169,6 +170,12 @@ pub(super) async fn start(
         let generation = capture_s.config_generation.load(Ordering::Acquire);
         let f = generation::capture(
             generation::Capture {
+                prompt: capture_runner
+                    .resolve(PromptSelection {
+                        provider: view.kind,
+                        action: PromptAction::GenerateCandidate,
+                    })
+                    .map_err(|_| generation::Error::ProfileNotReady)?,
                 date,
                 selections: b
                     .selections

@@ -10,7 +10,13 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
-- 2026-11-08 — Owner — Reopen P1-M29 for the [editor messages follow-up](milestone-29-editor-messages-overview.md): remove the visible editor title and place passive editor/generation/candidate notices in Global Messages. Completed with focused UI regressions and all seven gate commands passing; native visual proof was not run.
+- 2026-11-09 — agent, P1-M30 completed — Canonical frontend features/selectors and accessible regions, one application controller graph with separate navigation/messages/Trash owners, descriptive Rust interfaces, and immutable prompt resolution/preparation now ship together. Byte-equivalent embedded prompts, revision-capture/fake-runner regressions, all seven gate lanes and affected synthetic/native smokes pass. Validation fixtures use isolated loopback ports; native Trash selects its explicit library worker. Completed plans are archived; multiple-prompt management/evaluation remain Phase 2, and M32 packaged/native qualification remains open. See the [acceptance record](../archive/milestones/p1-m30/milestone-30-refactoring-overview.md#requirement-to-evidence-audit).
+
+- 2026-11-08 — agent, P1-M30 implementation started — Recorded the pre-move naming/contract inventory, moved frontend feature modules and their callers, extracted layout/editor composition, and introduced one application controller graph with deferred final teardown. Rust descriptive-name changes preserve transport and durable formats. Prompt preparation and final acceptance remain in progress; see the [M30 evidence record](../archive/milestones/p1-m30/milestone-30-refactoring-overview.md#evidence-record).
+
+- 2026-11-08 — Owner/agent — Plan [M30 refactoring](../archive/milestones/p1-m30/milestone-30-refactoring-overview.md) with unrestricted internal/API renames, canonical UX terminology, explicit lifecycle/layer ownership and immutable prompt preparation. Multiple-prompt management and evaluation are deferred to Phase 2 / v2.0.0. Added the implementation checklist and work sequence; M30 remains Planned and no runtime code changed.
+
+- 2026-11-08 — Owner — Reopen P1-M29 for the [editor messages follow-up](../archive/milestones/p1-m29/milestone-29-editor-messages-overview.md): remove the visible editor title and place passive editor/generation/candidate notices in Global Messages. Completed with focused UI regressions and all seven gate commands passing; native visual proof was not run.
 
 - 2026-11-08 — Agent, owner request — Implement unresolved M29 T34 using the reviewed design; complete toolbar layout/mask/tooltip verification and running-browser visual checks. Full gate, browser visual checks and owner-authorized live Notion heading/reorder proof pass; close M29 and archive its plans. Native WKWebView keyboard/IME evidence remains P1-M32.
 

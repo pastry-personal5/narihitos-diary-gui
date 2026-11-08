@@ -65,3 +65,6 @@ export interface GenerationBridge {
   readCandidate?(candidateId: string): Promise<CandidateView>;
   discardGeneration?(jobId: string): Promise<void>;
 }
+
+export const candidateKey = (job: string, index: number) =>
+  `candidate:${job}:${index}`;

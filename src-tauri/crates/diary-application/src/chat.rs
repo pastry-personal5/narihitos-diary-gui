@@ -3,8 +3,8 @@
 //! Nothing here touches disk or logs. A turn adds its user and assistant messages together and
 //! only on success, so a failed or cancelled turn leaves the transcript as the client saw it.
 use crate::agent::{
-    AgentError, AgentErrorCode, AgentOutput, ChatDocument, ChatPacket, Locale, ProfileHandle, Role,
-    Run, Turn,
+    AgentError, AgentErrorCode, AgentOutput, ChatDocument, ChatPacket, Locale, ProfileHandle,
+    PromptProvenance, Role, Run, Turn,
 };
 use crate::run::Shared;
 
@@ -16,6 +16,7 @@ pub enum Outcome {
 }
 
 pub struct ActiveTurn {
+    pub prompt: PromptProvenance,
     pub job_id: String,
     pub run: Run,
     pub shared: Shared,
@@ -64,8 +65,16 @@ impl Chat {
     }
 
     /// Records an admitted turn. The caller has already passed the busy gate.
-    pub fn start(&mut self, job_id: &str, message: &str, run: Run, shared: Shared) {
+    pub fn start(
+        &mut self,
+        job_id: &str,
+        message: &str,
+        run: Run,
+        shared: Shared,
+        prompt: PromptProvenance,
+    ) {
         self.turn = Some(ActiveTurn {
+            prompt,
             job_id: job_id.into(),
             run,
             shared,
@@ -151,7 +160,18 @@ mod tests {
         )
     }
     fn run(c: &mut Chat, job: &str, msg: &str, r: Result<AgentOutput, AgentError>) {
-        c.start(job, msg, Run::new(), Default::default());
+        c.start(
+            job,
+            msg,
+            Run::new(),
+            Default::default(),
+            crate::agent::test_prompts::definition(super::super::agent::PromptSelection {
+                provider: AgentKind::Codex,
+                action: crate::agent::PromptAction::Chat,
+            })
+            .provenance()
+            .clone(),
+        );
         assert!(c.finish(job, r));
     }
 
@@ -172,8 +192,30 @@ mod tests {
     #[test]
     fn late_result_for_a_replaced_turn_is_ignored() {
         let mut c = chat();
-        c.start("j1", "a", Run::new(), Default::default());
-        c.start("j2", "b", Run::new(), Default::default());
+        c.start(
+            "j1",
+            "a",
+            Run::new(),
+            Default::default(),
+            crate::agent::test_prompts::definition(super::super::agent::PromptSelection {
+                provider: AgentKind::Codex,
+                action: crate::agent::PromptAction::Chat,
+            })
+            .provenance()
+            .clone(),
+        );
+        c.start(
+            "j2",
+            "b",
+            Run::new(),
+            Default::default(),
+            crate::agent::test_prompts::definition(super::super::agent::PromptSelection {
+                provider: AgentKind::Codex,
+                action: crate::agent::PromptAction::Chat,
+            })
+            .provenance()
+            .clone(),
+        );
         assert!(!c.finish("j1", Ok(AgentOutput::Reply("x".into()))));
         assert!(c.transcript().is_empty());
     }
@@ -212,7 +254,18 @@ mod tests {
     #[test]
     fn cancel_commits_once() {
         let mut c = chat();
-        c.start("j1", "a", Run::new(), Default::default());
+        c.start(
+            "j1",
+            "a",
+            Run::new(),
+            Default::default(),
+            crate::agent::test_prompts::definition(super::super::agent::PromptSelection {
+                provider: AgentKind::Codex,
+                action: crate::agent::PromptAction::Chat,
+            })
+            .provenance()
+            .clone(),
+        );
         assert!(c.cancel_job("j1"));
         assert!(!c.cancel_job("j1"));
         assert!(!c.cancel_job("other"));

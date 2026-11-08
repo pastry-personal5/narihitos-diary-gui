@@ -12,7 +12,7 @@ use axum::{
 use diary_application::JobState;
 use diary_application::agent::{
     AgentErrorCode, AgentOutput, AgentRequest, Capability, ChatDocument, DocumentKind, Locale,
-    Mode, Phase, ProfileHandle, ProfileStatus, Role, Run,
+    Mode, Phase, ProfileHandle, ProfileStatus, PromptSelection, Role, Run,
 };
 use diary_application::chat::{Chat, Outcome};
 use diary_domain::authentic::DiaryDate;
@@ -131,6 +131,29 @@ pub(super) async fn open(
     (StatusCode::CREATED, Json(response)).into_response()
 }
 
+fn preparation_failure(
+    s: &ServerState,
+    kind: diary_application::agent::AgentKind,
+    error: diary_application::agent::AgentError,
+) -> Response {
+    use diary_application::diagnostics::{
+        ActionTag, AgentDetail, ErrorTag, EventCode, Level, Record,
+    };
+    let mut detail = AgentDetail::new(kind);
+    detail.action = Some(ActionTag::Chat);
+    detail.code = Some(error.0);
+    s.log(
+        Record::new(EventCode::AgentBlocked, Level::Warn)
+            .agent(detail)
+            .error(if error.0 == AgentErrorCode::Context {
+                ErrorTag::Context
+            } else {
+                ErrorTag::Unavailable
+            }),
+    );
+    failure(StatusCode::UNPROCESSABLE_ENTITY, error.0.as_str())
+}
+
 pub(super) async fn turn(
     State(s): State<Arc<ServerState>>,
     Path(chat_id): Path<String>,
@@ -182,6 +205,16 @@ pub(super) async fn turn(
             Err(e) => return failure(StatusCode::UNPROCESSABLE_ENTITY, e.0.as_str()),
         }
     };
+    let kind = profile.kind;
+    let request = AgentRequest::new(profile, locale, Mode::Chat(packet));
+    let definition = match runner.resolve(PromptSelection::for_request(&request)) {
+        Ok(prompt) => prompt,
+        Err(e) => return preparation_failure(&s, kind, e),
+    };
+    let prepared = match definition.prepare(request) {
+        Ok(prepared) => prepared,
+        Err(e) => return preparation_failure(&s, kind, e),
+    };
     let doc_text = b.document.as_ref().map_or("", |d| d.body.as_str());
     let doc_meta = b.document.as_ref().map_or(String::new(), |d| {
         format!("{}|{}|{}", d.kind, d.date, d.unsaved)
@@ -204,7 +237,13 @@ pub(super) async fn turn(
         let mut chat = s.chat.lock().expect("chat poisoned");
         match chat.as_mut().filter(|c| c.id == chat_id) {
             Some(chat) => {
-                chat.start(&job.id, &b.message, Run::from(run.token()), shared.clone());
+                chat.start(
+                    &job.id,
+                    &b.message,
+                    Run::from(run.token()),
+                    shared.clone(),
+                    prepared.provenance().clone(),
+                );
                 chat.observe_admission(
                     b.request_id.clone(),
                     b.document.as_ref().map(|d| d.date.clone()),
@@ -225,7 +264,6 @@ pub(super) async fn turn(
         .expect("new admission");
     imports::publish(&s, &mut c, &session, &running);
     drop(c);
-    let request = AgentRequest::new(profile, locale, Mode::Chat(packet));
     tokio::task::spawn_blocking(move || {
         let notify_state = s.clone();
         let (notify_session, notify_job) = (session.clone(), job.id.clone());
@@ -241,7 +279,7 @@ pub(super) async fn turn(
         let clock_state = s.clone();
         let result = diary_application::run::execute(
             &*runner,
-            request,
+            prepared,
             &run,
             &shared,
             &move || clock_state.now(),

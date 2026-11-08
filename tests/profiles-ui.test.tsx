@@ -9,7 +9,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { checkDelay } from "../src/components/useProfiles";
+import { checkDelay } from "../src/components/ai-agents/useProfiles";
 import { App } from "../src/components/App";
 import {
   AuthenticError,

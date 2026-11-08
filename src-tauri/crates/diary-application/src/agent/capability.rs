@@ -2,11 +2,6 @@
 use super::{AgentKind, ProfileStatus, Reason};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Action {
-    Chat,
-    Generate,
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AssetState {
     Valid,
     Missing,

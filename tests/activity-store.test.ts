@@ -1,12 +1,12 @@
 import { expect, it } from "vitest";
-import { ActivityStore } from "../src/application/activity/store";
+import { AIActivitiesStore } from "../src/application/ai-activities/store";
 import { generationView } from "./generation-fixtures";
 import type { SnapshotJob } from "../src/application/events";
 const view = generationView();
 const active: SnapshotJob = { ...view.job, progress: view.progress };
 const done: SnapshotJob = { ...active, sequence: 4, state: "succeeded" };
 function snapshot(
-  store: ActivityStore,
+  store: AIActivitiesStore,
   jobs: SnapshotJob[],
   first = true,
   complete = true,
@@ -21,7 +21,7 @@ function snapshot(
   });
 }
 it("restores historical results silently and dismisses attention without deleting metadata", () => {
-  const store = new ActivityStore();
+  const store = new AIActivitiesStore();
   snapshot(store, [done]);
   expect(store.state.jobs.get("j")?.unread).toBe(true);
   expect(store.state.announcement).toBe("");
@@ -31,7 +31,7 @@ it("restores historical results silently and dismisses attention without deletin
   expect(store.state.jobs.size).toBe(1);
 });
 it("keeps partial baseline staged and announces a new completion after disconnect once", () => {
-  const store = new ActivityStore();
+  const store = new AIActivitiesStore();
   snapshot(store, [active]);
   store.event({ kind: "disconnected" });
   snapshot(store, [done], true, false);
@@ -47,7 +47,7 @@ it("keeps partial baseline staged and announces a new completion after disconnec
 });
 
 it("counts each completion once even when consecutive outcomes have identical text", () => {
-  const store = new ActivityStore();
+  const store = new AIActivitiesStore();
   snapshot(store, [active]);
   store.observe(done);
   expect(store.state.notice).toBe(1);
@@ -58,7 +58,7 @@ it("counts each completion once even when consecutive outcomes have identical te
 });
 
 it("retains scoped terminal deduplication after authoritative result removal", () => {
-  const store = new ActivityStore();
+  const store = new AIActivitiesStore();
   snapshot(store, [active]);
   store.observe(done);
   expect(store.state.notice).toBe(1);
@@ -73,7 +73,7 @@ it("accounts staged metadata before retention and preserves the previous baselin
   const { SessionBudget } =
     await import("../src/application/navigation/budget");
   const budget = new SessionBudget(4096);
-  const store = new ActivityStore(budget);
+  const store = new AIActivitiesStore(budget);
   snapshot(store, [active]);
   const retained = budget.used;
   expect(retained).toBeGreaterThan(0);

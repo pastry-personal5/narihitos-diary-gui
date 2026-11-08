@@ -433,3 +433,6 @@ pub fn router(state: Arc<ServerState>) -> Router {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod test_prompts;

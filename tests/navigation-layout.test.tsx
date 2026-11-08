@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { App } from "../src/components/App";
-import { PaneSeparator } from "../src/components/PaneSeparator";
-import { GlobalMessages } from "../src/components/GlobalMessages";
-import { Messages } from "../src/application/navigation/messages";
+import { PaneSeparator } from "../src/components/standard-layout/PaneSeparator";
+import { GlobalMessages } from "../src/components/global-messages/GlobalMessages";
+import { GlobalMessagesStore } from "../src/application/global-messages/store";
 import { navigationFake } from "./navigation-fake";
 import { settingsFake } from "./settings-fake";
 import type { Bridge } from "../src/application/bridge";
@@ -100,19 +100,19 @@ describe("N01 Standard Layout containment", () => {
   it("places Global Messages inside the editor column and drives the grid from separators", () => {
     render(<App bridge={bridge()} />);
     const messages = screen.getByLabelText("Global Messages");
-    const editorColumn = messages.closest(".editor-column");
+    const editorColumn = messages.closest(".tabbed-editor");
     expect(editorColumn).toBeTruthy();
+    expect(editorColumn?.contains(screen.getByLabelText("Editor tabs"))).toBe(
+      true,
+    );
     expect(
-      editorColumn?.contains(screen.getByLabelText("Open editor resources")),
-    ).toBe(true);
-    expect(
-      screen.getByLabelText("Explorer").closest(".editor-column"),
+      screen.getByLabelText("Explorer").closest(".tabbed-editor"),
     ).toBeNull();
     expect(
-      screen.getByLabelText("AI Chat").closest(".editor-column"),
+      screen.getByLabelText("AI Chat").closest(".tabbed-editor"),
     ).toBeNull();
 
-    const workspace = document.querySelector<HTMLElement>(".workspace")!;
+    const workspace = document.querySelector<HTMLElement>(".main-content")!;
     const explorer = screen.getByRole("separator", { name: "Resize Explorer" });
     const before = Number(explorer.getAttribute("aria-valuenow"));
     for (let i = 0; i < 100; i++)
@@ -142,7 +142,7 @@ describe("N01 Standard Layout containment", () => {
 
 describe("N10 Global Messages presentation", () => {
   it("lists oldest first with time, severity text and icon, polite log, and no focus theft", () => {
-    const messages = new Messages(() => "09:15");
+    const messages = new GlobalMessagesStore(() => "09:15");
     messages.add("Imported 3 sources");
     messages.add("Disk nearly full", "warning");
     messages.add("Save failed", "error");

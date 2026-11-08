@@ -1,7 +1,7 @@
 import type { Bridge } from "../bridge";
 import type { StreamEvent } from "../events";
 import type { Calendar, CalendarAction, Source } from "./contracts";
-import { SessionBudget } from "./budget";
+import type { SessionBudget } from "./budget";
 import { ImportController } from "./imports";
 import {
   ResourceCoordinator,
@@ -9,15 +9,11 @@ import {
   type SourceChoice,
 } from "./resources";
 import { AuthenticCatalog } from "./catalog";
-import { Messages } from "./messages";
-import { TrashCoordinator } from "../trash/coordinator";
+import type { GlobalMessagesStore } from "../global-messages/store";
 export class NavigationModel {
-  readonly budget = new SessionBudget();
   readonly imports: ImportController;
   readonly resources: ResourceCoordinator;
   readonly catalog: AuthenticCatalog;
-  readonly messages = new Messages();
-  readonly trash: TrashCoordinator;
   focusedSnippet: Source | null = null;
   /** Runs before a date change; false keeps the date (an unsettled review). */
   private beforeDateChange: (() => Promise<boolean>) | null = null;
@@ -40,10 +36,14 @@ export class NavigationModel {
   private calendarEpoch = 0;
   private epoch = 0;
   private readonly listeners = new Set<() => void>();
-  constructor(private readonly bridge: Bridge) {
-    this.imports = new ImportController(bridge, this.budget);
-    this.catalog = new AuthenticCatalog(bridge, this.budget);
-    this.resources = new ResourceCoordinator(bridge, this.budget, {
+  constructor(
+    private readonly bridge: Bridge,
+    private readonly messages: GlobalMessagesStore,
+    budget: SessionBudget,
+  ) {
+    this.imports = new ImportController(bridge, budget);
+    this.catalog = new AuthenticCatalog(bridge, budget);
+    this.resources = new ResourceCoordinator(bridge, budget, {
       notice: (text) => this.messages.add(text),
       savedDatesChanged: () => {
         void this.catalog.refresh();
@@ -61,23 +61,6 @@ export class NavigationModel {
           this.emit();
         }),
     });
-    this.trash = new TrashCoordinator(bridge, this.budget, {
-      prepare: (id, previous) =>
-        this.resources.prepareSourceDelete(id, previous),
-      reserve: (id, operation) =>
-        this.resources.reserveSourceDelete(id, operation),
-      release: (id, operation) =>
-        this.resources.releaseSourceDelete(id, operation),
-      reconcileReservations: (unfinished) =>
-        this.resources.reconcileSourceReservations(unfinished),
-      moved: (id, baseline) => {
-        if (this.focusedSnippet?.id === id) this.focusedSnippet = null;
-        this.imports.sourceMoved(id);
-        this.resources.sourceMoved(id, baseline);
-      },
-      notice: (text) => this.messages.add(text),
-    });
-    this.trash.subscribe(() => this.emit());
     this.imports.subscribe(() => {
       const dates = new Set(
         [...this.resources.resources.values()]
@@ -120,7 +103,6 @@ export class NavigationModel {
       this.emit();
     });
     this.catalog.subscribe(() => this.emit());
-    this.messages.subscribe(() => this.emit());
   }
   subscribe = (l: () => void) => {
     this.listeners.add(l);
@@ -143,10 +125,7 @@ export class NavigationModel {
     this.calendarLoading = false; // a superseded browse() never clears it
     this.imports.connect(online ? `${instance}:*:${epoch}` : null, generation);
     this.catalog.connect(online);
-    const trashConnection = this.trash.connect(online, writable);
     await this.resources.connect(online, writable);
-    if (epoch !== this.epoch || this.disposed) return;
-    await trashConnection;
     if (epoch !== this.epoch || this.disposed) return;
     this.messages.add(
       online
@@ -248,6 +227,15 @@ export class NavigationModel {
   readSource(source: Source) {
     return this.bridge.readSource(source.id, source.import_id);
   }
+  sourceMoved(
+    id: string,
+    baseline?: import("./resources").DeleteBufferBaseline | null,
+  ) {
+    if (this.focusedSnippet?.id === id) this.focusedSnippet = null;
+    this.imports.sourceMoved(id);
+    this.resources.sourceMoved(id, baseline);
+    this.emit();
+  }
   focusSnippet(source: Source) {
     if (
       this.focusedSnippet?.id === source.id &&
@@ -256,42 +244,6 @@ export class NavigationModel {
       return;
     this.focusedSnippet = source;
     this.emit();
-  }
-  trashReason(source: Source | null): string | null {
-    if (!source) return "Choose a source snippet in the Explorer first.";
-    if (!this.online)
-      return "Connect to the server before moving a source to Trash.";
-    if (!this.resources.mutationReady)
-      return "Storage is unavailable. Move to Trash is disabled.";
-    if (this.trash.preparing || this.resources.transitioning)
-      return "Wait for source preparation to finish.";
-    if (this.imports.sourceDisabled(source))
-      return "This source moved to Trash. Refresh snippets first.";
-    if (this.resources.sourceReserved(source.id))
-      return "Inspect the unfinished Move to Trash operation in Trash Recovery.";
-    const context = this.resources.selectedDate
-      ? this.imports.view(this.resources.selectedDate)
-      : null;
-    if (context?.stale)
-      return "Refresh snippets before moving a source to Trash.";
-    const r = this.resources.resources.get(`source:${source.id}`);
-    const caps = r?.source?.capabilities ?? source.capabilities;
-    if (r?.detached)
-      return "This is a detached copy of a source that moved to Trash.";
-    if (caps.trash || caps.trash_reason === "checked_on_preview") return null;
-    return caps.trash_reason === "producer_unverified"
-      ? "Move to Trash is not supported for this producer."
-      : caps.trash_reason === "unsupported_format"
-        ? "Move to Trash is unavailable for this source format."
-        : "Move to Trash is unavailable for this source.";
-  }
-  async trashSource(source: Source) {
-    const reason = this.trashReason(source);
-    if (reason) {
-      this.messages.add(reason, "warning");
-      return;
-    }
-    await this.trash.start(source.id, source.relative_key);
   }
   async refreshActiveSource() {
     const resource = this.resources.active,
@@ -338,7 +290,6 @@ export class NavigationModel {
     this.calendarEpoch++;
     this.sourceGuard?.finish("cancel");
     this.resources.dispose();
-    this.trash.dispose();
     this.imports.dispose();
     this.catalog.dispose();
     this.listeners.clear();

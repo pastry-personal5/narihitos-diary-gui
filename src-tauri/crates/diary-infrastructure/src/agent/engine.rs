@@ -4,12 +4,11 @@
 //! (env, version/auth probes, argv, stream parsing); it never touches the supervisor, run directory
 //! lifetime, counter or logger. Ordering here is the contract the adapter suites pin.
 use super::{
-    assets::{AssetError, AssetReason, CHAT, GENERATE, Prompt, PromptAssets},
     host::{Host, RunDir},
     output::{validate_generation, validate_reply},
-    packet::encode_packet,
     process::{Exit, Outcome, Spec, Stop, Supervisor},
     profiles::{Entry, ProfileTable},
+    prompts::EmbeddedPromptCatalog,
 };
 use diary_application::{
     agent::*,
@@ -26,14 +25,14 @@ use std::{
 };
 
 /// Everything a protocol may use while probing: resolved paths and the child environment.
-pub struct Ctx<'a> {
+pub struct AgentProtocolContext<'a> {
     pub host: &'a Host,
     pub exe: &'a Path,
     pub home: &'a Path,
     pub dir: &'a RunDir,
     pub env: Vec<(OsString, OsString)>,
 }
-impl Ctx<'_> {
+impl AgentProtocolContext<'_> {
     /// Status probe (never inference): outcome plus stdout and stderr-tail text.
     pub fn probe(&self, args: &[&str], cancel: &CancelToken) -> Option<(Outcome, String)> {
         self.host
@@ -61,7 +60,7 @@ pub trait Stream: Send {
         &mut self,
         outcome: &Outcome,
         inv: &Invocation,
-        prompt: &Prompt,
+        prompt: &AgentExecutionSettings,
     ) -> Result<(), AgentError>;
     /// Reads the final output after the `ValidatingOutput` phase.
     fn collect(&mut self, inv: &Invocation) -> Result<Collected, AgentError>;
@@ -85,30 +84,24 @@ pub trait Protocol: Send + Sync + 'static {
         host.resolve(entry, name).ok_or(Reason::ExecutableMissing)
     }
     /// Builds the child's stdin from the rendered task prompt. Default: the prompt itself.
-    fn stdin(
-        &self,
-        _assets: &PromptAssets,
-        rendered: String,
-        _locale: &Locale,
-        _chat: bool,
-    ) -> Result<Vec<u8>, Reason> {
-        Ok(rendered.into_bytes())
+    fn stdin(&self, prepared: &PreparedAgentRun) -> Result<Vec<u8>, Reason> {
+        Ok(prepared.task().as_bytes().to_vec())
     }
     /// `Ok` only for a supported version; runs before every run and every check.
-    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), Reason>;
+    fn version(&self, ctx: &AgentProtocolContext, cancel: &CancelToken) -> Result<(), Reason>;
     /// Check-only login probe, after `version`. Default: nothing to probe.
-    fn auth(&self, _ctx: &Ctx) -> ProfileCheck {
+    fn auth(&self, _ctx: &AgentProtocolContext) -> ProfileCheck {
         ProfileStatus::Ready.into()
     }
     /// Runs after the asset lookup and before the packet is encoded.
-    fn check_prompt(&self, _prompt: &Prompt) -> Result<(), Reason> {
+    fn check_prompt(&self, _prompt: &AgentExecutionSettings) -> Result<(), Reason> {
         Ok(())
     }
     /// Builds argv (and any private files in the run directory) after preflight.
     fn invocation(
         &self,
         dir: &RunDir,
-        prompt: &Prompt,
+        prompt: &AgentExecutionSettings,
         chat: bool,
     ) -> Result<Invocation, AgentError>;
     fn stream(&self) -> Box<dyn Stream>;
@@ -188,7 +181,7 @@ impl Diag {
 
 pub struct Adapter<P: Protocol> {
     table: Arc<ProfileTable>,
-    assets: PromptAssets,
+    catalog: EmbeddedPromptCatalog,
     host: Arc<Host>,
     proto: P,
     /// Last `(status, reason)` per alias, so a check record can say whether the reason changed.
@@ -197,29 +190,30 @@ pub struct Adapter<P: Protocol> {
 
 impl<P: Protocol> Adapter<P> {
     pub fn with_protocol(table: Arc<ProfileTable>, host: Arc<Host>, proto: P) -> Self {
-        Self::with_assets(table, host, proto, PromptAssets::embedded())
+        Self::with_catalog(table, host, proto, EmbeddedPromptCatalog::embedded())
     }
     /// For tests that need missing, malformed or odd prompt assets.
-    pub fn with_assets(
+    pub fn with_catalog(
         table: Arc<ProfileTable>,
         host: Arc<Host>,
         proto: P,
-        assets: PromptAssets,
+        catalog: EmbeddedPromptCatalog,
     ) -> Self {
         Self {
             table,
-            assets,
+            catalog,
             host,
             proto,
             last: Mutex::new(HashMap::new()),
         }
     }
-    pub fn assets(&self) -> &PromptAssets {
-        &self.assets
-    }
-
-    fn ctx<'a>(&'a self, exe: &'a Path, home: &'a Path, dir: &'a RunDir) -> Ctx<'a> {
-        Ctx {
+    fn ctx<'a>(
+        &'a self,
+        exe: &'a Path,
+        home: &'a Path,
+        dir: &'a RunDir,
+    ) -> AgentProtocolContext<'a> {
+        AgentProtocolContext {
             host: &self.host,
             exe,
             home,
@@ -279,12 +273,13 @@ impl<P: Protocol> Adapter<P> {
 
     fn execute(
         &self,
-        request: &AgentRequest,
+        prepared: &PreparedAgentRun,
         events: &mut dyn EventSink,
         run: &Run,
         diag: &mut Diag,
     ) -> Result<AgentOutput, AgentError> {
         use AgentErrorCode as C;
+        let request = prepared.request();
         let phase = |events: &mut dyn EventSink, p: Phase| {
             if let Some(e) = run.accept(AgentEvent::Phase(p)) {
                 events.event(e);
@@ -314,35 +309,14 @@ impl<P: Protocol> Adapter<P> {
             }
             Some(e) => e,
         };
-        let (chat, name) = match request.mode() {
-            Mode::Chat(_) => (true, CHAT),
-            Mode::Candidate { .. } => (false, GENERATE),
-        };
-        let prompt = self
-            .assets
-            .get(self.proto.kind(), name)
-            .map_err(|e: AssetError| {
-                diag.fail(
-                    match e.reason {
-                        AssetReason::Missing => Reason::AssetsMissing,
-                        AssetReason::Malformed(_) => Reason::AssetsInvalid,
-                    },
-                    C::AssetsUnavailable,
-                )
-            })?;
+        let chat = matches!(request.mode(), Mode::Chat(_));
+        let prompt = prepared.settings();
         self.proto
             .check_prompt(prompt)
             .map_err(|r| diag.fail(r, C::AssetsUnavailable))?;
-        let data =
-            encode_packet(request.mode()).map_err(|e| diag.fail(Reason::PacketTooLarge, e.0))?;
         let stdin = self
             .proto
-            .stdin(
-                &self.assets,
-                prompt.render(request.locale(), Some(&data)),
-                request.locale(),
-                chat,
-            )
+            .stdin(prepared)
             .map_err(|r| diag.fail(r, C::AssetsUnavailable))?;
         diag.input = u32::try_from(stdin.len()).unwrap_or(u32::MAX);
         let exe = self
@@ -474,11 +448,77 @@ impl<P: Protocol> AgentRunner for Adapter<P> {
         self.log_check(profile, c, started);
         c
     }
+    fn run_prepared(
+        &self,
+        prepared: PreparedAgentRun,
+        events: &mut dyn EventSink,
+        cancel: &CancelToken,
+    ) -> Result<AgentOutput, AgentError> {
+        self.run_logged(prepared.request(), events, cancel, |events, run, diag| {
+            self.execute(&prepared, events, run, diag)
+        })
+    }
     fn run(
         &self,
         request: AgentRequest,
         events: &mut dyn EventSink,
         cancel: &CancelToken,
+    ) -> Result<AgentOutput, AgentError> {
+        self.run_logged(&request, events, cancel, |events, run, diag| {
+            if cancel.is_cancelled() || self.host.is_shutdown() {
+                return Err(diag.fail(
+                    if self.host.is_shutdown() {
+                        Reason::HostShuttingDown
+                    } else {
+                        Reason::CancelledBeforeStart
+                    },
+                    AgentErrorCode::Cancelled,
+                ));
+            }
+            // Standalone clients resolve at invocation; admitted jobs pass their captured definition.
+            let selection = PromptSelection::for_request(&request);
+            let prompt = self.resolve(selection).map_err(|e| {
+                let states = self.catalog.state(selection.provider, selection.action);
+                diag.fail(
+                    if states.contains(&AssetState::Invalid) {
+                        Reason::AssetsInvalid
+                    } else {
+                        Reason::AssetsMissing
+                    },
+                    e.0,
+                )
+            })?;
+            self.proto
+                .check_prompt(prompt.settings())
+                .map_err(|r| diag.fail(r, AgentErrorCode::AssetsUnavailable))?;
+            let prepared = prompt.prepare(request.clone()).map_err(|e| {
+                diag.fail(
+                    if e.0 == AgentErrorCode::Context {
+                        Reason::PacketTooLarge
+                    } else {
+                        Reason::AssetsInvalid
+                    },
+                    e.0,
+                )
+            })?;
+            self.execute(&prepared, events, run, diag)
+        })
+    }
+}
+
+impl<P: Protocol> PromptResolver for Adapter<P> {
+    fn resolve(&self, selection: PromptSelection) -> Result<ResolvedPrompt, AgentError> {
+        self.catalog.resolve(selection)
+    }
+}
+
+impl<P: Protocol> Adapter<P> {
+    fn run_logged(
+        &self,
+        request: &AgentRequest,
+        events: &mut dyn EventSink,
+        cancel: &CancelToken,
+        work: impl FnOnce(&mut dyn EventSink, &Run, &mut Diag) -> Result<AgentOutput, AgentError>,
     ) -> Result<AgentOutput, AgentError> {
         let _active = self.host.enter();
         let started = Instant::now();
@@ -489,7 +529,7 @@ impl<P: Protocol> AgentRunner for Adapter<P> {
             events: 0,
             phase: None,
         };
-        let result = run.finish(self.execute(&request, &mut watch, &run, &mut diag));
+        let result = run.finish(work(&mut watch, &run, &mut diag));
         let last_phase = watch.phase;
         if let Some(e) = run.accept(AgentEvent::Phase(Phase::Finished)) {
             watch.event(e);

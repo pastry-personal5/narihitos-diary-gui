@@ -10,11 +10,11 @@ use diary_application::{
 };
 use diary_domain::authentic::DiaryDate;
 use diary_infrastructure::agent::{
-    assets::{EMBEDDED, PromptAssets},
     codex::CodexAdapter,
     host::Host,
     process::Limits,
     profiles::{Entry, ProfileTable},
+    prompts::{EMBEDDED, EmbeddedPromptCatalog},
     registry::Agents,
 };
 use std::{
@@ -417,7 +417,7 @@ fn no_record_carries_content_paths_or_names() {
 /// A Codex adapter with chosen limits and prompt assets, logging into the returned sink.
 fn codex_with(
     limits: Limits,
-    assets: Option<PromptAssets>,
+    assets: Option<EmbeddedPromptCatalog>,
     runtime_is_a_file: bool,
 ) -> (tempfile::TempDir, CodexAdapter, Arc<Logs>) {
     let root = tempfile::tempdir().unwrap();
@@ -438,7 +438,7 @@ fn codex_with(
     // Probes keep ordinary limits so a tiny run limit cannot break the version check.
     let host = support::host_with_probe(root.path(), logs.clone(), limits, self::limits());
     let adapter = match assets {
-        Some(a) => CodexAdapter::with_prompt_assets(table, host, a),
+        Some(a) => CodexAdapter::with_prompt_catalog(table, host, a),
         None => CodexAdapter::new(table, host),
     };
     (root, adapter, logs)
@@ -460,7 +460,7 @@ fn only(logs: &Logs) -> (EventCode, Level, AgentDetail) {
     logs.one()
 }
 /// The embedded table with every Codex asset passed through `f`.
-fn codex_assets(f: impl Fn(&'static str, &str) -> Option<String>) -> PromptAssets {
+fn codex_assets(f: impl Fn(&'static str, &str) -> Option<String>) -> EmbeddedPromptCatalog {
     let table: Vec<(AgentKind, &str, String)> = EMBEDDED
         .iter()
         .filter_map(|(k, n, t)| {
@@ -473,7 +473,7 @@ fn codex_assets(f: impl Fn(&'static str, &str) -> Option<String>) -> PromptAsset
         .collect();
     let refs: Vec<(AgentKind, &str, &str)> =
         table.iter().map(|(k, n, t)| (*k, *n, t.as_str())).collect();
-    PromptAssets::from_table(&refs)
+    EmbeddedPromptCatalog::from_table(&refs)
 }
 
 #[test]

@@ -2,8 +2,10 @@
 //! turn), fixed-argv one-shot run on stdin, stream-json parsing and error mapping. No diary or chat
 //! text reaches argv, logs or `AgentError`. Output is accepted only through the M16 validators.
 use super::{
-    assets::Prompt,
-    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream, auth_failed, probe_fault},
+    engine::{
+        Adapter, AgentProtocolContext, Collected, Invocation, Protocol, Stream, auth_failed,
+        probe_fault,
+    },
     host::{GENERATION_SCHEMA, Host, RunDir, classify},
     process::{Exit, Outcome},
     profiles::ProfileTable,
@@ -138,7 +140,12 @@ impl Stream for ClaudeStream {
     fn record(&mut self, rec: &[u8], chat: bool, run: &Run, sink: &mut dyn EventSink) {
         ClaudeStream::record(self, rec, chat, run, sink)
     }
-    fn conclude(&mut self, o: &Outcome, _: &Invocation, _: &Prompt) -> Result<(), AgentError> {
+    fn conclude(
+        &mut self,
+        o: &Outcome,
+        _: &Invocation,
+        _: &AgentExecutionSettings,
+    ) -> Result<(), AgentError> {
         if let Some(code) = self.failure() {
             return Err(code.into());
         }
@@ -231,7 +238,7 @@ impl Protocol for Claude {
         extra.extend(self.user.clone().map(|u| ("USER".into(), u)));
         host.env(exe, tmp, extra)
     }
-    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), Reason> {
+    fn version(&self, ctx: &AgentProtocolContext, cancel: &CancelToken) -> Result<(), Reason> {
         let (o, text) = ctx
             .probe(&["--version"], cancel)
             .ok_or(Reason::SpawnFailed)?;
@@ -247,7 +254,7 @@ impl Protocol for Claude {
             Err(Reason::VersionUnreadable)
         }
     }
-    fn auth(&self, ctx: &Ctx) -> ProfileCheck {
+    fn auth(&self, ctx: &AgentProtocolContext) -> ProfileCheck {
         let Some((o, text)) = ctx.probe(&["auth", "status"], &CancelToken::default()) else {
             return auth_failed(None);
         };
@@ -268,7 +275,7 @@ impl Protocol for Claude {
     fn invocation(
         &self,
         _: &RunDir,
-        prompt: &Prompt,
+        prompt: &AgentExecutionSettings,
         chat: bool,
     ) -> Result<Invocation, AgentError> {
         Ok(Invocation {

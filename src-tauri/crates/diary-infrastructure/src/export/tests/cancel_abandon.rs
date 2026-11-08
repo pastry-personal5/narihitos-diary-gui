@@ -1,6 +1,6 @@
 use super::*;
 
-fn uncertain(e: &Env, rev: &AuthenticRevision) -> Service {
+fn uncertain(e: &Env, rev: &AuthenticRevision) -> ExportCoordinator {
     let svc =
         e.ws.exports(e.store.clone(), Some(e.fake.clone()))
             .unwrap()

@@ -1,7 +1,7 @@
 //! Saved-revision snapshot and session-bound preview issuing.
 use super::*;
 
-impl Inner {
+impl ExportCoordinatorState {
     pub(super) fn snapshot(&self, request: &StartRequest) -> Result<Snapshot, ExportError> {
         match self.authentic.load(&request.date) {
             Ok(Loaded::File {

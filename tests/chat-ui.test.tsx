@@ -12,8 +12,8 @@ import {
   type Bridge,
   type ProfileInfo,
 } from "../src/application/bridge";
-import { ChatController } from "../src/application/chat";
-import { ChatPane } from "../src/components/ChatPane";
+import { AIChatController } from "../src/application/ai-chat/controller";
+import { AIChat } from "../src/components/ai-chat/AIChat";
 
 afterEach(cleanup);
 const cap = { available: true, reason: null };
@@ -52,7 +52,7 @@ function setup() {
     closeChat: async () => {},
     cancelJob: vi.fn(async () => ({})),
   } as unknown as Bridge;
-  const controller = new ChatController(bridge, Date.now, () => "req");
+  const controller = new AIChatController(bridge, Date.now, () => "req");
   return {
     bridge,
     controller,
@@ -77,7 +77,7 @@ async function mount(locale: string | null = "en-US", connected = true) {
   const s = setup();
   await s.controller.loadProfiles();
   render(
-    <ChatPane
+    <AIChat
       controller={s.controller}
       connected={connected}
       locale={locale}
@@ -87,7 +87,7 @@ async function mount(locale: string | null = "en-US", connected = true) {
   return s;
 }
 
-describe("ChatPane", () => {
+describe("AIChat", () => {
   it("allows Shift+Enter newlines and sends multiline text on Enter without hints", async () => {
     const s = await mount();
     const box = screen.getByLabelText("Message");
@@ -116,9 +116,9 @@ describe("ChatPane", () => {
       locale: "en-US",
       context: () => ({ document: null, chip }),
     };
-    const view = render(<ChatPane {...props} />);
+    const view = render(<AIChat {...props} />);
     const badge = screen.getByLabelText("AI Chat context");
-    expect(badge.closest(".chat-composer")).toBeTruthy();
+    expect(badge.closest(".ai-chat-composer")).toBeTruthy();
     expect(badge.textContent).toBe(chip);
     expect(
       badge.querySelector('[aria-hidden="true"]')?.getAttribute("style"),
@@ -127,10 +127,10 @@ describe("ChatPane", () => {
       screen.getByLabelText("Message").getAttribute("aria-describedby"),
     ).toContain(badge.id);
     chip = "Source interview, unsaved edits included";
-    view.rerender(<ChatPane {...props} />);
+    view.rerender(<AIChat {...props} />);
     expect(badge.textContent).toBe(chip);
     chip = "No document";
-    view.rerender(<ChatPane {...props} />);
+    view.rerender(<AIChat {...props} />);
     expect(badge.textContent).toBe(chip);
     s.controller.dispose();
   });

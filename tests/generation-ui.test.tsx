@@ -1,4 +1,4 @@
-import { Messages } from "../src/application/navigation/messages";
+import { GlobalMessagesStore } from "../src/application/global-messages/store";
 import { App } from "../src/components/App";
 import { navigationFake } from "./navigation-fake";
 import { settingsFake } from "./settings-fake";
@@ -16,17 +16,15 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  CandidateBanner,
+  CandidateEditor,
   GenerationControls,
   GenerationDialog,
-} from "../src/components/GenerationPane";
+} from "../src/components/tabbed-editor/CandidateEditor";
 import { GenerationController } from "../src/application/generation/controller";
 import { generationServer } from "./generation-fake";
-import {
-  candidateKey,
-  useCandidateTabs,
-} from "../src/components/candidateTabs";
-import { useGeneration } from "../src/components/useGeneration";
+import { useCandidateTabs } from "../src/components/tabbed-editor/useCandidateTabs";
+import { candidateKey } from "../src/application/generation/contracts";
+import { useGeneration } from "../src/components/tabbed-editor/useGeneration";
 import { ResourceCoordinator } from "../src/application/navigation/resources";
 import { SessionBudget } from "../src/application/navigation/budget";
 import { useSyncExternalStore } from "react";
@@ -54,7 +52,7 @@ function Tabs({ c, r }: { c: GenerationController; r: ResourceCoordinator }) {
           </button>
         ))}
       </div>
-      <CandidateBanner
+      <CandidateEditor
         controller={c}
         resources={r}
         messages={controlMessages}
@@ -73,7 +71,7 @@ async function setup() {
 }
 beforeEach(() => {
   vi.useFakeTimers();
-  controlMessages = new Messages();
+  controlMessages = new GlobalMessagesStore();
 });
 afterEach(() => {
   cleanup();
@@ -81,7 +79,7 @@ afterEach(() => {
   controllers.length = 0;
   vi.useRealTimers();
 });
-let controlMessages = new Messages();
+let controlMessages = new GlobalMessagesStore();
 function Controls({ c }: { c: GenerationController }) {
   useGeneration(c);
   return (
@@ -101,7 +99,7 @@ function Controls({ c }: { c: GenerationController }) {
 describe("generation interaction", () => {
   it("routes generation guidance and blockers to Global Messages only when changed", async () => {
     const { c } = await setup();
-    const messages = new Messages();
+    const messages = new GlobalMessagesStore();
     const props = {
       controller: c,
       messages,

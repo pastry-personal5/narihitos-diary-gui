@@ -6,7 +6,7 @@ import {
   type ChatTurn,
   type ProfileInfo,
 } from "../src/application/bridge";
-import { ChatController } from "../src/application/chat";
+import { AIChatController } from "../src/application/ai-chat/controller";
 
 const cap = { available: true, reason: null };
 const profile = (alias: string): ProfileInfo => ({
@@ -80,7 +80,7 @@ function server() {
 }
 async function ready() {
   const s = server();
-  const c = new ChatController(
+  const c = new AIChatController(
     s.bridge,
     () => 1000,
     () => "req-1",
@@ -95,7 +95,7 @@ const doc = {
   body: "b",
 };
 
-describe("ChatController", () => {
+describe("AIChatController", () => {
   it("opens lazily, shows provisional text, then the validated reply with its chip", async () => {
     const { s, c } = await ready();
     expect(
@@ -208,7 +208,7 @@ describe("ChatController", () => {
   });
 
   it("is unavailable when the bridge has no chat commands", () => {
-    const c = new ChatController({} as Bridge);
+    const c = new AIChatController({} as Bridge);
     expect(c.available).toBe(false);
   });
 });
@@ -303,7 +303,7 @@ it("refuses unaccounted frozen context before starting inference", async () => {
   const { SessionBudget } =
     await import("../src/application/navigation/budget");
   const budget = new SessionBudget(64);
-  const c = new ChatController(
+  const c = new AIChatController(
     s.bridge,
     () => 0,
     () => "r",

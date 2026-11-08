@@ -117,3 +117,10 @@ Smoke tests and the log trace tool: [docs/smoke-tests.md](smoke-tests.md).
 - Expose backend features to the UI only through explicit Tauri commands, and grant the minimum Tauri 2 capabilities/permissions each needs.
 - Write UI in TypeScript with React function components; keep CodeMirror 6 editor setup in dedicated modules.
 - Before adding or changing agent behavior, inspect `assets/prompts/` and reuse or update the relevant files under `assets/prompts/<agent-type>/` (`codex`, `claude`, `qwen`, `apple-foundation-models`). Store all app-authored system/session instructions, task prompts and retry/repair prompts there; never hard-code prompt text or fallback prompts in source code. Source code may load assets, validate schemas and substitute request data. Missing or invalid assets disable the affected action with a visible error. See the [format and existing inventory](../assets/prompts/README.md).
+
+Synthetic server smokes select an unused loopback port in their temporary
+configuration (`scripts/smoke/isolation.py`), with no fallback into the ordinary
+app's ports. They authenticate only through their own process's discovery file;
+if the short port release/bind race is lost, readiness fails. They never stop an
+unrelated server. Loopback permission is required for both these smokes and the
+bridge tests; a sandbox denial is not a passing result.

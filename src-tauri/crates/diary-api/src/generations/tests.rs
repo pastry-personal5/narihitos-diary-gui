@@ -211,22 +211,44 @@ impl ProfileDirectory for Profiles {
     }
 }
 struct Runner {
+    revision: AtomicUsize,
+    resolutions: AtomicUsize,
+    captured: Mutex<Vec<(PromptRevision, String)>>,
     calls: AtomicUsize,
     block: bool,
     ack: AtomicBool,
     partial: bool,
     fail: bool,
 }
+impl PromptResolver for Runner {
+    fn resolve(&self, selection: PromptSelection) -> Result<ResolvedPrompt, AgentError> {
+        self.resolutions.fetch_add(1, Ordering::SeqCst);
+        Ok(crate::test_prompts::definition_at(
+            selection,
+            if self.revision.load(Ordering::SeqCst) == 0 {
+                'a'
+            } else {
+                'b'
+            },
+        ))
+    }
+}
 impl AgentRunner for Runner {
     fn check(&self, _: &ProfileHandle) -> ProfileCheck {
         unreachable!()
     }
-    fn run(
+    fn run_prepared(
         &self,
-        request: AgentRequest,
+        prepared: PreparedAgentRun,
         events: &mut dyn EventSink,
         cancel: &CancelToken,
     ) -> Result<AgentOutput, AgentError> {
+        self.captured.lock().unwrap().push((
+            prepared.provenance().revision.clone(),
+            prepared.task().into(),
+        ));
+        self.revision.store(1, Ordering::SeqCst);
+        let request = prepared.into_request();
         let index = self.calls.fetch_add(1, Ordering::SeqCst);
         let Mode::Candidate { packet, .. } = request.mode() else {
             panic!("generation only")
@@ -286,6 +308,9 @@ fn setup(kind: AgentKind, block: bool, partial: bool, fail: bool) -> Fx {
         checks: AtomicUsize::new(0),
     });
     let runner = Arc::new(Runner {
+        revision: AtomicUsize::new(0),
+        resolutions: AtomicUsize::new(0),
+        captured: Mutex::new(vec![]),
         calls: AtomicUsize::new(0),
         block,
         ack: AtomicBool::new(true),
@@ -821,4 +846,26 @@ async fn t09_review_needs_a_session_and_the_hasher() {
     let r = request("POST", "/api/v1/reviews");
     let response = router(f.s.clone()).oneshot(r).await.unwrap();
     assert!(response.status().is_client_error());
+}
+
+#[tokio::test]
+async fn generation_captures_one_prompt_revision_for_every_candidate() {
+    let f = setup(AgentKind::Codex, false, false, false);
+    let first = start(&f, "revision-one", 3).await;
+    assert_eq!(terminal(&f, &first).await["job"]["state"], "succeeded");
+    assert_eq!(f.runner.resolutions.load(Ordering::SeqCst), 1);
+    {
+        let seen = f.runner.captured.lock().unwrap();
+        assert_eq!(seen.len(), 3);
+        assert!(
+            seen.iter()
+                .all(|(revision, task)| revision.as_str() == "a".repeat(64) && task == "fixture:a")
+        );
+    }
+    let later = start(&f, "revision-two", 1).await;
+    assert_eq!(terminal(&f, &later).await["job"]["state"], "succeeded");
+    assert_eq!(f.runner.resolutions.load(Ordering::SeqCst), 2);
+    let seen = f.runner.captured.lock().unwrap();
+    assert_eq!(seen.last().unwrap().0.as_str(), "b".repeat(64));
+    assert_eq!(seen.last().unwrap().1, "fixture:b");
 }

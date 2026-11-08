@@ -2,8 +2,10 @@
 //! parsing and error mapping. Every flag lives in `argv`; no diary or chat text ever reaches argv,
 //! logs or `AgentError`. Output is accepted only through the M16 validators and `Run`.
 use super::{
-    assets::Prompt,
-    engine::{Adapter, Collected, Ctx, Invocation, Protocol, Stream, auth_failed, probe_fault},
+    engine::{
+        Adapter, AgentProtocolContext, Collected, Invocation, Protocol, Stream, auth_failed,
+        probe_fault,
+    },
     host::{Host, RunDir, read_bounded},
     process::{Exit, Outcome},
     profiles::ProfileTable,
@@ -99,7 +101,12 @@ impl Stream for CodexStream {
     fn record(&mut self, rec: &[u8], chat: bool, run: &Run, sink: &mut dyn EventSink) {
         CodexStream::record(self, rec, chat, run, sink)
     }
-    fn conclude(&mut self, o: &Outcome, _: &Invocation, _: &Prompt) -> Result<(), AgentError> {
+    fn conclude(
+        &mut self,
+        o: &Outcome,
+        _: &Invocation,
+        _: &AgentExecutionSettings,
+    ) -> Result<(), AgentError> {
         if o.exit != Exit::Success || self.failed.is_some() {
             let msg = self
                 .failed
@@ -131,12 +138,12 @@ impl CodexAdapter {
     pub fn new(table: Arc<ProfileTable>, host: Arc<Host>) -> Self {
         Adapter::with_protocol(table, host, Codex)
     }
-    pub fn with_prompt_assets(
+    pub fn with_prompt_catalog(
         table: Arc<ProfileTable>,
         host: Arc<Host>,
-        assets: super::assets::PromptAssets,
+        assets: super::prompts::EmbeddedPromptCatalog,
     ) -> Self {
-        Adapter::with_assets(table, host, Codex, assets)
+        Adapter::with_catalog(table, host, Codex, assets)
     }
 }
 
@@ -194,7 +201,7 @@ impl Protocol for Codex {
         )
     }
     /// `Ok` only for the allowlisted version.
-    fn version(&self, ctx: &Ctx, cancel: &CancelToken) -> Result<(), Reason> {
+    fn version(&self, ctx: &AgentProtocolContext, cancel: &CancelToken) -> Result<(), Reason> {
         let (o, text) = ctx
             .probe(&["--version"], cancel)
             .ok_or(Reason::SpawnFailed)?;
@@ -210,7 +217,7 @@ impl Protocol for Codex {
             Err(Reason::VersionUnreadable)
         }
     }
-    fn auth(&self, ctx: &Ctx) -> ProfileCheck {
+    fn auth(&self, ctx: &AgentProtocolContext) -> ProfileCheck {
         match ctx.probe(&["login", "status"], &CancelToken::default()) {
             Some((o, _)) if o.stop.is_none() && o.escaped == 0 && o.exit == Exit::Success => {
                 ProfileStatus::Ready.into()
@@ -225,7 +232,7 @@ impl Protocol for Codex {
             other => auth_failed(other.as_ref().map(|(o, _)| o)),
         }
     }
-    fn check_prompt(&self, prompt: &Prompt) -> Result<(), Reason> {
+    fn check_prompt(&self, prompt: &AgentExecutionSettings) -> Result<(), Reason> {
         // The effort is spliced into a `-c key="value"` argument, so quoting characters are refused.
         if prompt.model.contains(['"', '\\']) || prompt.reasoning_effort.contains(['"', '\\']) {
             return Err(Reason::PromptPinRejected);
@@ -235,7 +242,7 @@ impl Protocol for Codex {
     fn invocation(
         &self,
         dir: &RunDir,
-        prompt: &Prompt,
+        prompt: &AgentExecutionSettings,
         chat: bool,
     ) -> Result<Invocation, AgentError> {
         let last = dir.path().join("last-message.txt");
