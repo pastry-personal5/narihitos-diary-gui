@@ -1,6 +1,9 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { ActivityStore } from "../application/activity/store";
-import type { GenerationController } from "../application/generation/controller";
+import {
+  GENERATION_MESSAGE,
+  type GenerationController,
+} from "../application/generation/controller";
 import type { ChatController } from "../application/chat";
 import type { Messages } from "../application/navigation/messages";
 /** Global Messages is the single polite announcement source for integrated AI work. */
@@ -63,6 +66,13 @@ export function ActivityFeedback({
     if (conversation.localNotice)
       messages.add(conversation.localNotice, "info");
   }, [conversation.localNotice, messages]);
+  useEffect(() => {
+    if (generation.error)
+      messages.add(
+        GENERATION_MESSAGE[generation.error] ?? GENERATION_MESSAGE.failed,
+        "error",
+      );
+  }, [generation.error, messages]);
   const preparing = generation.submitting;
   const sending = conversation.submitting;
   useEffect(() => {

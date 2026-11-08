@@ -93,6 +93,17 @@ None yet.
   - [x] T21.1 - Server card preserves disconnected, connecting, connected and storage-unavailable states; Connect is disabled while connecting. Evidence: affected UI suites pass (45 tests), including Settings and client connection regressions.
   - [x] T21.2 - UI regression coverage and the full `scripts/gate.sh` pass (2026-11-08, G01–G07; local TCP fixtures require execution outside the sandbox); affected README, user guide, UX docs and changelog updated.
 
+- [ ] T22 `[gui]` `[bug]` - Fix the Main Toolbar Strip layout, make custom bitmap icons render consistently as tinted masks, and provide hover tooltips for toolbar actions.
+  - [ ] T22.1 - Toolbar title, actions and save status remain distinct and usable at the minimum window width.
+  - [ ] T22.2 - Custom bitmap masks use alpha consistently and retain disabled/hover tinting.
+  - [ ] T22.3 - Toolbar and icon-strip controls expose visible hover tooltips and accessible names.
+
+- [x] T23 `[bug]` - Generate must work with a closed Entry tab and report preparation/admission failures in Global Messages.
+  - [x] T23.1 - Regression coverage proves generation proceeds with the Entry tab open or closed without creating or saving it. Evidence: `tests/generation-ui.test.tsx` (6 pass).
+  - [x] T23.2 - Failures appear once in Global Messages with actionable text. Evidence: `tests/activity-feedback.test.tsx`; `scripts/gate.sh` G01–G07 pass (2026-11-08; TCP fixtures run outside the sandbox). The original reported attempt could not be attributed to a specific failure from the retained logs.
+
+- [x] T24 `[bug]` - Add typed generation preparation/admission diagnostics with stage, count and closed error tags. Evidence: controller tests (25 pass) verify stages, failure tags, redaction and nonblocking diagnostic rejection; native diagnostic tests validate allowlists and reject private fields. Logging/contribution docs updated; full `scripts/gate.sh` G01–G07 pass (2026-11-08; local TCP fixtures outside the sandbox).
+
 ### Proof and docs
 
 - [x] Z01 - Full gate (`scripts/gate.sh`) passes (2026-11-07): G01–G07 all exit 0. Fixes made on the way: `cargo fmt --all` on `diary-logging` `codec.rs`/`codec/tests.rs` (formatting only; the architecture test checks all workspace members) and the T11 default in `tests/accessibility.test.tsx`.

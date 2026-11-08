@@ -116,3 +116,26 @@ it("announces waiting and cancellation once without repeated silence ticks", () 
   expect(messages.items).toHaveLength(2);
   expect(messages.items[1].text).toContain("acknowledgement");
 });
+
+it("reports generation preparation and admission failures once in Global Messages", () => {
+  const activity = new ActivityStore(),
+    messages = new Messages();
+  const subscribe = () => () => {};
+  const generator = {
+    subscribe,
+    state: { submitting: false, error: "reimport_required" },
+  } as unknown as GenerationController;
+  const chat = {
+    subscribe,
+    state: { submitting: false },
+  } as unknown as ChatController;
+  const props = { activity, messages, generator, chat };
+  const view = render(<ActivityFeedback {...props} />);
+  expect(messages.items).toHaveLength(1);
+  expect(messages.items[0]).toMatchObject({
+    severity: "error",
+    text: "The selected sources changed. Refresh the import and confirm your selection.",
+  });
+  view.rerender(<ActivityFeedback {...props} />);
+  expect(messages.items).toHaveLength(1);
+});

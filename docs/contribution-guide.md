@@ -51,6 +51,8 @@ Logs live under `<runtime_root>/<workspace-key>/logs/{server,client}` (0700/0600
 
 The trace command is read-only, bounded to 200 records (`--limit` up to 500) and 256 KiB, and drops any line that fails strict validation, so it is safe to hand to an agent. If a client has no log file (another client holds it, or discovery was never validated), its records are on its stderr only.
 
+For Generate failures, launch the client with `DIARY_LOG=debug` (`make gui` already sets it), reproduce once, then use `diary-server trace --config PATH --select debug:50` for preparation stages or `--select recent:20` for failure warnings. Client `ui.generation_*` stages distinguish a dirty-source choice, Entry settling and submission; server `generation.capture` warnings explain rejected profile/source capture. See the [logging contract](architecture/logging.md#generation-records).
+
 ## Required validation
 
 Before opening a pull request, run the full checks below from the repository root, except for the owner-approved docs-only P1-M1/P1-M2 exemption. See [development-process.md](development-process.md#definition-of-done) for that exemption and the required documentation review.

@@ -1,4 +1,9 @@
-import { AuthenticError, type Bridge, type ProfileInfo } from "../bridge";
+import {
+  AuthenticError,
+  type Bridge,
+  type ClientEvent,
+  type ProfileInfo,
+} from "../bridge";
 import type { StreamEvent } from "../events";
 import { SessionBudget, payloadBytes } from "../navigation/budget";
 import type {
@@ -117,6 +122,43 @@ export class GenerationController {
     private budget = new SessionBudget(),
     private newId = () => crypto.randomUUID(),
   ) {}
+  private diagnostic(
+    eventCode: ClientEvent["code"],
+    count?: number,
+    failure?: unknown,
+  ) {
+    const errors: Record<string, NonNullable<ClientEvent["detail"]>["error"]> =
+      {
+        empty_selection: "empty_selection",
+        reimport_required: "reimport_required",
+        profile_not_ready: "profile_not_ready",
+        context: "context",
+        source_save: "source_save",
+        authentic_save: "authentic_save",
+        discard_required: "discard_required",
+        cancelled: "cancelled",
+        busy: "busy",
+        session_limit: "limit",
+        invalid_input: "invalid",
+      };
+    const error =
+      failure === undefined
+        ? undefined
+        : Object.hasOwn(errors, code(failure))
+          ? errors[code(failure)]
+          : "unavailable";
+    try {
+      void this.bridge
+        .logClientEvent?.({
+          code: eventCode,
+          level: error ? "warn" : "debug",
+          detail: { component: "editor", count, error },
+        })
+        .catch(() => {});
+    } catch {
+      /* Diagnostics must never affect generation. */
+    }
+  }
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
     return () => {
@@ -262,9 +304,11 @@ export class GenerationController {
       announcement: `Preparing generation for ${date}.`,
       localNotice: null,
     });
+    this.diagnostic("ui.generation_preparing", selected.length);
     try {
       const dirty = this.preparation.dirty(selected);
       if (dirty.length) {
+        this.diagnostic("ui.generation_dirty", dirty.length);
         const choice = await new Promise<"save" | "exclude" | "cancel">(
           (resolve) => {
             this.dirtyChoice = resolve;
@@ -278,16 +322,19 @@ export class GenerationController {
         if (choice === "exclude") {
           const ids = new Set(dirty.map((d) => d.id));
           selected = selected.filter((s) => !ids.has(s.source_id));
-        } else
+        } else {
+          this.diagnostic("ui.generation_saving", dirty.length);
           selected = await this.preparation.saveAndRefresh(
             date,
             selected,
             dirty,
             abort.signal,
           );
+        }
       }
       if (!current()) return;
       if (!selected.length) throw new AuthenticError("empty_selection", false);
+      this.diagnostic("ui.generation_flushing");
       if (!(await this.preparation.flushAuthentic(date)))
         throw new AuthenticError("authentic_save", false);
       if (!current()) return;
@@ -312,7 +359,10 @@ export class GenerationController {
       };
       await this.admit();
     } catch (e) {
-      if (current()) this.set({ error: code(e) });
+      if (current()) {
+        this.diagnostic("ui.generation_failed", undefined, e);
+        this.set({ error: code(e) });
+      }
     } finally {
       if (epoch === this.epoch) {
         this.abort = null;
@@ -329,7 +379,9 @@ export class GenerationController {
     const epoch = this.epoch;
     this.admission = true;
     try {
+      this.diagnostic("ui.generation_submitting", input.selections.length);
       const { job } = await this.bridge.startGeneration(input);
+      this.diagnostic("ui.generation_admitted");
       if (epoch !== this.epoch) return;
       const key = `generation:${job.id}`;
       if (
@@ -349,6 +401,7 @@ export class GenerationController {
       await this.refresh();
     } catch (e) {
       if (epoch !== this.epoch) return;
+      this.diagnostic("ui.generation_failed", undefined, e);
       const c = code(e),
         uncertain =
           this.pending !== null &&

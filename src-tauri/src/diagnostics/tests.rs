@@ -211,3 +211,34 @@ fn concurrent_attach_calls_open_the_log_once_and_stay_on_file() {
     }
     assert_eq!(log.mode(), Mode::File);
 }
+
+#[test]
+fn generation_events_accept_closed_tags_and_reject_private_details() {
+    let (log, _sink, _ms) = test_log();
+    for code in [
+        "ui.generation_preparing",
+        "ui.generation_dirty",
+        "ui.generation_saving",
+        "ui.generation_flushing",
+        "ui.generation_submitting",
+        "ui.generation_admitted",
+        "ui.generation_failed",
+    ] {
+        let mut event = ev(code);
+        event.level = "debug".into();
+        event.detail = Some(json!({"component":"editor", "count":3, "error":"reimport_required"}));
+        assert_eq!(log.client_event(event), Ok(()));
+    }
+    for detail in [
+        json!({"component":"editor", "error":"private diary text"}),
+        json!({"component":"editor", "body":"private diary text"}),
+    ] {
+        let mut event = ev("ui.generation_failed");
+        event.detail = Some(detail);
+        assert_eq!(log.client_event(event), Err(Reject::Invalid));
+    }
+    assert_eq!(
+        log.client_event(ev("generation.capture")),
+        Err(Reject::Invalid)
+    );
+}

@@ -182,98 +182,103 @@ describe("generation interaction", () => {
   });
 });
 
-it("a new App request uses the saved generation count and actual Include selection", async () => {
-  vi.useRealTimers();
-  const server = generationServer(),
-    settings = settingsFake({ writing_locale: "ko-KR" });
-  const day = new Date().toLocaleDateString("sv"),
-    source = generationSource(day);
-  const status = {
-    instance_id: "i",
-    workspace_key: "w",
-    server_version: "1.0.0",
-    api_version: 1 as const,
-    api_minor: 0,
-    storage_ready: true,
-    capabilities: ["status", "sessions", "jobs", "events", "generation"],
-  };
-  const bridge = {
-    ...navigationFake(),
-    ...server.bridge,
-    ...settings,
-    metadata: async () => ({ version: "1.0.0" }),
-    connect: async () => status,
-    status: async () => status,
-    watch: async () => async () => {},
-    listAuthentic: async () => ({ items: [], next_cursor: null }),
-    loadAuthentic: async (date: string) => ({
-      date,
-      exists: false,
-      revision: null,
-      body: "",
-    }),
-    saveAuthentic: async () => {
-      throw new Error("unexpected save");
-    },
-    createEmptyAuthentic: async () => {
-      throw new Error("unexpected creation");
-    },
-    refreshAuthentic: async () => ({ files: 0, problems: 0 }),
-    getOperation: async () => {
-      throw new Error("unexpected operation");
-    },
-    listSources: async () => ({
-      import_id: "import",
-      date: day,
-      zone: "Asia/Seoul",
-      timezone_database: "test",
-      config_generation: 1,
-      completed_at: 1,
-      items: [
-        {
-          kind: "included",
-          source,
-          instant: { unix_ms: 0, precision: "milli" },
-          misplaced: false,
-        },
-      ],
-      next_cursor: null,
-      incomplete: false,
-      groups: [{ id: "g", alias: "Diary", type: "narihito" }],
-      reimport_required: false,
-    }),
-  } as Bridge;
-  const app = render(<App bridge={bridge} />);
-  await waitFor(() =>
-    expect(
-      screen
-        .getByRole("button", { name: "Generate", exact: true })
-        .hasAttribute("disabled"),
-    ).toBe(false),
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Settings", exact: true }),
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Generation", exact: true }),
-  );
-  fireEvent.change(screen.getByLabelText("Candidates per generation"), {
-    target: { value: "5" },
-  });
-  await waitFor(() => expect(settings.user.generation_count).toBe(5));
-  fireEvent.click(screen.getByRole("button", { name: "Go back" }));
-  fireEvent.click(
-    screen.getByRole("button", { name: "Generate", exact: true }),
-  );
-  await waitFor(() =>
-    expect(server.bridge.startGeneration).toHaveBeenCalledTimes(1),
-  );
-  expect(server.input[0].count).toBe(5);
-  expect(server.input[0].selections).toEqual([
-    { import_id: "import", source_id: "source" },
-  ]);
-  await act(async () => app.unmount());
-});
+it.each([false, true])(
+  "a new App request uses the saved count and Include selection (closed Entry tab: %s)",
+  async (closed) => {
+    vi.useRealTimers();
+    const server = generationServer(),
+      settings = settingsFake({ writing_locale: "ko-KR" });
+    const day = new Date().toLocaleDateString("sv"),
+      source = generationSource(day);
+    const status = {
+      instance_id: "i",
+      workspace_key: "w",
+      server_version: "1.0.0",
+      api_version: 1 as const,
+      api_minor: 0,
+      storage_ready: true,
+      capabilities: ["status", "sessions", "jobs", "events", "generation"],
+    };
+    const bridge = {
+      ...navigationFake(),
+      ...server.bridge,
+      ...settings,
+      metadata: async () => ({ version: "1.0.0" }),
+      connect: async () => status,
+      status: async () => status,
+      watch: async () => async () => {},
+      listAuthentic: async () => ({ items: [], next_cursor: null }),
+      loadAuthentic: async (date: string) => ({
+        date,
+        exists: false,
+        revision: null,
+        body: "",
+      }),
+      saveAuthentic: async () => {
+        throw new Error("unexpected save");
+      },
+      createEmptyAuthentic: async () => {
+        throw new Error("unexpected creation");
+      },
+      refreshAuthentic: async () => ({ files: 0, problems: 0 }),
+      getOperation: async () => {
+        throw new Error("unexpected operation");
+      },
+      listSources: async () => ({
+        import_id: "import",
+        date: day,
+        zone: "Asia/Seoul",
+        timezone_database: "test",
+        config_generation: 1,
+        completed_at: 1,
+        items: [
+          {
+            kind: "included",
+            source,
+            instant: { unix_ms: 0, precision: "milli" },
+            misplaced: false,
+          },
+        ],
+        next_cursor: null,
+        incomplete: false,
+        groups: [{ id: "g", alias: "Diary", type: "narihito" }],
+        reimport_required: false,
+      }),
+    } as Bridge;
+    const app = render(<App bridge={bridge} />);
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Generate", exact: true })
+          .hasAttribute("disabled"),
+      ).toBe(false),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Settings", exact: true }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Generation", exact: true }),
+    );
+    fireEvent.change(screen.getByLabelText("Candidates per generation"), {
+      target: { value: "5" },
+    });
+    await waitFor(() => expect(settings.user.generation_count).toBe(5));
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
+    if (closed)
+      fireEvent.click(screen.getByRole("button", { name: `Close ${day}` }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Generate", exact: true }),
+    );
+    await waitFor(() =>
+      expect(server.bridge.startGeneration).toHaveBeenCalledTimes(1),
+    );
+    expect(server.input[0].count).toBe(5);
+    expect(server.input[0].selections).toEqual([
+      { import_id: "import", source_id: "source" },
+    ]);
+    await act(async () => app.unmount());
+  },
+);
 
 it("discarding results closes the candidate tabs", async () => {
   const { server, c } = await setup();

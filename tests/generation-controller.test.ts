@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AuthenticError } from "../src/application/bridge";
+import { AuthenticError, type ClientEvent } from "../src/application/bridge";
 import { GenerationController } from "../src/application/generation/controller";
 import { SessionBudget } from "../src/application/navigation/budget";
 import { generationServer } from "./generation-fake";
@@ -479,4 +479,54 @@ it("terminal hints bypass the preview polling delay", async () => {
   await vi.advanceTimersByTimeAsync(0);
   expect(controller.state.jobs.get("j")?.job.state).toBe("succeeded");
   expect(controller.running).toBe(false);
+});
+
+it("logs content-free preparation stages through admission", async () => {
+  const { server, controller } = await readyGeneration();
+  const log = vi
+    .fn<(event: ClientEvent) => Promise<void>>()
+    .mockResolvedValue(undefined);
+  server.bridge.logClientEvent = log;
+  await controller.start("2026-11-06", "ko-KR", 3);
+  expect(log.mock.calls.map(([event]) => event.code)).toEqual([
+    "ui.generation_preparing",
+    "ui.generation_flushing",
+    "ui.generation_submitting",
+    "ui.generation_admitted",
+  ]);
+  expect(log.mock.calls[0][0]).toEqual({
+    code: "ui.generation_preparing",
+    level: "debug",
+    detail: { component: "editor", count: 2, error: undefined },
+  });
+});
+it("logs a closed failure tag without raw exception text", async () => {
+  const { server, controller } = await readyGeneration();
+  const log = vi
+    .fn<(event: ClientEvent) => Promise<void>>()
+    .mockRejectedValue(new Error("logging unavailable"));
+  server.bridge.logClientEvent = log;
+  vi.mocked(server.preparation.flushAuthentic).mockResolvedValue(false);
+  await controller.start("2026-11-06", "ko-KR", 3);
+  expect(log).toHaveBeenLastCalledWith({
+    code: "ui.generation_failed",
+    level: "warn",
+    detail: { component: "editor", count: undefined, error: "authentic_save" },
+  });
+  expect(controller.state.error).toBe("authentic_save");
+  expect(server.bridge.startGeneration).not.toHaveBeenCalled();
+});
+
+it("replaces unknown exception details with an unavailable tag", async () => {
+  const { server, controller } = await readyGeneration();
+  const log = vi
+    .fn<(event: ClientEvent) => Promise<void>>()
+    .mockResolvedValue(undefined);
+  server.bridge.logClientEvent = log;
+  vi.mocked(server.preparation.flushAuthentic).mockRejectedValue(
+    new AuthenticError("SECRET diary body and path", false),
+  );
+  await controller.start("2026-11-06", "ko-KR", 3);
+  expect(log.mock.calls.at(-1)?.[0].detail?.error).toBe("unavailable");
+  expect(JSON.stringify(log.mock.calls)).not.toContain("SECRET");
 });

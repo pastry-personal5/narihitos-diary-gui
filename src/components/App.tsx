@@ -111,7 +111,7 @@ export function App({ bridge }: { bridge: Bridge }) {
         className="standard-layout"
       >
         <header aria-label="Main Toolbar Strip" className="toolbar">
-          <div>
+          <div className="toolbar-title">
             <h1>Narihito’s Diary</h1>
           </div>
           <div className="toolbar-actions">
@@ -296,7 +296,7 @@ export function App({ bridge }: { bridge: Bridge }) {
             >
               <span
                 aria-hidden="true"
-                className="symbol"
+                className="bitmap-icon"
                 style={{
                   width: 32,
                   height: 32,

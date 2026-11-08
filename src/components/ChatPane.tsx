@@ -172,7 +172,7 @@ export function ChatPane({
           >
             <span
               aria-hidden="true"
-              className="symbol"
+              className="bitmap-icon"
               style={{
                 width: 24,
                 height: 24,

@@ -18,3 +18,7 @@ T21 moves the connection display and manual Connect action from `App.tsx` to a S
 ## Risks
 
 _Added per request._
+
+T23 updates `generation/navigation.ts` so a closed Authentic tab has no local save prerequisite, while loaded tabs still settle their edits and loading/error states still block. `ActivityFeedback.tsx` reports generation controller errors using the existing content-free user messages. The integrated Generate regression closes the Entry tab before submission; feedback coverage checks actionable errors without repeated announcements.
+
+T24 instruments `GenerationController` through the existing optional bridge diagnostic port and `log_client_event`, with closed event/error tags in the shared Rust diagnostic model. Native validation rejects private fields; logging is best effort and never awaited by generation. The API logs capture failures before job admission. Controller tests verify stage order, save failure, redaction and diagnostic rejection; native tests verify allowlists and rejection of body/raw error fields. Logging and contribution docs describe reproduction and trace selection.

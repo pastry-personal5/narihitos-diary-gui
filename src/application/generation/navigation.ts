@@ -60,12 +60,13 @@ async function imported(
     "source" in item && item.source ? [item.source] : [],
   );
 }
-/** Settles the open Entry for a date; false when it is not loaded or has a load error. */
+/** Settles the open Entry for a date; a closed tab has no pending local edits. */
 export const settleAuthentic =
   (model: NavigationModel) =>
   async (date: string): Promise<boolean> => {
     const r = model.resources.resources.get(`authentic:${date}`);
-    if (!r?.session || r.loading || r.error) return false;
+    if (!r) return true;
+    if (!r.session || r.loading || r.error) return false;
     return (await r.session.settle()) === "proceed";
   };
 export function generationPreparation(

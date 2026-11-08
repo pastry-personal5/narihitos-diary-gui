@@ -142,6 +142,14 @@ describe("toolbar symbols", () => {
     expect(generate.getAttribute("title")).toMatch(
       /Generation is (unavailable|not supported by this server)/u,
     );
+    expect(
+      screen
+        .getByRole("button", { name: "Create Empty" })
+        .getAttribute("title"),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Settings" }).getAttribute("title"),
+    ).toBeTruthy();
   });
   it("posts one Global Message per unsupported name and keeps the text label", async () => {
     const load = vi.fn(async (): Promise<SymbolResult> => ({
@@ -165,5 +173,8 @@ describe("symbol styling", () => {
     const rule = css.match(/\.symbol\s*\{[^}]*\}/u)?.[0] ?? "";
     expect(rule).toMatch(/background-color:\s*currentColor/u);
     expect(rule).toMatch(/mask-size:\s*contain/u);
+    const bitmapRule = css.match(/\.bitmap-icon\s*\{[^}]*\}/u)?.[0] ?? "";
+    expect(bitmapRule).toMatch(/mask-mode:\s*alpha/u);
+    expect(bitmapRule).toMatch(/background-color:\s*currentColor/u);
   });
 });

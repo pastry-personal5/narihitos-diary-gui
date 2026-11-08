@@ -52,6 +52,14 @@ tag_enum!(EventCode {
     LogDropped => "log.dropped",
     UiBridgeError => "ui.bridge_error",
     UiRenderError => "ui.render_error",
+    GenerationPreparing => "ui.generation_preparing",
+    GenerationDirty => "ui.generation_dirty",
+    GenerationSaving => "ui.generation_saving",
+    GenerationFlushing => "ui.generation_flushing",
+    GenerationSubmitting => "ui.generation_submitting",
+    GenerationAdmitted => "ui.generation_admitted",
+    GenerationFailed => "ui.generation_failed",
+    GenerationCapture => "generation.capture",
     ClientEventRejected => "client.event_rejected",
     BridgeConnectStarted => "bridge.connect_started",
     BridgeDiscoveryRead => "bridge.discovery_read",
@@ -70,6 +78,14 @@ tag_enum!(ErrorTag {
     Unavailable => "unavailable",
     Limit => "limit",
     Internal => "internal",
+    EmptySelection => "empty_selection",
+    ReimportRequired => "reimport_required",
+    ProfileNotReady => "profile_not_ready",
+    Context => "context",
+    SourceSave => "source_save",
+    AuthenticSave => "authentic_save",
+    DiscardRequired => "discard_required",
+    Cancelled => "cancelled",
 });
 tag_enum!(Fault {
     DiscoveryUnavailable => "discovery_unavailable",
@@ -239,7 +255,18 @@ impl AgentDetail {
 impl EventCode {
     /// Only UI codes may be reported by the WebView.
     pub const fn webview_allowed(self) -> bool {
-        matches!(self, Self::UiBridgeError | Self::UiRenderError)
+        matches!(
+            self,
+            Self::UiBridgeError
+                | Self::UiRenderError
+                | Self::GenerationPreparing
+                | Self::GenerationDirty
+                | Self::GenerationSaving
+                | Self::GenerationFlushing
+                | Self::GenerationSubmitting
+                | Self::GenerationAdmitted
+                | Self::GenerationFailed
+        )
     }
 }
 

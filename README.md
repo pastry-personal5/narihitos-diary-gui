@@ -15,3 +15,5 @@ Apache-2.0. See [LICENSE](LICENSE) and the [third-party notices](third-party-not
 ## Contributing
 
 See [AGENTS.md](AGENTS.md) and the [contribution guide](docs/contribution-guide.md).
+
+Generate uses the selected eligible diary snippets even when the Entry tab is closed. Preparation and submission errors appear in Global Messages with recovery guidance.

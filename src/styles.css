@@ -82,24 +82,40 @@ p {
   min-height: 500px;
 }
 .toolbar {
-  min-height: 86px;
-  padding: 16px 20px;
+  min-height: 72px;
+  padding: 12px 20px;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
   border-bottom: 1px solid var(--line);
 }
-.toolbar span,
+.toolbar-title {
+  flex: 0 0 auto;
+}
+.toolbar-title h1 {
+  white-space: nowrap;
+}
+.toolbar-actions {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.toolbar-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.toolbar-save-status,
 footer {
   font-size: 12px;
   color: var(--muted);
 }
-.toolbar-actions {
-  display: flex;
-  gap: 8px;
-}
 .toolbar-save-status {
-  margin-left: auto;
+  flex: 0 1 220px;
+  margin-left: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -446,6 +462,23 @@ footer {
   -webkit-mask-size: contain;
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-position: center;
+  mask-mode: alpha;
+  -webkit-mask-mode: alpha;
+  flex: 0 0 auto;
+}
+.bitmap-icon {
+  display: inline-block;
+  vertical-align: middle;
+  background-color: currentColor;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-mode: alpha;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-mode: alpha;
+  flex: 0 0 auto;
 }
 .visually-hidden {
   position: absolute;

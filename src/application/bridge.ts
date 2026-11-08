@@ -19,12 +19,35 @@ export interface Status {
 }
 /** Events the WebView may report; the server-side codes are not reportable. */
 export interface ClientEvent {
-  code: "ui.bridge_error" | "ui.render_error";
-  level: "warn" | "error";
+  code:
+    | "ui.bridge_error"
+    | "ui.render_error"
+    | "ui.generation_preparing"
+    | "ui.generation_dirty"
+    | "ui.generation_saving"
+    | "ui.generation_flushing"
+    | "ui.generation_submitting"
+    | "ui.generation_admitted"
+    | "ui.generation_failed";
+  level: "debug" | "warn" | "error";
   traceId?: string;
   detail?: {
     component: "editor" | "bridge" | "layout" | "settings";
     count?: number;
+    error?:
+      | "unavailable"
+      | "internal"
+      | "busy"
+      | "limit"
+      | "invalid"
+      | "empty_selection"
+      | "reimport_required"
+      | "profile_not_ready"
+      | "context"
+      | "source_save"
+      | "authentic_save"
+      | "discard_required"
+      | "cancelled";
   };
 }
 export interface Revision {
@@ -191,6 +214,7 @@ export interface Bridge
     GenerationBridge,
     ReviewBridge,
     ExportBridge {
+  logClientEvent?(event: ClientEvent): Promise<void>;
   listJobs?(cursor?: string): Promise<JobPage>;
   metadata(): Promise<AppMetadata>;
   /** Absent in fakes; symbols then fall back to their text labels. */

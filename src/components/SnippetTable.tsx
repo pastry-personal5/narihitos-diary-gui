@@ -27,7 +27,7 @@ function Bitmap({ src, size = 18 }: { src: string; size?: number }) {
   return (
     <span
       aria-hidden="true"
-      className="symbol"
+      className="bitmap-icon"
       style={{
         width: size,
         height: size,

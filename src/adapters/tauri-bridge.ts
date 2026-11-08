@@ -88,6 +88,7 @@ export async function logClientEvent(event: ClientEvent): Promise<void> {
   await invoke("log_client_event", { event: payload }).catch(() => {});
 }
 export const tauriBridge: Bridge = {
+  logClientEvent,
   startExport: (request) =>
     authentic("start_export", { request }, startOutcomeDto),
   confirmExport: (operationId, request) =>

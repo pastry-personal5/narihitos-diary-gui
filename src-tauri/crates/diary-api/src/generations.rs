@@ -198,8 +198,30 @@ pub(super) async fn start(
     .await;
     let frozen = match captured {
         Ok(Ok(f)) => f,
-        Ok(Err(e)) => return error(e),
-        Err(_) => return failure(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+        Ok(Err(e)) => {
+            use diary_application::diagnostics::ErrorTag;
+            let tag = match e {
+                generation::Error::EmptySelection => ErrorTag::EmptySelection,
+                generation::Error::ChangedSource => ErrorTag::ReimportRequired,
+                generation::Error::InvalidInput => ErrorTag::Invalid,
+                generation::Error::Context => ErrorTag::Context,
+                generation::Error::ProfileNotReady => ErrorTag::ProfileNotReady,
+                generation::Error::DiscardRequired => ErrorTag::DiscardRequired,
+                generation::Error::Busy => ErrorTag::Busy,
+                _ => ErrorTag::Unavailable,
+            };
+            let mut record = Record::new(EventCode::GenerationCapture, Level::Warn).error(tag);
+            record.session = OpaqueId::parse(&session);
+            s.log(record);
+            return error(e);
+        }
+        Err(_) => {
+            s.log(
+                Record::new(EventCode::GenerationCapture, Level::Warn)
+                    .error(diary_application::diagnostics::ErrorTag::Internal),
+            );
+            return failure(StatusCode::SERVICE_UNAVAILABLE, "unavailable");
+        }
     };
     let job_id = Uuid::new_v4().to_string();
     let mut c = s.coordinator.lock().expect("coordinator poisoned");
