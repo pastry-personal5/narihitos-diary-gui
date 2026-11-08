@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 export function PaneSeparator({
   label,
   orientation,
@@ -16,6 +16,7 @@ export function PaneSeparator({
   change(value: number): void;
   reverse?: boolean;
 }) {
+  const [dragging, setDragging] = useState(false);
   const drag = useRef<{ pointer: number; start: number; value: number } | null>(
     null,
   );
@@ -32,6 +33,7 @@ export function PaneSeparator({
       aria-valuemax={max}
       aria-valuenow={Math.round(value)}
       tabIndex={0}
+      data-dragging={dragging || undefined}
       className={`pane-separator ${orientation}`}
       onKeyDown={(e) => {
         const delta =
@@ -53,6 +55,7 @@ export function PaneSeparator({
       }}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
+        setDragging(true);
         drag.current = { pointer: e.pointerId, start: coordinate(e), value };
         e.currentTarget.setPointerCapture(e.pointerId);
       }}
@@ -66,14 +69,17 @@ export function PaneSeparator({
       onPointerUp={(e) => {
         if (drag.current?.pointer === e.pointerId) {
           drag.current = null;
+          setDragging(false);
           e.currentTarget.releasePointerCapture(e.pointerId);
         }
       }}
       onPointerCancel={() => {
         drag.current = null;
+        setDragging(false);
       }}
       onLostPointerCapture={() => {
         drag.current = null;
+        setDragging(false);
       }}
     />
   );

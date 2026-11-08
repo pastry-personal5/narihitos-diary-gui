@@ -102,11 +102,33 @@ p {
   gap: 6px;
   min-width: 0;
 }
-.toolbar-actions button {
+.toolbar-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  white-space: nowrap;
+  justify-content: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  border-color: transparent;
+  border-radius: 10px;
+  background: transparent;
+}
+.toolbar-button .bitmap-icon {
+  width: 24px;
+  height: 24px;
+}
+.toolbar-button:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--on-accent);
+}
+.toolbar-button:active:not(:disabled) {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+.toolbar-button:disabled {
+  background: transparent;
+  opacity: 0.5;
 }
 .toolbar-save-status,
 footer {
@@ -159,14 +181,11 @@ footer {
   padding: 20px 16px;
   overflow: auto;
 }
-.explorer {
-  border-right: 1px solid var(--line);
-}
+
 .ai-column {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid var(--line);
   background: var(--panel);
 }
 .ai-column .chat {
@@ -351,7 +370,6 @@ footer {
   height: 160px;
   overflow: auto;
   padding: 8px 16px;
-  border-top: 1px solid var(--line);
   background: var(--panel);
 }
 .editor-column [aria-label="Global Messages"] h2 {
@@ -400,8 +418,40 @@ footer {
   overflow: auto;
 }
 .pane-separator {
-  background: var(--line);
+  position: relative;
+  background: transparent;
   touch-action: none;
+  user-select: none;
+}
+.pane-separator::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+  border-radius: 1px;
+  pointer-events: none;
+}
+.pane-separator.vertical::after {
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 0.5px);
+  width: 1px;
+}
+.pane-separator.horizontal::after {
+  left: 0;
+  right: 0;
+  top: calc(50% - 0.5px);
+  height: 1px;
+}
+.pane-separator:is(:hover, :focus-visible, [data-dragging])::after {
+  background: var(--accent);
+}
+.pane-separator.vertical:is(:hover, :focus-visible, [data-dragging])::after {
+  left: calc(50% - 1px);
+  width: 2px;
+}
+.pane-separator.horizontal:is(:hover, :focus-visible, [data-dragging])::after {
+  top: calc(50% - 1px);
+  height: 2px;
 }
 .pane-separator.vertical {
   cursor: col-resize;
@@ -746,7 +796,8 @@ footer {
   font-size: 12px;
 }
 
-.trash-recovery-dialog {
+.trash-recovery-dialog,
+.ai-activities-dialog {
   width: min(960px, calc(100vw - 48px));
   height: min(740px, calc(100dvh - 48px));
   max-height: calc(100dvh - 48px);
@@ -757,7 +808,8 @@ footer {
   border-radius: 16px;
   background: var(--bg);
 }
-.trash-recovery-header {
+.trash-recovery-header,
+.ai-activities-dialog .ai-activities-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -766,29 +818,34 @@ footer {
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
-.trash-recovery-header h2 {
+.trash-recovery-header h2,
+.ai-activities-dialog .ai-activities-header h2 {
   margin: 4px 0 0;
   font-size: 26px;
 }
-.trash-recovery-eyebrow {
+.trash-recovery-eyebrow,
+.ai-activities-eyebrow {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
 }
-.trash-recovery-close {
+.trash-recovery-close,
+.ai-activities-header > button {
   flex: 0 0 40px;
   height: 40px;
   font-size: 24px;
   line-height: 1;
   border-radius: 10px;
 }
-.trash-recovery-body {
+.trash-recovery-body,
+.ai-activities-body {
   padding: 24px 32px 32px;
   overflow: auto;
   min-height: 0;
   line-height: 1.6;
 }
-.trash-recovery-intro {
+.trash-recovery-intro,
+.ai-activities-intro {
   margin: 0 0 24px;
   max-width: 76ch;
 }
@@ -803,12 +860,15 @@ footer {
   margin: 0 0 12px;
   font-size: 18px;
 }
-.trash-recovery-guide {
+.trash-recovery-guide,
+.ai-activities-guidance {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
-.trash-recovery-guide article {
+.trash-recovery-guide article,
+.ai-activities-guidance article,
+.ai-activity-details li {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -818,7 +878,8 @@ footer {
   margin: 0 0 8px;
   font-size: 15px;
 }
-.trash-recovery-guide p {
+.trash-recovery-guide p,
+.ai-activities-guidance p {
   margin: 0;
 }
 .trash-recovery-dialog .trash-activity {
@@ -827,66 +888,15 @@ footer {
 .trash-recovery-dialog .trash-activity-heading {
   justify-content: space-between;
 }
-@media (max-width: 680px) {
-  .trash-recovery-guide {
-    grid-template-columns: 1fr;
-  }
-  .trash-recovery-header,
-  .trash-recovery-body {
-    padding: 20px;
-  }
-}
-
-.ai-activities-dialog {
-  width: min(960px, calc(100vw - 48px));
-  height: min(740px, calc(100dvh - 48px));
-  max-height: calc(100dvh - 48px);
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg);
-}
-.ai-activities-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px 28px;
-  border-bottom: 1px solid var(--line);
-}
-.ai-activities-header h2 {
-  margin: 0;
-}
-.ai-activities-header > button {
-  flex: 0 0 40px;
-  height: 40px;
-  font-size: 24px;
-}
-.ai-activities-body {
-  padding: 20px 28px;
-  overflow: auto;
-  min-height: 0;
-  line-height: 1.6;
-}
-.ai-activities-guidance {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
 .ai-activities-guidance article,
 .ai-activity-details li {
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
   overflow-wrap: anywhere;
 }
 .ai-activities-guidance h3 {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0;
+  margin: 0 0 8px;
   font-size: 15px;
 }
 .activity-info {
@@ -904,7 +914,15 @@ footer {
   line-height: 1.6;
 }
 .activity-help-dialog .ai-activities-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
   padding: 0 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+.activity-help-dialog .ai-activities-header h2 {
+  margin: 0;
 }
 footer {
   display: flex;
@@ -913,11 +931,105 @@ footer {
   flex-wrap: wrap;
 }
 @media (max-width: 680px) {
+  .trash-recovery-guide,
   .ai-activities-guidance {
     grid-template-columns: 1fr;
   }
-  .ai-activities-header,
+  .trash-recovery-header,
+  .trash-recovery-body,
+  .ai-activities-dialog .ai-activities-header,
   .ai-activities-body {
-    padding: 16px;
+    padding: 20px;
   }
+}
+
+.command-palette {
+  position: fixed;
+  z-index: 20;
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 104px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+.command-palette input {
+  flex: 0 0 auto;
+  width: 100%;
+}
+.command-palette ul {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 0;
+  margin: 8px 0 0;
+  list-style: none;
+}
+.command-palette [role="option"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.command-palette [role="option"][aria-selected="true"] {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+.command-palette small {
+  flex-basis: 100%;
+}
+.palette-shortcuts {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Keep action help visible on hover, including blocked toolbar actions. */
+.toolbar-button,
+.icon-bar button {
+  position: relative;
+}
+.toolbar-button::after,
+.icon-bar button::after {
+  content: attr(title);
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  left: 0;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 32px));
+  padding: 8px 10px;
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: normal;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  visibility: hidden;
+}
+.toolbar-button:hover::after,
+.toolbar-button:focus-visible::after,
+.icon-bar button:hover::after,
+.icon-bar button:focus-visible::after {
+  visibility: visible;
+}
+.toolbar-button:last-child::after {
+  left: auto;
+  right: 0;
+}
+.command-palette input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

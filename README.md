@@ -22,4 +22,8 @@ Settings → Server holds configuration status and Reload configuration. Setting
 
 Open **Trash Recovery** in the Main Toolbar Strip to check interrupted moves, inspect each file’s saved result and review the next steps. Its dialog explains partial and uncertain outcomes; retrying remaining files requires a new preview and confirmation.
 
-Use **AI Activities** in the Main Toolbar Strip to inspect AI work, cancel a run or open its results in a spacious modal. Bitmap info buttons explain progress and temporary results. Closing the modal keeps work running; the bottom status line shows a brief activity summary.
+The Main Toolbar Strip uses distinct custom bitmap icon buttons, with tooltips for action names and keyboard shortcuts. Thin pane dividers highlight on hover, keyboard focus and drag; drag them or use arrow keys to resize.
+
+Use **AI Activities** in the Main Toolbar Strip to inspect AI work, cancel a run or open its results in a spacious modal. Its header and guidance cards match Trash Recovery. Bitmap info buttons explain progress and temporary results. Closing the modal keeps work running; the bottom status line shows a brief activity summary.
+
+The Command palette toolbar button toggles a search overlay with ranked command recommendations, current shortcut hints and unavailable reasons. Use arrows and Enter or click a command; Escape and outside interaction close it. See the [keyboard contract](docs/architecture/keyboard-shortcuts.md#command-palette-overlay).

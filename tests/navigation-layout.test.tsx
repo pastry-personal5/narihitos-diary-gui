@@ -40,10 +40,12 @@ describe("N01 pane separators", () => {
     render(<Fixture />);
     const sep = screen.getByRole("separator", { name: "Sep" });
     const up = drag(sep, 0, 5000);
+    expect(sep.getAttribute("data-dragging")).toBe("true");
     expect(sep.getAttribute("aria-valuenow")).toBe("480");
     fireEvent.pointerMove(sep, { pointerId: 1, clientX: -5000 });
     expect(sep.getAttribute("aria-valuenow")).toBe("160");
     up();
+    expect(sep.hasAttribute("data-dragging")).toBe(false);
     // After release, further moves do nothing.
     fireEvent.pointerMove(sep, { pointerId: 1, clientX: 300 });
     expect(sep.getAttribute("aria-valuenow")).toBe("160");
@@ -56,6 +58,7 @@ describe("N01 pane separators", () => {
     fireEvent.pointerMove(sep, { pointerId: 2, clientX: 0 });
     expect(sep.getAttribute("aria-valuenow")).toBe("240");
     fireEvent.pointerCancel(sep, { pointerId: 1 });
+    expect(sep.hasAttribute("data-dragging")).toBe(false);
     fireEvent.pointerMove(sep, { pointerId: 1, clientX: 0 });
     expect(sep.getAttribute("aria-valuenow")).toBe("240");
     fireEvent.pointerDown(sep, { pointerId: 3, button: 2, clientX: 0 });

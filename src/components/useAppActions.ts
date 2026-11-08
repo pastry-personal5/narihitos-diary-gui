@@ -82,7 +82,13 @@ export function useAppActions({
     ? "Connect to the server first."
     : exporter.reason(model.resources.selectedDate, !!selectedView?.exists);
   const handlers: Handlers = {
-    "palette.open": { reason: null, run: () => setPaletteOpen(true) },
+    "palette.open": {
+      reason: null,
+      run: () => {
+        if (!document.querySelector('[aria-modal="true"], [data-capture]'))
+          setPaletteOpen(true);
+      },
+    },
     "editor.save": {
       reason:
         active?.kind === "source"

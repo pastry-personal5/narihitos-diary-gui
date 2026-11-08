@@ -9,7 +9,7 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Visible term        | Code-facing name     | Meaning                                                                                                                                         |
 | ------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Standard Layout     | `standardLayout`     | The whole application window arrangement                                                                                                        |
-| Main Toolbar Strip  | `mainToolbarStrip`   | App title, actions and Save status                                                                                                              |
+| Main Toolbar Strip  | `mainToolbarStrip`   | App title, distinct custom bitmap icon buttons (named with tooltips) and Save status                                                            |
 | Main Content        | `mainContent`        | Region below the Main Toolbar Strip: Icon Bar, Explorer, Tabbed Editor and the AI column                                                        |
 | Icon Bar            | `iconBar`            | Left strip of flat icon-only buttons (no visible label), including Settings                                                                     |
 | Explorer            | `explorer`           | Left pane containing the four navigation tabs                                                                                                   |
@@ -28,7 +28,7 @@ This is the canonical vocabulary for visible user interface components, and thei
 | Settings sidebar    | `settingsSidebar`    | Category list inside Settings: Status, Server, Sources, AI Agents, Writing Language, Keyboard Shortcuts and Generation, under a Go back button  |
 | Writing Language    | `writingLanguage`    | Persistent AI prose locale, initially the Mac's preferred language                                                                              |
 | Keyboard Shortcuts  | `keyboardShortcuts`  | Settings category: table of Action, Original shortcuts, Current shortcuts, Info with editing                                                    |
-| Command palette     | `commandPalette`     | Searchable list of actions, opened by its shortcut                                                                                              |
+| Command palette     | `commandPalette`     | Search overlay with ranked commands, toggled by the toolbar button or opened by its shortcut                                                    |
 | Authentic           | `authentic`          | The one autosaved managed Diary file for a date, shared by Draft/Entry                                                                          |
 | Candidate           | `candidate`          | A transient suggestion shown in a read-only Editor tab that can be reviewed against Authentic                                                   |
 | Paragraph review    | `paragraphReview`    | Review mode for paragraph or indivisible Markdown structure changes                                                                             |

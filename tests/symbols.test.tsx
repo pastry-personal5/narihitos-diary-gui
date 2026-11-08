@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { ToolbarButton } from "../src/components/ToolbarButton";
 import { App } from "../src/components/App";
 import {
   SymbolLabel,
@@ -128,13 +129,24 @@ describe("SymbolLabel", () => {
   });
 });
 
-describe("toolbar symbols", () => {
-  it("keeps names, tooltips and the disabled state with symbols showing", async () => {
+describe("toolbar bitmaps", () => {
+  it("uses distinct custom bitmap buttons with names, tooltips and disabled states", () => {
     const load = vi.fn(async () => ok);
-    const { container } = render(<App bridge={appBridge(load)} />);
-    await waitFor(() =>
-      expect(container.querySelectorAll(".symbol").length).toBeGreaterThan(2),
-    );
+    render(<App bridge={appBridge(load)} />);
+    const toolbar = screen.getByLabelText("Main Toolbar Strip");
+    const buttons = [...toolbar.querySelectorAll("button")];
+    expect(buttons).toHaveLength(7);
+    const icons = buttons.map((button) => {
+      expect(button.getAttribute("aria-label")).toBeTruthy();
+      expect(button.getAttribute("title")).toBeTruthy();
+      expect(button.textContent).toBe("");
+      const icon = button.querySelector('.bitmap-icon[aria-hidden="true"]');
+      expect(icon).not.toBeNull();
+      expect(icon?.getAttribute("style")).toContain("/toolbar/");
+      return icon?.getAttribute("style");
+    });
+    expect(new Set(icons).size).toBe(buttons.length);
+    expect(toolbar.querySelector(".symbol")).toBeNull();
     for (const name of ["Create Empty", "Command palette", "Settings"])
       expect(screen.getByRole("button", { name })).toBeTruthy();
     const generate = screen.getByRole("button", { name: "Generate" });
@@ -151,17 +163,53 @@ describe("toolbar symbols", () => {
       screen.getByRole("button", { name: "Settings" }).getAttribute("title"),
     ).toBeTruthy();
   });
-  it("posts one Global Message per unsupported name and keeps the text label", async () => {
+  it("covers all eight toolbar actions, including conditional Save, with unique PNGs", () => {
+    const actions = [
+      ["createEmpty", "Create Empty", "create-empty"],
+      ["exportIcloud", "Export", "export-icloud"],
+      ["exportNotion", "Notion", "export-notion"],
+      ["commandPalette", "Command palette", "command-palette"],
+      ["trashRecovery", "Trash Recovery", "trash-recovery"],
+      ["aiActivities", "AI Activities", "ai-activities"],
+      ["save", "Save", "save"],
+      ["generate", "Generate", "generate"],
+    ] as const;
+    render(
+      <div>
+        {actions.map(([action, label]) => (
+          <ToolbarButton
+            key={action}
+            action={action}
+            label={label}
+            title={label}
+          />
+        ))}
+      </div>,
+    );
+    const files = actions.map(([, label, file]) => {
+      const button = screen.getByRole("button", { name: label });
+      expect(
+        button.querySelector(".bitmap-icon")?.getAttribute("style"),
+      ).toContain(`${file}.png`);
+      const png = readFileSync(`src/assets/toolbar/${file}.png`);
+      expect(png.subarray(1, 4).toString()).toBe("PNG");
+      return png.toString("base64");
+    });
+    expect(new Set(files).size).toBe(8);
+  });
+  it("keeps toolbar icons when native symbols are unavailable", () => {
     const load = vi.fn(async (): Promise<SymbolResult> => ({
       status: "unsupported",
     }));
     render(<App bridge={appBridge(load)} />);
-    await screen.findByText(/Unsupported symbol command/u);
-    await waitFor(() => expect(load).toHaveBeenCalled());
-    expect(screen.getAllByText(/Unsupported symbol command/u)).toHaveLength(1);
+    expect(
+      screen
+        .getByLabelText("Main Toolbar Strip")
+        .querySelectorAll(".bitmap-icon"),
+    ).toHaveLength(7);
     expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
   });
-  it("shows text labels without a symbol bridge", () => {
+  it("keeps accessible names without a symbol bridge", () => {
     render(<App bridge={appBridge(undefined)} />);
     expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
   });
@@ -173,7 +221,7 @@ describe("symbol styling", () => {
     const rule = css.match(/\.symbol\s*\{[^}]*\}/u)?.[0] ?? "";
     expect(rule).toMatch(/background-color:\s*currentColor/u);
     expect(rule).toMatch(/mask-size:\s*contain/u);
-    const bitmapRule = css.match(/\.bitmap-icon\s*\{[^}]*\}/u)?.[0] ?? "";
+    const bitmapRule = css.match(/^\.bitmap-icon\s*\{[^}]*\}/mu)?.[0] ?? "";
     expect(bitmapRule).toMatch(/mask-mode:\s*alpha/u);
     expect(bitmapRule).toMatch(/background-color:\s*currentColor/u);
   });

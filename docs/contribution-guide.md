@@ -110,6 +110,8 @@ Smoke tests and the log trace tool: [docs/smoke-tests.md](smoke-tests.md).
 
 ## Agent and code conventions
 
+- Main Toolbar Strip actions must use `ToolbarButton` with a distinct custom PNG per action, an accessible name and a tooltip. Preserve shortcut hints, pending labels and disabled reasons. Regenerate app-owned toolbar masks with `python3 scripts/draw-toolbar-icons.py` (standard library only); do not substitute native symbols or reuse another action’s icon.
+
 - Format with `cargo fmt` and `prettier`; do not hand-format.
 - Keep `cargo clippy -D warnings` and `eslint --max-warnings 0` clean.
 - Expose backend features to the UI only through explicit Tauri commands, and grant the minimum Tauri 2 capabilities/permissions each needs.

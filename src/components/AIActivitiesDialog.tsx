@@ -30,18 +30,21 @@ export function AIActivitiesDialog({
         className="ai-activities-dialog"
       >
         <header className="ai-activities-header">
-          <h2>AI Activities</h2>
+          <div>
+            <p className="ai-activities-eyebrow">AI Agents &amp; results</p>
+            <h2>AI Activities</h2>
+          </div>
           <button
             data-initial-focus
             aria-label="Close AI Activities"
             title="Close AI Activities"
             onClick={onClose}
           >
-            ×
+            <span aria-hidden="true">×</span>
           </button>
         </header>
         <div className="ai-activities-body">
-          <p id={description}>
+          <p id={description} className="ai-activities-intro">
             See what your AI Agents are working on and return to their results.
             You can close this window and keep writing while an activity runs.
           </p>

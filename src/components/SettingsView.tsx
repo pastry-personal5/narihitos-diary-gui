@@ -62,6 +62,7 @@ export function SettingsView({
     <section aria-label="Settings" className="settings">
       <nav aria-label="Settings sections">
         <button
+          autoFocus
           className="settings-back"
           title="Close Settings"
           aria-label="Go back"

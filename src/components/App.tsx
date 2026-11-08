@@ -1,3 +1,4 @@
+import { ToolbarButton } from "./ToolbarButton";
 import settingsIcon from "../assets/settings.png";
 import { ActivityFeedback } from "./ActivityFeedback";
 import { AIActivitiesDialog } from "./AIActivitiesDialog";
@@ -119,67 +120,73 @@ export function App({ bridge }: { bridge: Bridge }) {
             <h1>Narihito’s Diary</h1>
           </div>
           <div className="toolbar-actions">
-            <button
+            <ToolbarButton
+              action="createEmpty"
+              label="Create Empty"
               disabled={!canCreate}
               title={hint("authentic.create_empty", createReason)}
               onClick={() => void handlers["authentic.create_empty"].run()}
-            >
-              <SymbolLabel name="doc.badge.plus" label="Create Empty" />
-            </button>
-            <button
+            />
+            <ToolbarButton
+              action="exportIcloud"
+              label={exportState.phase === "working" ? "Exporting…" : "Export"}
               disabled={!!exportReason}
               title={hint("export.start", exportReason ?? "Export to iCloud")}
               onClick={() => void handlers["export.start"].run()}
-            >
-              <SymbolLabel
-                name="square.and.arrow.up"
-                label={
-                  exportState.phase === "working" ? "Exporting…" : "Export"
-                }
-              />
-            </button>
-            <button
+            />
+            <ToolbarButton
+              action="exportNotion"
+              label="Notion"
               disabled={!!exportReason}
               title={hint(
                 "export.start.notion",
                 exportReason ?? "Export to Notion",
               )}
               onClick={() => void handlers["export.start.notion"].run()}
-            >
-              <SymbolLabel name="square.and.arrow.up" label="Notion" />
-            </button>
-            <button
+            />
+            <ToolbarButton
+              action="commandPalette"
+              label="Command palette"
+              id="palette-toggle"
+              aria-expanded={paletteOpen}
+              aria-controls={paletteOpen ? "command-palette" : undefined}
               title={hint("palette.open", "Open command palette")}
-              onClick={() => void handlers["palette.open"].run()}
-            >
-              <SymbolLabel name="command" label="Command palette" />
-            </button>
-            <button
+              onClick={() => {
+                if (paletteOpen) setPaletteOpen(false);
+                else if (
+                  !document.querySelector('[aria-modal="true"], [data-capture]')
+                )
+                  setPaletteOpen(true);
+              }}
+            />
+            <ToolbarButton
+              action="trashRecovery"
+              label="Trash Recovery"
               ref={recoveryButton}
-              title="Inspect interrupted moves and saved Trash results"
+              title="Trash Recovery: inspect interrupted moves and saved results"
               onClick={() => setRecoveryOpen(true)}
-            >
-              Trash Recovery
-            </button>
-            <button
+            />
+            <ToolbarButton
+              action="aiActivities"
+              label="AI Activities"
               title="View AI Activities and results"
               onClick={() => setActivitiesOpen(true)}
-            >
-              AI Activities
-            </button>
+            />
             {active?.kind === "source" && (
-              <button
+              <ToolbarButton
+                action="save"
+                label="Save"
                 disabled={!!handlers["editor.save"].reason || !!active.saving}
                 title={hint(
                   "editor.save",
                   handlers["editor.save"].reason ?? "Save source",
                 )}
                 onClick={() => void handlers["editor.save"].run()}
-              >
-                Save
-              </button>
+              />
             )}
-            <button
+            <ToolbarButton
+              action="generate"
+              label={generationState.submitting ? "Submitting…" : "Generate"}
               disabled={!!generationReason}
               title={hint(
                 "generate.start",
@@ -187,12 +194,7 @@ export function App({ bridge }: { bridge: Bridge }) {
               )}
               aria-describedby="generation-reason"
               onClick={() => void handlers["generate.start"].run()}
-            >
-              <SymbolLabel
-                name="sparkles"
-                label={generationState.submitting ? "Submitting…" : "Generate"}
-              />
-            </button>
+            />
           </div>
           <div className="toolbar-save-status">
             <span role="status" aria-label="Save status">
