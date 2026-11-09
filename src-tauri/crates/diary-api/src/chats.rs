@@ -20,12 +20,29 @@ use uuid::Uuid;
 
 /// Request bodies carry up to a 1 MiB document plus the message.
 pub(super) const BODY_LIMIT: usize = 1_300_000;
+#[derive(Clone, Copy, Default, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum PurposeDto {
+    #[default]
+    Chat,
+    ParagraphReview,
+}
+impl From<PurposeDto> for diary_application::chat::conversations::Purpose {
+    fn from(value: PurposeDto) -> Self {
+        match value {
+            PurposeDto::Chat => Self::Chat,
+            PurposeDto::ParagraphReview => Self::ParagraphReview,
+        }
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Open {
     profile: String,
     locale: String,
+    #[serde(default)]
+    purpose: PurposeDto,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -94,7 +111,8 @@ pub(super) async fn open(
             &*profiles,
             &b.profile,
             locale,
-            Uuid::new_v4().to_string(),
+            diary_application::chat::conversations::Purpose::from(b.purpose)
+                .conversation_id(&Uuid::new_v4().to_string()),
             session,
         )
     })
@@ -106,7 +124,14 @@ pub(super) async fn open(
     };
     let response =
         json!({"chat_id":chat.id,"profile":chat.profile.alias,"locale":chat.locale.as_str()});
-    workflow::replace(&mut s.chat.lock().expect("chat poisoned"), chat);
+    workflow::replace(
+        &mut s
+            .conversations
+            .for_id(&chat.id)
+            .lock()
+            .expect("chat poisoned"),
+        chat,
+    );
     (StatusCode::CREATED, Json(response)).into_response()
 }
 
@@ -181,13 +206,20 @@ pub(super) async fn turn(
         Ok(r) => r,
         Err(r) => return r,
     };
+    let conversation_id = chat_id.clone();
     let input = workflow::TurnRequest {
         chat_id,
         request_id: b.request_id,
         message: b.message,
         document,
     };
-    let request = match input.request(&s.chat.lock().expect("chat poisoned"), &session) {
+    let request = match input.request(
+        &s.conversations
+            .for_id(&conversation_id)
+            .lock()
+            .expect("chat poisoned"),
+        &session,
+    ) {
         Ok(request) => request,
         Err(e) => return workflow_error(&s, e),
     };
@@ -207,7 +239,11 @@ pub(super) async fn turn(
     }
     let started = prepared.start(
         &mut c,
-        &mut s.chat.lock().expect("chat poisoned"),
+        &mut s
+            .conversations
+            .for_id(&conversation_id)
+            .lock()
+            .expect("chat poisoned"),
         &session,
         s.now(),
         &job,
@@ -250,7 +286,11 @@ pub(super) async fn turn(
             &mut notify,
         );
         let terminal = workflow::finish(
-            &mut s.chat.lock().expect("chat poisoned"),
+            &mut s
+                .conversations
+                .for_id(&conversation_id)
+                .lock()
+                .expect("chat poisoned"),
             &job.id,
             result,
             s.now(),
@@ -272,7 +312,11 @@ pub(super) async fn get(
         Ok(id) => id,
         Err(r) => return r,
     };
-    let guard = s.chat.lock().expect("chat poisoned");
+    let guard = s
+        .conversations
+        .for_id(&chat_id)
+        .lock()
+        .expect("chat poisoned");
     let Some(chat) = guard
         .as_ref()
         .filter(|c| c.id == chat_id && c.session == session)
@@ -311,7 +355,11 @@ pub(super) async fn close(
         Err(r) => return r,
     };
     workflow::close(
-        &mut s.chat.lock().expect("chat poisoned"),
+        &mut s
+            .conversations
+            .for_id(&chat_id)
+            .lock()
+            .expect("chat poisoned"),
         &session,
         &chat_id,
     );
@@ -327,8 +375,24 @@ pub(super) fn progress(
     session: &str,
     job: &diary_application::Job,
 ) -> Option<Value> {
-    let guard = s.chat.lock().expect("chat poisoned");
-    let chat = guard.as_ref().filter(|c| c.session == session)?;
+    // User-chat discovery must never adopt a paragraph-review conversation.
+    // Paragraph AI execution currently exposes its state through its own polling adapter.
+    let guard = s
+        .conversations
+        .slot(diary_application::chat::conversations::Purpose::Chat)
+        .lock()
+        .expect("conversation poisoned");
+    conversation_progress(s, session, job, guard.as_ref()?)
+}
+fn conversation_progress(
+    s: &ServerState,
+    session: &str,
+    job: &diary_application::Job,
+    chat: &diary_application::chat::Chat,
+) -> Option<Value> {
+    if chat.session != session {
+        return None;
+    }
     let turn = chat.turn().filter(|t| t.job_id == job.id)?;
     let request_id = turn.request_id.as_ref()?;
     let snap = turn.shared.lock().expect("snapshot poisoned");

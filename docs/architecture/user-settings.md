@@ -47,3 +47,21 @@ Typed update contract: `update_user_settings(section, value, expected_revision, 
 ## Required evidence
 
 Synthetic tests with a temporary directory: missing, corrupt, oversized, duplicate-key and newer-schema files fall back with a message and no implicit overwrite; newer-schema updates are rejected; bad sections preserve other data; explicit recovery retains the original backup; interrupted writes before/after rename report the correct outcome; concurrent/stale edits conflict; symlink swaps and modes 0600/0700; location is outside the config and workspace roots; no token or path appears in the snapshot sent to the WebView. Restart persistence of an edited binding and writing language is checked in the packaged app.
+
+## Status line indicators
+
+Settings → Status Line precedes Keyboard Shortcuts (last); Server is first. The
+client-owned `status_line` section has exactly three boolean keys:
+`generate_ready`, `review_ready`, `chat_ready`, each defaulting to true when the
+section is absent or invalid. Each controls its ready label in the footer; labels
+appear only when the corresponding action is eligible. Review means the caret
+paragraph review action. Operational AI activity remains visible.
+The snapshot exposes `status_line`; guarded updates use section `status_line` and
+the same three-key object. Invalid sections warn and remain preserved until an
+explicit update of that section.
+
+Status line styling uses foreground colors only: green Generate readiness, violet
+Review readiness and cyan Chat readiness. AI activity text is amber while active,
+cyan for unread results, rose when unavailable and slate when idle. Labels continue to communicate state independently of color.
+
+Status line items align from the left, retain a 16px gap and wrap on narrow windows.

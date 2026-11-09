@@ -73,7 +73,7 @@ pub struct ServerState {
     export_jobs: Mutex<std::collections::BTreeMap<String, (String, u64, &'static str)>>,
     profiles: Option<Arc<dyn diary_application::agent::ProfileDirectory>>,
     agent_runner: Option<Arc<dyn diary_application::agent::AgentRunner + Send + Sync>>,
-    chat: Mutex<Option<diary_application::chat::Chat>>,
+    conversations: diary_application::chat::conversations::Conversations,
     generations: Mutex<diary_application::generation::Store>,
     reviews: diary_application::review::Reviews,
     review_hasher: Option<Arc<dyn diary_domain::review::Hasher>>,
@@ -118,7 +118,7 @@ impl ServerState {
             export_jobs: Mutex::new(std::collections::BTreeMap::new()),
             profiles: None,
             agent_runner: None,
-            chat: Mutex::new(None),
+            conversations: Default::default(),
             generations: Mutex::new(Default::default()),
             reviews: Default::default(),
             review_hasher: None,
@@ -230,9 +230,7 @@ impl ServerState {
     }
     fn lease_ended(&self) {
         // The chat and its transcript belong to the lease; a running turn is cancelled first.
-        if let Some(chat) = self.chat.lock().expect("chat poisoned").take() {
-            chat.cancel();
-        }
+        self.conversations.clear();
         self.reviews.clear();
         self.generations
             .lock()
@@ -248,7 +246,7 @@ impl ServerState {
         let mut c = self.coordinator.lock().expect("coordinator poisoned");
         let expired = c.expire(now);
         let orphaned = !c.has_session()
-            && (self.chat.lock().expect("chat poisoned").is_some()
+            && (!self.conversations.is_empty()
                 || !self
                     .generations
                     .lock()

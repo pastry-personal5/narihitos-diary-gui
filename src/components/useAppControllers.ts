@@ -7,13 +7,22 @@ import type { SymbolHost } from "./Symbol";
 import { useAIChat } from "./ai-chat/useAIChat";
 import { useExport } from "./export/useExport";
 import { useGeneration } from "./tabbed-editor/useGeneration";
+import { ChatParagraphReviewer } from "../adapters/paragraph-review/chat-reviewer";
 
 /** Builds the app's controllers once per bridge and owns their lifetime. */
 export function useAppControllers(bridge: Bridge) {
   const { graph, buffers } = useMemo(() => {
     const budget = new SessionBudget();
     const buffers = new CodeMirrorBuffers(budget);
-    return { graph: createAppControllers(bridge, buffers, budget), buffers };
+    return {
+      graph: createAppControllers(
+        bridge,
+        buffers,
+        budget,
+        new ChatParagraphReviewer(bridge),
+      ),
+      buffers,
+    };
   }, [bridge]);
   const {
     model,
@@ -22,6 +31,7 @@ export function useAppControllers(bridge: Bridge) {
     trash,
     chat,
     review,
+    paragraphReview,
     generator,
     activity,
     exporter,
@@ -88,6 +98,7 @@ export function useAppControllers(bridge: Bridge) {
     chat,
     chatState,
     review,
+    paragraphReview,
     generator,
     activity,
     exporter,

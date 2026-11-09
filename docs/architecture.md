@@ -14,6 +14,7 @@ This is the target architecture for Narihito's Diary, the GUI, using Clean Archi
 | Domain types, Markdown, SQLite, autosave, locking and recovery                       | [Domain and persistence](architecture/domain-and-persistence.md)       |
 | Path identity, source parsing/save/Trash, timestamps and civil dates                 | [Sources and dates](architecture/sources-and-dates.md)                 |
 | Editor ownership, paragraph review, CLI/native agents, prompt assets and supervision | [Editing and agents](architecture/editing-and-agents.md)               |
+| Caret paragraph review module ownership, extension ports and lifecycle               | [Paragraph review boundaries](architecture/paragraph-review.md)        |
 | Nonblocking AI work, progress, streaming, cancellation and completion attention      | [Background AI experience](architecture/ai-job-experience.md)          |
 | Diagnostic logs, 3-day rotation and redaction                                        | [Logging](architecture/logging.md)                                     |
 | GUI actions, default shortcuts, Settings Keyboard Shortcuts table                    | [Keyboard shortcuts](architecture/keyboard-shortcuts.md)               |

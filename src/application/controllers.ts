@@ -13,15 +13,41 @@ import {
 } from "./generation/navigation";
 import { NavigationModel } from "./navigation/model";
 import { ReviewController } from "./review/controller";
+import { ParagraphReviewController } from "./paragraph-review/controller";
+import type { ParagraphReviewer } from "./paragraph-review/contracts";
 
 /** Session-lifetime controller graph. React owns only a lease on this graph. */
 export function createAppControllers(
   bridge: Bridge,
   buffers: ResourceBuffers,
   budget: SessionBudget,
+  paragraphReviewer: ParagraphReviewer = {
+    available: false,
+    review: async () => {
+      throw new Error("unavailable");
+    },
+  },
 ) {
   const messages = new GlobalMessagesStore();
   const model = new NavigationModel(bridge, messages, budget, buffers);
+  const paragraphReview = new ParagraphReviewController(
+    paragraphReviewer,
+    (text, severity) => messages.add(text, severity),
+  );
+  let activeEditor = model.resources.active;
+  const offParagraphNavigation = model.resources.subscribe(() => {
+    const current = model.resources.active;
+    if (current !== activeEditor) {
+      paragraphReview.configure({
+        editor: null,
+        profile: null,
+        locale: null,
+        blocked: true,
+        context: async () => [],
+      });
+      activeEditor = current;
+    }
+  });
   const sourceTrash = new SourceTrashController(
     bridge,
     model,
@@ -97,6 +123,8 @@ export function createAppControllers(
     if (disposed) return;
     disposed = true;
     unguard();
+    offParagraphNavigation();
+    paragraphReview.dispose();
     activity.dispose();
     exporter.dispose();
     generator.dispose();
@@ -112,6 +140,7 @@ export function createAppControllers(
     trash,
     chat,
     review,
+    paragraphReview,
     generator,
     activity,
     exporter,

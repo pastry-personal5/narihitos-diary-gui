@@ -1,0 +1,11 @@
+# P1-M32: Caret paragraph review work plan
+
+Status: Active
+
+The [overview](milestone-32-paragraph-review-overview.md) tracks acceptance. The owner authorized incompatible refactoring for advanced future paragraph-review work. The maintained [module boundary contract](../architecture/paragraph-review.md) defines the application controller, complete editor/AI ports, explicit adapters, asset-based instructions and application-owned conversation registry with named purposes. No new dependency is required.
+
+The toolbar dispatches to the session-owned controller. The controller captures the active Authentic buffer's paragraph through the editor port. Pure targeting policy treats blank lines as paragraph delimiters. Only that paragraph is sent, bounded to 60 KiB to leave room for instructions, using the independently selected ready Paragraph Review profile and Writing Language. The AI adapter loads provider instruction assets and uses the named `paragraph_review` conversation purpose. The server registry owns slot/ID routing and cleanup for both purposes.
+
+The client polls the paragraph slot for at most ten minutes and displays only a completed, nonempty reply of at most 64 KiB. Navigation cancels the slot and ignores late replies. Model text is rendered as plain text. CodeMirror displays the suggestion as a block below the original with top-right Accept/Reject buttons. Decorations map through edits. Accept checks the captured full body, editability and composition before a normal undoable transaction triggers autosave. Reject clears only the widget. Candidate reviews retain their durable server-owned accept flow.
+
+Regression coverage includes isolated chat transcript preservation, paragraph-only request contents, rejection without writes, editor application/autosave notification, and stale draft refusal. Release qualification still owns native visual and live-model evidence.

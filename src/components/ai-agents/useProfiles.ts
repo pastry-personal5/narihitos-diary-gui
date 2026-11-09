@@ -58,6 +58,7 @@ export function useProfiles(
         if (!alive.current) return;
         setProfiles((all) => all?.map((p) => (p.alias === alias ? next : p)));
         setError(undefined);
+        return next.status;
       } catch (e) {
         // A removed alias (reload) is a stale list, not a failed check.
         if (alive.current)
@@ -82,8 +83,12 @@ export function useProfiles(
     aliasKey.split("\n").forEach((alias, i) => {
       let n = 0;
       const tick = async () => {
-        await check(alias);
-        if (live) timers[i] = setTimeout(tick, checkDelay(n++));
+        const status = await check(alias);
+        if (live)
+          timers[i] = setTimeout(
+            tick,
+            status === "busy" ? CHECK_BASE_MS : checkDelay(n++),
+          );
       };
       void tick();
     });
@@ -98,6 +103,8 @@ export function useProfiles(
     profiles: connected ? profiles : undefined,
     checking,
     error,
-    check,
+    check: async (alias: string) => {
+      await check(alias);
+    },
   };
 }

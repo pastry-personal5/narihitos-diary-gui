@@ -103,9 +103,9 @@ pub(crate) async fn close_session(
                 .lock()
                 .expect("generations poisoned")
                 .cancel_job(&id, &job.id);
-            if let Some(chat) = s.chat.lock().expect("chat poisoned").as_ref() {
+            s.conversations.each(|chat| {
                 chat.cancel_job(&job.id);
-            }
+            });
         }
         active
     };

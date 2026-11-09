@@ -1,5 +1,6 @@
 import type { BufferPort } from "../authentic/session";
 import type { ReviewView } from "../review/contracts";
+import type { ParagraphReviewEditor } from "../paragraph-review/contracts";
 
 export type ReviewDecide = (hunk: string, action: "accept" | "reject") => void;
 
@@ -7,6 +8,7 @@ export type ReviewDecide = (hunk: string, action: "accept" | "reject") => void;
 export interface ResourceBufferPort extends BufferPort {
   readonly composing: boolean;
   readonly reviewing: boolean;
+  readonly paragraphReview?: ParagraphReviewEditor;
   setEditable(editable: boolean): void;
   setReview(view: ReviewView | null, decide: ReviewDecide): void;
   focus(): void;

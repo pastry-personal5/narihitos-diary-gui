@@ -13,6 +13,23 @@ function sources(directory) {
   });
 }
 describe("frontend dependency boundaries", () => {
+  it("protects paragraph presentation, AI and editor extension seams", () => {
+    for (const [file, source] of [
+      [
+        "src/components/paragraph-review/ParagraphReviewButton.tsx",
+        'import type { Bridge } from "../../application/bridge";',
+      ],
+      [
+        "src/adapters/paragraph-review/probe.ts",
+        'import { ResourceBuffer } from "../../editor/resource-buffer";',
+      ],
+      [
+        "src/editor/paragraph-review.ts",
+        'import { bridge } from "../adapters/tauri-bridge";',
+      ],
+    ])
+      expect(frontendViolations(file, source).length).toBeGreaterThan(0);
+  });
   it("keeps application policy inward and feature hooks local", () => {
     const failures = sources("src").flatMap((file) =>
       frontendViolations(file, readFileSync(file, "utf8")).map(

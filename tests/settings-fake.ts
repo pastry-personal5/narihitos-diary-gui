@@ -1,5 +1,6 @@
 import {
   SettingsError,
+  DEFAULT_STATUS_LINE,
   type Bridge,
   type ReloadResult,
   type ServerSettings,
@@ -33,6 +34,7 @@ export function settingsFake(
       warnings: [],
       writing_locale: null,
       generation_count: 3,
+      status_line: { ...DEFAULT_STATUS_LINE },
       keybindings: {},
       effective_keybindings: { ...DEFAULT_BINDINGS },
       keybinding_issues: [],
@@ -91,6 +93,10 @@ export function settingsFake(
         }
         fake.user.keybindings = stored;
         fake.user.effective_keybindings = { ...DEFAULT_BINDINGS, ...stored };
+      } else if (u.section === "status_line") {
+        fake.user.status_line = structuredClone(
+          u.value,
+        ) as UserSettings["status_line"];
       } else if (u.section === "generation") {
         const count = (u.value as { count?: unknown }).count;
         if (

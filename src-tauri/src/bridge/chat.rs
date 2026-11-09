@@ -104,14 +104,25 @@ impl Bridge {
         profile: String,
         locale: String,
     ) -> Result<ChatOpened, AuthenticError> {
-        if !super::profiles::valid_alias(&profile) || Locale::parse(&locale).is_err() {
+        self.open_chat_kind(profile, locale, "chat").await
+    }
+    pub async fn open_chat_kind(
+        &self,
+        profile: String,
+        locale: String,
+        purpose: &str,
+    ) -> Result<ChatOpened, AuthenticError> {
+        if !super::profiles::valid_alias(&profile)
+            || Locale::parse(&locale).is_err()
+            || !matches!(purpose, "chat" | "paragraph_review")
+        {
             return Err(invalid());
         }
         let opened: ChatOpened = self
             .authentic(
                 Method::POST,
                 "/chats",
-                Some(json!({"profile":profile,"locale":locale})),
+                Some(json!({"profile":profile,"locale":locale,"purpose":purpose})),
             )
             .await?;
         if !id_ok(&opened.chat_id) || opened.profile != profile {

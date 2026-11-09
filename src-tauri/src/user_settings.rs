@@ -18,7 +18,27 @@ pub use locale::canonical_tag;
 const FILE: &str = "user_settings.json";
 const TEMP: &str = "user_settings.json.tmp";
 const MAX_BYTES: usize = 256 * 1024;
-const SECTIONS: [&str; 3] = ["keybindings", "writing", "generation"];
+const SECTIONS: [&str; 4] = ["keybindings", "writing", "generation", "status_line"];
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct StatusLine {
+    pub generate_ready: bool,
+    pub review_ready: bool,
+    pub chat_ready: bool,
+}
+impl Default for StatusLine {
+    fn default() -> Self {
+        Self {
+            generate_ready: true,
+            review_ready: true,
+            chat_ready: true,
+        }
+    }
+}
+pub fn status_line(value: &Value) -> Option<StatusLine> {
+    serde_json::from_value(value.clone()).ok()
+}
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Warning {
@@ -34,6 +54,7 @@ pub struct Snapshot {
     pub warnings: Vec<Warning>,
     pub writing_locale: Option<String>,
     pub generation_count: u8,
+    pub status_line: StatusLine,
     /// Stored overrides, verbatim (unknown and invalid entries included).
     pub keybindings: Value,
     /// Defaults merged with valid, conflict-free overrides, one list per registry action.
@@ -45,6 +66,7 @@ pub enum Change {
     Writing(String),
     /// Explicit replacement of the generation section, including an invalid saved section.
     Generation(u8),
+    StatusLine(StatusLine),
     /// First run: store the first valid tag of the system's preferred list, only if none is saved.
     InitWriting(Vec<String>),
     /// `{"set": {id: [shortcut..] | null}}` or `{"reset_all": true}`; see `keybindings::apply`.
@@ -166,6 +188,7 @@ fn snapshot_of(r: &Observed) -> Snapshot {
         warnings: Vec::new(),
         writing_locale: None,
         generation_count: 3,
+        status_line: StatusLine::default(),
         keybindings: json!({}),
         effective_keybindings: Value::Null,
         keybinding_issues: Vec::new(),
@@ -191,6 +214,12 @@ fn snapshot_of(r: &Observed) -> Snapshot {
                 match valid_writing(v) {
                     Some(tag) => s.writing_locale = Some(tag),
                     None => s.warnings.push(warn("writing", "section_invalid")),
+                }
+            }
+            if let Some(v) = map.get("status_line") {
+                match status_line(v) {
+                    Some(value) => s.status_line = value,
+                    None => s.warnings.push(warn("status_line", "section_invalid")),
                 }
             }
             if let Some(v) = map.get("generation") {
@@ -317,6 +346,9 @@ impl Store {
         };
         match change {
             Change::Recover => {}
+            Change::StatusLine(value) => {
+                map.insert("status_line".into(), json!(value));
+            }
             Change::Generation(count) => {
                 if !(1..=5).contains(&count) {
                     return Err(Error::Invalid);

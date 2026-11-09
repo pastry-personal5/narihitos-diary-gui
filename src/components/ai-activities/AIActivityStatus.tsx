@@ -25,8 +25,19 @@ export function AIActivityStatus({
         : unread
           ? `AI idle · ${unread} unread results`
           : "AI idle");
+  const tone = state.stale
+    ? "unavailable"
+    : preparing || active.length
+      ? "active"
+      : unread
+        ? "unread"
+        : "idle";
   return (
-    <span aria-label="AI Activities status" aria-live="off">
+    <span
+      className={`status-line-activity status-line-activity-${tone}`}
+      aria-label="AI Activities status"
+      aria-live="off"
+    >
       {message}
     </span>
   );

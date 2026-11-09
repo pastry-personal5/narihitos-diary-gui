@@ -176,6 +176,9 @@ async fn update_user_settings(
             .map(|v| v.as_str().map(str::to_owned).ok_or(Error::Invalid))
             .collect::<Result<_, _>>()
             .map(Change::InitWriting),
+        (_, "status_line", v) => user_settings::status_line(&v)
+            .map(Change::StatusLine)
+            .ok_or(Error::Invalid),
         (_, "generation", v) => user_settings::generation_count(&v)
             .map(Change::Generation)
             .ok_or(Error::Invalid),
@@ -229,9 +232,14 @@ async fn open_chat(
     state: State<'_, Bridge>,
     profile: String,
     locale: String,
+    purpose: Option<String>,
 ) -> Result<bridge::ChatOpened, bridge::AuthenticError> {
     main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
-    state.open_chat(profile, locale).await
+    if let Some(purpose) = purpose {
+        state.open_chat_kind(profile, locale, &purpose).await
+    } else {
+        state.open_chat(profile, locale).await
+    }
 }
 #[tauri::command]
 async fn send_chat(

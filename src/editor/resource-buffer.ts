@@ -1,5 +1,6 @@
 import { Compartment, EditorState, Text } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
+import { CodeMirrorParagraphReview } from "./paragraph-review";
 import {
   defaultKeymap,
   history,
@@ -50,6 +51,16 @@ export class ResourceBuffer implements ResourceBufferPort {
   private state: EditorState;
   private view: EditorView | null = null;
   private readonly access = new Compartment();
+  readonly paragraphReview = new CodeMirrorParagraphReview({
+    state: () => this.state,
+    editable: () => this.editable && !this.review && !this.composing,
+    focus: () => this.focus(),
+    update: (transaction) => {
+      this.state = transaction.state;
+      if (this.view) this.view.update([transaction]);
+      else if (transaction.docChanged) this.handlers.edit();
+    },
+  });
   private editable = false;
   private review: { view: ReviewView; decide: ReviewDecide } | null = null;
   private scroll = { top: 0, left: 0 };
@@ -68,6 +79,7 @@ export class ResourceBuffer implements ResourceBufferPort {
       doc,
       extensions: [
         this.access.of(this.accessExtensions(this.editable)),
+        this.paragraphReview.extension(),
         this.review && this.review.view.body === doc
           ? reviewExtension(
               this.review.view,

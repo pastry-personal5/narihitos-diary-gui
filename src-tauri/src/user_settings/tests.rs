@@ -632,3 +632,55 @@ fn generation_newer_schema_untouched() {
     );
     assert_eq!(fs::read_to_string(f.dir.join(FILE)).unwrap(), text);
 }
+
+#[test]
+fn status_line_defaults_validation_and_persistence() {
+    let f = fx();
+    assert_eq!(f.store.snapshot().status_line, StatusLine::default());
+    let before = f.store.snapshot();
+    let writing = f
+        .store
+        .update(&before.revision, Change::Writing("en-US".into()))
+        .unwrap();
+    let value = StatusLine {
+        generate_ready: false,
+        review_ready: true,
+        chat_ready: false,
+    };
+    let saved = f
+        .store
+        .update(&writing.revision, Change::StatusLine(value))
+        .unwrap();
+    assert_eq!(saved.status_line, value);
+    let reopened = Store::new(f.dir.clone()).snapshot();
+    assert_eq!(reopened.status_line, value);
+    assert_eq!(reopened.writing_locale.as_deref(), Some("en-US"));
+    for invalid in [
+        json!({}),
+        json!({"generate_ready": "false", "review_ready": true, "chat_ready": true}),
+        json!({"generate_ready": true, "review_ready": true, "chat_ready": true, "extra": false}),
+    ] {
+        assert!(status_line(&invalid).is_none());
+    }
+}
+
+#[test]
+fn invalid_status_line_is_preserved_until_explicitly_replaced() {
+    let f = fx();
+    put(
+        &f,
+        r#"{"schema_version":1,"status_line":{"chat_ready":"bad"}}"#,
+    );
+    let before = f.store.snapshot();
+    assert_eq!(before.status_line, StatusLine::default());
+    assert!(codes(&before).contains(&("status_line", "section_invalid")));
+    let next = f
+        .store
+        .update(&before.revision, Change::Generation(2))
+        .unwrap();
+    assert_eq!(on_disk(&f)["status_line"], json!({"chat_ready":"bad"}));
+    f.store
+        .update(&next.revision, Change::StatusLine(StatusLine::default()))
+        .unwrap();
+    assert!(f.store.snapshot().warnings.is_empty());
+}

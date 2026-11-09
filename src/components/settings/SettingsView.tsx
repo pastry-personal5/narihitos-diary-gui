@@ -1,6 +1,7 @@
 import type { AIChatController } from "../../application/ai-chat/controller";
 import type { GenerationController } from "../../application/generation/controller";
 import { ProfilePicker } from "../ai-agents/ProfilePicker";
+import { DEFAULT_STATUS_LINE } from "../../application/bridge";
 import type { Connection } from "../../application/bridge";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { useState } from "react";
@@ -32,6 +33,9 @@ export function SettingsView({
   connection,
   onConnect,
   profiles,
+  paragraphProfiles = [],
+  paragraphProfile = null,
+  onParagraphProfile,
   onClose,
 }: {
   model: Model;
@@ -41,6 +45,9 @@ export function SettingsView({
   connection: Connection;
   onConnect: () => void;
   profiles: ProfileStatusModel;
+  paragraphProfiles?: import("../../application/bridge").ProfileInfo[];
+  paragraphProfile?: string | null;
+  onParagraphProfile?: (alias: string) => void;
   onClose: () => void;
 }) {
   const { user, server, error } = model;
@@ -51,6 +58,7 @@ export function SettingsView({
     | "Sources"
     | "AI Agents"
     | "Writing Language"
+    | "Status Line"
     | "Keyboard Shortcuts"
     | "Generation"
   >("Status");
@@ -77,13 +85,14 @@ export function SettingsView({
         </button>
         {(
           [
-            "Status",
             "Server",
+            "Status",
             "Sources",
             "AI Agents",
             "Writing Language",
-            "Keyboard Shortcuts",
             "Generation",
+            "Status Line",
+            "Keyboard Shortcuts",
           ] as const
         ).map((name) => (
           <button
@@ -258,6 +267,24 @@ export function SettingsView({
           <div>
             <h2>AI Agents</h2>
             <ProfilePicker chat={chat} generator={generator} />
+            <div className="card" aria-label="Paragraph Review profile">
+              <h3>Paragraph Review profile</h3>
+              <label htmlFor="paragraph-review-profile">
+                Paragraph Review profile
+              </label>
+              <select
+                id="paragraph-review-profile"
+                value={paragraphProfile ?? ""}
+                disabled={paragraphProfiles.length === 0}
+                onChange={(event) => onParagraphProfile?.(event.target.value)}
+              >
+                {paragraphProfiles.map((p) => (
+                  <option key={p.alias} value={p.alias}>
+                    {p.alias} · {p.status.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
             {profiles.supported ? (
               <div className="card">
                 <h3>Agent profiles</h3>
@@ -304,6 +331,33 @@ export function SettingsView({
               Saved for new requests. Candidates run sequentially with the
               selected profile.
             </p>
+          </div>
+        ) : section === "Status Line" ? (
+          <div className="card" aria-label="Status Line settings">
+            <h2>Status Line</h2>
+            <p>Choose which ready indicators appear in the status line.</p>
+            {(
+              [
+                ["generate_ready", "Generate ready"],
+                ["review_ready", "Review ready"],
+                ["chat_ready", "Chat ready"],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key}>
+                <input
+                  type="checkbox"
+                  checked={(user?.status_line ?? DEFAULT_STATUS_LINE)[key]}
+                  disabled={!user || user.read_only}
+                  onChange={(event) =>
+                    void model.setStatusLine({
+                      ...(user?.status_line ?? DEFAULT_STATUS_LINE),
+                      [key]: event.target.checked,
+                    })
+                  }
+                />
+                {label}
+              </label>
+            ))}
           </div>
         ) : section === "Keyboard Shortcuts" ? (
           <KeyboardShortcuts user={user} save={model.setKeybindings} />

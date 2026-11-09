@@ -134,16 +134,14 @@ pub(crate) async fn cancel_job(
             Err(e) => app_error(e),
         };
     }
-    let chat_job = {
-        let chat = s.chat.lock().expect("chat poisoned");
-        chat.as_ref()
-            .and_then(|c| c.turn())
-            .is_some_and(|t| t.job_id == job)
-    };
+    let mut chat_job = false;
+    s.conversations.each(|chat| {
+        chat_job |= chat.turn().is_some_and(|t| t.job_id == job);
+    });
     if chat_job && !was_terminal {
-        if let Some(chat) = s.chat.lock().expect("chat poisoned").as_ref() {
+        s.conversations.each(|chat| {
             chat.cancel_job(&job);
-        }
+        });
         if let Ok(j) = c.touch(id, s.now(), &job) {
             imports::publish(&s, &mut c, id, &j);
         }
@@ -154,9 +152,9 @@ pub(crate) async fn cancel_job(
     }
     match c.cancel(id, s.now(), &job) {
         Ok(job) => {
-            if let Some(chat) = s.chat.lock().expect("chat poisoned").as_ref() {
+            s.conversations.each(|chat| {
                 chat.cancel_job(&job.id);
-            }
+            });
             // Compute the exact encoded envelope size before retaining notification.
             let dto = JobDto::from(job.clone());
             let bytes = serde_json::to_vec(&json!({"instance_id":s.instance_id,"session_id":id,"event_id":u64::MAX,"job_id":job.id,"job_sequence":job.sequence,"kind":"job_changed","payload":dto})).expect("fixed DTO").len();

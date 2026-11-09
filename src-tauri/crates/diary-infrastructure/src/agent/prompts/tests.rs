@@ -175,11 +175,31 @@ fn embedded_table_equals_disk_and_registers_every_file() {
     }
     let mut table: Vec<_> = EMBEDDED
         .iter()
+        .chain(CLIENT_TASKS.iter())
         .map(|(k, n, t)| (k.asset_dir().to_owned(), n.to_string(), t.to_string()))
         .collect();
     disk.sort();
     table.sort();
     assert_eq!(table, disk);
+}
+
+#[test]
+fn paragraph_task_assets_are_registered_and_valid_for_every_provider() {
+    let catalog = EmbeddedPromptCatalog::from_table(CLIENT_TASKS);
+    for kind in [
+        AgentKind::Codex,
+        AgentKind::Claude,
+        AgentKind::Qwen,
+        AgentKind::AppleFoundationModels,
+    ] {
+        let asset = catalog.get(kind, PARAGRAPH_REVIEW).unwrap();
+        assert!(
+            asset
+                .template
+                .render(&en(), Some("quoted paragraph"))
+                .contains("quoted paragraph")
+        );
+    }
 }
 
 fn real(kind: AgentKind, name: &'static str) -> ParsedPromptAsset {

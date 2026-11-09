@@ -4,6 +4,10 @@ Status: Active
 
 This log records Phase 1 decisions and material plan changes. Research recommendations remain proposals unless an owner decision is recorded.
 
+- 2026-11-09 — Owner authorized incompatible refactoring to prepare paragraph review as an advanced feature. Policy now belongs to a session-owned application controller, AI/editor capabilities are explicit ports, provider instruction prose lives in prompt assets, and server conversation purposes/cleanup have one application owner. The maintained [module boundary contract](../architecture/paragraph-review.md) records ownership and extension points; boundary and lifecycle tests enforce the separation.
+
+- 2026-11-09 — Owner requested caret paragraph AI review and subsequent review/fixes. The original toolbar implementation incorrectly selected a whole candidate. M32 now adds a separate transient paragraph chat slot, preserving user chat, and a guarded editor suggestion with Accept/Reject. See the [checklist](milestone-32-paragraph-review-overview.md).
+
 ## Export review follow-up (2026-11-07)
 
 - Hardened the delivered export contract: persist intent/reserve before remote observation, return concurrent duplicate confirmation admissions without repeating writes, and reject paused-operation previews/confirmations against a changed destination root. See the [review checklist](../archive/milestones/p1-m25/milestone-25-export-review-overview.md) for regression evidence.

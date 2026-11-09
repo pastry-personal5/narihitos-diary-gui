@@ -47,7 +47,12 @@ export function useSettings(bridge: Bridge, connected: boolean) {
   }, []);
   const update = useCallback(
     async (
-      section: "writing" | "writing_init" | "keybindings" | "generation",
+      section:
+        | "writing"
+        | "writing_init"
+        | "keybindings"
+        | "generation"
+        | "status_line",
       value: unknown,
     ) => {
       if (revision.current === undefined) return false;
@@ -151,6 +156,9 @@ export function useSettings(bridge: Bridge, connected: boolean) {
       }
     },
     setWriting: (tag: string) => update("writing", tag),
+    setStatusLine: (
+      value: import("../../application/bridge").StatusLineSettings,
+    ) => update("status_line", value),
     setGenerationCount: (count: number) => update("generation", { count }),
     setKeybindings: (value: unknown) => update("keybindings", value),
     recover: async () => {

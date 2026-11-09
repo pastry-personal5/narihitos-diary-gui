@@ -179,6 +179,16 @@ export interface ChatSnapshot {
   transcript: ChatMessage[];
   turn: ChatTurn | null;
 }
+export interface StatusLineSettings {
+  generate_ready: boolean;
+  review_ready: boolean;
+  chat_ready: boolean;
+}
+export const DEFAULT_STATUS_LINE: StatusLineSettings = {
+  generate_ready: true,
+  review_ready: true,
+  chat_ready: true,
+};
 export interface UserSettings {
   revision: string;
   read_only: boolean;
@@ -186,6 +196,7 @@ export interface UserSettings {
   warnings: { section: string; code: string }[];
   writing_locale: string | null;
   generation_count: number;
+  status_line?: StatusLineSettings;
   keybindings: unknown;
   /** Defaults merged with valid, conflict-free overrides, one list per action. */
   effective_keybindings: Record<string, string[]>;
@@ -193,7 +204,8 @@ export interface UserSettings {
 }
 export interface UserSettingsUpdate {
   /** `writing_init` takes the system's preferred tags and only fills an empty choice. */
-  section: "writing" | "writing_init" | "keybindings" | "generation";
+  section:
+    "writing" | "writing_init" | "keybindings" | "generation" | "status_line";
   value: unknown;
   expectedRevision: string;
   recover: boolean;
@@ -226,7 +238,11 @@ export interface Bridge
   listProfiles?(): Promise<ProfileInfo[]>;
   checkProfile?(alias: string): Promise<ProfileInfo>;
   /** Absent in fakes; AI Chat then stays disabled. */
-  openChat?(profile: string, locale: string): Promise<{ chat_id: string }>;
+  openChat?(
+    profile: string,
+    locale: string,
+    purpose?: "chat" | "paragraph_review",
+  ): Promise<{ chat_id: string }>;
   sendChat?(
     chatId: string,
     requestId: string,

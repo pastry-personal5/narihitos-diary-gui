@@ -9,6 +9,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { App } from "../src/components/App";
 import type { Bridge } from "../src/application/bridge";
@@ -554,4 +555,101 @@ it("groups configuration and profiles in their requested categories and reveals 
   fireEvent.click(screen.getByRole("button", { name: "Go back" }));
   expect(screen.queryByLabelText("Chat profile")).toBeNull();
   expect(screen.queryByLabelText("Generation profile")).toBeNull();
+});
+
+it("orders Settings categories and persists independent ready indicator toggles", async () => {
+  const fake = settingsFake({ writing_locale: "en-US" });
+  const adapter = bridge(fake);
+  const first = render(<App bridge={adapter} />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("AI Activities status")).toBeTruthy(),
+  );
+  await openSettings("Status Line");
+  const nav = screen.getByRole("navigation", { name: "Settings sections" });
+  expect(
+    within(nav)
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label") ?? b.textContent),
+  ).toEqual([
+    "Go back",
+    "Server",
+    "Status",
+    "Sources",
+    "AI Agents",
+    "Writing Language",
+    "Generation",
+    "Status Line",
+    "Keyboard Shortcuts",
+  ]);
+  const chat = screen.getByRole("checkbox", { name: "Chat ready" });
+  await waitFor(() => expect(chat).toHaveProperty("disabled", false));
+  fireEvent.click(chat);
+  await waitFor(() => expect(chat).toHaveProperty("checked", false));
+  expect(
+    screen.getByRole("checkbox", { name: "Generate ready" }),
+  ).toHaveProperty("checked", true);
+  expect(screen.getByRole("checkbox", { name: "Review ready" })).toHaveProperty(
+    "checked",
+    true,
+  );
+  first.unmount();
+  render(<App bridge={adapter} />);
+  await openSettings("Status Line");
+  await waitFor(() =>
+    expect(screen.getByRole("checkbox", { name: "Chat ready" })).toHaveProperty(
+      "checked",
+      false,
+    ),
+  );
+  expect(fake.user.status_line).toEqual({
+    generate_ready: true,
+    review_ready: true,
+    chat_ready: false,
+  });
+});
+
+it("hides and restores the ready label without hiding operational status", async () => {
+  const fake = settingsFake({ writing_locale: "en-US" });
+  const adapter = bridge(fake);
+  adapter.listProfiles = async () => [
+    {
+      alias: "main",
+      type: "codex",
+      status: "ready",
+      reason: null,
+      capabilities: {
+        chat: { available: true, reason: null },
+        generate: { available: true, reason: null },
+      },
+    },
+  ];
+  adapter.openChat = async () => ({ chat_id: "chat" });
+  adapter.sendChat = async () => ({ job_id: "job" });
+  adapter.getChat = async () => ({
+    chat_id: "chat",
+    profile: "main",
+    type: "codex",
+    locale: "en-US",
+    transcript: [],
+    turn: null,
+  });
+  render(<App bridge={adapter} />);
+  const footer = document.querySelector("footer")!;
+  await waitFor(() =>
+    expect(within(footer).getByText("Chat ready")).toBeTruthy(),
+  );
+  // Without a selected paragraph or generation inputs, those actions are not ready.
+  expect(within(footer).queryByText("Review ready")).toBeNull();
+  expect(within(footer).queryByText("Generate ready")).toBeNull();
+  await openSettings("Status Line");
+  const toggle = screen.getByRole("checkbox", { name: "Chat ready" });
+  fireEvent.click(toggle);
+  await waitFor(() =>
+    expect(within(footer).queryByText("Chat ready")).toBeNull(),
+  );
+  expect(within(footer).getByLabelText("AI Activities status")).toBeTruthy();
+  fireEvent.click(toggle);
+  await waitFor(() =>
+    expect(within(footer).getByText("Chat ready")).toBeTruthy(),
+  );
 });

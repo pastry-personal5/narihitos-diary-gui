@@ -12,7 +12,50 @@ use tower::ServiceExt;
 
 const SESSION: &str = "07249746-e280-4d51-a86a-cbcb198ee101";
 
+#[tokio::test]
+async fn paragraph_chat_preserves_user_chat_and_closes_independently() {
+    let s = setup(Mode_::Reply);
+    let user = open(&s).await;
+    send(&s, &user, "user-turn", "hello").await;
+    let before = until(&s, &user, "done").await;
+    let (status, opened) = call(
+        &s,
+        "POST",
+        "/api/v1/chats",
+        Some(json!({"profile":"main","locale":"en-US","purpose":"paragraph_review"})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let paragraph = opened["chat_id"].as_str().unwrap();
+    send(&s, paragraph, "paragraph-turn", "review this").await;
+    until(&s, paragraph, "done").await;
+    call(&s, "DELETE", &format!("/api/v1/chats/{paragraph}"), None).await;
+    let (status, after) = call(&s, "GET", &format!("/api/v1/chats/{user}"), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(before["transcript"], after["transcript"]);
+}
+
 struct Profiles;
+
+#[tokio::test]
+async fn paragraph_conversation_participates_in_job_cancellation() {
+    let s = setup(Mode_::Block);
+    let (status, opened) = call(
+        &s,
+        "POST",
+        "/api/v1/chats",
+        Some(json!({"profile":"main","locale":"en-US","purpose":"paragraph_review"})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let paragraph = opened["chat_id"].as_str().unwrap();
+    let (_, started) = send(&s, paragraph, "review-turn", "review").await;
+    let job = started["job"]["id"].as_str().unwrap();
+    let (status, _) = call(&s, "POST", &format!("/api/v1/jobs/{job}/cancel"), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let result = until(&s, paragraph, "cancelled").await;
+    assert!(result["transcript"].as_array().unwrap().is_empty());
+}
 impl ProfileDirectory for Profiles {
     fn list(&self) -> Vec<ProfileView> {
         self.check("main").into_iter().collect()
@@ -410,7 +453,8 @@ async fn chat_retains_current_turn_definition_and_resolves_again_for_next_turn()
     let first = until(&s, &chat, "done").await;
     assert!(first.to_string().contains("fixture:a"));
     assert_eq!(
-        s.chat
+        s.conversations
+            .for_id(&chat)
             .lock()
             .unwrap()
             .as_ref()
@@ -429,7 +473,8 @@ async fn chat_retains_current_turn_definition_and_resolves_again_for_next_turn()
     let second = until(&s, &chat, "done").await;
     assert!(second.to_string().contains("fixture:b"));
     assert_eq!(
-        s.chat
+        s.conversations
+            .for_id(&chat)
             .lock()
             .unwrap()
             .as_ref()

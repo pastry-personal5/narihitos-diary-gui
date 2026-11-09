@@ -2,6 +2,10 @@
 
 Status: Active
 
+- [Paragraph review module boundaries](architecture/paragraph-review.md): application policy, AI/editor ports, composition, conversation ownership and future extension guidance.
+
+- [P1-M32 caret paragraph review](phase-1/milestone-32-paragraph-review-overview.md) ([work plan](phase-1/milestone-32-paragraph-review-architecture.md)): focused Draft paragraph AI suggestion, guarded Accept/Reject and isolated chat lifecycle.
+
 - [P1-M32 Draft candidate table](phase-1/milestone-32-draft-candidate-table-overview.md) ([work plan](phase-1/milestone-32-draft-candidate-table-architecture.md)): four-column table matching the Snippet tab, with Style label, bitmap Info/Style description and bitmap Open in Tabbed Editor actions; implemented with the full gate passing; narrow-Explorer visual evidence pending.
 - [Phase 2 ideas](phase-2-ideas.md): initial non-binding ideas for Diary v2.0.0; scheduling and milestones are deferred.
 - [P1-M31 text-only snippet follow-up](archive/milestones/p1-m31/milestone-31-text-only-snippets-overview.md) ([work plan](archive/milestones/p1-m31/milestone-31-text-only-snippets-architecture.md)): done; schema 2 import and guarded Source Save, verified by producer round trips and the full gate.

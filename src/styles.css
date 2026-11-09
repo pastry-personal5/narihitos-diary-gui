@@ -27,6 +27,12 @@
   --diff-del: #f85149;
   --diff-add: #30a46c;
   --review-bar: var(--accent);
+  --status-idle: #b5bdcc;
+  --status-generate: #89d9a0;
+  --status-review: #c4a7f5;
+  --status-chat: #78cfee;
+  --status-active: #f0ca7c;
+  --status-unavailable: #f4a0a8;
 }
 * {
   box-sizing: border-box;
@@ -675,6 +681,20 @@ footer {
 }
 
 /* Paragraph review, modelled on CodeMirror's unified merge view. */
+.paragraph-suggestion {
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  background: var(--surface);
+  white-space: pre-wrap;
+}
+.paragraph-suggestion-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 8px;
+}
 .review-controls {
   display: flex;
   flex-wrap: wrap;
@@ -979,7 +999,7 @@ footer {
 }
 footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
   flex-wrap: wrap;
 }
@@ -1102,4 +1122,25 @@ footer {
 }
 .candidate-table .snippet-actions {
   width: 1%;
+}
+
+/* Foreground-only status colors retain the existing footer background and layout. */
+.status-line-activity-idle {
+  color: var(--status-idle);
+}
+.status-line-generate {
+  color: var(--status-generate);
+}
+.status-line-review {
+  color: var(--status-review);
+}
+.status-line-chat,
+.status-line-activity-unread {
+  color: var(--status-chat);
+}
+.status-line-activity-active {
+  color: var(--status-active);
+}
+.status-line-activity-unavailable {
+  color: var(--status-unavailable);
 }

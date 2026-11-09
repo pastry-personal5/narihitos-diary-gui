@@ -34,6 +34,34 @@ afterEach(() => {
 });
 
 describe("review view in the editor", () => {
+  it("shows the caret paragraph suggestion below the original and accepts through autosave", () => {
+    const buffer = mount();
+    const snapshot = buffer.paragraphReview.paragraph()!;
+    expect(snapshot.text).toBe("A");
+    const decide = vi.fn();
+    buffer.paragraphReview.suggestParagraph(snapshot, "Improved A", decide);
+    const box = host.querySelector(".paragraph-suggestion")!;
+    expect(box.textContent).toBe("AcceptRejectImproved A");
+    expect(buffer.getText()).toBe("A\n\nB\n\n");
+    box.querySelectorAll("button")[1].click();
+    expect(decide).toHaveBeenCalledWith(false);
+    expect(buffer.paragraphReview.acceptParagraph(snapshot, "Improved A")).toBe(
+      true,
+    );
+    expect(buffer.getText()).toBe("Improved A\n\nB\n\n");
+    expect(handlers.edit).toHaveBeenCalled();
+    buffer.dispose();
+  });
+  it("refuses a stale paragraph and preserves the edited draft", () => {
+    const buffer = mount();
+    const snapshot = buffer.paragraphReview.paragraph()!;
+    buffer.setText("changed draft");
+    expect(buffer.paragraphReview.acceptParagraph(snapshot, "AI reply")).toBe(
+      false,
+    );
+    expect(buffer.getText()).toBe("changed draft");
+    buffer.dispose();
+  });
   it("marks removals, shows additions, a gutter bar and named Accept/Reject buttons", () => {
     const buffer = mount();
     const decide = vi.fn();

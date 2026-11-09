@@ -6,6 +6,8 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 ## Decided
 
+- **Paragraph review changeability (owner, 2026-11-09):** Treat caret paragraph review as an independently owned advanced feature with explicit application, AI, editor and presentation boundaries. Incompatible internal/API changes are authorized for this refactor. The [module boundary contract](architecture/paragraph-review.md) defines ownership and extension points; the [M32 checklist](phase-1/milestone-32-paragraph-review-overview.md) records validation. This does not add future review features or change dependencies.
+
 - **Draft candidate table (owner, 2026-11-09):** Replace the Draft tab candidate list/tree with a table: Number, Style label, Info button, Open in Tabbed Editor button. Info is a custom bitmap button showing Style description; the custom bitmap Open button focuses an existing candidate tab or opens it. Initially recorded as a planned M32 task; the owner subsequently requested implementation and matching the Snippet tab table's look and feel. Implemented with focused tests and all seven gate lanes passing; narrow-Explorer visual evidence remains pending. See the [overview/checklist](phase-1/milestone-32-draft-candidate-table-overview.md).
 
 - **Candidate style terminology (owner, 2026-11-09):** Adopt **Style label** and **Style description** as the canonical UX terms for the pair describing a Candidate's requested prompt style. Example: (reflective, dwell on feelings and thoughts the facts imply, without adding events.). Definitions and code-facing names are in [UX terms](ux-terms.md#candidate-style-terms). Terminology only; no implementation change is requested.

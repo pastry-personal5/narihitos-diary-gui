@@ -2,11 +2,16 @@ import { TabbedEditor } from "./tabbed-editor/TabbedEditor";
 import { StandardLayout } from "./standard-layout/StandardLayout";
 import { MainToolbarStrip } from "./standard-layout/MainToolbarStrip";
 import { ToolbarButton } from "./standard-layout/ToolbarButton";
+import { ParagraphReviewButton } from "./paragraph-review/ParagraphReviewButton";
+import type { ParagraphReviewSnippet } from "../application/paragraph-review/contracts";
+import { useReview } from "./paragraph-review/useReview";
 import settingsIcon from "../assets/settings.png";
 import { AIActivityFeedback } from "./ai-activities/AIActivityFeedback";
 import { AIActivitiesDialog } from "./ai-activities/AIActivitiesDialog";
 import { AIActivityStatus } from "./ai-activities/AIActivityStatus";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { DEFAULT_STATUS_LINE } from "../application/bridge";
+import { useControllerSnapshot } from "./useControllerSnapshot";
 import type { Bridge } from "../application/bridge";
 import { SettingsView } from "./settings/SettingsView";
 import { Explorer } from "./explorer/Explorer";
@@ -45,6 +50,7 @@ export function App({ bridge }: { bridge: Bridge }) {
     chat,
     chatState,
     review,
+    paragraphReview,
     generator,
     activity,
     exporter,
@@ -100,6 +106,90 @@ export function App({ bridge }: { bridge: Bridge }) {
     setPaletteOpen,
     setSettingsOpen,
   });
+  const reviewState = useReview(review);
+  const paragraphState = useControllerSnapshot(
+    paragraphReview,
+    paragraphReview.state,
+  );
+  const statusLine = settings.user?.status_line ?? DEFAULT_STATUS_LINE;
+  const [paragraphAlias, setParagraphAlias] = useState<string | null>(null);
+  const paragraphProfiles = (profiles.profiles ?? []).filter(
+    (p) => p.capabilities.chat.available,
+  );
+  const paragraphSelection = paragraphProfiles.some(
+    (p) => p.alias === paragraphAlias,
+  )
+    ? paragraphAlias
+    : (paragraphProfiles[0]?.alias ?? null);
+  const paragraphProfile = paragraphProfiles.find(
+    (p) =>
+      p.alias === paragraphSelection &&
+      (p.status === "ready" || p.status === "busy"),
+  );
+  const paragraphEditor =
+    active?.kind === "authentic"
+      ? (active.buffer.paragraphReview ?? null)
+      : null;
+  const paragraphBlocked =
+    !connected ||
+    !storage ||
+    generator.running ||
+    chat.running ||
+    reviewState.busy ||
+    !!reviewState.view;
+  const paragraphContext = useCallback(async (): Promise<
+    ParagraphReviewSnippet[]
+  > => {
+    const date = model.resources.selectedDate;
+    if (!date) return [];
+    const center = new Date(`${date}T12:00:00Z`);
+    const dates = [-1, 0, 1].map((offset) => {
+      const day = new Date(center);
+      day.setUTCDate(day.getUTCDate() + offset);
+      return day.toISOString().slice(0, 10);
+    });
+    const seen = new Set<string>();
+    const result: ParagraphReviewSnippet[] = [];
+    for (const day of dates) {
+      for (const item of model.imports.view(day).items) {
+        if (!("source" in item) || !item.source || seen.has(item.source.id))
+          continue;
+        seen.add(item.source.id);
+        try {
+          const body = await bridge.readSource(
+            item.source.id,
+            item.source.import_id,
+          );
+          result.push({
+            date: item.source.navigation?.included?.date ?? day,
+            selected: model.imports.inclusion(item.source.id)?.checked ?? false,
+            text: body.body,
+          });
+        } catch {
+          // Loose context is best effort; unavailable source bodies are omitted.
+        }
+      }
+    }
+    return result;
+  }, [bridge, model]);
+  useEffect(() => {
+    paragraphReview.configure({
+      editor: paragraphEditor,
+      profile: paragraphProfile
+        ? { alias: paragraphProfile.alias, type: paragraphProfile.type }
+        : null,
+      locale: settings.user?.writing_locale ?? null,
+      blocked: paragraphBlocked,
+      context: paragraphContext,
+    });
+  }, [
+    paragraphReview,
+    paragraphEditor,
+    paragraphProfile,
+    settings.user?.writing_locale,
+    paragraphBlocked,
+    paragraphContext,
+  ]);
   return (
     <SymbolProvider value={symbols}>
       {closePending && (
@@ -183,6 +273,7 @@ export function App({ bridge }: { bridge: Bridge }) {
             )}
             onClick={() => void handlers["generate.start"].run()}
           />
+          <ParagraphReviewButton controller={paragraphReview} />
         </MainToolbarStrip>
         {selectedView?.createError && (
           <p role="alert" className="notice">
@@ -255,6 +346,9 @@ export function App({ bridge }: { bridge: Bridge }) {
           <SettingsView
             chat={chat}
             generator={generator}
+            paragraphProfiles={paragraphProfiles}
+            paragraphProfile={paragraphSelection}
+            onParagraphProfile={setParagraphAlias}
             profiles={profiles}
             model={{
               ...settings,
@@ -392,8 +486,27 @@ export function App({ bridge }: { bridge: Bridge }) {
             </div>
           }
         />
-        <footer>
-          <span>Authentic files save automatically</span>
+        <footer className="status-line">
+          {statusLine.generate_ready &&
+            !generationReason &&
+            paragraphState.phase !== "reviewing" && (
+              <span className="status-line-generate">Generate ready</span>
+            )}
+          {statusLine.review_ready && !paragraphState.reason && (
+            <span className="status-line-review">Review ready</span>
+          )}
+          {statusLine.chat_ready &&
+            connected &&
+            storage &&
+            chat.available &&
+            !!chatState.profile &&
+            !!settings.user?.writing_locale &&
+            !chat.running &&
+            !generator.running &&
+            paragraphState.phase !== "reviewing" && (
+              <span className="status-line-chat">Chat ready</span>
+            )}
+
           <AIActivityStatus
             store={activity.store}
             preparing={

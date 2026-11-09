@@ -8,7 +8,9 @@ pub struct EmbeddedPromptCatalog {
 }
 
 fn known(name: &str) -> Option<&'static str> {
-    [GENERATE, CHAT, SESSION].into_iter().find(|n| *n == name)
+    [GENERATE, CHAT, SESSION, PARAGRAPH_REVIEW]
+        .into_iter()
+        .find(|n| *n == name)
 }
 
 impl EmbeddedPromptCatalog {

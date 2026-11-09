@@ -48,7 +48,21 @@ pub const EMBEDDED: &Table<'static> = &[
     ),
 ];
 
+/// Client task-message assets are inventoried and parsed here in tests, not resolved as server agent actions.
+#[cfg(test)]
+const CLIENT_TASKS: &Table<'static> = &[
+    asset!(AgentKind::Codex, "codex", "review-paragraph"),
+    asset!(AgentKind::Claude, "claude", "review-paragraph"),
+    asset!(AgentKind::Qwen, "qwen", "review-paragraph"),
+    asset!(
+        AgentKind::AppleFoundationModels,
+        "apple-foundation-models",
+        "review-paragraph"
+    ),
+];
+
 pub const GENERATE: &str = "generate-candidate";
+pub const PARAGRAPH_REVIEW: &str = "review-paragraph";
 pub const CHAT: &str = "chat";
 pub const SESSION: &str = "session-instructions";
 

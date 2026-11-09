@@ -263,6 +263,16 @@ export function serverSettingsDto(value: unknown): ServerSettings {
 }
 export function userSettingsDto(value: unknown): UserSettings {
   const dto = record(value);
+  const statusLine =
+    dto.status_line == null ? undefined : record(dto.status_line);
+  if (
+    statusLine &&
+    (Object.keys(statusLine).length !== 3 ||
+      ["generate_ready", "review_ready", "chat_ready"].some(
+        (key) => typeof statusLine[key] !== "boolean",
+      ))
+  )
+    throw new Error("Invalid settings response");
   if (
     typeof dto.read_only !== "boolean" ||
     typeof dto.recoverable !== "boolean" ||
@@ -286,6 +296,7 @@ export function userSettingsDto(value: unknown): UserSettings {
     writing_locale:
       dto.writing_locale == null ? null : text(dto.writing_locale, 35),
     generation_count: dto.generation_count as number,
+    status_line: statusLine as unknown as UserSettings["status_line"],
     keybindings: dto.keybindings ?? {},
     effective_keybindings: Object.fromEntries(
       Object.entries(record(dto.effective_keybindings)).map(([id, keys]) => [

@@ -4,6 +4,8 @@ Status: Active
 
 This defines client state ownership, paragraph review and runtime-selectable agent adapters. The [canonical UX](../ux-gui.md) governs visible behavior; the [API](api-and-processes.md) carries validated use cases.
 
+Caret paragraph review has its own maintained [module boundary contract](paragraph-review.md), separate from the saved-candidate review flow described here.
+
 ## Editor and client state
 
 React owns layout, focus and view subscriptions. Application controllers own active dates, retained Editor tabs, snippet inclusion, command availability and run/result state. A dedicated CodeMirror module owns one EditorState per resource ID, including undo/selection/scroll and extensions. Use one active EditorView and switch retained states; destroy the view/subscriptions on unmount. Keep streamed text and keystroke document storage outside global React state. Client application state machines depend on a typed bridge port; Vitest can use a fake without loading Tauri.

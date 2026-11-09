@@ -149,8 +149,8 @@ export const tauriBridge: Bridge = {
   reloadSettings: () => settings("reload_settings", undefined, reloadResultDto),
   listProfiles: () => authentic("list_agents", undefined, profileListDto),
   checkProfile: (alias) => authentic("check_agent", { alias }, profileDto),
-  openChat: (profile, locale) =>
-    authentic("open_chat", { profile, locale }, chatOpenedDto),
+  openChat: (profile, locale, purpose = "chat") =>
+    authentic("open_chat", { profile, locale, purpose }, chatOpenedDto),
   sendChat: (chatId, requestId, message, document) =>
     authentic(
       "send_chat",

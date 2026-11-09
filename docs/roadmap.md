@@ -2,6 +2,8 @@
 
 Status: Active
 
+P1-M32 also includes the owner's [caret paragraph review correction](phase-1/milestone-32-paragraph-review-overview.md): a main-toolbar bitmap action with AI suggestions and guarded Accept/Reject below the focused Draft paragraph.
+
 This is the authority for the active phase and milestone order. The owner confirmed that Phase 1 delivers Diary v1.0.0; its phase plan sequences the remaining feature and personal-release themes, and its implementation handoff maps their evidence requirements.
 
 | Phase | Title        | Status | Plan                          |
@@ -34,3 +36,5 @@ P1-M31 is Done (2026-11-09): [changeability refactoring overview/checklist](arch
 P1-M31 also completed the [text-only snippet follow-up](archive/milestones/p1-m31/milestone-31-text-only-snippets-overview.md) (2026-11-09): producer-created schema 2 manual snippets now import and support guarded Source Save. Both producer round trips and all seven gate lanes pass; text-only Trash remains disabled. The completed changeability refactoring evidence above remains valid; M32 remains Planned.
 
 P1-M32 includes the owner-requested [Draft candidate table plan/checklist](phase-1/milestone-32-draft-candidate-table-overview.md) and [work plan](phase-1/milestone-32-draft-candidate-table-architecture.md) (2026-11-09). The owner subsequently requested implementation matching the Snippet tab table; implementation and the full gate pass; narrow-Explorer visual evidence and release qualification remain pending.
+
+P1-M32 includes the owner-requested [Settings category order and status line indicators](phase-1/milestone-32-status-line-overview.md).

@@ -40,6 +40,32 @@ export function frontendViolations(file, source, root = cwd()) {
     );
     if (feature && destination && destination[1] !== feature)
       violations.push(`feature imports another feature's hook: ${specifier}`);
+    const paragraphUI = from.startsWith("src/components/paragraph-review/");
+    if (
+      paragraphUI &&
+      (/^src\/(adapters|editor)\//u.test(target) ||
+        target === "src/application/bridge.ts" ||
+        target === "src/application/editor/buffers.ts")
+    )
+      violations.push(
+        `paragraph review presentation imports an execution implementation: ${specifier}`,
+      );
+    if (
+      from.startsWith("src/adapters/paragraph-review/") &&
+      /^src\/(components|editor)\//u.test(target)
+    )
+      violations.push(
+        `paragraph AI adapter imports presentation: ${specifier}`,
+      );
+    if (
+      (from === "src/editor/paragraph-review.ts" ||
+        from === "src/editor/paragraph-suggestion.ts") &&
+      (/^src\/(components|adapters)\//u.test(target) ||
+        target === "src/application/bridge.ts")
+    )
+      violations.push(
+        `paragraph editor imports AI transport or React: ${specifier}`,
+      );
   }
   function visit(node) {
     if (

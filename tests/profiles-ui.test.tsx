@@ -2,6 +2,8 @@ import { navigationFake } from "./navigation-fake";
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
+  renderHook,
   cleanup,
   fireEvent,
   render,
@@ -9,7 +11,10 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { checkDelay } from "../src/components/ai-agents/useProfiles";
+import {
+  checkDelay,
+  useProfiles,
+} from "../src/components/ai-agents/useProfiles";
 import { App } from "../src/components/App";
 import {
   AuthenticError,
@@ -204,16 +209,29 @@ describe("Profile status in Settings", () => {
     );
     await open();
     const chat = screen.getByRole("combobox", { name: "Chat profile" });
+    const paragraph = screen.getByRole("combobox", {
+      name: "Paragraph Review profile",
+    });
     const generation = screen.getByRole("combobox", {
       name: "Generation profile",
     });
     fireEvent.change(chat, { target: { value: "second" } });
     await waitFor(() => expect(chat).toHaveProperty("value", "second"));
     expect(generation).toHaveProperty("value", "first");
+    expect(paragraph).toHaveProperty("value", "first");
+    fireEvent.change(paragraph, { target: { value: "second" } });
+    fireEvent.change(chat, { target: { value: "first" } });
+    await waitFor(() => expect(chat).toHaveProperty("value", "first"));
+    expect(paragraph).toHaveProperty("value", "second");
+    fireEvent.change(chat, { target: { value: "second" } });
+    await waitFor(() => expect(chat).toHaveProperty("value", "second"));
     fireEvent.change(generation, { target: { value: "second" } });
     fireEvent.click(screen.getByRole("button", { name: "Go back" }));
     expect(screen.queryByRole("combobox", { name: "Chat profile" })).toBeNull();
     await open();
+    expect(
+      screen.getByRole("combobox", { name: "Paragraph Review profile" }),
+    ).toHaveProperty("value", "second");
     expect(
       screen.getByRole("combobox", { name: "Chat profile" }),
     ).toHaveProperty("value", "second");
@@ -303,4 +321,35 @@ describe("profile DTO validation", () => {
     });
     expect(() => profileListDto({ profiles: "x" })).toThrow();
   });
+});
+
+it("retries busy checks at the base interval even after backoff", async () => {
+  vi.useFakeTimers();
+  const checkProfile = vi.fn().mockResolvedValue(profile("agent", "ready"));
+  const b = bridge({
+    listProfiles: async () => [profile("agent", "ready")],
+    checkProfile,
+  });
+  const { unmount } = renderHook(() => useProfiles(b, true));
+  try {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    checkProfile.mockResolvedValue(profile("agent", "busy"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    const count = checkProfile.mock.calls.length;
+    checkProfile.mockResolvedValue(profile("agent", "ready"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(checkProfile).toHaveBeenCalledTimes(count + 1);
+  } finally {
+    unmount();
+    vi.useRealTimers();
+  }
 });
