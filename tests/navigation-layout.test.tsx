@@ -122,6 +122,7 @@ describe("N01 Standard Layout containment", () => {
     expect(before).toBeLessThan(480);
 
     const chat = screen.getByRole("separator", { name: "Resize AI Chat" });
+    expect(chat.getAttribute("aria-valuenow")).toBe("480");
     for (let i = 0; i < 100; i++)
       fireEvent.keyDown(chat, { key: "ArrowRight" });
     expect(chat.getAttribute("aria-valuenow")).toBe("160");

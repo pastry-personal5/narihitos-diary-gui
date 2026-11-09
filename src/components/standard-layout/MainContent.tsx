@@ -16,7 +16,7 @@ export function MainContent({
   aiChat: ReactNode;
 }) {
   const [explorerWidth, setExplorerWidth] = useState(220);
-  const [chatWidth, setChatWidth] = useState(240);
+  const [chatWidth, setChatWidth] = useState(480);
   return (
     <div
       className="main-content"

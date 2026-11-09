@@ -41,3 +41,8 @@ Refactor evidence: the delegated runner passed the focused paragraph controller,
 - [x] Cover both regressions and pass the full gate.
 
 Follow-up evidence: delegated validation passed 19 focused profile/paragraph tests and all seven gate lanes. Rust tests passed with localhost socket permission after the sandbox blocked loopback setup. Profile selection remains independent across Settings close/reopen; busy probes retry at the base interval after prior backoff. Native/live-model reproduction remains unverified.
+## Owner-requested GUI follow-up: AI Chat width
+
+- [x] AI Chat opens at twice its previous default width (480px) while remaining resizable.
+- [x] Layout regression coverage verifies the 480px default and existing resize bounds; the focused test and full gate pass.
+
