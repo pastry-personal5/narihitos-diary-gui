@@ -5,7 +5,7 @@
 use pulldown_cmark::{Event, Options, Parser, Tag};
 use std::{collections::BTreeSet, ops::Range};
 
-pub const RULES_VERSION: u32 = 1;
+pub const RULES_VERSION: u32 = 2;
 pub const MAX_UNITS: usize = 4_000;
 pub const MAX_COMPARISONS: usize = 4_000_000;
 
@@ -232,7 +232,15 @@ pub fn align(h: &dyn Hasher, b_text: &str, c_text: &str) -> Result<Vec<Hunk>, Re
         return Err(ReviewError::Limit);
     }
     let (m, n) = (bu.len(), cu.len());
-    let same = |i: usize, j: usize| b_text[bu[i].range.clone()] == c_text[cu[j].range.clone()];
+    let same = |i: usize, j: usize| {
+        let b = &b_text[bu[i].range.clone()];
+        let c = &c_text[cu[j].range.clone()];
+        b == c
+            || (i + 1 == m
+                && j + 1 < n
+                && c.starts_with(b)
+                && c[b.len()..].chars().all(|ch| ch == '\n' || ch == '\r'))
+    };
     let w = n + 1;
     let mut t = vec![0u16; (m + 1) * w];
     for i in (0..m).rev() {
@@ -279,6 +287,7 @@ pub fn align(h: &dyn Hasher, b_text: &str, c_text: &str) -> Result<Vec<Hunk>, Re
     let b_at = |i: usize| bu.get(i).map_or(b_text.len(), |u| u.range.start);
     let mut hunks = Vec::new();
     let (mut bi, mut ci) = (0, 0);
+    let mut append_separator = None;
     for (ai, aj) in anchors {
         let (nb, nc) = (ai - bi, aj - ci);
         for k in 0..nb.min(nc) {
@@ -295,7 +304,17 @@ pub fn align(h: &dyn Hasher, b_text: &str, c_text: &str) -> Result<Vec<Hunk>, Re
         }
         for c in cu.iter().take(aj).skip(ci + nb.min(nc)) {
             let at = b_at(ai);
-            hunks.push(make(HunkKind::Insert, c.kind, at..at, c.range.clone()));
+            let mut range = c.range.clone();
+            if let Some(start) = append_separator.take() {
+                range.start = start;
+            }
+            hunks.push(make(HunkKind::Insert, c.kind, at..at, range));
+        }
+        if ai + 1 == m && aj + 1 < n {
+            let start = cu[aj].range.start + bu[ai].range.len();
+            if start < cu[aj].range.end {
+                append_separator = Some(start);
+            }
         }
         bi = ai + 1;
         ci = aj + 1;
@@ -318,8 +337,21 @@ pub fn view(
     for hk in hunks {
         out.push_str(&b_text[cursor..hk.baseline.start]);
         cursor = hk.baseline.start;
+        let mut inserted = c_text[hk.candidate.clone()].to_owned();
+        if hk.kind == HunkKind::Insert
+            && hk.baseline.start == b_text.len()
+            && !out.is_empty()
+            && !inserted.starts_with(['\n', '\r'])
+        {
+            let before = &c_text[..hk.candidate.start];
+            let separator = &before[before.trim_end_matches(['\n', '\r']).len()..];
+            let existing = out.len() - out.trim_end_matches(['\n', '\r']).len();
+            if separator.len() > existing {
+                inserted.insert_str(0, &separator[existing..]);
+            }
+        }
         if accepted.contains(&hk.id) {
-            out.push_str(&c_text[hk.candidate.clone()]);
+            out.push_str(&inserted);
             cursor = hk.baseline.end;
         } else if !rejected.contains(&hk.id) {
             let at = out.len();
@@ -328,7 +360,7 @@ pub fn view(
                 kind: hk.kind,
                 unit: hk.unit,
                 body: at..at + hk.baseline.len(),
-                text: c_text[hk.candidate.clone()].to_owned(),
+                text: inserted,
             });
         }
     }

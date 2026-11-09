@@ -1,6 +1,6 @@
 # P1-M32: Personal release qualification work plan
 
-Status: Planned
+Status: Active
 
 Execute the [release checklist](milestone-32-personal-release-overview.md) against the final ordinary packaged app and standalone server. Reuse existing verification tools and application boundaries; fix demonstrated defects with code, regression coverage and docs together. Planning does not certify a capability or authorize new dependencies.
 

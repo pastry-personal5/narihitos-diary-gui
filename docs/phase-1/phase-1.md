@@ -230,7 +230,7 @@ Notes: The owner accepted changeability refactoring as the first task set on 202
 
 ### P1-M32: Personal release qualification
 
-Status: Planned
+Status: Active
 Goal: Qualify Diary v1.0.0 on the owner's Apple Silicon Mac with separate shell launch, automated workflow/recovery/artifact evidence and the full release gate; document exempt by-human observations.
 Plan: [release overview/checklist](milestone-32-personal-release-overview.md), [qualification work plan](milestone-32-personal-release-architecture.md).
 

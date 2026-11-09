@@ -26,8 +26,41 @@ Press Shift+Command+P (or use the toolbar) for the command palette; Command+S sa
 
 The [planned background AI experience](architecture/ai-job-experience.md) keeps editing available with visible progress, cancellation and in-app completion feedback.
 
-Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat profile and Generation profile cards. Profile choices apply to new AI runs. Each profile has a **Show progress using Global Messages** checkbox, on by default and remembered after restart. Enabled profiles report ongoing job and request/response turn stages every two seconds. Turn it off to stop periodic progress; completion, warnings and errors still appear.
+Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat, Generation and Paragraph Review profile cards. Profile choices apply to new AI runs. Each profile has a **Show progress using Global Messages** checkbox, on by default and remembered after restart. Enabled profiles report ongoing job and request/response turn stages every two seconds. Turn it off to stop periodic progress; completion, warnings and errors still appear.
 
 The AI Activities window has a top-right Close button and supports Escape. Bitmap (i) buttons open further explanations. Close an explanation to return to its info button. Closing AI Activities keeps work running, and the bottom status line shows what is running or waiting. Use Reconnect when observations are out of date. Profile choices remain in Settings → AI Agents.
 
 Generate, Chat and Review report their current request/response stage in Global Messages every two seconds when the running profile’s progress toggle is on, including preparation and unchanged waits. Interrupted observations report status unavailable until refreshed. Completion, warnings and errors remain visible when progress is off.
+
+## Personal release layout and independent launch
+
+Keep the standalone `diary-server`, `Narihito's Diary.app`,
+`third-party-notices.md` and the accompanying `assets/third-party` license files
+in the installation folder. Use ordinary release artifacts qualified by the
+[release ledger](phase-1/milestone-32-release-evidence.md); development and
+fault-injection builds are separate test tooling.
+
+Start the server in one shell using absolute paths:
+
+```sh
+"/absolute/Diary Install/diary-server" --config "/absolute/private/config.yaml"
+```
+
+Start the client from a second shell, using the discovery file published by
+that server under its configured private runtime directory:
+
+```sh
+"/absolute/Diary Install/Narihito's Diary.app/Contents/MacOS/diary-client" --connect "/absolute/private/runtime/WORKSPACE_KEY/discovery.json"
+```
+
+Use real paths without symlink components. Keep configuration and runtime
+credentials private; do not copy a discovery token between installations.
+The client does not start or own the server. Closing the client waits for
+save/session cleanup; stop the server separately with Ctrl+C after the client
+has finished. Resolve failed or uncertain saves before closing; retry preserves
+the operation identity so an acknowledged write is not repeated. On recovery,
+use the displayed saved state and recovery controls rather than deleting the
+workspace ledger. AI results and chat are session memory and do not survive a
+server restart. Missing AI tools disable their actions while editing remains
+available. Local export read-back does not establish remote iCloud upload;
+text-only snippet Trash remains unavailable.

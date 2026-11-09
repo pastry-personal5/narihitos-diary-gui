@@ -14,11 +14,23 @@ import time
 import urllib.error
 import urllib.request
 
+import argparse
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--server', type=Path)
+parser.add_argument('--fake-cli', type=Path)
+args = parser.parse_args()
 root = Path(__file__).resolve().parents[2]
-subprocess.run(['cargo', 'build', '--quiet', '--manifest-path', str(root / 'src-tauri/Cargo.toml'), '-p', 'diary-server'], check=True)
-binary = Path(os.environ.get('CARGO_TARGET_DIR', root / 'src-tauri/target')) / 'debug/diary-server'
-subprocess.run(['cargo', 'build', '--quiet', '--manifest-path', str(root / 'src-tauri/Cargo.toml'), '-p', 'diary-infrastructure', '--example', 'fake_cli'], check=True)
-fake_binary = binary.parent / 'examples/fake_cli'
+if args.server or args.fake_cli:
+    if not (args.server and args.fake_cli):
+        parser.error('--server and --fake-cli must be supplied together (no rebuilds)')
+    binary = args.server.resolve(strict=True)
+    fake_binary = args.fake_cli.resolve(strict=True)
+    print('Artifact mode: explicit server and external synthetic CLI; no rebuild')
+else:
+    subprocess.run(['cargo', 'build', '--quiet', '--manifest-path', str(root / 'src-tauri/Cargo.toml'), '-p', 'diary-server'], check=True)
+    binary = Path(os.environ.get('CARGO_TARGET_DIR', root / 'src-tauri/target')) / 'debug/diary-server'
+    subprocess.run(['cargo', 'build', '--quiet', '--manifest-path', str(root / 'src-tauri/Cargo.toml'), '-p', 'diary-infrastructure', '--example', 'fake_cli'], check=True)
+    fake_binary = binary.parent / 'examples/fake_cli'
 SOURCE_SECRET = 'SYNTHETIC_GENERATION_SOURCE_SENTINEL'
 DATE = '2026-11-06'
 

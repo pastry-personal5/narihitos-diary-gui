@@ -165,3 +165,65 @@ describe("paragraph review controller", () => {
     expect(c.state.announcement).toBe("Review ended. Editing resumed.");
   });
 });
+
+it.each(["decided", "set_mismatch"])(
+  "removes stale decision controls after %s",
+  async (error) => {
+    const { c, calls, editor } = setup();
+    await c.start("2026-11-07", "job-1");
+    calls.decideReview.mockRejectedValueOnce(new AuthenticError(error, false));
+    expect(await c.decide("h1", "reject")).toBe(false);
+    expect(c.state.view).toBeNull();
+    expect(editor.show).toHaveBeenLastCalledWith(
+      "2026-11-07",
+      null,
+      expect.any(Function),
+    );
+    expect(editor.reload).toHaveBeenCalledWith("2026-11-07");
+  },
+);
+
+it("rechecks a watcher read that predates a completed accept", async () => {
+  const { c, calls } = setup();
+  await c.start("2026-11-07", "job-1");
+  let finish!: (file: Awaited<ReturnType<typeof calls.loadAuthentic>>) => void;
+  calls.loadAuthentic.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const read = c.onAuthenticChanged();
+  await c.decide("h1", "accept");
+  calls.loadAuthentic.mockResolvedValue({
+    date: "2026-11-07",
+    exists: true,
+    revision: rev(2),
+    body: "saved",
+  });
+  finish({ date: "2026-11-07", exists: true, revision: rev(1), body: "old" });
+  await read;
+  await Promise.resolve();
+  expect(c.state.invalidated).toBe(false);
+  expect(c.state.view?.revision).toEqual(rev(2));
+});
+
+it("preserves an acknowledged decision when the editor refuses the updated view", async () => {
+  const { c, calls, editor } = setup();
+  await c.start("2026-11-07", "job-1");
+  editor.show.mockResolvedValueOnce(false);
+  expect(await c.decide("h1", "accept")).toBe(true);
+  expect(calls.decideReview).toHaveBeenCalledTimes(1);
+  expect(calls.endReview).toHaveBeenCalled();
+  expect(editor.show).toHaveBeenLastCalledWith(
+    "2026-11-07",
+    null,
+    expect.any(Function),
+  );
+  expect(editor.reload).toHaveBeenCalledWith("2026-11-07");
+  expect(c.state.view).toBeNull();
+  expect(c.state.uncertain).toBe(false);
+  expect(c.state.error).toBeNull();
+  expect(await c.decide("h1", "accept")).toBe(false);
+  expect(calls.decideReview).toHaveBeenCalledTimes(1);
+});

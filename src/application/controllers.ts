@@ -67,6 +67,14 @@ export function createAppControllers(
       if (view && !(await model.resources.openAuthentic(date))) return false;
       const r = model.resources.resources.get(`authentic:${date}`);
       if (!r) return !view;
+      if (
+        view &&
+        !r.buffer.reviewing &&
+        (r.buffer.composing ||
+          r.buffer.getText() !== view.body ||
+          r.session?.view().queue.state !== "clean")
+      )
+        return false;
       try {
         r.buffer.setReview(view, decide);
       } catch {

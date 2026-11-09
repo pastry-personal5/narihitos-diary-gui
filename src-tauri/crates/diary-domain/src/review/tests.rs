@@ -170,3 +170,64 @@ fn set_digest_is_order_free_and_empty_defined() {
     assert_eq!(set_digest(&Fnv, &a), set_digest(&Fnv, &b));
     assert_ne!(set_digest(&Fnv, &a), set_digest(&Fnv, &BTreeSet::new()));
 }
+
+#[test]
+fn appended_paragraph_owns_missing_separator() {
+    for baseline in ["P1\n\nP2", "P1\n\nP2\n"] {
+        let candidate = "P1\n\nP2\n\nP3";
+        let hunks = align(&Fnv, baseline, candidate).unwrap();
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].kind, HunkKind::Insert);
+        assert_eq!(
+            compose(baseline, candidate, &hunks, &all(&hunks)),
+            candidate
+        );
+        assert_eq!(
+            compose(baseline, candidate, &hunks, &BTreeSet::new()),
+            baseline
+        );
+    }
+}
+
+#[test]
+fn later_append_keeps_boundary_when_earlier_append_is_rejected() {
+    let baseline = "P1\n\nP2";
+    let candidate = "P1\n\nP2\n\nP3\n\nP4";
+    let hunks = align(&Fnv, baseline, candidate).unwrap();
+    assert_eq!(hunks.len(), 2);
+    assert_eq!(
+        compose(baseline, candidate, &hunks, &sets(&[&hunks[1]])),
+        "P1\n\nP2\n\nP4"
+    );
+    assert_eq!(
+        compose(baseline, candidate, &hunks, &all(&hunks)),
+        candidate
+    );
+}
+
+#[test]
+fn append_subsets_preserve_unicode_and_crlf_boundaries() {
+    let baseline = "처음\r\n\r\n마지막";
+    let candidate = "처음\r\n\r\n마지막\r\n\r\n셋째\r\n\r\n넷째";
+    let hunks = align(&Fnv, baseline, candidate).unwrap();
+    assert_eq!(hunks.len(), 2);
+    for mask in 0..4 {
+        let accepted = hunks
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| mask & (1 << i) != 0)
+            .map(|(_, h)| h.id.clone())
+            .collect();
+        let result = compose(baseline, candidate, &hunks, &accepted);
+        assert!(result.starts_with(baseline));
+        if mask & 2 != 0 {
+            assert!(result.contains("\r\n\r\n넷째"));
+        }
+        if mask == 3 {
+            assert_eq!(result, candidate);
+        }
+        if mask == 0 {
+            assert_eq!(result, baseline);
+        }
+    }
+}

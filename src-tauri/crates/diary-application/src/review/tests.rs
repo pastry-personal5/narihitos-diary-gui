@@ -33,6 +33,7 @@ struct Fake {
     saves: StdMutex<u32>,
     /// Runs inside `save_review`, to probe serialization.
     probe: StdMutex<Option<Box<dyn Fn() + Send>>>,
+    load_probe: StdMutex<Option<Box<dyn Fn() + Send>>>,
 }
 
 fn date() -> DiaryDate {
@@ -68,6 +69,7 @@ impl Fake {
             fault: StdMutex::new(Fault::None),
             saves: StdMutex::new(0),
             probe: StdMutex::new(None),
+            load_probe: StdMutex::new(None),
         }
     }
     fn body(&self) -> Option<String> {
@@ -85,6 +87,9 @@ impl Fake {
 
 impl AuthenticStore for Fake {
     fn load(&self, d: &DiaryDate) -> Result<Loaded, StoreError> {
+        if let Some(probe) = self.load_probe.lock().unwrap().take() {
+            probe();
+        }
         Ok(match self.file.lock().unwrap().as_ref() {
             None => Loaded::Virtual(*d),
             Some((s, b)) => Loaded::File {
@@ -372,4 +377,33 @@ fn guards_follow_the_candidate() {
     assert!(reviews.has_date("s", &date()));
     reviews.clear();
     assert!(!reviews.uses_job("s", "job"));
+}
+
+#[test]
+fn reject_load_does_not_hold_review_mutex() {
+    let store = Fake::new(Some("A\n\nB\n\n"));
+    let reviews = std::sync::Arc::new(Reviews::default());
+    let v = start(&store, &reviews);
+    let other = reviews.clone();
+    *store.load_probe.lock().unwrap() = Some(Box::new(move || {
+        assert!(
+            other.inner.try_lock().is_ok(),
+            "disk load held review mutex"
+        );
+    }));
+    reviews
+        .decide(
+            &store,
+            &Fnv,
+            "s",
+            REVIEW,
+            Decide {
+                operation_id: op(99),
+                hunk: v.pending[0].id.clone(),
+                accept: false,
+                expected: v.revision,
+                set_digest: v.set_digest,
+            },
+        )
+        .unwrap();
 }

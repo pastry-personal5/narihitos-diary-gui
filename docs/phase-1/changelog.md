@@ -14,6 +14,10 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-10 — Implementation review — Hardened release cleanup for exited leaders, discovery validation and packaged license integrity; candidate review now handles refused editor presentation after acknowledged decisions. Added regression coverage and recorded rebuilt client provenance in the [execution ledger](milestone-32-release-evidence.md#implementation-review-follow-up).
+
+- 2026-11-10 — Owner requested M32 implementation and automated execution. Added explicit ordinary-artifact verification, copied-install server qualification, harness failure tests and real paragraph-accept undo coverage; execution and owner-approved M24 defect resolution are tracked in the [release ledger](milestone-32-release-evidence.md).
+
 - 2026-11-09 — Owner/agent, M32 plan review — Separate required automated/artifact acceptance from [by-human procedures](milestone-32-by-human-tests.md); all by-human execution is exempt from M32 and Phase 1 exit gates, superseding earlier human-only deferrals. Preserve unverified observations and known-defect triage. Update release R items, feature follow-ups, phase/roadmap/handoff and decisions together. Record the owner's Qwen AI Agent by-human Generate Draft, Review Paragraphs and AI Chat run as completed, without inventing version/artifact/assertion evidence. Planning/docs only; release execution remains pending.
 
 - 2026-11-09 — Agent, M31 progress extension completed — Generate/Chat preparation and the separate Review operation now share the two-second profile-controlled heartbeat. Preference updates and frequent observations preserve cadence; stale observations report status unavailable. Review retains its private conversation and ignores late callbacks. Five focused files (62 tests), TypeScript and all seven gate lanes pass. See the [completion evidence](../archive/milestones/p1-m31/milestone-31-review-progress-overview.md#completion-evidence-2026-11-09); M32 retains native/release qualification.

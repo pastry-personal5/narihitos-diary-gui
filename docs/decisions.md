@@ -121,6 +121,8 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 - **Command palette (owner, 2026-11-08):** The request to complete unresolved M29 work authorizes T34’s recorded overlay design: toolbar toggle, local deterministic ranking with hidden scores, non-modal focus/dismissal and existing command guards. See the [keyboard contract](architecture/keyboard-shortcuts.md#command-palette-overlay).
 
+- **M32 review hardening (owner, 2026-11-10):** Approved resolving the five historical M24 findings: guarded paragraph append separators, disk reads outside the review mutex, startup stale-buffer protection, revision-safe watcher checks and obsolete lost-reply decision cleanup. Rejection remains transient and writes no diary data; stale controls may end the review and reload acknowledged saved state.
+
 ## Undecided
 
 The [P1-M2 owner interview](phase-1/milestone-02-owner-decisions.md) resolves the earlier product choices. The maintained [architecture](architecture.md) resolves delegated internal design work; do not ask again about already approved choices. Ask before changing those choices or inventing new product behavior outside the delegation.

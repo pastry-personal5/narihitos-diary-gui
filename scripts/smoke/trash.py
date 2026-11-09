@@ -24,7 +24,9 @@ FILES = ['Domain/DiarySnippet.swift', 'Application/AssetCatalog.swift',
          'Adapters/CatalogAssetRegistry.swift', 'Adapters/CatalogAudioInspector.swift',
          'Adapters/DiaryCatalogHandler.swift', 'Adapters/DiaryCatalogCurrentReader.swift',
          'Adapters/DiaryCatalogLegacyReader.swift', 'Adapters/DiaryCatalogReadPlan.swift',
-         'Adapters/FileCatalogWorker.swift']
+         'Adapters/FileCatalogWorker.swift', 'Adapters/CatalogPerformanceProbe.swift',
+         'Adapters/DiaryCatalogReadPreparation.swift', 'Adapters/CatalogResourcePresence.swift',
+         'Adapters/PurgeFileTree.swift', 'Application/PurgePort.swift']
 WORKER = 'source::trash::service::native_harness::native_process_worker'
 if sys.platform != 'darwin' or not shutil.which('swiftc') or not all((MOBILE / f).exists() for f in FILES):
     print('SKIP source Trash: macOS, swiftc and pinned producer required (not evidence)')

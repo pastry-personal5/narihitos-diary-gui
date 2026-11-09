@@ -1,28 +1,26 @@
-import { readFileSync } from "node:fs";
-const targets = [
-  [
-    "src-tauri/target/debug/diary-client",
-    ["SMOKE main_cancelled_job_read", "smoke-unexpected-allow"],
-  ],
-  [
-    "src-tauri/target/debug/diary-server",
+import { parseArgs } from "node:util";
+import { scan, verifyRelease } from "./release-artifacts.mjs";
+const { values } = parseArgs({
+  options: Object.fromEntries(
+    ["server", "client", "app", "notices"].map((key) => [
+      key,
+      { type: "string" },
+    ]),
+  ),
+});
+if (Object.keys(values).length) {
+  for (const key of ["server", "client", "app", "notices"])
+    if (!values[key]) throw new Error(`Missing --${key}`);
+  console.log(JSON.stringify(verifyRelease(values), null, 2));
+} else {
+  for (const [path, kind] of [
+    ["src-tauri/target/debug/diary-client", "client"],
+    ["src-tauri/target/debug/diary-server", "server"],
     [
-      "scaffold-fake-request",
-      "scaffold-fake-job",
-      "SMOKE server_folder_readable",
+      "src-tauri/target/debug/bundle/macos/Narihito's Diary.app/Contents/MacOS/diary-client",
+      "client",
     ],
-  ],
-  [
-    "src-tauri/target/debug/bundle/macos/Narihito's Diary.app/Contents/MacOS/diary-client",
-    ["SMOKE main_cancelled_job_read", "smoke-unexpected-allow"],
-  ],
-];
-for (const [path, markers] of targets) {
-  const bytes = readFileSync(path);
-  for (const marker of markers)
-    if (bytes.includes(marker))
-      throw new Error(`Fixture marker present in ordinary binary: ${path}`);
+  ])
+    scan(path, kind);
+  console.log("Ordinary debug binaries exclude fixture markers");
 }
-console.log(
-  "Ordinary client bundle and standalone binaries exclude fixture markers",
-);

@@ -239,6 +239,19 @@ impl Reviews {
                 }
             }
         }
+        // Read before admission: never hold the global review lock across disk I/O.
+        // The expected revision is revalidated under the lock below.
+        let rejected_revision = if !d.accept {
+            let date = self
+                .lock()
+                .get(review_id)
+                .filter(|r| r.session == session)
+                .ok_or(Error::NotFound)?
+                .date;
+            Some(revision_of(store.load(&date).map_err(Error::Store)?).0)
+        } else {
+            None
+        };
         // Admit under the lock; the store call runs outside it with `busy` set.
         let save = {
             let mut reviews = self.lock();
@@ -272,8 +285,7 @@ impl Reviews {
             }
             if !d.accept {
                 // Rejection writes nothing; confirm the entry is unchanged first.
-                let (now, _) = revision_of(store.load(&r.date).map_err(Error::Store)?);
-                if now != r.revision {
+                if rejected_revision != Some(r.revision.clone()) {
                     r.invalidated = true;
                     return Err(Error::Invalidated);
                 }

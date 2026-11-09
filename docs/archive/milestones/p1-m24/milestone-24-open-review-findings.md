@@ -1,6 +1,8 @@
 # P1-M24: Open review findings
 
-Status: Open — awaiting owner decision
+Status: Superseded by [M32 resolution](../../../phase-1/milestone-32-release-evidence.md#final-post-hardening-results-2026-11-10)
+
+Owner approved and M32 resolved these five historical issues on 2026-11-10; the original report below is preserved.
 
 Five issues from the post-delivery `/code-review --fix` of the paragraph review (2026-11-07) were not fixed because each needs a behavior or design decision. The six fixed findings are not listed here. Each item below is unverified against the running app; none has a test yet.
 

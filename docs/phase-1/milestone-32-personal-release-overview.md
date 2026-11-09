@@ -1,6 +1,6 @@
 # P1-M32: Personal release qualification
 
-Status: Planned
+Status: Active
 
 Qualify Diary v1.0.0 for personal use on the owner's Apple Silicon Mac, with independently shell-launched server and packaged client. This is the milestone-wide release checklist; the existing M32 feature checklists retain their implementation evidence. The [work plan](milestone-32-personal-release-architecture.md) defines sequencing, verification and evidence handling.
 
@@ -111,12 +111,12 @@ failure modes rather than duplicating passing assertions. The [automation
 matrix](milestone-32-personal-release-architecture.md#automated-test-matrix) defines
 placement, assertions and evidence limits.
 
-- [ ] A01 — Add release-path artifact verification for versions, architecture, notices/resources, helper availability and fixture exclusion, with negative cases that prove missing/wrong/contaminated artifacts fail (R02/R14).
+- [x] A01 — Add release-path artifact verification for versions, architecture, notices/resources, helper availability and fixture exclusion, with negative cases that prove missing/wrong/contaminated artifacts fail (R02/R14).
 - [ ] A02 — Extend isolated process smokes to accept explicitly supplied ordinary release artifacts; automate independent launch, discovery/rejection, restart and cleanup, proving an unrelated process and the separately launched server survive client cleanup (R03/R14).
-- [ ] A03 — Audit and fill integration gaps across source/Authentic save, review and export recovery using existing producer, fault and fake-service harnesses; assert read-back, metadata/audio preservation, deduplication and no repeated side effects. Link existing coverage when no addition is needed (R04–R07/R11–R12).
-- [ ] A04 — Audit cross-feature UI/application regressions for candidate lifecycle, paragraph-review isolation/undo/stale guards and persisted independent profiles/Status Line settings; add only missing cases and link existing coverage (R08–R09).
+- [x] A03 — Audit and fill integration gaps across source/Authentic save, review and export recovery using existing producer, fault and fake-service harnesses; assert read-back, metadata/audio preservation, deduplication and no repeated side effects. Link existing coverage when no addition is needed (R04–R07/R11–R12).
+- [x] A04 — Audit cross-feature UI/application regressions for candidate lifecycle, paragraph-review isolation/undo/stale guards and persisted independent profiles/Status Line settings; add only missing cases and link existing coverage (R08–R09).
 - [ ] A05 — Audit and extend deterministic slow/flood/disconnect/reload/lease tests for continued saves/control, bounded publications/payloads, correct restored/new completion announcements and zero implicit inference. Exercise ordinary release process paths with an external synthetic CLI; feasible packaged automation is A06 and optional real-device measurements are H09 (R07/R10).
-- [ ] A06 — Automate feasible ordinary packaged GUI actions, screenshots and focus/geometry assertions with available macOS tooling; report unavailable GUI automation and link native/IME/provider observations to the exempt manual guide (R08–R10).
+- [x] A06 — Automate feasible ordinary packaged GUI actions, screenshots and focus/geometry assertions with available macOS tooling; report unavailable GUI automation and link native/IME/provider observations to the exempt manual guide (R08–R10).
 - [ ] A07 — Document and run separate offline, artifact and GUI automation commands with meaningful failure statuses, bounded deadlines, disposable data and exact artifact provenance; pass delegated checks and link remaining gaps to R01–R15 (R14/R15).
 
 Automation task completion needs either passing implemented tests or an explicit
@@ -181,3 +181,48 @@ This change updates plans and evidence policy only. No release artifacts,
 by-human procedures or live workflow were executed by this documentation task;
 the Qwen completion note is the owner's separately supplied report. Concurrent
 implementation/test edits were preserved.
+
+## Execution checklist (2026-11-10)
+
+- [x] Implement explicit ordinary-artifact scans with negative regression cases.
+- [x] Implement copied-install lifecycle checks with PID-bound readiness, bounded cleanup and harness regressions.
+- [ ] Run offline coverage, production builds, artifact/process checks and assess GUI feasibility.
+- [ ] Record coverage ledger, exact provenance, limitations and final delegated gate.
+
+Execution ledger: [release evidence](milestone-32-release-evidence.md).
+
+2026-11-10: A01/A04 and the harness implementation checklist are supported by
+[delegated results](milestone-32-release-evidence.md#delegated-results-2026-11-10).
+A02/R03 native cleanup and A06 packaged actions remain separate; The approved M24 findings are resolved in the post-hardening evidence below. M32 is Active, not release accepted.
+
+## Approved review-defect resolution (2026-11-10)
+
+Owner approved resolving the five historical M24 findings within M32.
+
+- [x] Appended paragraphs own missing separators without a spurious replacement or merged text.
+- [x] Reject checks disk state outside the global review mutex and revalidates admission.
+- [x] Review startup preserves edits/composition that arrive during the server request.
+- [x] Watcher reads from before a completed decision cannot invalidate its newer revision.
+- [x] Lost-reply stale decisions clear obsolete controls and reload saved state safely.
+- [x] Focused regressions, final gate, affected smokes and ordinary release artifacts pass after these runtime changes.
+
+Final post-hardening gate and artifact results are in the [execution ledger](milestone-32-release-evidence.md#final-post-hardening-results-2026-11-10). Required copied-app lifecycle and ordinary-release streaming/save-control scenarios remain open; exempt human observations do not block closure.
+
+## Implementation review and enhancement
+
+- [x] Regress and fix cleanup when an owned process leader exits before its descendants.
+- [x] Reject malformed or unrelated discovery records without crashing readiness.
+- [x] Verify packaged license contents against the shipped notice inventory, including missing/changed-file negatives.
+- [x] Handle a committed review decision whose updated editor presentation is refused, without retrying the mutation.
+- [x] Recheck paragraph append subset/boundary behavior and fix demonstrated regressions.
+- [x] Pass delegated focused checks, full gate and affected release checks; update evidence.
+
+Implementation review validation: [focused, gate and rebuilt artifact results](milestone-32-release-evidence.md#implementation-review-follow-up). The full Rust workspace rerun passed after the initial transient synthetic Apple-helper failure. M32 release scenarios listed above remain open.
+
+## Packaged GUI test attempt
+
+- [x] Launch an isolated ordinary release fixture and record artifact identity.
+- [x] Exercise observable native GUI controls, editing/settings/dialog focus and close where computer-use tooling permits.
+- [x] Record passed/failed/unverified observations and verify owned-process cleanup separately from the independent server.
+
+[Packaged GUI evidence](milestone-32-release-evidence.md#packaged-native-gui-run-2026-11-10) records the successful scoped run, clean client exit and durable synthetic text. AI Activities focus return remains inconclusive; copied installation and AI/provider/native IME scenarios are not claimed.

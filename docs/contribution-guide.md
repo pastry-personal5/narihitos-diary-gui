@@ -146,3 +146,30 @@ app's ports. They authenticate only through their own process's discovery file;
 if the short port release/bind race is lost, readiness fails. They never stop an
 unrelated server. Loopback permission is required for both these smokes and the
 bridge tests; a sandbox denial is not a passing result.
+
+## Release automation lanes
+
+Offline validation uses `scripts/gate.sh` plus
+`python3 -m unittest discover -s scripts/tests -p 'test_*.py'`.
+No default test uses a real AI account or export destination.
+
+After the ordinary release builds in the [M32 work plan](phase-1/milestone-32-personal-release-architecture.md#build-procedure),
+run the artifact lane with absolute paths (respect `CARGO_TARGET_DIR`):
+
+```sh
+node scripts/check-fixture-exclusion.mjs --server /absolute/release/diary-server --client /absolute/release/diary-client --app "/absolute/release/bundle/macos/Narihito's Diary.app" --notices /absolute/third-party-notices.md
+python3 scripts/smoke/release.py --server /absolute/release/diary-server
+python3 scripts/smoke/agent.py --server /absolute/release/diary-server --fake-cli /absolute/debug/examples/fake_cli
+```
+
+Explicit artifact mode never builds or substitutes debug binaries. The external
+fake CLI is test tooling and must not ship. Artifact verification prints SHA-256
+provenance, checks arm64, bundled version, matching client bytes, notices/licenses,
+server prompt markers and fixture exclusion. Marker scans do not replace runtime
+contract tests or establish live Apple integration. The copied-server lane runs
+outside the checkout in private paths containing spaces; its HTTP lease client
+covers authentication, session exclusion, release, restart and independent server
+and sentinel survival. Readiness and cleanup have bounded deadlines. Missing
+artifacts and failed assertions exit nonzero. Neither command proves native GUI
+close, TCC, IME or File Provider behavior. GUI observations use the separate
+[manual/automation evidence policy](phase-1/milestone-32-by-human-tests.md).

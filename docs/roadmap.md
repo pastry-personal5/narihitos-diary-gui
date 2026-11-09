@@ -2,7 +2,7 @@
 
 Status: Active
 
-P1-M32 personal release qualification is Planned: [release overview/checklist](phase-1/milestone-32-personal-release-overview.md) and [work plan](phase-1/milestone-32-personal-release-architecture.md). These consolidate the existing M32 feature work and outstanding packaged/native/live evidence with required automated/artifact acceptance and explicit limitations; no release acceptance is claimed.
+P1-M32 personal release qualification is Active: [release overview/checklist](phase-1/milestone-32-personal-release-overview.md) and [work plan](phase-1/milestone-32-personal-release-architecture.md). These consolidate the existing M32 feature work and outstanding packaged/native/live evidence with required automated/artifact acceptance and explicit limitations; no release acceptance is claimed.
 
 Owner update (2026-11-09): [by-human tests](phase-1/milestone-32-by-human-tests.md) are documented but exempt from M32/Phase 1 exit gates; the [updated release policy](phase-1/milestone-32-personal-release-overview.md#acceptance-policy-owner-update-2026-11-09) supersedes earlier manual deferrals. The guide records the owner's completed Qwen Generate Draft, Review Paragraphs and AI Chat run. Required automated/artifact work remains pending.
 

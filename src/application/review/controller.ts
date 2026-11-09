@@ -160,7 +160,17 @@ export class ReviewController {
         });
         return true;
       }
-      await this.editor.show(view.date, d.view, this.pick);
+      if (!(await this.editor.show(view.date, d.view, this.pick))) {
+        // The decision is already acknowledged. Do not leave old controls visible
+        // or invite another mutation when the editor cannot display its new body.
+        await this.invalidate(d.view);
+        this.set({
+          invalidated: false,
+          announcement:
+            "Change recorded. The review ended because the editor could not display its updated state.",
+        });
+        return true;
+      }
       const left = d.view.hunks.length;
       this.set({
         view: d.view,
@@ -180,6 +190,15 @@ export class ReviewController {
       }
       // A retryable failure may have lost the reply of a committed accept: keep its ID.
       if (!(e instanceof AuthenticError && e.retryable)) this.op = null;
+      if (c === "decided" || c === "set_mismatch") {
+        // Lost transient replies cannot leave buttons for obsolete decisions.
+        await this.invalidate(view);
+        this.set({
+          announcement:
+            "Review state changed. Review ended; saved changes are preserved.",
+        });
+        return false;
+      }
       if (INVALIDATING.has(c)) {
         await this.invalidate(view);
         return false;
@@ -244,7 +263,14 @@ export class ReviewController {
       const now = this.state.view;
       if (this.state.busy) {
         this.recheck = true;
-      } else if (now && !same(file.revision, now.revision)) {
+      } else if (
+        now &&
+        (now.review_id !== view.review_id || !same(now.revision, view.revision))
+      ) {
+        // This read predates a completed decision or a replacement review.
+        this.recheck = true;
+        this.settleChanges();
+      } else if (now && !same(file.revision, view.revision)) {
         await this.invalidate(now);
       }
     } catch {

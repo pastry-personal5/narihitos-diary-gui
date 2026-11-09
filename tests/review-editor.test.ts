@@ -5,6 +5,8 @@ import {
   ResourceBuffer,
 } from "../src/editor/resource-buffer";
 import { SessionBudget } from "../src/application/navigation/budget";
+import { EditorView } from "@codemirror/view";
+import { undo } from "@codemirror/commands";
 import { view } from "./review-fake";
 
 const handlers = {
@@ -49,7 +51,11 @@ describe("review view in the editor", () => {
       true,
     );
     expect(buffer.getText()).toBe("Improved A\n\nB\n\n");
-    expect(handlers.edit).toHaveBeenCalled();
+    expect(handlers.edit).toHaveBeenCalledTimes(1);
+    const editor = EditorView.findFromDOM(host.querySelector(".cm-editor")!)!;
+    expect(undo(editor)).toBe(true);
+    expect(buffer.getText()).toBe("A\n\nB\n\n");
+    expect(handlers.edit).toHaveBeenCalledTimes(2);
     buffer.dispose();
   });
   it("refuses a stale paragraph and preserves the edited draft", () => {
