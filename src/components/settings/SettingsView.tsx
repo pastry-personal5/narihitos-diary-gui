@@ -288,7 +288,22 @@ export function SettingsView({
             {profiles.supported ? (
               <div className="card">
                 <h3>Agent profiles</h3>
-                <ProfileTable profiles={profiles} />
+                <ProfileTable
+                  profiles={profiles}
+                  progress={user?.agent_progress}
+                  progressDisabled={
+                    !user ||
+                    user.read_only ||
+                    user.recoverable ||
+                    model.savingAgentProgress
+                  }
+                  onProgress={(alias, enabled) =>
+                    void model.setAgentProgress({
+                      ...user?.agent_progress,
+                      [alias]: enabled,
+                    })
+                  }
+                />
               </div>
             ) : server ? (
               <div className="card">

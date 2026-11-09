@@ -24,6 +24,7 @@ export interface ParagraphReviewRequest {
   context: ParagraphReviewSnippet[] | Promise<ParagraphReviewSnippet[]>;
   profile: { alias: string; type: string };
   locale: string;
+  onProgress?: (progress: ParagraphReviewObservation) => void;
 }
 export interface ParagraphReviewSnippet {
   date: string;
@@ -49,7 +50,17 @@ export interface ParagraphReviewContext {
   context?: () => Promise<ParagraphReviewSnippet[]>;
 }
 export type ParagraphReviewPhase = "idle" | "reviewing" | "suggestion";
+/** Content-free observations; execution adapters never expose chat DTOs here. */
+export interface ParagraphReviewObservation {
+  requestId: string | null;
+  jobId: string | null;
+  stage: string | null;
+}
+export interface ParagraphReviewProgress extends ParagraphReviewObservation {
+  profile: string;
+}
 export interface ParagraphReviewState {
   phase: ParagraphReviewPhase;
+  progress: ParagraphReviewProgress | null;
   reason: string | null;
 }

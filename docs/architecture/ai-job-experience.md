@@ -95,7 +95,7 @@ Coalesce preview renders to at most ten updates per second per visible run; offs
 
 ## Accessibility and evidence
 
-Use a polite status region for admission, important stage changes and completion. Keep it outside any busy subtree that would defer its announcements. Apply busy semantics only to the candidate/chat output region, never the entire window or editor. Use named keyboard-operable Open details, Cancel and View results controls, and return focus to the invoker when details close. An indeterminate indicator has no fake numeric value; textual phase/counts remain available with reduced motion. Do not announce token deltas, every elapsed second or repeatedly unchanged waiting messages. W3C's [status-message guidance](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html) supports status updates without moving focus. Apple's [progress guidance](https://developer.apple.com/design/human-interface-guidelines/progress-indicators) supports distinguishing measured progress from an indefinite wait; the concrete thresholds and layout above are engineering choices.
+Use a polite status region for admission, important stage changes and completion. Keep it outside any busy subtree that would defer its announcements. Apply busy semantics only to the candidate/chat output region, never the entire window or editor. Use named keyboard-operable Open details, Cancel and View results controls, and return focus to the invoker when details close. An indeterminate indicator has no fake numeric value; textual phase/counts remain available with reduced motion. Do not announce token deltas or every elapsed second. The owner-requested per-profile progress option below explicitly permits a two-second Global Messages cadence, including unchanged waiting stages. W3C's [status-message guidance](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html) supports status updates without moving focus. Apple's [progress guidance](https://developer.apple.com/design/human-interface-guidelines/progress-indicators) supports distinguishing measured progress from an indefinite wait; the concrete thresholds and layout above are engineering choices.
 
 Fake-clock and fake-adapter scenarios must cover 0/30/120-second silence, all wall/lease deadlines, delayed/lost admission, duplicate activation, an adapter with no deltas, reordered/duplicate/gapped events, flooding output, partial success then cancel/failure, terminal cancellation races and stale completion. Verify date switching preserves origin/results, same-date edits require regeneration, initial locale remains snapshotted, and completion never changes focus, caret, tab, scroll or unsaved buffers. A stalled event consumer must leave heartbeat/cancel/save available. Assert zero extra inference calls and no system notification request.
 
@@ -129,3 +129,26 @@ introduced. The milestone completed its automated acceptance audit and full gate
 see the [M23 checklist](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-overview.md).
 Packaged macOS timing, sleep/reconnect and native interaction evidence remains
 explicitly assigned to P1-M32 as described above.
+
+## Per-profile progress in Global Messages
+
+Each profile in Settings → AI Agents has a saved, default-on **Show progress using
+Global Messages** toggle. For enabled profiles, ongoing jobs add a content-free
+progress message every two seconds, identifying the profile, job and request turn,
+and the current request/response stage. Generation also identifies the candidate
+index/count when available. Stages come from authoritative activity metadata:
+preparing context, starting the agent, waiting for output, receiving/validating
+output, preparing the next candidate or awaiting cancellation acknowledgement.
+An unknown stage remains explicitly pending; no reasoning trace or percentage is
+invented. The existing 500-message session bound still applies.
+
+The reporter reads the latest activity and feature-controller observations at each tick;
+frequent observations do not postpone updates. Generate and Chat preparation/admission
+and the independent Review operation use the same reporter, so enabled work keeps
+a two-second cadence before and after server admission, including unchanged waits. Disabled profiles emit no periodic
+messages. Terminal/finished jobs and disposal stop reporting. During stale/disconnected
+observations, retained work emits an explicit status-unavailable heartbeat rather
+than claiming that an observed stage is current; a fresh baseline resumes stage
+reporting. Completion, warning and
+error feedback remains independent. Messages contain no raw prompts, response
+bodies or diary text and are not diagnostic log records.

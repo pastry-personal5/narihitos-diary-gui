@@ -653,3 +653,62 @@ it("hides and restores the ready label without hiding operational status", async
     expect(within(footer).getByText("Chat ready")).toBeTruthy(),
   );
 });
+
+it("saves independent default-on agent progress toggles and restores them after restart", async () => {
+  const fake = settingsFake({ writing_locale: "en-US" });
+  const adapter = bridge(fake);
+  adapter.listProfiles = async () =>
+    ["main", "local"].map((alias) => ({
+      alias,
+      type: "codex",
+      status: "ready",
+      reason: null,
+      capabilities: {
+        chat: { available: true, reason: null },
+        generate: { available: true, reason: null },
+      },
+    }));
+  const first = render(<App bridge={adapter} />);
+  connectFromSettings();
+  fireEvent.click(
+    screen.getByRole("button", { name: "AI Agents", exact: true }),
+  );
+  const main = await screen.findByRole("checkbox", {
+    name: "Show progress using Global Messages for main",
+  });
+  expect(main).toHaveProperty("checked", true);
+  expect(
+    screen.getByRole("checkbox", {
+      name: "Show progress using Global Messages for local",
+    }),
+  ).toHaveProperty("checked", true);
+  fireEvent.click(main);
+  await waitFor(() =>
+    expect(fake.user.agent_progress).toEqual({ main: false }),
+  );
+  expect(main).toHaveProperty("checked", false);
+  first.unmount();
+  render(<App bridge={adapter} />);
+  connectFromSettings();
+  fireEvent.click(
+    screen.getByRole("button", { name: "AI Agents", exact: true }),
+  );
+  expect(
+    await screen.findByRole("checkbox", {
+      name: "Show progress using Global Messages for main",
+    }),
+  ).toHaveProperty("checked", false);
+  expect(
+    screen.getByRole("checkbox", {
+      name: "Show progress using Global Messages for local",
+    }),
+  ).toHaveProperty("checked", true);
+  fireEvent.click(
+    screen.getByRole("checkbox", {
+      name: "Show progress using Global Messages for local",
+    }),
+  );
+  await waitFor(() =>
+    expect(fake.user.agent_progress).toEqual({ main: false, local: false }),
+  );
+});

@@ -2,6 +2,8 @@
 
 Status: Active
 
+P1-M32 personal release qualification is Planned: [release overview/checklist](phase-1/milestone-32-personal-release-overview.md) and [work plan](phase-1/milestone-32-personal-release-architecture.md). These consolidate the existing M32 feature work and outstanding packaged/native/live evidence without changing prior waivers or claiming release acceptance.
+
 P1-M32 also includes the owner's [caret paragraph review correction](phase-1/milestone-32-paragraph-review-overview.md): a main-toolbar bitmap action with AI suggestions and guarded Accept/Reject below the focused Draft paragraph.
 
 This is the authority for the active phase and milestone order. The owner confirmed that Phase 1 delivers Diary v1.0.0; its phase plan sequences the remaining feature and personal-release themes, and its implementation handoff maps their evidence requirements.
@@ -38,3 +40,7 @@ P1-M31 also completed the [text-only snippet follow-up](archive/milestones/p1-m3
 P1-M32 includes the owner-requested [Draft candidate table plan/checklist](phase-1/milestone-32-draft-candidate-table-overview.md) and [work plan](phase-1/milestone-32-draft-candidate-table-architecture.md) (2026-11-09). The owner subsequently requested implementation matching the Snippet tab table; implementation and the full gate pass; narrow-Explorer visual evidence and release qualification remain pending.
 
 P1-M32 includes the owner-requested [Settings category order and status line indicators](phase-1/milestone-32-status-line-overview.md).
+
+P1-M31 completed the owner-requested [AI Agent progress follow-up](archive/milestones/p1-m31/milestone-31-agent-progress-overview.md): each profile in Settings → AI Agents gets a default-on **Show progress using Global Messages** toggle, with ongoing request/response turn progress every two seconds. Focused regressions and all seven gate lanes pass. Prior M31 work remains Done; M32 retains release qualification.
+
+P1-M31 completed the owner-requested [Generate/Chat/Review progress extension](archive/milestones/p1-m31/milestone-31-review-progress-overview.md), using each running profile’s saved Global Messages toggle. All seven gate lanes pass. Prior work remains complete; M32 retains release qualification.

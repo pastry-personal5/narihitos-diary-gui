@@ -33,7 +33,17 @@ function Capability({ cap }: { cap: ProfileCapability }) {
   );
 }
 
-export function ProfileTable({ profiles }: { profiles: ProfileStatusModel }) {
+export function ProfileTable({
+  profiles,
+  progress = {},
+  progressDisabled = true,
+  onProgress,
+}: {
+  profiles: ProfileStatusModel;
+  progress?: Record<string, boolean>;
+  progressDisabled?: boolean;
+  onProgress?: (alias: string, enabled: boolean) => void;
+}) {
   const list = profiles.profiles;
   return (
     <>
@@ -75,6 +85,22 @@ export function ProfileTable({ profiles }: { profiles: ProfileStatusModel }) {
                     />
                   </span>{" "}
                   <strong>{p.alias}</strong> <small>{p.type}</small>
+                  <label className="profile-progress-toggle">
+                    <input
+                      type="checkbox"
+                      checked={
+                        Object.hasOwn(progress, p.alias)
+                          ? progress[p.alias]
+                          : true
+                      }
+                      disabled={progressDisabled}
+                      aria-label={`Show progress using Global Messages for ${p.alias}`}
+                      onChange={(event) =>
+                        onProgress?.(p.alias, event.target.checked)
+                      }
+                    />
+                    Show progress using Global Messages
+                  </label>
                 </td>
                 <td>
                   <span className={`tone-${tone}`}>

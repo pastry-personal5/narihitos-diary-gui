@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, act, cleanup } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { AIActivityFeedback } from "../src/components/ai-activities/AIActivityFeedback";
 import { AIActivitiesStore } from "../src/application/ai-activities/store";
 import { GlobalMessagesStore } from "../src/application/global-messages/store";
@@ -138,4 +138,131 @@ it("reports generation preparation and admission failures once in Global Message
   });
   view.rerender(<AIActivityFeedback {...props} />);
   expect(messages.items).toHaveLength(1);
+});
+
+it("applies progress preferences immediately and waits for settings before reporting", () => {
+  vi.useFakeTimers();
+  const activity = new AIActivitiesStore(),
+    messages = new GlobalMessagesStore();
+  const v = generationView();
+  activity.event({
+    kind: "job_snapshot",
+    instance_id: "i",
+    session_id: "s",
+    first: true,
+    complete: true,
+    jobs: [{ ...v.job, progress: v.progress }],
+  });
+  const subscribe = () => () => {};
+  const generator = {
+    subscribe,
+    state: { submitting: false },
+  } as unknown as GenerationController;
+  const chat = {
+    subscribe,
+    state: { submitting: false },
+  } as unknown as AIChatController;
+  const props = { activity, messages, generator, chat };
+  const view = render(<AIActivityFeedback {...props} progressReady={false} />);
+  try {
+    act(() => vi.advanceTimersByTime(4000));
+    expect(messages.items).toHaveLength(0);
+    view.rerender(
+      <AIActivityFeedback {...props} progressPreferences={{ main: false }} />,
+    );
+    act(() => vi.advanceTimersByTime(4000));
+    expect(messages.items).toHaveLength(0);
+    view.rerender(
+      <AIActivityFeedback {...props} progressPreferences={{ main: true }} />,
+    );
+    act(() => vi.advanceTimersByTime(2000));
+    expect(messages.items).toHaveLength(1);
+    view.rerender(
+      <AIActivityFeedback {...props} progressPreferences={{ main: false }} />,
+    );
+    act(() => vi.advanceTimersByTime(4000));
+    expect(messages.items).toHaveLength(1);
+    view.unmount();
+    act(() => vi.advanceTimersByTime(4000));
+    expect(messages.items).toHaveLength(1);
+  } finally {
+    view.unmount();
+    vi.useRealTimers();
+  }
+});
+
+it("gates preparation and waiting notices by profile without hiding errors or completion", () => {
+  const activity = new AIActivitiesStore(),
+    messages = new GlobalMessagesStore();
+  const v = generationView();
+  activity.event({
+    kind: "job_snapshot",
+    instance_id: "i",
+    session_id: "s",
+    first: true,
+    complete: true,
+    jobs: [{ ...v.job, progress: { ...v.progress, silence_ms: 35000 } }],
+  });
+  const subscribe = () => () => {};
+  const generator = {
+    subscribe,
+    state: {
+      submitting: true,
+      profile: "main",
+      originDate: "2026-11-06",
+      error: "failed",
+    },
+  } as unknown as GenerationController;
+  const chat = {
+    subscribe,
+    state: { submitting: true, profile: "main" },
+  } as unknown as AIChatController;
+  const props = { activity, messages, generator, chat };
+  const view = render(
+    <AIActivityFeedback {...props} progressPreferences={{ main: false }} />,
+  );
+  expect(messages.items.map((m) => m.text)).toEqual(["Generation failed."]);
+  view.rerender(
+    <AIActivityFeedback {...props} progressPreferences={{ main: true }} />,
+  );
+  expect(messages.items.some((m) => m.text.includes("Still waiting"))).toBe(
+    true,
+  );
+  expect(
+    messages.items.some((m) => m.text.includes("Preparing generation")),
+  ).toBe(true);
+  expect(
+    messages.items.some((m) => m.text.includes("Submitting AI Chat")),
+  ).toBe(true);
+  act(() =>
+    activity.observe({
+      ...v.job,
+      sequence: 4,
+      state: "succeeded",
+      progress: v.progress,
+    }),
+  );
+  expect(messages.items.at(-1)?.text).toMatch(/generation/i);
+  view.unmount();
+});
+
+it("does not postpone the heartbeat when settings snapshots change during a run", () => {
+  vi.useFakeTimers();
+  const activity = new AIActivitiesStore(), messages = new GlobalMessagesStore();
+  const v = generationView();
+  activity.event({ kind: "job_snapshot", instance_id: "i", session_id: "s", first: true, complete: true, jobs: [{ ...v.job, progress: v.progress }] });
+  const subscribe = () => () => {};
+  const generator = { subscribe, state: { submitting: false } } as unknown as GenerationController;
+  const chat = { subscribe, state: { submitting: false } } as unknown as AIChatController;
+  const props = { activity, messages, generator, chat };
+  const view = render(<AIActivityFeedback {...props} progressPreferences={{ main: true }} />);
+  try {
+    act(() => vi.advanceTimersByTime(1000));
+    view.rerender(<AIActivityFeedback {...props} progressPreferences={{ main: true, other: false }} />);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(messages.items).toHaveLength(1);
+    view.rerender(<AIActivityFeedback {...props} progressPreferences={{ main: false }} />);
+    act(() => vi.advanceTimersByTime(2000));
+    expect(messages.items).toHaveLength(1);
+  } finally { view.unmount(); vi.useRealTimers(); }
 });

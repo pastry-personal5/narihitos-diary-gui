@@ -371,6 +371,9 @@ export function App({ bridge }: { bridge: Bridge }) {
         )}
         <AIActivityFeedback
           activity={activity.store}
+          progressPreferences={settings.user?.agent_progress}
+          progressReady={!!settings.user}
+          review={paragraphReview}
           generator={generator}
           chat={chat}
           messages={messages}

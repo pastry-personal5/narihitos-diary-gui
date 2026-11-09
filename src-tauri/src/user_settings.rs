@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize, de};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::BTreeMap,
     io::{Read, Write},
     os::unix::fs::DirBuilderExt,
     path::PathBuf,
@@ -18,7 +19,32 @@ pub use locale::canonical_tag;
 const FILE: &str = "user_settings.json";
 const TEMP: &str = "user_settings.json.tmp";
 const MAX_BYTES: usize = 256 * 1024;
-const SECTIONS: [&str; 4] = ["keybindings", "writing", "generation", "status_line"];
+const SECTIONS: [&str; 5] = [
+    "keybindings",
+    "writing",
+    "generation",
+    "status_line",
+    "agent_progress",
+];
+
+/// Per-profile display preferences. An absent alias means enabled.
+pub type AgentProgress = BTreeMap<String, bool>;
+pub fn agent_progress(value: &Value) -> Option<AgentProgress> {
+    let map = value.as_object().filter(|m| m.len() <= 512)?;
+    map.iter()
+        .map(|(alias, enabled)| {
+            if alias.is_empty()
+                || alias.len() > 64
+                || !alias
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+            {
+                return None;
+            }
+            Some((alias.clone(), enabled.as_bool()?))
+        })
+        .collect()
+}
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -55,6 +81,7 @@ pub struct Snapshot {
     pub writing_locale: Option<String>,
     pub generation_count: u8,
     pub status_line: StatusLine,
+    pub agent_progress: AgentProgress,
     /// Stored overrides, verbatim (unknown and invalid entries included).
     pub keybindings: Value,
     /// Defaults merged with valid, conflict-free overrides, one list per registry action.
@@ -67,6 +94,7 @@ pub enum Change {
     /// Explicit replacement of the generation section, including an invalid saved section.
     Generation(u8),
     StatusLine(StatusLine),
+    AgentProgress(AgentProgress),
     /// First run: store the first valid tag of the system's preferred list, only if none is saved.
     InitWriting(Vec<String>),
     /// `{"set": {id: [shortcut..] | null}}` or `{"reset_all": true}`; see `keybindings::apply`.
@@ -189,6 +217,7 @@ fn snapshot_of(r: &Observed) -> Snapshot {
         writing_locale: None,
         generation_count: 3,
         status_line: StatusLine::default(),
+        agent_progress: AgentProgress::new(),
         keybindings: json!({}),
         effective_keybindings: Value::Null,
         keybinding_issues: Vec::new(),
@@ -214,6 +243,12 @@ fn snapshot_of(r: &Observed) -> Snapshot {
                 match valid_writing(v) {
                     Some(tag) => s.writing_locale = Some(tag),
                     None => s.warnings.push(warn("writing", "section_invalid")),
+                }
+            }
+            if let Some(v) = map.get("agent_progress") {
+                match agent_progress(v) {
+                    Some(value) => s.agent_progress = value,
+                    None => s.warnings.push(warn("agent_progress", "section_invalid")),
                 }
             }
             if let Some(v) = map.get("status_line") {
@@ -346,6 +381,11 @@ impl Store {
         };
         match change {
             Change::Recover => {}
+            Change::AgentProgress(value) => {
+                let value = json!(value);
+                agent_progress(&value).ok_or(Error::Invalid)?;
+                map.insert("agent_progress".into(), value);
+            }
             Change::StatusLine(value) => {
                 map.insert("status_line".into(), json!(value));
             }

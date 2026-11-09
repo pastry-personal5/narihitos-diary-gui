@@ -263,6 +263,16 @@ export function serverSettingsDto(value: unknown): ServerSettings {
 }
 export function userSettingsDto(value: unknown): UserSettings {
   const dto = record(value);
+  const agentProgress =
+    dto.agent_progress == null ? {} : record(dto.agent_progress);
+  if (
+    Object.keys(agentProgress).length > 512 ||
+    Object.entries(agentProgress).some(
+      ([alias, enabled]) =>
+        !/^[a-zA-Z0-9_-]{1,64}$/u.test(alias) || typeof enabled !== "boolean",
+    )
+  )
+    throw new Error("Invalid settings response");
   const statusLine =
     dto.status_line == null ? undefined : record(dto.status_line);
   if (
@@ -297,6 +307,10 @@ export function userSettingsDto(value: unknown): UserSettings {
       dto.writing_locale == null ? null : text(dto.writing_locale, 35),
     generation_count: dto.generation_count as number,
     status_line: statusLine as unknown as UserSettings["status_line"],
+    agent_progress: Object.fromEntries(Object.entries(agentProgress)) as Record<
+      string,
+      boolean
+    >,
     keybindings: dto.keybindings ?? {},
     effective_keybindings: Object.fromEntries(
       Object.entries(record(dto.effective_keybindings)).map(([id, keys]) => [

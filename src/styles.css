@@ -1144,3 +1144,10 @@ footer {
 .status-line-activity-unavailable {
   color: var(--status-unavailable);
 }
+
+.profile-progress-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}

@@ -314,6 +314,30 @@ describe("settings commands", () => {
     expect(got.writing_locale).toBe("ja-JP");
     expect(JSON.stringify(got)).not.toContain("secret");
   });
+  it("validates and round trips profile progress preferences with default-on omissions", async () => {
+    mocks.invoke.mockResolvedValueOnce(user);
+    expect((await tauriBridge.getUserSettings()).agent_progress).toEqual({});
+    mocks.invoke.mockResolvedValueOnce({
+      ...user,
+      agent_progress: { main: false, local: true },
+    });
+    const saved = await tauriBridge.updateUserSettings({
+      section: "agent_progress",
+      value: { main: false, local: true },
+      expectedRevision: "missing",
+      recover: false,
+    });
+    expect(saved.agent_progress).toEqual({ main: false, local: true });
+    for (const agent_progress of [
+      [],
+      { main: "false" },
+      { "bad alias": true },
+      { "": false },
+    ]) {
+      mocks.invoke.mockResolvedValueOnce({ ...user, agent_progress });
+      await expect(tauriBridge.getUserSettings()).rejects.toBeTruthy();
+    }
+  });
   it("round trips generation count and rejects invalid count responses", async () => {
     mocks.invoke.mockResolvedValueOnce({ ...user, generation_count: 5 });
     const got = await tauriBridge.updateUserSettings({

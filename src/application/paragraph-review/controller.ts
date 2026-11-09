@@ -19,6 +19,7 @@ export class ParagraphReviewController {
   private disposed = false;
   state: ParagraphReviewState = {
     phase: "idle",
+    progress: null,
     reason: "Focus a Draft in the Tabbed Editor.",
   };
   constructor(
@@ -35,7 +36,7 @@ export class ParagraphReviewController {
     };
   };
   getSnapshot = () => this.state;
-  private publish(phase = this.state.phase) {
+  private publish(phase = this.state.phase, progress = this.state.progress) {
     const { editor, profile, locale, blocked } = this.context;
     const reason = !editor
       ? "Focus a Draft in the Tabbed Editor."
@@ -50,8 +51,13 @@ export class ParagraphReviewController {
               : phase === "suggestion"
                 ? "Accept or reject the current suggestion first."
                 : null;
-    if (phase === this.state.phase && reason === this.state.reason) return;
-    this.state = { phase, reason };
+    if (
+      phase === this.state.phase &&
+      reason === this.state.reason &&
+      progress === this.state.progress
+    )
+      return;
+    this.state = { phase, reason, progress };
     for (const listener of this.listeners) listener();
   }
   configure(context: ParagraphReviewContext) {
@@ -71,7 +77,7 @@ export class ParagraphReviewController {
     this.operation?.abort();
     this.operation = null;
     this.context.editor?.clearParagraph();
-    this.publish("idle");
+    this.publish("idle", null);
   }
   async start(): Promise<void> {
     if (this.disposed || this.state.reason) return;
@@ -94,12 +100,30 @@ export class ParagraphReviewController {
     }
     const operation = new AbortController();
     this.operation = operation;
-    this.publish("reviewing");
+    this.publish("reviewing", {
+      profile: profile.alias,
+      requestId: null,
+      jobId: null,
+      stage: "preparing_context",
+    });
     try {
       const snippets = context?.() ?? [];
       const text = (
         await this.reviewer.review(
-          { text: snapshot.text, context: snippets, profile, locale },
+          {
+            text: snapshot.text,
+            context: snippets,
+            profile,
+            locale,
+            onProgress: (progress) => {
+              if (this.operation !== operation || operation.signal.aborted)
+                return;
+              this.publish("reviewing", {
+                ...progress,
+                profile: profile.alias,
+              });
+            },
+          },
           operation.signal,
         )
       ).trim();
@@ -128,7 +152,7 @@ export class ParagraphReviewController {
         this.cancel();
         editor.focus();
       });
-      this.publish("suggestion");
+      this.publish("suggestion", null);
       this.notify(
         "Paragraph suggestion ready. Accept or Reject below the original paragraph.",
         "info",
@@ -142,7 +166,7 @@ export class ParagraphReviewController {
     } finally {
       if (this.operation === operation && this.state.phase !== "suggestion") {
         this.operation = null;
-        this.publish("idle");
+        this.publish("idle", null);
       }
     }
   }

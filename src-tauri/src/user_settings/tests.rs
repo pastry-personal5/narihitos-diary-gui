@@ -684,3 +684,80 @@ fn invalid_status_line_is_preserved_until_explicitly_replaced() {
         .unwrap();
     assert!(f.store.snapshot().warnings.is_empty());
 }
+
+#[test]
+fn agent_progress_defaults_persist_independently_and_conflict() {
+    let f = fx();
+    assert!(f.store.snapshot().agent_progress.is_empty());
+    let initial = f.store.snapshot();
+    let first = f
+        .store
+        .update(
+            &initial.revision,
+            Change::AgentProgress(BTreeMap::from([
+                ("main".into(), false),
+                ("local".into(), true),
+            ])),
+        )
+        .unwrap();
+    let writing = f
+        .store
+        .update(&first.revision, Change::Writing("ko-KR".into()))
+        .unwrap();
+    let reopened = Store::new(f.dir.clone()).snapshot();
+    assert_eq!(reopened.agent_progress.get("main"), Some(&false));
+    assert_eq!(reopened.agent_progress.get("local"), Some(&true));
+    assert!(!reopened.agent_progress.contains_key("new-profile"));
+    assert_eq!(reopened.writing_locale.as_deref(), Some("ko-KR"));
+    assert!(matches!(
+        f.store
+            .update(&first.revision, Change::AgentProgress(BTreeMap::new())),
+        Err(Error::Conflict)
+    ));
+    assert_eq!(writing.agent_progress, reopened.agent_progress);
+}
+
+#[test]
+fn agent_progress_validation_and_invalid_section_preservation() {
+    for invalid in [
+        json!(null),
+        json!([]),
+        json!({"": false}),
+        json!({"bad alias": true}),
+        json!({"main": "false"}),
+        json!({"main": null}),
+        json!({"x".repeat(65): true}),
+    ] {
+        assert!(agent_progress(&invalid).is_none());
+    }
+    let oversized: Map<String, Value> = (0..513).map(|i| (format!("p{i}"), json!(false))).collect();
+    assert!(agent_progress(&Value::Object(oversized)).is_none());
+    let f = fx();
+    put(
+        &f,
+        r#"{"schema_version":1,"agent_progress":{"main":"bad"}}"#,
+    );
+    let before = f.store.snapshot();
+    assert!(before.agent_progress.is_empty());
+    assert!(codes(&before).contains(&("agent_progress", "section_invalid")));
+    let next = f
+        .store
+        .update(&before.revision, Change::Generation(2))
+        .unwrap();
+    assert_eq!(on_disk(&f)["agent_progress"], json!({"main":"bad"}));
+    let repaired = f
+        .store
+        .update(
+            &next.revision,
+            Change::AgentProgress(BTreeMap::from([("main".into(), false)])),
+        )
+        .unwrap();
+    assert!(repaired.warnings.is_empty());
+    assert!(matches!(
+        f.store.update(
+            &repaired.revision,
+            Change::AgentProgress(BTreeMap::from([("bad alias".into(), false)]))
+        ),
+        Err(Error::Invalid)
+    ));
+}

@@ -176,6 +176,9 @@ async fn update_user_settings(
             .map(|v| v.as_str().map(str::to_owned).ok_or(Error::Invalid))
             .collect::<Result<_, _>>()
             .map(Change::InitWriting),
+        (_, "agent_progress", v) => user_settings::agent_progress(&v)
+            .map(Change::AgentProgress)
+            .ok_or(Error::Invalid),
         (_, "status_line", v) => user_settings::status_line(&v)
             .map(Change::StatusLine)
             .ok_or(Error::Invalid),

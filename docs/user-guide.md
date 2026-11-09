@@ -26,6 +26,8 @@ Press Shift+Command+P (or use the toolbar) for the command palette; Command+S sa
 
 The [planned background AI experience](architecture/ai-job-experience.md) keeps editing available with visible progress, cancellation and in-app completion feedback.
 
-Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat profile and Generation profile cards. Profile choices apply to new AI runs.
+Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat profile and Generation profile cards. Profile choices apply to new AI runs. Each profile has a **Show progress using Global Messages** checkbox, on by default and remembered after restart. Enabled profiles report ongoing job and request/response turn stages every two seconds. Turn it off to stop periodic progress; completion, warnings and errors still appear.
 
 The AI Activities window has a top-right Close button and supports Escape. Bitmap (i) buttons open further explanations. Close an explanation to return to its info button. Closing AI Activities keeps work running, and the bottom status line shows what is running or waiting. Use Reconnect when observations are out of date. Profile choices remain in Settings → AI Agents.
+
+Generate, Chat and Review report their current request/response stage in Global Messages every two seconds when the running profile’s progress toggle is on, including preparation and unchanged waits. Interrupted observations report status unavailable until refreshed. Completion, warnings and errors remain visible when progress is off.

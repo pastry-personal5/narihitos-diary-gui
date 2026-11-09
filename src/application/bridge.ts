@@ -197,6 +197,8 @@ export interface UserSettings {
   writing_locale: string | null;
   generation_count: number;
   status_line?: StatusLineSettings;
+  /** Profile aliases omitted from this map default to enabled. */
+  agent_progress?: Record<string, boolean>;
   keybindings: unknown;
   /** Defaults merged with valid, conflict-free overrides, one list per action. */
   effective_keybindings: Record<string, string[]>;
@@ -205,7 +207,12 @@ export interface UserSettings {
 export interface UserSettingsUpdate {
   /** `writing_init` takes the system's preferred tags and only fills an empty choice. */
   section:
-    "writing" | "writing_init" | "keybindings" | "generation" | "status_line";
+    | "writing"
+    | "writing_init"
+    | "keybindings"
+    | "generation"
+    | "status_line"
+    | "agent_progress";
   value: unknown;
   expectedRevision: string;
   recover: boolean;

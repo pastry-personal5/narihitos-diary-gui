@@ -108,3 +108,11 @@ Do not prebuild those features in generic registries or UI conditionals. Extend 
 Controller tests run without React or CodeMirror and cover duplicate admission, stale targets, late completion, cancellation, disposal and retry. AI adapter tests cover named purpose, asset substitution, timeout, stalled reads and late-open cleanup. Editor tests cover suggestion placement and normal edit/autosave notifications. Server tests preserve user chat and verify independent close; the full gate protects shared transport and lease behavior. Live AI and native visual qualification remain separate evidence.
 
 Paragraph Review has its own session profile selection in Settings > AI Agents, independent of Chat and Generation. Busy probe results are transient: background checks retry every fifteen seconds while busy, and a busy probe does not cancel an active paragraph review. All purposes still obey the shared server admission limit.
+
+Review execution publishes content-free request/job identity and lifecycle stage
+through the optional application-port progress callback. The controller captures
+the operation's profile, ignores late callbacks, and clears progress on cancellation,
+completion or failure. Global Messages observes that state on the shared two-second
+cadence and honors the captured profile's saved progress toggle. This does not
+publish the private review conversation into user-chat discovery or expose its prompt
+and response bodies. Suggestion/completion and error notices remain independent.

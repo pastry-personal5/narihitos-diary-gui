@@ -35,6 +35,7 @@ export function settingsFake(
       writing_locale: null,
       generation_count: 3,
       status_line: { ...DEFAULT_STATUS_LINE },
+      agent_progress: {},
       keybindings: {},
       effective_keybindings: { ...DEFAULT_BINDINGS },
       keybinding_issues: [],
@@ -93,6 +94,11 @@ export function settingsFake(
         }
         fake.user.keybindings = stored;
         fake.user.effective_keybindings = { ...DEFAULT_BINDINGS, ...stored };
+      } else if (u.section === "agent_progress") {
+        fake.user.agent_progress = structuredClone(u.value) as Record<
+          string,
+          boolean
+        >;
       } else if (u.section === "status_line") {
         fake.user.status_line = structuredClone(
           u.value,

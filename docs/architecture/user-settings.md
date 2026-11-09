@@ -65,3 +65,20 @@ Review readiness and cyan Chat readiness. AI activity text is amber while active
 cyan for unread results, rose when unavailable and slate when idle. Labels continue to communicate state independently of color.
 
 Status line items align from the left, retain a 16px gap and wrap on narrow windows.
+
+## AI Agent progress messages
+
+Settings → AI Agents provides **Show progress using Global Messages** for each
+profile. The client-owned `agent_progress` section maps profile aliases to
+booleans (at most 512 entries; aliases use the configured 1–64 ASCII alphanumeric,
+underscore or hyphen grammar). Missing aliases default to true, including new
+profiles. This section stores display preferences only, not profile configuration.
+The snapshot exposes `agent_progress`; the guarded `agent_progress` update
+replaces this section and preserves other sections. Invalid sections fall back to
+an empty map with a warning and remain untouched by unrelated edits.
+
+Preferences survive restart and apply independently of Chat/Generation profile
+selection. Editing is disabled until settings load, during a preference save and
+when settings are read-only or need recovery. Failed/conflicting writes use the
+existing settings error and reload behavior. Progress waits for settings to load
+so a saved disabled profile cannot emit messages during startup.

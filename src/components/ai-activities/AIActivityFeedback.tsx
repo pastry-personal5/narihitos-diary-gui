@@ -1,3 +1,8 @@
+import type { ParagraphReviewController } from "../../application/paragraph-review/controller";
+import {
+  AgentProgressMessages,
+  agentProgressEnabled,
+} from "../../application/ai-activities/progress-messages";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { AIActivitiesStore } from "../../application/ai-activities/store";
 import {
@@ -12,12 +17,33 @@ export function AIActivityFeedback({
   generator,
   chat,
   messages,
+  progressPreferences,
+  progressReady = true,
+  review,
 }: {
   activity: AIActivitiesStore;
   generator: GenerationController;
   chat: AIChatController;
   messages: GlobalMessagesStore;
+  progressPreferences?: Record<string, boolean>;
+  progressReady?: boolean;
+  review?: ParagraphReviewController;
 }) {
+  const progressReporter = useRef<AgentProgressMessages | null>(null);
+  useEffect(() => {
+    if (!progressReady) return;
+    const reporter = new AgentProgressMessages(
+      activity, messages, undefined, review, { generator, chat },
+    );
+    progressReporter.current = reporter;
+    return () => {
+      reporter.dispose();
+      progressReporter.current = null;
+    };
+  }, [activity, messages, progressReady, review, generator, chat]);
+  useEffect(() => {
+    progressReporter.current?.setPreferences(progressPreferences);
+  }, [activity, messages, progressReady, review, generator, chat, progressPreferences]);
   const state = useSyncExternalStore(activity.subscribe, () => activity.state);
   const generation = useSyncExternalStore(
     generator.subscribe,
@@ -37,6 +63,11 @@ export function AIActivityFeedback({
     for (const { job } of state.jobs.values()) {
       if (!["queued", "running"].includes(job.state)) continue;
       const p = job.progress!;
+      if (
+        !progressReady ||
+        !agentProgressEnabled(progressPreferences, p.profile_id)
+      )
+        continue;
       const kind = p.cancellation_requested
         ? "stopping"
         : (p.silence_ms ?? 0) >= 30_000
@@ -58,7 +89,14 @@ export function AIActivityFeedback({
         "info",
       );
     }
-  }, [state.jobs, state.stale, state.scope, messages]);
+  }, [
+    state.jobs,
+    state.stale,
+    state.scope,
+    messages,
+    progressReady,
+    progressPreferences,
+  ]);
   useEffect(() => {
     if (generation.localNotice) messages.add(generation.localNotice, "info");
   }, [generation.localNotice, messages]);
@@ -76,14 +114,40 @@ export function AIActivityFeedback({
   const preparing = generation.submitting;
   const sending = conversation.submitting;
   useEffect(() => {
-    if (preparing)
+    if (
+      preparing &&
+      progressReady &&
+      agentProgressEnabled(progressPreferences, generation.profile)
+    )
       messages.add(
         `Preparing generation for ${generation.originDate}.`,
         "info",
       );
-  }, [preparing, generation.originDate, messages]);
+  }, [
+    preparing,
+    generation.originDate,
+    generation.profile,
+    messages,
+    progressReady,
+    progressPreferences,
+  ]);
   useEffect(() => {
-    if (sending) messages.add("Submitting AI Chat message.", "info");
-  }, [sending, messages]);
+    if (
+      sending &&
+      progressReady &&
+      agentProgressEnabled(
+        progressPreferences,
+        conversation.chat?.profile ?? conversation.profile,
+      )
+    )
+      messages.add("Submitting AI Chat message.", "info");
+  }, [
+    sending,
+    conversation.chat?.profile,
+    conversation.profile,
+    messages,
+    progressReady,
+    progressPreferences,
+  ]);
   return null;
 }

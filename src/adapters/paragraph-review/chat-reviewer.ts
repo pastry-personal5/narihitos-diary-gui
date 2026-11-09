@@ -30,6 +30,14 @@ export class ChatParagraphReviewer implements ParagraphReviewer {
   ): Promise<string> {
     if (!this.available) throw new Error("unavailable");
     const contextPromise = Promise.resolve(request.context);
+    const requestId = crypto.randomUUID();
+    let jobId: string | null = null;
+    let lastStage: string | null | undefined;
+    const progress = (stage: string | null) => {
+      if (local.signal.aborted || stage === lastStage) return;
+      lastStage = stage;
+      request.onProgress?.({ requestId, jobId, stage });
+    };
     let id: string | null = null;
     let closed = false;
     const local = new AbortController();
@@ -51,6 +59,7 @@ export class ChatParagraphReviewer implements ParagraphReviewer {
     });
     const run = async () => {
       if (local.signal.aborted) throw new Error("cancelled");
+      progress("starting_agent");
       id = (
         await this.transport.openChat!(
           request.profile.alias,
@@ -62,16 +71,23 @@ export class ChatParagraphReviewer implements ParagraphReviewer {
         await close();
         throw new Error("cancelled");
       }
+      progress("preparing_context");
+      const context = await contextPromise;
+      if (local.signal.aborted) throw new Error("cancelled");
       const message = paragraphReviewPrompt(
         request.profile.type,
         request.text,
-        await contextPromise,
+        context,
         request.locale,
       );
-      await this.transport.sendChat!(id, crypto.randomUUID(), message, null);
+      progress("starting_agent");
+      jobId = (await this.transport.sendChat!(id, requestId, message, null))
+        .job_id;
+      progress("waiting_for_output");
       while (!local.signal.aborted) {
         const result = await this.transport.getChat!(id);
         if (local.signal.aborted) throw new Error("cancelled");
+        if (result.turn?.state === "running") progress(result.turn.stage);
         if (result.turn && result.turn.state !== "running") {
           if (result.turn.state !== "done") throw new Error("review_failed");
           return (
@@ -95,6 +111,7 @@ export class ChatParagraphReviewer implements ParagraphReviewer {
     try {
       return await Promise.race([run(), cancelled]);
     } finally {
+      request.onProgress?.({ requestId, jobId, stage: "finished" });
       clearTimeout(deadline);
       signal.removeEventListener("abort", abort);
       local.abort();

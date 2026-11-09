@@ -59,7 +59,9 @@ No check in this table has run as part of P1-M2. These are explicit blockers on 
 
 ## Delivery order and scope
 
-The [phase plan](phase-1.md#milestones) defines the sequence: 24 architecture-derived themes from P1-M4 through P1-M27, then P1-M28 simple refactoring, P1-M29–P1-M31 owner-requested revisions and P1-M32 release qualification, following the unchanged first three milestones. This table is a contract/evidence routing map, not a set of detailed milestone plans. No P1-M4-or-later overview or work-plan document is created by this change.
+The milestone-wide [M32 release checklist](milestone-32-personal-release-overview.md) and [work plan](milestone-32-personal-release-architecture.md) now consolidate the final E1–E13 audit, existing M32 feature evidence and outstanding packaged/native/live qualification. Release remains Planned; historical waivers and live-test exemptions are preserved.
+
+The [phase plan](phase-1.md#milestones) defines the sequence: 24 architecture-derived themes from P1-M4 through P1-M27, then P1-M28 simple refactoring, P1-M29–P1-M31 owner-requested revisions and P1-M32 release qualification, following the unchanged first three milestones. This table is a contract/evidence routing map, not a set of detailed milestone plans. Detailed milestone plans are linked from the phase plan.
 
 P1-M1 and P1-M2 are documentation-only under the [process exception](../development-process.md#definition-of-done). P1-M3 and later require the full code gate. These milestones remain sequential; dependent capabilities may not ship by silently dropping a failed acceptance requirement. Each later milestone needs its own overview/checklist and architecture work plan before code begins.
 
@@ -139,3 +141,7 @@ completed verification; M32's packaged/native obligations remain open.
 ## M31 changeability handoff
 
 The [completed checklist](../archive/milestones/p1-m31/milestone-31-changeability-overview.md) and [work plan](../archive/milestones/p1-m31/milestone-31-changeability-architecture.md) record application-owned buffer/source/action policy and generation/chat workflows, plus dependency enforcement. The [editing/ownership contract](../architecture/editing-and-agents.md#client-feature-and-lifecycle-ownership) and [contributor change procedures](../contribution-guide.md#where-to-make-changes) describe the implemented extension points. All seven gate lanes and eight synthetic/native smokes pass; transport/persisted contracts, producer compatibility, effective prompts and dependencies are unchanged. M32 retains packaged/native qualification and its existing evidence obligations.
+
+M31 T02 is also Done: [AI Agent progress completion/evidence](../archive/milestones/p1-m31/milestone-31-agent-progress-overview.md#completion-evidence-2026-11-09) and [work plan](../archive/milestones/p1-m31/milestone-31-agent-progress-architecture.md). Per-profile settings and periodic content-free feedback pass focused regressions and all seven gate lanes; M32 retains packaged/native qualification.
+
+M31’s [Generate/Chat/Review progress extension](../archive/milestones/p1-m31/milestone-31-review-progress-overview.md#completion-evidence-2026-11-09) is Done: preparation and execution share the profile-controlled two-second cadence, Review exposes content-free observations without user-chat discovery, and stale connections keep an explicit unavailable heartbeat. Focused regressions and all seven gate lanes pass; M32 retains packaged/native evidence.

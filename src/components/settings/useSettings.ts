@@ -38,6 +38,8 @@ export function useSettings(bridge: Bridge, connected: boolean) {
   const [revealing, setRevealing] = useState(false);
   const [revealError, setRevealError] = useState(false);
   const [reloading, setReloading] = useState(false);
+  const [savingAgentProgress, setSavingAgentProgress] = useState(false);
+  const savingProgress = useRef(false);
   const alive = useRef(true);
   const revision = useRef<string | undefined>(undefined);
 
@@ -52,7 +54,8 @@ export function useSettings(bridge: Bridge, connected: boolean) {
         | "writing_init"
         | "keybindings"
         | "generation"
-        | "status_line",
+        | "status_line"
+        | "agent_progress",
       value: unknown,
     ) => {
       if (revision.current === undefined) return false;
@@ -159,6 +162,18 @@ export function useSettings(bridge: Bridge, connected: boolean) {
     setStatusLine: (
       value: import("../../application/bridge").StatusLineSettings,
     ) => update("status_line", value),
+    savingAgentProgress,
+    setAgentProgress: async (value: Record<string, boolean>) => {
+      if (savingProgress.current) return false;
+      savingProgress.current = true;
+      setSavingAgentProgress(true);
+      try {
+        return await update("agent_progress", value);
+      } finally {
+        savingProgress.current = false;
+        if (alive.current) setSavingAgentProgress(false);
+      }
+    },
     setGenerationCount: (count: number) => update("generation", { count }),
     setKeybindings: (value: unknown) => update("keybindings", value),
     recover: async () => {

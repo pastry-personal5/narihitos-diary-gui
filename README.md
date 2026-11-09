@@ -22,7 +22,7 @@ See [AGENTS.md](AGENTS.md) and the [contribution guide](docs/contribution-guide.
 
 Generate uses the selected eligible diary snippets even when the Entry tab is closed. Generation settings, blocked reasons, adjacent-date warnings and preparation/submission errors appear in Global Messages with recovery guidance. Draft and Entry use distinct custom bitmap buttons with tooltips and selected states; Jump to latest in Global Messages uses a matching bitmap button. The editor has no visible “Tabbed Editor” title; passive editor and save notices appear in Global Messages. The toolbar has no save-status text. Source snippet details have a custom bitmap Close button at the top right of the overlay, with a tooltip and Escape dismissal.
 
-Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat profile and Generation profile cards. Profile choices apply to new AI runs.
+Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat profile and Generation profile cards. Profile choices apply to new AI runs. Each profile has a saved **Show progress using Global Messages** toggle, on by default; enabled profiles report ongoing request/response turn progress every two seconds.
 
 Open **Trash Recovery** in the Main Toolbar Strip to check interrupted moves, inspect each file’s saved result and review the next steps. Its dialog explains partial and uncertain outcomes; retrying remaining files requires a new preview and confirmation.
 
@@ -47,3 +47,5 @@ The empty AI Chat input shows a dimmed “Chat with AI” placeholder that disap
 AI Chat uses a very dark gray background with a darker input area.
 
 The server connection starts automatically without a startup delay after frontend reload. Failed attempts retry within one second; returning to the window or recovering the network prompts an immediate retry.
+
+Generate, Chat and Review report their current request/response stage in Global Messages every two seconds when the running profile’s progress toggle is on, including preparation and unchanged waits. Interrupted observations report status unavailable until refreshed. Completion, warnings and errors remain visible when progress is off.

@@ -119,3 +119,12 @@ The AI Chat Send button uses a thin white bitmap up arrow centered in a filled b
 AI Chat uses a very dark gray background (#141414) throughout its column and pane. Its input composer uses a darker gray (#0c0c0c), with existing text, placeholder, context border and Send colors retained.
 
 The AI Chat placeholder uses a dedicated darker foreground (#808080).
+
+In Settings → AI Agents, each profile has a **Show progress using Global Messages**
+checkbox, enabled by default and saved independently. Enabled profiles report the
+current AI job and request/response turn stage in Global Messages every two
+seconds while work is ongoing. Turning it off suppresses periodic progress;
+completion, warnings and errors remain available. Reporting stops when work finishes. Stale/disconnected observations keep a
+status-unavailable heartbeat until refreshed.
+
+Generate, Chat and Review report their current request/response stage in Global Messages every two seconds when the running profile’s progress toggle is on, including preparation and unchanged waits. Interrupted observations report status unavailable until refreshed. Completion, warnings and errors remain visible when progress is off.
