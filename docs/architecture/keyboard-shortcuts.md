@@ -38,7 +38,7 @@ Factory defaults. Shortcuts use macOS names; the stored key names are `Command`,
 
 ## Settings: Keyboard Shortcuts
 
-Settings has a sidebar with status, writing language and **Keyboard Shortcuts**. The Keyboard Shortcuts section shows a table with one row per action:
+The [Settings sidebar](../ux-terms.md#settings-categories-and-cards) places **Keyboard Shortcuts** last. The Keyboard Shortcuts section shows a table with one row per action:
 
 | Column             | Content                                                                                     |
 | ------------------ | ------------------------------------------------------------------------------------------- |

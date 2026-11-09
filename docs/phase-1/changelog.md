@@ -14,6 +14,10 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-10 — Agent, current-document/UX review — Consolidated the maintained UX contracts: terms own names and the Settings inventory, information architecture owns containment, GUI owns interactions, the keyboard contract owns palette behavior, and `src/styles.css` owns color values. Corrected toolbar Save status, Settings order, independent Paragraph Review profile, caret review versus Candidate review, status-line readiness, message retention/severity and Authentic-buffer chat context. Removed repeated chat/progress rules. Reduced the roadmap to current phase/milestone navigation; completed delivery records remain in the entries below and linked milestone evidence. No product decision or release acceptance changed.
+
+  Historical context removed from the current UX narrative: P1-M15 delivered detached-buffer/Trash behavior with automated component/coordinator coverage and native/producer acceptance ([evidence](../archive/milestones/p1-m15/milestone-15-source-audio-trash-overview.md)); P1-M29 adopted the dark theme, Settings cards, AI Activities modal, Candidate tabs and Trash Recovery ([evidence](../archive/milestones/p1-m29/milestone-29-owner-requested-revisions-overview.md)); P1-M30 established the canonical view/application module grouping ([evidence](../archive/milestones/p1-m30/milestone-30-refactoring-overview.md)). Native VoiceOver proof was exempted on 2026-11-06; the later [2026-11-09 acceptance policy](milestone-32-personal-release-overview.md#acceptance-policy-owner-update-2026-11-09) exempts all by-human execution, while preserving unverified observations. The historical roadmap’s M32 Planned statements are superseded by its Active release plan.
+
 - 2026-11-10 — Agent, version/release-note follow-up — Verified the package,
   Cargo workspace and Tauri bundle each declare `1.0.0`; added the user-facing
   [Version v1.0.0 release note](../release-notes-v1.0.0.md). `npm run

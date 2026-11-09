@@ -17,7 +17,7 @@ Work is organized into numbered phases and milestones. General documentation rul
 A milestone is done when:
 
 1. Its completion checklist is checked with acceptance evidence.
-2. The gate passes: `cargo fmt --manifest-path src-tauri/Cargo.toml --check`, `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`, `cargo test --manifest-path src-tauri/Cargo.toml`, `npx prettier --check .`, `npx eslint . --max-warnings 0`, and `npx vitest run`.
+2. The gate passes: `cargo fmt --manifest-path src-tauri/Cargo.toml --check`, `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`, `cargo test --manifest-path src-tauri/Cargo.toml`, `npx prettier --check .`, `npx eslint . --max-warnings 0`, `npx vitest run`, and `npx tsc --noEmit` (all seven lanes in `scripts/gate.sh`).
 3. Affected docs and its phase-doc status are updated in the same change.
 
 A phase is done when every milestone is `Done` or `Dropped` and its exit criteria hold.
@@ -62,7 +62,7 @@ Plan: [overview](milestone-01-<theme>-overview.md), [architecture](milestone-01-
 Notes: <optional decisions or links>
 ```
 
-Before implementation, create and link `milestone-NN-<theme>-overview.md` and `milestone-NN-<theme>-architecture.md`. Resolve any related "Undecided" item in `AGENTS.md` first.
+Before implementation, create and link `milestone-NN-<theme>-overview.md` and `milestone-NN-<theme>-architecture.md`. Resolve any related open question in [decisions](decisions.md) first.
 
 Record owner decisions, departures from the architecture plan, decided open questions, and reordered/dropped milestones in `changelog.md`:
 
@@ -80,7 +80,7 @@ Status: Active
 
 - Other docs use `Draft`, `Proposal`, `Active`, `Superseded by <link>`, or `Archived`. Proposals are not decisions.
 - Archive completed phase plans, superseded designs, and concluded research; fix their links in `docs/roadmap.md`.
-- Record resolved open questions under "Decided" in `AGENTS.md`.
+- Record resolved open questions in [decisions](decisions.md).
 
 ## Documentation rules
 

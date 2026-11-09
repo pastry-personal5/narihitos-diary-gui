@@ -2,6 +2,30 @@
 
 Status: Active
 
+## Current UX documentation review (2026-11-10)
+
+Review the maintained UX contracts against current decisions, Settings, editor,
+chat and message behavior. Consolidate repeated rules and keep historical delivery
+and acceptance records in the Phase 1 changelog; release qualification stays active.
+
+- [x] Correct UX terminology, containment and interactions against current source and approved contracts.
+- [x] Consolidate duplicated rules and move historical context to the changelog without losing evidence links.
+- [x] Reconcile affected current-document references and validation requirements.
+- [x] Pass delegated documentation checks and record the repository gate outcome.
+
+Review evidence: compared the maintained contracts with SettingsView, the
+paragraph-review controller/module contract, chat-context composition, the Global
+Messages store/view and CSS tokens. Current behavior lives in the three `ux-*`
+documents; historical context and milestone evidence links are recorded in the
+[Phase 1 changelog](changelog.md). The roadmap now links the active M32 plan.
+
+Validation evidence (2026-11-10): the delegated runner passed Prettier and
+local-link/heading-fragment checks across all 11 changed Markdown documents and
+`git diff --check`. All seven repository gate lanes passed: G03 initially failed
+in sandboxed localhost bridge tests, then passed in full with localhost socket
+access; G04 was rerun after the final prose changes. This documentation review
+does not qualify the personal release or close M32.
+
 ## README story doodle follow-up
 
 - [x] Create and inspect a doodle explaining the three-step daily ritual.
