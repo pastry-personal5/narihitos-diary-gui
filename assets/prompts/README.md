@@ -67,6 +67,32 @@ exercise complete preparation, cancellation, validation and output bounds.
 
 Caret paragraph review also embeds `review-paragraph.md` from each provider directory through the frontend AI adapter. These are task-message instruction assets with default provider settings and single-pass `{{locale}}` / JSON `{{data}}` substitution. They are separate from the server's prepared `chat` prompt catalogue and do not select model settings. The Rust prompt inventory includes them in the separate `CLIENT_TASKS` test table and validates them with the shared strict parser, while the server's historical render fixture continues to cover server-resolved assets. Their runtime loader and tests live in `src/adapters/paragraph-review/`; see the [feature boundary contract](../../docs/architecture/paragraph-review.md).
 
+Paragraph Review defaults to reflective writing with evidence-supported context
+enrichment. It first corrects clear typos in every sentence, preserving intentional
+wording and avoiding guessed corrections. It then checks hypotheses against supplied context, uses 5W1H as a loose guide
+rather than a required sentence structure or order, composes a proportionate reflection and audits added claims. It may add
+clearly supported details about the same event, but must preserve uncertainty and
+avoid inventing events or asserting inferred feelings as lived facts. Only the
+revised paragraph is returned. This is a prompt default, not a selectable style
+or a model setting; output quality still requires live-model assessment.
+
+The paragraph remains the baseline account when snippets conflict. Source dates
+are not automatically event dates; plans and possibilities must not become
+completed facts. Uncertain typo corrections wait for evidence. Reflection needs
+textual support even when hedged with "perhaps" or "maybe". Brief illustrative
+examples show both useful edits and inference limits. Every provider receives the
+same policy and final-paragraph contract, with no external research or reasoning
+transcript requested. These safeguards are instructions, not verified guarantees
+of model behavior.
+
+Snippet `creation_time` supplies parsed header creation evidence (UTC timestamp,
+precision, optional diary-local datetime/offset, and a filename-conflict flag), or
+null. A temporal evidence step uses it as a secondary clue when event time is
+missing; explicit text takes priority. Recording time alone does not establish
+event time, and timestamp conflicts must not fill gaps. Filename-only and
+filesystem timestamps are not substituted. Relative time uses supported snippet
+context rather than the current date or the selected paragraph date.
+
 | Agent type                | Files                                                                                                                                                                                          | Outstanding coverage                                                                                                                       |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `apple-foundation-models` | [generate-candidate.md](apple-foundation-models/generate-candidate.md), [chat.md](apple-foundation-models/chat.md), [session-instructions.md](apple-foundation-models/session-instructions.md) | P1-M20 runtime proof recorded below; packaged qualification remains P1-M32                                                                 |

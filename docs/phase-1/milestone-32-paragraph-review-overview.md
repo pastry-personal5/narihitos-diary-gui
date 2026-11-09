@@ -13,6 +13,11 @@ See the [work plan](milestone-32-paragraph-review-architecture.md) for transport
 - [x] Accept uses a normal editor transaction and autosave; Reject leaves text unchanged; changed drafts refuse acceptance.
 - [x] Focused regression tests and the repository gate pass.
 
+## Owner-requested GUI follow-up: AI Chat width
+
+- [x] AI Chat opens at twice its previous default width (480px) while remaining resizable.
+- [x] Layout regression coverage verifies the 480px default and existing resize bounds; the focused test and full gate pass.
+
 ## Changeability refactor checklist
 
 Owner authorization (2026-11-09): paragraph review is a growing advanced feature; incompatible internal and transport changes are permitted.
@@ -23,6 +28,82 @@ Owner authorization (2026-11-09): paragraph review is a growing advanced feature
 - [x] Server conversation ownership and routing are centralized, with named purposes instead of feature booleans.
 - [x] Module responsibilities, dependency direction, extension points and future scope are documented and protected by boundary tests.
 - [x] Application lifecycle regressions, adapter cancellation tests, existing behavior tests and the full gate pass.
+
+## Reflective, evidence-supported prompt follow-up
+
+Owner authorization (2026-11-09): permit clearly supported details from context
+and default Paragraph Review to reflective writing: dwell on feelings and thoughts
+the facts imply, without adding events.
+
+- [x] All four provider assets use hypothesis checking, evidence gathering, optional 5W1H and reflective composition, followed by a factual audit.
+- [x] Instructions distinguish supported context details from uncertain interpretation, preserve voice and uncertainty, and return only one revised paragraph.
+- [x] Maintained prompt documentation describes the default and evidence limits; delegated focused checks and the full gate pass.
+
+Prompt follow-up evidence: all four provider assets were reviewed for the shared
+hypothesis/evidence/5W1H/reflection/audit policy and paragraph-only output. The
+delegated runner passed the five paragraph AI adapter tests, changed-file Prettier
+and whitespace checks, and all seven `scripts/gate.sh` lanes with authorized
+localhost access after the sandbox initially denied bridge sockets. These checks
+verify asset and integration compatibility; reflective writing quality and factual
+restraint remain unverified by live-model evaluation.
+
+## Loose 5W1H guide clarification
+
+Owner clarification (2026-11-09): 5W1H is a loose guide, not a required sentence
+structure or order.
+
+- [x] Make the loose-guide wording explicit in all four provider prompts and maintained documentation; preserve natural reflective flow.
+- [x] Delegated prompt checks and the full gate pass.
+
+Clarification evidence: delegated validation passed all five paragraph adapter
+tests, changed-file Prettier and whitespace checks, and all seven gate lanes with
+authorized localhost access after sandbox socket denial. Live writing quality
+remains unverified.
+
+## Typo-first review follow-up
+
+Owner request (2026-11-09): correct typos in every sentence of the paragraph
+before the remaining review process.
+
+- [x] Add a first typo-correction pass to all four provider prompts, preserving intended wording when a correction is uncertain; document the sequence.
+- [x] Delegated prompt checks and all seven gate lanes pass.
+
+Typo-first evidence: delegated validation passed all five paragraph adapter tests,
+changed-file Prettier and whitespace checks, and all seven gate lanes with
+authorized localhost access. Live-model typo-correction quality remains unverified.
+
+## Prompt quality review follow-up
+
+Owner request (2026-11-09): review and enhance Paragraph Review prompts with
+careful attention to LLM behavior.
+
+- [x] Refine all four provider assets: typo-first, evidence-supported context enrichment, loose 5W1H, reflective default and paragraph-only output remain intact.
+- [x] Clarify original-text priority, uncertain typo corrections, source dates versus event dates, unsupported emotions despite hedging, and empty/conflicting context; include short boundary examples.
+- [x] Update maintained prompt documentation and record delegated adapter checks, asset checks and all seven gate lanes; distinguish automated compatibility from live writing quality.
+
+Quality-review evidence: all four provider assets were reviewed against the
+paragraph/context request schema and surrounding chat instructions. The delegated
+runner formatted the four prompt files and passed five paragraph adapter tests,
+twenty Rust infrastructure prompt tests, whitespace checks and all seven gate
+lanes with authorized localhost access. No runtime contract or model setting
+changed. These results establish automated compatibility; they do not establish
+live-model factuality or reflective writing quality.
+
+## Creation-time evidence follow-up
+
+Owner request (2026-11-09): gather evidence using snippet creation time when the
+text does not mention time.
+
+- [x] Send parsed header creation time, precision, diary-local projection and timestamp-conflict status with snippet context; do not substitute filename or filesystem times.
+- [x] All four provider prompts distinguish explicit event time from tentative creation-time clues, preserve relative-time wording, and avoid inventing exact event times.
+- [x] Cover metadata mapping and prompt payload preservation, update maintained docs, and pass delegated checks plus all seven gate lanes.
+
+Creation-time evidence: delegated validation passed 21 focused context, adapter,
+controller and frontend boundary tests, changed-file Prettier and whitespace
+checks, and all seven gate lanes with authorized localhost access. Tests cover
+UTC/local day boundaries, header-only and missing timestamps, conflicts, and the
+actual AI request metadata payload. Live-model temporal inference quality remains
+unverified.
 
 ## Current approach
 
@@ -41,8 +122,3 @@ Refactor evidence: the delegated runner passed the focused paragraph controller,
 - [x] Cover both regressions and pass the full gate.
 
 Follow-up evidence: delegated validation passed 19 focused profile/paragraph tests and all seven gate lanes. Rust tests passed with localhost socket permission after the sandbox blocked loopback setup. Profile selection remains independent across Settings close/reopen; busy probes retry at the base interval after prior backoff. Native/live-model reproduction remains unverified.
-## Owner-requested GUI follow-up: AI Chat width
-
-- [x] AI Chat opens at twice its previous default width (480px) while remaining resizable.
-- [x] Layout regression coverage verifies the 480px default and existing resize bounds; the focused test and full gate pass.
-

@@ -29,6 +29,12 @@ export interface ParagraphReviewSnippet {
   date: string;
   selected: boolean;
   text: string;
+  creation_time: {
+    utc: string;
+    precision: "second" | "milli";
+    diary_local: { datetime: string; offset_seconds: number } | null;
+    conflicts_with_filename: boolean;
+  } | null;
 }
 /** AI implementation owns protocol, prompt loading, polling, timeout and remote cleanup. */
 export interface ParagraphReviewer {

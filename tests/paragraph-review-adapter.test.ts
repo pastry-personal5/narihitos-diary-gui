@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChatParagraphReviewer } from "../src/adapters/paragraph-review/chat-reviewer";
 import { paragraphReviewPrompt } from "../src/adapters/paragraph-review/prompt";
+import { snippetCreationTime } from "../src/application/paragraph-review/context";
 import type { Bridge } from "../src/application/bridge";
 const request = {
   text: "Review me",
@@ -104,5 +105,42 @@ describe("paragraph AI adapter", () => {
     expect(() => paragraphReviewPrompt("unknown", "text", [], "en-US")).toThrow(
       "prompt_unavailable",
     );
+  });
+  it("sends header creation evidence and its conflict status in the request data", async () => {
+    const bridge = transport();
+    const header = {
+      unix_ms: Date.parse("2026-11-09T00:00:00Z"),
+      precision: "second" as const,
+    };
+    const context = [
+      {
+        date: "2026-11-09",
+        selected: false,
+        text: "Dinner with Jun yesterday. Keep {{locale}} literally.",
+        creation_time: snippetCreationTime({
+          dating: {
+            state: "timestamp_conflict",
+            header,
+            filename: { ...header, unix_ms: header.unix_ms + 86400000 },
+          },
+          navigation: null,
+        }),
+      },
+      {
+        date: "2026-11-09",
+        selected: true,
+        text: "No header timestamp.",
+        creation_time: null,
+      },
+    ];
+    await new ChatParagraphReviewer(bridge).review(
+      { ...request, context },
+      new AbortController().signal,
+    );
+    const message = vi.mocked(bridge.sendChat!).mock.calls[0][2];
+    expect(JSON.parse(message.slice(message.lastIndexOf("\n") + 1))).toEqual({
+      paragraph: request.text,
+      context,
+    });
   });
 });

@@ -4,6 +4,7 @@ import { MainToolbarStrip } from "./standard-layout/MainToolbarStrip";
 import { ToolbarButton } from "./standard-layout/ToolbarButton";
 import { ParagraphReviewButton } from "./paragraph-review/ParagraphReviewButton";
 import type { ParagraphReviewSnippet } from "../application/paragraph-review/contracts";
+import { snippetCreationTime } from "../application/paragraph-review/context";
 import { useReview } from "./paragraph-review/useReview";
 import settingsIcon from "../assets/settings.png";
 import { AIActivityFeedback } from "./ai-activities/AIActivityFeedback";
@@ -164,6 +165,7 @@ export function App({ bridge }: { bridge: Bridge }) {
             date: item.source.navigation?.included?.date ?? day,
             selected: model.imports.inclusion(item.source.id)?.checked ?? false,
             text: body.body,
+            creation_time: snippetCreationTime(body.source),
           });
         } catch {
           // Loose context is best effort; unavailable source bodies are omitted.
