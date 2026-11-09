@@ -149,6 +149,23 @@ bridge tests; a sandbox denial is not a passing result.
 
 ## Release automation lanes
 
+`make package` builds the ordinary release `.app`; `make release-server` checks
+version consistency and builds the standalone release server. `make release`
+builds both. These phony targets wrap the existing release commands without
+publishing or installing artifacts. `make bundle` remains the debug `.app` build.
+
+Use an absolute `CARGO_TARGET_DIR` for a custom build directory. The Makefile's
+smoke and exclusion paths follow it; for a Cargo-configured target directory,
+set `TARGET_DIR` to the matching absolute directory when invoking Make.
+`make smoke` rebuilds both the fixture app and fixture server and uses an isolated
+loopback port. `make exclusion` rebuilds ordinary debug artifacts before scanning
+them, including rejection of fault-injection markers. Avoid running fixture and
+ordinary builds against the same output directory concurrently.
+
+Each `scripts/gate.sh` invocation keeps its logs in a separate `run.*` directory
+under `GATE_LOG_DIR` (default: the temporary directory's `narihito-gate`). The
+script prints that directory and preserves logs from other runs.
+
 Offline validation uses `scripts/gate.sh` plus
 `python3 -m unittest discover -s scripts/tests -p 'test_*.py'`.
 No default test uses a real AI account or export destination.

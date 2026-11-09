@@ -1,10 +1,11 @@
 # Thin wrappers over the commands in AGENTS.md. Run `make help` for targets.
 M := src-tauri/Cargo.toml
-APP := src-tauri/target/debug/bundle/macos/Narihito's Diary.app/Contents/MacOS/diary-client
+TARGET_DIR ?= $(if $(CARGO_TARGET_DIR),$(CARGO_TARGET_DIR),src-tauri/target)
+APP = $(TARGET_DIR)/debug/bundle/macos/Narihito's Diary.app/Contents/MacOS/diary-client
 DISCOVERY ?=
 
 .PHONY: help install dev server gui build bundle bundle-smoke fmt fmt-check clippy lint test test-rust test-ui \
-	typecheck versions gate smoke exclusion clean
+	typecheck versions gate smoke exclusion clean package release-server release
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "%-14s %s\n", $$1, $$2}'
@@ -30,6 +31,14 @@ bundle: ## Ordinary debug .app bundle (no fixtures)
 
 bundle-smoke: ## Debug .app bundle with the scaffold-smoke fixture feature
 	npm run tauri build -- --debug --bundles app --features scaffold-smoke
+
+package: ## Package the ordinary release .app (no fixtures)
+	npm run tauri build -- --bundles app
+
+release-server: versions ## Build the ordinary release standalone server
+	cargo build --release --manifest-path $(M) -p diary-server
+
+release: release-server package ## Build the release server and .app (no publishing)
 
 fmt: ## Format Rust and the rest (writes files)
 	cargo fmt --manifest-path $(M)
@@ -59,15 +68,16 @@ typecheck: ## TypeScript check
 versions: ## Check package/Cargo/Tauri versions agree
 	npm run check:versions
 
-gate: ## Full gate G01-G06: parallel, quiet, PASS/FAIL per command
+gate: ## Full gate G01-G07: parallel, quiet, PASS/FAIL per command
 	scripts/gate.sh
 
 smoke: bundle-smoke ## Packaged native smoke (needs a GUI session)
-	python3 scripts/smoke/server.py "$(APP)"
+	cargo build --manifest-path $(M) -p diary-server --features scaffold-smoke
+	python3 scripts/smoke/server.py --server "$(TARGET_DIR)/debug/diary-server" "$(APP)"
 
 exclusion: bundle ## Rebuild ordinary bundle and verify fixture markers are absent
 	cargo build --manifest-path $(M) -p diary-server
-	node scripts/check-fixture-exclusion.mjs
+	node scripts/check-fixture-exclusion.mjs --target-dir "$(TARGET_DIR)"
 
 clean: ## Remove build output (dist and cargo target)
 	cargo clean --manifest-path $(M)

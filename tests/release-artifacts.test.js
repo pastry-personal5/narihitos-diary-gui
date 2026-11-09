@@ -59,6 +59,7 @@ test("records actual digests and distinguishes helper fallback", () => {
   expect(result.helper).toContain("unavailable");
 });
 test.each([
+  "DIARY_FAULT",
   "scaffold-fake-request",
   "DIARY_FAKE_EXPORT_DIR",
   "DIARY_FAKE_NOTION_FILE",
@@ -119,6 +120,9 @@ test("rejects a missing referenced license despite unrelated remaining files", (
 
 test("rejects inventories stripped of license references", () => {
   const f = fixture();
-  writeFileSync(join(f.app, "Contents/Resources/third-party/inventory.json"), JSON.stringify([{ notices: [] }]));
+  writeFileSync(
+    join(f.app, "Contents/Resources/third-party/inventory.json"),
+    JSON.stringify([{ notices: [] }]),
+  );
   expect(() => verifyRelease(f)).toThrow("No license references");
 });

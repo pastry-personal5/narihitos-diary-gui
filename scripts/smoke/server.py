@@ -1,16 +1,23 @@
 """Synthetic standalone server lifecycle smoke; never loads private app config."""
+import argparse
 import json
 import os
 from pathlib import Path
 import signal
 import subprocess
-import sys
 import tempfile
 import time
 import urllib.request
 import urllib.error
+from isolation import server_configuration
 
-binary = Path('src-tauri/target/debug/diary-server').resolve()
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('app', nargs='?', type=Path)
+parser.add_argument('--server', type=Path, default=Path(os.environ.get(
+    'CARGO_TARGET_DIR', str(Path(__file__).resolve().parents[2] / 'src-tauri/target')
+)) / 'debug/diary-server')
+args = parser.parse_args()
+binary = args.server.resolve(strict=True)
 with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
     base = Path(temporary).resolve()
     workspace, runtime = base / 'workspace', base / 'runtime'
@@ -23,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
         (folder / 'sentinel.txt').write_text('synthetic scaffold sentinel\n')
     denied.chmod(0o0)
     config = base / 'config.yaml' 
-    config.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: smoke-readable, type: narihito, root: {readable}}}\n  - {{alias: smoke-denied, type: ayumi, root: {denied}}}\n')
+    config.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nsources:\n  - {{alias: smoke-readable, type: narihito, root: {readable}}}\n  - {{alias: smoke-denied, type: ayumi, root: {denied}}}\n')
     config.chmod(0o600)
     processes = []
     tokens = []
@@ -101,8 +108,8 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
         restarted, discovery, fresh = start()
         assert fresh['instance_id'] != stale['instance_id'] and fresh['token'] != stale['token']
 
-        if len(sys.argv) == 2:
-            app = Path(sys.argv[1]).resolve()
+        if args.app is not None:
+            app = args.app.resolve(strict=True)
             with (base / 'client.log').open('w+') as client_log:
                 client = subprocess.Popen([str(app), '--connect', str(discovery)], stdout=client_log, stderr=client_log, text=True)
                 processes.append(client)
@@ -204,7 +211,7 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
         assert [r['code'] for r in rows] == ['http.auth_rejected'] and rows[0]['trace'] == TRACE and rows[0]['role'] == 'server'
         assert summary['returned'] == 1 and summary['invalid'] == 0 and not summary['truncated']
         assert any(r.get('trace') == TRACE for r in trace('recent:10')[0])
-        if len(sys.argv) == 2:
+        if args.app is not None:
             client_logs = list(runtime.glob('*/logs/client'))
             assert len(client_logs) == 1 and mode(client_logs[0]) == 0o700, 'missing client log directory'
             assert all(mode(p) == 0o600 for p in client_logs[0].iterdir()), 'client log file modes'
@@ -213,7 +220,7 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
             rows, _ = trace('trace:' + competitor_trace)
             assert any(r['code'] == 'session.client_busy' and r['role'] == 'server' for r in rows), 'competitor request not found in the server log'
             print('Trace correlation: competitor client stderr trace ' + competitor_trace + ' found in the server log')
-        if len(sys.argv) == 2:
+        if args.app is not None:
             folder_messages = [line.strip() for line in restarted.stderr.read().splitlines() if line.startswith('SMOKE server_folder_')]
             assert 'SMOKE server_folder_readable' in folder_messages
             assert 'SMOKE server_folder_denied' in folder_messages

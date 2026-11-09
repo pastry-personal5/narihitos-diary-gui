@@ -1,9 +1,11 @@
 #!/bin/sh
 # Quiet, parallel run of the six-command gate (G01-G06) plus a TypeScript typecheck (G07; vitest/esbuild does not typecheck).
-# Prints one PASS/FAIL line per command; full logs go to $GATE_LOG_DIR, and only failures show their tail.
+# Prints one PASS/FAIL line per command; each run owns a directory under $GATE_LOG_DIR.
 cd "$(dirname "$0")/.." || exit 2
-D="${GATE_LOG_DIR:-${TMPDIR:-/tmp}/narihito-gate}"
-mkdir -p "$D" && rm -f "$D"/*.log "$D"/*.rc
+LOG_ROOT="${GATE_LOG_DIR:-${TMPDIR:-/tmp}/narihito-gate}"
+mkdir -p "$LOG_ROOT" || exit 2
+D=$(mktemp -d "$LOG_ROOT/run.XXXXXX") || exit 2
+echo "Gate logs: $D"
 M=src-tauri/Cargo.toml
 
 run() { # name, command...

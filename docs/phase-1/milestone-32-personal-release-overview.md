@@ -2,7 +2,63 @@
 
 Status: Active
 
+## README story doodle follow-up
+
+- [x] Create and inspect a doodle explaining the three-step daily ritual.
+- [x] Insert the project-local image in the README with descriptive alt text.
+- [x] Pass delegated documentation and image-reference checks.
+
+Visually inspected the built-in image generation result. Delegated validation
+passed changed-Markdown Prettier, whitespace and image-reference checks; the
+project-local image is a valid 1536×1024 PNG. Its final generation prompt is
+preserved in [the asset note](../images/start-small-keep-your-story.prompt.md).
+
+## README daily ritual concept follow-up
+
+- [x] Reframe the README around a simple three-minute daily ritual, with accurate product claims.
+- [x] Pass delegated documentation formatting and whitespace checks.
+
+Delegated changed-document Prettier and `git diff --check` passed for the README
+and this overview after the daily ritual revision.
+
+## README product copy follow-up
+
+- [x] Tighten the introduction and Background into concise product copy while preserving supported capabilities and user control.
+- [x] Pass delegated documentation formatting and whitespace checks.
+
+Delegated changed-document Prettier and `git diff --check` passed for the README
+and this overview.
+
+## README app icon follow-up
+
+- [x] Display the existing app icon immediately after the root README tagline.
+- [ ] Verify the image reference and pass the delegated repository gate.
+
+Delegated inspection confirmed the centered image reference resolves to the
+existing 512×512 PNG. The gate passed G01/G02/G05/G06/G07; G03 failed in client
+bridge tests. G04 reported README emphasis formatting in concurrently edited
+content. Final changed-document Prettier and whitespace checks passed. G03 was
+blocked by sandbox loopback permission errors (`Operation not permitted`); the
+full-gate item remains unchecked.
+
 Qualify Diary v1.0.0 for personal use on the owner's Apple Silicon Mac, with independently shell-launched server and packaged client. This is the milestone-wide release checklist; the existing M32 feature checklists retain their implementation evidence. The [work plan](milestone-32-personal-release-architecture.md) defines sequencing, verification and evidence handling.
+
+## Version and release-note follow-up (2026-11-10)
+
+- [x] Verify the package, Cargo workspace and Tauri bundle versions are all `1.0.0`.
+- [x] Publish a user-facing release note headed `Version v1.0.0` without claiming M32 release qualification. [Release note](../release-notes-v1.0.0.md).
+- [x] Run `npm run check:versions`; it reports `Version v1.0.0`.
+- [ ] Pass the repository gate. On 2026-11-10, G03 was blocked by sandbox loopback permissions in existing bridge tests and G04 reported pre-existing formatting in `tests/release-artifacts.test.js`; no task files caused either result.
+
+## README and user-guide follow-up (2026-11-10)
+
+Keep the repository landing page short and product-oriented, with the maintained
+user-facing behavior guide under `docs/`.
+
+- [x] Replace the implementation-heavy root README with a concise marketing overview, tagline, background and main features. Evidence: `README.md` review, 2026-11-10.
+- [x] Make `docs/user-guide.md` the linked home for user-facing operational guidance, and retain its installation, launch, recovery and limitation information. Evidence: `docs/user-guide.md` review, 2026-11-10.
+- [x] Verify the changed Markdown links and whitespace. Evidence: local-target existence check and `git diff --check`, 2026-11-10.
+- [x] Capture a redacted/synthetic GUI example with a diary draft and completed AI Chat turn, then present it in the root README. Evidence: `docs/images/diary-draft-ai-chat.png` and `README.md`, 2026-11-10.
 
 ## Plan revision completion checklist (2026-11-09)
 
@@ -226,3 +282,32 @@ Implementation review validation: [focused, gate and rebuilt artifact results](m
 - [x] Record passed/failed/unverified observations and verify owned-process cleanup separately from the independent server.
 
 [Packaged GUI evidence](milestone-32-release-evidence.md#packaged-native-gui-run-2026-11-10) records the successful scoped run, clean client exit and durable synthetic text. AI Activities focus return remains inconclusive; copied installation and AI/provider/native IME scenarios are not claimed.
+
+## Packaging and release Make targets
+
+- [x] Add documented phony targets for the ordinary release app, standalone server and combined build using the existing release commands.
+- [x] Verify target discovery, dry-run recipes and execution despite same-named files.
+- [x] Pass the delegated full gate.
+
+Review follow-up:
+
+- [x] Audit build/packaging commands, smoke prerequisites, artifact exclusion and gate isolation; fix demonstrated defects with regression coverage.
+- [x] Run delegated focused harness checks and the full gate; record remaining limitations.
+
+Review findings and fixes: native smoke now builds the fixture server and selects
+an isolated loopback port; custom target paths reach both smoke and debug
+exclusion checks; release scans reject `DIARY_FAULT`; gate invocations own
+separate log directories and preserve other runs' output. Regression tests cover
+the Make recipes, target collisions, custom paths, exclusion CLI and concurrent
+gate success/failure reporting.
+
+Delegated review validation built the ordinary server and `.app` with
+`CARGO_TARGET_DIR=/tmp/narihito-release-target make release`. Explicit release
+artifact verification and both the standalone server smoke and copied-server
+release smoke passed. The Apple helper was unavailable in this build; no live
+Apple integration or native GUI qualification is claimed. Final focused JS tests
+passed 13/13, the full Python harness suite passed 13/13 and the full gate passed
+G01–G07. ESLint, changed-document Prettier and `git diff --check` passed. The
+successful gate and Python runs required loopback/process access beyond the
+restricted sandbox; the earlier sandbox-denied failures are superseded by these
+results. Existing M32 native/copy-install qualification gaps remain separate.

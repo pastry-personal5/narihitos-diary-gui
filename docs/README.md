@@ -2,6 +2,9 @@
 
 Status: Active
 
+- [Version v1.0.0 release note](release-notes-v1.0.0.md): user-facing summary,
+  availability and qualification limits for the first personal release.
+
 - [Paragraph review module boundaries](architecture/paragraph-review.md): application policy, AI/editor ports, composition, conversation ownership and future extension guidance.
 
 - [P1-M32 caret paragraph review](phase-1/milestone-32-paragraph-review-overview.md) ([work plan](phase-1/milestone-32-paragraph-review-architecture.md)): focused Draft paragraph AI suggestion, guarded Accept/Reject and isolated chat lifecycle.

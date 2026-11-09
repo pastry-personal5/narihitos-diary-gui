@@ -2,7 +2,9 @@
 
 Status: Active
 
-What the app does today, moved out of `README.md`.
+Practical guidance for using Narihito's Diary, including setup, everyday
+workflows, recovery and current limitations. The root [README](../README.md)
+is a short product introduction.
 
 The app runs a separately launched Rust server and Tauri client, with saved Authentic editing, Create Empty, autosave, Settings, a transient AI Chat, generated candidates and paragraph-by-paragraph review. iCloud export is available when an iCloud folder is configured; Notion export is available when a Notion root page and token are configured. Setup and independent launch commands are in the [contribution guide](contribution-guide.md#setup-and-development). Feature delivery follows the [roadmap](roadmap.md).
 
@@ -25,6 +27,34 @@ Writing language is selected in Settings, initially uses the Mac's preferred lan
 Press Shift+Command+P (or use the toolbar) for the command palette; Command+S saves the active Authentic file or explicitly saves a supported Narihito source. Shortcuts are editable in Settings → Keyboard Shortcuts, and the palette lists commands with their availability. Type to search and order recommendations, use arrows and Enter to choose, or click a command. The toolbar button toggles the palette; Escape closes it and restores focus. Unavailable commands explain why they cannot run. To move a supported Narihito snippet and its owned audio to macOS Trash, use Trash in the Explorer or command palette, review the exact files and confirm. Use Trash Recovery in the Main Toolbar Strip to inspect saved results, check unfinished moves and review guidance for partial or uncertain outcomes. Inspect opens the file results and offers a fresh confirmation for safe partial retries; closing the result returns to Trash Recovery. The spacious dialog has a top-right Close button and supports Escape. Directories stay in place; the mobile producer can show an empty recovery row for a retained assets directory. Text-only manual snippets have no related audio and their Trash action remains unavailable. Ayumi source saves remain unavailable. Export in the toolbar saves pending Authentic edits first, then writes the acknowledged entry to `YYYY/MM/YYYY-MM-DD.md` under the configured iCloud folder, asks before replacing a file changed outside the app, and lets you resolve an export whose outcome is unknown. Retained exports can be resumed after reload; confirmation dialogs identify their original entry date. Toolbar and tab controls show macOS SF Symbols when the system provides them and fall back to text labels otherwise.
 
 The [planned background AI experience](architecture/ai-job-experience.md) keeps editing available with visible progress, cancellation and in-app completion feedback.
+
+## Interface and feedback
+
+The app connects to its separately launched server automatically; **Settings →
+Server** shows connection status and offers **Connect** and **Reload
+configuration**. Failed connections retry promptly, and returning to the app or
+recovering network access prompts another attempt. **Settings → Sources** lists
+configured sources and can reveal the active server configuration folder in
+Finder.
+
+The Main Toolbar Strip provides **AI Activities**, **Trash Recovery** and the
+command palette. AI Activities lets you inspect or cancel work without stopping
+it when the window closes; Trash Recovery explains and records interrupted
+moves. The command palette shows shortcut hints and unavailable reasons; use
+arrow keys and Enter, click a command, or press Escape to close it. Pane
+dividers can be dragged or resized with arrow keys. Controls provide tooltips
+and accessible names.
+
+Global Messages show save, preparation, warning and recovery information. For a
+profile with **Show progress using Global Messages** enabled (the default),
+Generate, Chat and Review also report ongoing request and response stages every
+two seconds. Completion, warnings and errors remain visible when it is off.
+
+In AI Chat, Enter sends, Shift+Enter inserts a line break, and `/clear` starts a
+fresh in-memory conversation after the active response finishes or is cancelled.
+Replies are labeled **AI Agent** while complete and **AI Agent (provisional)**
+while streaming. Chat context is shown before sending and is not retained after
+the session ends.
 
 Settings → Server holds configuration status and Reload configuration. Settings → Sources lists configured sources and reveals the active server configuration folder in macOS Finder. Settings → AI Agents holds the Agent profiles table and separate Chat, Generation and Paragraph Review profile cards. Profile choices apply to new AI runs. Each profile has a **Show progress using Global Messages** checkbox, on by default and remembered after restart. Enabled profiles report ongoing job and request/response turn stages every two seconds. Turn it off to stop periodic progress; completion, warnings and errors still appear.
 

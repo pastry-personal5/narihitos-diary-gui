@@ -14,6 +14,14 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-10 — Agent, version/release-note follow-up — Verified the package,
+  Cargo workspace and Tauri bundle each declare `1.0.0`; added the user-facing
+  [Version v1.0.0 release note](../release-notes-v1.0.0.md). `npm run
+check:versions` passes and reports `Version v1.0.0`; the full gate remains
+  blocked by sandbox loopback permissions in existing bridge tests and a
+  pre-existing Prettier failure in `tests/release-artifacts.test.js`. M32
+  release qualification remains active and unclaimed.
+
 - 2026-11-10 — Implementation review — Hardened release cleanup for exited leaders, discovery validation and packaged license integrity; candidate review now handles refused editor presentation after acknowledged decisions. Added regression coverage and recorded rebuilt client provenance in the [execution ledger](milestone-32-release-evidence.md#implementation-review-follow-up).
 
 - 2026-11-10 — Owner requested M32 implementation and automated execution. Added explicit ordinary-artifact verification, copied-install server qualification, harness failure tests and real paragraph-accept undo coverage; execution and owner-approved M24 defect resolution are tracked in the [release ledger](milestone-32-release-evidence.md).

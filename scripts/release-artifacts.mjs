@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process";
 export const fixtureMarkers = {
   client: ["SMOKE main_cancelled_job_read", "smoke-unexpected-allow"],
   server: [
+    "DIARY_FAULT",
     "scaffold-fake-request",
     "scaffold-fake-job",
     "SMOKE server_folder_readable",

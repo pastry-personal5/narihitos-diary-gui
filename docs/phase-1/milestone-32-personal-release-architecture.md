@@ -118,6 +118,10 @@ npm run tauri build -- --bundles app
 
 Verify the resulting release paths from build output; do not substitute `make bundle`, which builds a debug app. Respect any configured Cargo target directory. Copy the server, `.app` and standalone-server notices into a fresh installation directory outside the checkout. Record hashes for the server, standalone/bundled client and bundle resources, and confirm native arm64 output and compatible app/server metadata.
 
+`make release` wraps the standalone server and packaged release app builds;
+`make release-server` and `make package` run each part separately. Tauri's
+configured before-build command runs the frontend version/type/build checks.
+
 The actual asset owners are important: infrastructure `build.rs` embeds the
 Swift helper in the **server**, which extracts and verifies it in its private
 runtime directory. Generation/chat prompts are server-embedded; paragraph-review
@@ -130,7 +134,14 @@ the copied server. An empty embedded helper may correctly produce
 `helper_missing`, but helper fallback does not establish live Apple success. Link prior live
 evidence or record that limitation; further by-human runs are exempt.
 
-Build without `scaffold-smoke` or `fault-injection`. The existing `scripts/check-fixture-exclusion.mjs` checks debug paths only: retain its debug proof and separately inspect/test the final release artifacts for fixture markers and unavailable fault-only endpoints. Do not report its output as a release scan. Keep debug/fault-injection artifacts separate from the deliverable and rebuild ordinary artifacts after any shared-output fixture build.
+Build without `scaffold-smoke` or `fault-injection`. Run
+`scripts/check-fixture-exclusion.mjs` with explicit `--server`, `--client`,
+`--app` and `--notices` paths for release verification, as documented in the
+[contribution guide](../contribution-guide.md#release-automation-lanes).
+Without artifact options it scans debug paths; `--target-dir` or
+`CARGO_TARGET_DIR` selects their output root. A debug scan is not release proof.
+Keep debug/fault-injection artifacts separate from the deliverable and rebuild
+ordinary artifacts after any shared-output fixture build.
 
 ## 3. Isolated workflow and recovery qualification
 
