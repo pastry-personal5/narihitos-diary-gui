@@ -25,6 +25,7 @@ import { GenerationController } from "../src/application/generation/controller";
 import { generationServer } from "./generation-fake";
 import { useCandidateTabs } from "../src/components/tabbed-editor/useCandidateTabs";
 import { candidateKey } from "../src/application/generation/contracts";
+import { openGenerationCandidate } from "../src/application/generation/candidates";
 import { useGeneration } from "../src/components/tabbed-editor/useGeneration";
 import { ResourceCoordinator } from "../src/application/navigation/resources";
 import { SessionBudget } from "../src/application/navigation/budget";
@@ -208,6 +209,44 @@ describe("generation interaction", () => {
     await r.openCandidate(candidateKey(job.job.id, 2));
     expect(r.activeKey).toBe(candidateKey(job.job.id, 2));
   });
+  it("keeps explicitly closed candidate tabs closed across streaming and completion, then reopens on request", async () => {
+    const { server, c } = await setup();
+    const r = coordinator();
+    await c.start("2026-11-06", "ko-KR", 3);
+    render(<Tabs c={c} r={r} />);
+    const key = candidateKey("j", 1);
+    await act(async () => {
+      await r.closeTab(key);
+    });
+    const active = r.activeKey;
+    await act(async () => {
+      server.snapshot().provisional = "More streamed text";
+      await c.refresh();
+    });
+    expect(r.resources.has(key)).toBe(false);
+    expect(r.activeKey).toBe(active);
+    await act(async () => {
+      server.finish();
+      await c.refresh();
+    });
+    expect(r.resources.has(key)).toBe(false);
+    await act(async () => {
+      await openGenerationCandidate(c, r, "j", 1);
+    });
+    expect(r.activeKey).toBe(key);
+    expect(r.active?.buffer.getText()).toBe("draft");
+    await act(async () => {
+      for (const key of [...r.resources.keys()]) await r.closeTab(key);
+      await c.refresh(true);
+    });
+    expect(r.resources.size).toBe(0);
+    expect(r.activeKey).toBeNull();
+    await act(async () => {
+      await c.discard("j");
+    });
+    expect(await openGenerationCandidate(c, r, "j", 1)).toBe(false);
+  });
+
   it("announces completion once, labels stale results and provides keyboard cancellation", async () => {
     const { server, c } = await setup();
     const r = coordinator();

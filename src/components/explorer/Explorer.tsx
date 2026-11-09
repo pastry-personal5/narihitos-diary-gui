@@ -1,5 +1,5 @@
 import type { SourceTrashController } from "../../application/trash/source-controller";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState } from "react";
 import type { CalendarAction } from "../../application/navigation/contracts";
 import dateIcon from "../../assets/tab-date.png";
 import snippetIcon from "../../assets/tab-snippet.png";
@@ -19,7 +19,7 @@ const viewIcons = {
   "Draft tab": draftIcon,
   "Entry tab": entryIcon,
 };
-import { candidateKey } from "../../application/generation/contracts";
+import { CandidateTable } from "./CandidateTable";
 import type { GenerationController } from "../../application/generation/controller";
 export function Explorer({
   model,
@@ -30,10 +30,6 @@ export function Explorer({
   sourceTrash: SourceTrashController;
   generator: GenerationController;
 }) {
-  const generation = useSyncExternalStore(
-    generator.subscribe,
-    () => generator.state,
-  );
   const [view, setView] = useState<(typeof views)[number]>("Date tab");
   const date = model.resources.selectedDate;
   const calendar = model.calendar;
@@ -271,31 +267,12 @@ export function Explorer({
           ) : (
             <p>Select a date.</p>
           )}
-          {(() => {
-            const slots = [...generation.jobs.values()]
-              .filter((job) => job.date === date)
-              .flatMap((job) => job.candidates.map((slot) => ({ job, slot })));
-            return slots.length ? (
-              <ul aria-label="Candidates">
-                {slots.map(({ job, slot }) => (
-                  <li key={candidateKey(job.job.id, slot.index)}>
-                    <button
-                      onClick={() =>
-                        void model.resources.openCandidate(
-                          candidateKey(job.job.id, slot.index),
-                        )
-                      }
-                    >
-                      Candidate {slot.index} ·{" "}
-                      {slot.status.replaceAll("_", " ")}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No candidates are available.</p>
-            );
-          })()}
+          <CandidateTable
+            key={date ?? "no-date"}
+            controller={generator}
+            resources={model.resources}
+            date={date}
+          />
         </>
       )}
       {view === "Entry tab" && (

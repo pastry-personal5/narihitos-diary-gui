@@ -11,6 +11,7 @@ import type {
 } from "../../application/navigation/contracts";
 import type { NavigationModel } from "../../application/navigation/model";
 import { ModalDialog } from "../ModalDialog";
+import { Bitmap } from "../Bitmap";
 import { ToolbarButton } from "../standard-layout/ToolbarButton";
 import detailsIcon from "../../assets/state-details.png";
 import readyIcon from "../../assets/state-ready.png";
@@ -23,22 +24,6 @@ const typeNames = { ayumi: "Ayumi", narihito: "Narihito" };
 
 type Context = NonNullable<ReturnType<NavigationModel["imports"]["view"]>>;
 type Choice = { source: Source; authority: TimeAuthority } | null;
-
-/** A custom bitmap, tinted like the other app icons. */
-function Bitmap({ src, size = 18 }: { src: string; size?: number }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="bitmap-icon"
-      style={{
-        width: size,
-        height: size,
-        maskImage: `url(${src})`,
-        WebkitMaskImage: `url(${src})`,
-      }}
-    />
-  );
-}
 
 export function SnippetTable({
   model,

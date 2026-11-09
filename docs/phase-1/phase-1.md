@@ -228,4 +228,6 @@ Notes: The owner accepted changeability refactoring as the first task set on 202
 Status: Planned
 Goal: Qualify Diary v1.0.0 on the owner's Apple Silicon Mac with separate shell launch, complete workflow/recovery/native evidence and the full release gate.
 
+Planned GUI task (owner, 2026-11-09): replace Draft candidates with the four-column candidate table; see [overview/checklist](milestone-32-draft-candidate-table-overview.md) and [work plan](milestone-32-draft-candidate-table-architecture.md). The owner subsequently requested implementation matching the Snippet tab table; implementation and the full gate pass; narrow-Explorer visual evidence is pending.
+
 Notes: P1-M32 also owns the packaged AI proof moved from M23 by the owner on 2026-11-06: editing/autosave under a slow synthetic run and maximum streaming, toolbar/details and off-date results, native keyboard/reduced motion, connection recovery and activation after sleep, measured submission feedback (100 ms target), cancel acknowledgement and render/memory bounds. See the [M23 evidence limits](../archive/milestones/p1-m23/milestone-23-background-ai-activity-results-architecture.md#gate-and-evidence-limits). Native VoiceOver proof remains exempt.

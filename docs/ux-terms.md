@@ -102,6 +102,19 @@ Use these exact category names in the Settings sidebar, in this order. A categor
 
 Profile choices are configured in Settings > AI Agents. AI Activities in the Main Toolbar Strip opens run status and result access.
 
+## Candidate style terms
+
+Each AI-generated Candidate has a **Style label** and **Style description** pair describing the writing style requested by its generation prompt.
+
+| Visible term      | Code-facing name   | Meaning                                                                                      |
+| ----------------- | ------------------ | -------------------------------------------------------------------------------------------- |
+| Style label       | `styleLabel`       | A few words naming the requested writing style or approach, such as concise or chronological |
+| Style description | `styleDescription` | A short explanation of how the prompt asks the AI Agent to write                             |
+
+Example pair: (**reflective**, **dwell on feelings and thoughts the facts imply, without adding events.**)
+
+These terms describe the prompt's requested style, rather than the Candidate's subject or a summary of its content. Use **Style label** and **Style description** as the canonical names instead of title, tagline or request summary for this pair. This records terminology only; it does not change generation behavior or define uniqueness enforcement.
+
 ## Implementation map
 
 M30 groups views under `src/components/{standard-layout,explorer,tabbed-editor,
