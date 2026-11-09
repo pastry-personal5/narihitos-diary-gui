@@ -3,6 +3,7 @@
 Status: Active
 
 - [P1-M32 Draft candidate table](phase-1/milestone-32-draft-candidate-table-overview.md) ([work plan](phase-1/milestone-32-draft-candidate-table-architecture.md)): four-column table matching the Snippet tab, with Style label, bitmap Info/Style description and bitmap Open in Tabbed Editor actions; implemented with the full gate passing; narrow-Explorer visual evidence pending.
+- [Phase 2 ideas](phase-2-ideas.md): initial non-binding ideas for Diary v2.0.0; scheduling and milestones are deferred.
 - [P1-M31 text-only snippet follow-up](archive/milestones/p1-m31/milestone-31-text-only-snippets-overview.md) ([work plan](archive/milestones/p1-m31/milestone-31-text-only-snippets-architecture.md)): done; schema 2 import and guarded Source Save, verified by producer round trips and the full gate.
 - [P1-M31 changeability refactoring tasks](archive/milestones/p1-m31/milestone-31-changeability-overview.md) ([work plan](archive/milestones/p1-m31/milestone-31-changeability-architecture.md)): done; injected editor ports, source mutation policy, application workflows/actions and dependency enforcement, with the full gate and eight synthetic/native smokes passing.
 - [P1-M25 export review follow-up](archive/milestones/p1-m25/milestone-25-export-review-overview.md): ordering, confirmation idempotency and destination binding regression fixes.
