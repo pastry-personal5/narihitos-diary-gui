@@ -14,6 +14,8 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-09 — Owner/agent, M32 plan review — Separate required automated/artifact acceptance from [by-human procedures](milestone-32-by-human-tests.md); all by-human execution is exempt from M32 and Phase 1 exit gates, superseding earlier human-only deferrals. Preserve unverified observations and known-defect triage. Update release R items, feature follow-ups, phase/roadmap/handoff and decisions together. Record the owner's Qwen AI Agent by-human Generate Draft, Review Paragraphs and AI Chat run as completed, without inventing version/artifact/assertion evidence. Planning/docs only; release execution remains pending.
+
 - 2026-11-09 — Agent, M31 progress extension completed — Generate/Chat preparation and the separate Review operation now share the two-second profile-controlled heartbeat. Preference updates and frequent observations preserve cadence; stale observations report status unavailable. Review retains its private conversation and ignores late callbacks. Five focused files (62 tests), TypeScript and all seven gate lanes pass. See the [completion evidence](../archive/milestones/p1-m31/milestone-31-review-progress-overview.md#completion-evidence-2026-11-09); M32 retains native/release qualification.
 
 - 2026-11-09 — Owner — Extend profile-controlled Global Messages progress to Generate, Chat and Review, with no silence beyond the two-second cadence during preparation, admission or unchanged waits. Review uses its own content-free observations and stays isolated from user-chat discovery. Stale observations keep an honest status-unavailable heartbeat. See the [checklist](../archive/milestones/p1-m31/milestone-31-review-progress-overview.md).

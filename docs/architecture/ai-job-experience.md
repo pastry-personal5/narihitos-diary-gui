@@ -152,3 +152,7 @@ than claiming that an observed stage is current; a fresh baseline resumes stage
 reporting. Completion, warning and
 error feedback remains independent. Messages contain no raw prompts, response
 bodies or diary text and are not diagnostic log records.
+
+A terminal activity observation stops the matching Chat turn's fallback heartbeat
+even when its transcript read is delayed. A new message submission still reports
+its own preparation rather than inheriting the previous turn's terminal state.

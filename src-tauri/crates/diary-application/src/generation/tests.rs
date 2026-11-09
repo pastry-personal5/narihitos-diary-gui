@@ -747,6 +747,40 @@ fn workflow_replays_before_fresh_checks_and_does_not_execute_simultaneous_winner
     ));
 }
 #[test]
+fn workflow_capture_rejects_reload_during_profile_lookup() {
+    struct ReloadingProfiles(std::sync::atomic::AtomicU64);
+    impl ProfileDirectory for ReloadingProfiles {
+        fn list(&self) -> Vec<ProfileView> {
+            vec![]
+        }
+        fn check(&self, alias: &str) -> Option<ProfileView> {
+            let old = WorkflowProfiles {
+                ready: true,
+                kind: AgentKind::Codex,
+            }
+            .check(alias);
+            self.0.store(1, Ordering::SeqCst);
+            old
+        }
+    }
+    let profiles = ReloadingProfiles(std::sync::atomic::AtomicU64::new(0));
+    let runner = Fake::new(vec![]);
+    assert!(matches!(
+        workflow_request().capture(CaptureServices {
+            profiles: &profiles,
+            runner: &runner,
+            imports: &Imports::new(),
+            authentic: &Authentic {
+                present: AtomicBool::new(false)
+            },
+            configuration: &|| profiles.0.load(Ordering::SeqCst),
+            cancelled: &|| false,
+        }),
+        Err(Error::ChangedSource)
+    ));
+    assert!(runner.calls.borrow().is_empty());
+}
+#[test]
 fn workflow_capture_checks_profiles_configuration_and_cancellation_without_inference() {
     let imports = Imports::new();
     let authentic = Authentic {

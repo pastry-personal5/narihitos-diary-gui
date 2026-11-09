@@ -29,7 +29,6 @@ export class ChatParagraphReviewer implements ParagraphReviewer {
     signal: AbortSignal,
   ): Promise<string> {
     if (!this.available) throw new Error("unavailable");
-    const contextPromise = Promise.resolve(request.context);
     const requestId = crypto.randomUUID();
     let jobId: string | null = null;
     let lastStage: string | null | undefined;
@@ -58,6 +57,10 @@ export class ChatParagraphReviewer implements ParagraphReviewer {
       if (local.signal.aborted) stop();
     });
     const run = async () => {
+      // Observe context rejection immediately, including after cancellation,
+      // and avoid acquiring a conversation for context that cannot be used.
+      progress("preparing_context");
+      const context = await request.context;
       if (local.signal.aborted) throw new Error("cancelled");
       progress("starting_agent");
       id = (
@@ -71,9 +74,6 @@ export class ChatParagraphReviewer implements ParagraphReviewer {
         await close();
         throw new Error("cancelled");
       }
-      progress("preparing_context");
-      const context = await contextPromise;
-      if (local.signal.aborted) throw new Error("cancelled");
       const message = paragraphReviewPrompt(
         request.profile.type,
         request.text,

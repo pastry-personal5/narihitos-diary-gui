@@ -25,6 +25,38 @@ function transport() {
 }
 afterEach(() => vi.useRealTimers());
 describe("paragraph AI adapter", () => {
+  it("handles failed context before opening a conversation", async () => {
+    const bridge = transport();
+    await expect(
+      new ChatParagraphReviewer(bridge).review(
+        {
+          ...request,
+          context: Promise.reject(new Error("context unavailable")),
+        },
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow("context unavailable");
+    expect(bridge.openChat).not.toHaveBeenCalled();
+    expect(bridge.sendChat).not.toHaveBeenCalled();
+  });
+  it("cancels pending context without opening a conversation or leaking a late rejection", async () => {
+    const bridge = transport();
+    let rejectContext!: (reason: Error) => void;
+    const context = new Promise<never>((_resolve, reject) => {
+      rejectContext = reject;
+    });
+    const abort = new AbortController();
+    const run = new ChatParagraphReviewer(bridge).review(
+      { ...request, context },
+      abort.signal,
+    );
+    const outcome = expect(run).rejects.toThrow("cancelled");
+    abort.abort();
+    await outcome;
+    rejectContext(new Error("late context failure"));
+    await Promise.resolve();
+    expect(bridge.openChat).not.toHaveBeenCalled();
+  });
   it("uses a named conversation purpose and closes after completion", async () => {
     const bridge = transport();
     expect(
@@ -69,6 +101,7 @@ describe("paragraph AI adapter", () => {
     const abort = new AbortController();
     const run = new ChatParagraphReviewer(bridge).review(request, abort.signal);
     const outcome = expect(run).rejects.toThrow("cancelled");
+    await vi.waitFor(() => expect(bridge.openChat).toHaveBeenCalled());
     abort.abort();
     await outcome;
     opened({ chat_id: "late" });

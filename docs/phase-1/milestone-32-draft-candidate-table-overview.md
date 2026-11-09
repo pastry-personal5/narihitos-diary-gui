@@ -4,6 +4,14 @@ Status: Active
 
 Implement the owner's 2026-11-09 Draft tab revision as a task within P1-M32. The owner requested implementation and matching the Snippet tab table's look and feel. Release qualification remains separate. Technical sequencing is in the [work plan](milestone-32-draft-candidate-table-architecture.md).
 
+## Manual evidence policy (owner update, 2026-11-09)
+
+Remaining native/visual/live observations are documented in the [by-human test guide](milestone-32-by-human-tests.md)
+and exempt from M32/Phase 1 exit gates. Earlier statements below that keep this
+feature open solely for human evidence are superseded. Preserve the historical
+results; unrun manual checks are unverified, not passed. Automated requirements
+and disposition of observed defects still apply.
+
 ## Scope and behavior
 
 Replace the Draft tab's candidate list/tree with a table containing one row per candidate and these four columns, in order:
@@ -42,7 +50,7 @@ Automated implementation evidence is recorded below. Visual qualification remain
 - [x] Custom bitmap Info buttons show the matching Style description, with keyboard activation, dismissal and focus return.
 - [x] Custom bitmap Open in Tabbed Editor buttons focus an existing tab or reopen a closed tab, without duplicates; unavailable candidates have an explained disabled state.
 - [x] Both buttons have descriptive accessible names/tooltips and share Snippet table styles; a horizontal scroll container keeps narrow layouts reachable.
-- [ ] Visually verify the table and bitmap controls in a narrow Explorer using a real browser/native GUI runner.
+- Exempt by owner (2026-11-09): narrow-Explorer table/bitmap visual inspection is optional H07; not run, not passed, and not a completion gate.
 - [x] Existing streaming, empty/failed/cancelled states, date navigation, Authentic access, review and discard remain correct.
 - [x] Focused UI/navigation regressions pass; maintained UX docs reflect the delivered behavior.
 - [x] `scripts/gate.sh` passes; M32 release qualification obligations remain tracked separately.

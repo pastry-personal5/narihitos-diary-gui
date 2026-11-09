@@ -23,6 +23,14 @@ seven gate lanes. The 92 native client tests passed with localhost socket
 permission after sandbox restrictions blocked loopback setup. Native visual
 inspection was not performed.
 
+## Manual evidence policy (owner update, 2026-11-09)
+
+Remaining native/visual/live observations are documented in the [by-human test guide](milestone-32-by-human-tests.md)
+and exempt from M32/Phase 1 exit gates. Earlier statements below that keep this
+feature open solely for human evidence are superseded. Preserve the historical
+results; unrun manual checks are unverified, not passed. Automated requirements
+and disposition of observed defects still apply.
+
 ## Color styling follow-up
 
 - [x] Use foreground colors only: green Generate, violet Review and cyan Chat readiness text.

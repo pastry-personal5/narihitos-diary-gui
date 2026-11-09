@@ -76,6 +76,9 @@ impl StartRequest {
     }
     /// Blocking capture is scheduled by the runtime adapter, without coordinator/store locks.
     pub fn capture(self, services: CaptureServices<'_>) -> Result<GenerationContext, Error> {
+        // Sample before profile lookup so a concurrent reload cannot bless an
+        // old profile as belonging to the newly captured configuration.
+        let generation = (services.configuration)();
         let view = services
             .profiles
             .check(&self.profile)
@@ -83,7 +86,6 @@ impl StartRequest {
         if view.status != Some(ProfileStatus::Ready) || view.generate != Capability::Ready {
             return Err(Error::ProfileNotReady);
         }
-        let generation = (services.configuration)();
         let context = capture(
             Capture {
                 prompt: services

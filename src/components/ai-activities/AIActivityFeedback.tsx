@@ -33,7 +33,11 @@ export function AIActivityFeedback({
   useEffect(() => {
     if (!progressReady) return;
     const reporter = new AgentProgressMessages(
-      activity, messages, undefined, review, { generator, chat },
+      activity,
+      messages,
+      undefined,
+      review,
+      { generator, chat },
     );
     progressReporter.current = reporter;
     return () => {
@@ -43,7 +47,15 @@ export function AIActivityFeedback({
   }, [activity, messages, progressReady, review, generator, chat]);
   useEffect(() => {
     progressReporter.current?.setPreferences(progressPreferences);
-  }, [activity, messages, progressReady, review, generator, chat, progressPreferences]);
+  }, [
+    activity,
+    messages,
+    progressReady,
+    review,
+    generator,
+    chat,
+    progressPreferences,
+  ]);
   const state = useSyncExternalStore(activity.subscribe, () => activity.state);
   const generation = useSyncExternalStore(
     generator.subscribe,
@@ -62,7 +74,11 @@ export function AIActivityFeedback({
     if (state.stale) return;
     for (const { job } of state.jobs.values()) {
       if (!["queued", "running"].includes(job.state)) continue;
-      const p = job.progress!;
+      // Older servers and jobs admitted before progress metadata was added may
+      // not have an observation yet. They are still represented by the
+      // activity status, but cannot produce progress-specific announcements.
+      const p = job.progress;
+      if (!p) continue;
       if (
         !progressReady ||
         !agentProgressEnabled(progressPreferences, p.profile_id)

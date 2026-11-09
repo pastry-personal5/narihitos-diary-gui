@@ -249,3 +249,81 @@ it("keeps Chat submission heartbeats and suppresses all preparation for disabled
     ),
   ).toBe(true);
 });
+
+it.each(["succeeded", "failed", "cancelled"] as const)(
+  "stops Chat fallback heartbeats on authoritative %s even if the Chat read is stalled",
+  (state) => {
+    const { activity, snapshot, messages, reporter } = setup();
+    reporter.dispose();
+    snapshot([]);
+    const listeners = new Set<() => void>();
+    const subscribe = (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    };
+    const chat = {
+      subscribe,
+      state: {
+        submitting: false,
+        pending: { text: "private" },
+        profile: "local",
+        chat: {
+          profile: "local",
+          turn: {
+            job_id: "chat-job",
+            state: "running",
+            stage: "waiting_for_output",
+          },
+        },
+      },
+    };
+    const fallback = new AgentProgressMessages(
+      activity,
+      messages,
+      {},
+      undefined,
+      {
+        generator: {
+          subscribe,
+          state: { submitting: false, activeJob: null },
+        } as unknown as import("../src/application/generation/controller").GenerationController,
+        chat: chat as unknown as import("../src/application/ai-chat/controller").AIChatController,
+      },
+    );
+    reporters.push(fallback);
+    vi.advanceTimersByTime(2000);
+    expect(messages.items).toHaveLength(1);
+    activity.observe({
+      id: "chat-job",
+      sequence: 2,
+      state,
+      progress: {
+        kind: "chat",
+        job_id: "chat-job",
+        request_id: "r",
+        instance_id: "i",
+        session_id: "s",
+        chat_id: "chat",
+        origin_date: null,
+        profile_id: "local",
+        locale: "en-US",
+        phase: "finished",
+        elapsed_ms: 1,
+        last_agent_activity_at: 1,
+        cancellation_requested: state === "cancelled",
+        error_code: null,
+      },
+    });
+    vi.advanceTimersByTime(6000);
+    expect(messages.items).toHaveLength(1);
+    chat.state.submitting = true;
+    listeners.forEach((listener) => listener());
+    vi.advanceTimersByTime(2000);
+    expect(messages.items).toHaveLength(2);
+    expect(messages.items.at(-1)?.text).toContain(
+      "request: submitting message",
+    );
+  },
+);

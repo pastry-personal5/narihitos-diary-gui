@@ -96,6 +96,8 @@ Generation admission policy lives in the application
 [generation workflow](../../src-tauri/crates/diary-application/src/generation/workflow.rs):
 StartRequest performs replay-first preflight and immutable source/profile/prompt
 capture through explicit ports, including the configuration-generation check.
+The configuration epoch is sampled before profile lookup so reloads during that
+lookup cannot label an old profile with the new epoch.
 Store.start commits admission and distinguishes a simultaneous winner from a
 new job; Store.finish acknowledges terminal state and settles result accounting.
 The [chat workflow](../../src-tauri/crates/diary-application/src/chat/workflow.rs)

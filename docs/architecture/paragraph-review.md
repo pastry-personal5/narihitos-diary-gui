@@ -116,3 +116,7 @@ completion or failure. Global Messages observes that state on the shared two-sec
 cadence and honors the captured profile's saved progress toggle. This does not
 publish the private review conversation into user-chat discovery or expose its prompt
 and response bodies. Suggestion/completion and error notices remain independent.
+
+The adapter awaits context before opening its private conversation, inside the
+same timeout/cancellation race. Failed context acquires no conversation; late
+context rejection after cancellation remains handled.

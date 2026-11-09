@@ -4,6 +4,18 @@ Status: Active
 
 This records P1-M2 requirement coverage and maps the architecture-derived P1-M4–P1-M32 themes in the [phase plan](phase-1.md#milestones) to contracts and required evidence. Architecture contracts stay independent of delivery numbering in [the maintained design](../architecture.md).
 
+## Current release acceptance override (owner, 2026-11-09)
+
+The [M32 acceptance policy](milestone-32-personal-release-overview.md#acceptance-policy-owner-update-2026-11-09)
+supersedes human-only evidence requirements in the routing tables and historical
+notes below. By-human packaged/native, visual/IME, phone/live-iCloud and live-model
+observations are documented in [H01–H12](milestone-32-by-human-tests.md) and exempt
+from M32 and Phase 1 exit gates. Unrun cases remain unverified; required automated,
+artifact/process and final gate results remain mandatory, with A06's explicit
+feasibility disposition for inaccessible GUI automation. Known failures still
+require triage. The owner's Qwen Generate Draft, Review Paragraphs and AI Chat
+completion is recorded in that guide, without claiming a version or final artifact.
+
 ## Owner decision coverage
 
 All internal choices below are engineering decisions under D17, not new interview answers. The [interview](milestone-02-owner-decisions.md) remains authoritative for D01–D17.

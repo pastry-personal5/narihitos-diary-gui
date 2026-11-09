@@ -248,21 +248,47 @@ it("gates preparation and waiting notices by profile without hiding errors or co
 
 it("does not postpone the heartbeat when settings snapshots change during a run", () => {
   vi.useFakeTimers();
-  const activity = new AIActivitiesStore(), messages = new GlobalMessagesStore();
+  const activity = new AIActivitiesStore(),
+    messages = new GlobalMessagesStore();
   const v = generationView();
-  activity.event({ kind: "job_snapshot", instance_id: "i", session_id: "s", first: true, complete: true, jobs: [{ ...v.job, progress: v.progress }] });
+  activity.event({
+    kind: "job_snapshot",
+    instance_id: "i",
+    session_id: "s",
+    first: true,
+    complete: true,
+    jobs: [{ ...v.job, progress: v.progress }],
+  });
   const subscribe = () => () => {};
-  const generator = { subscribe, state: { submitting: false } } as unknown as GenerationController;
-  const chat = { subscribe, state: { submitting: false } } as unknown as AIChatController;
+  const generator = {
+    subscribe,
+    state: { submitting: false },
+  } as unknown as GenerationController;
+  const chat = {
+    subscribe,
+    state: { submitting: false },
+  } as unknown as AIChatController;
   const props = { activity, messages, generator, chat };
-  const view = render(<AIActivityFeedback {...props} progressPreferences={{ main: true }} />);
+  const view = render(
+    <AIActivityFeedback {...props} progressPreferences={{ main: true }} />,
+  );
   try {
     act(() => vi.advanceTimersByTime(1000));
-    view.rerender(<AIActivityFeedback {...props} progressPreferences={{ main: true, other: false }} />);
+    view.rerender(
+      <AIActivityFeedback
+        {...props}
+        progressPreferences={{ main: true, other: false }}
+      />,
+    );
     act(() => vi.advanceTimersByTime(1000));
     expect(messages.items).toHaveLength(1);
-    view.rerender(<AIActivityFeedback {...props} progressPreferences={{ main: false }} />);
+    view.rerender(
+      <AIActivityFeedback {...props} progressPreferences={{ main: false }} />,
+    );
     act(() => vi.advanceTimersByTime(2000));
     expect(messages.items).toHaveLength(1);
-  } finally { view.unmount(); vi.useRealTimers(); }
+  } finally {
+    view.unmount();
+    vi.useRealTimers();
+  }
 });

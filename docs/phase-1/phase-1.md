@@ -13,6 +13,11 @@ Theme: Deliver Diary v1.0.0 through the [maintained architecture](../architectur
 - The owner-confirmed v1 Diary workflows from [the research baseline](../archive/milestones/p1-m1/milestone-01-research-overview.md#working-baseline-and-decision-boundaries) are implemented and verified, with affected product/UX docs completed.
 - The macOS v1.0.0 release meets the installation/distribution criteria agreed after R14 research. Feature and release milestone checklists must be added before that work begins.
 
+Owner update (2026-11-09): the [M32 acceptance policy](milestone-32-personal-release-overview.md#acceptance-policy-owner-update-2026-11-09)
+exempts by-human tests from M32 and Phase 1 exit gates. Required automated/artifact
+qualification and final gate remain; unobserved native/live behavior stays an
+explicit limitation. See the [manual procedures and Qwen completion note](milestone-32-by-human-tests.md).
+
 ## Milestones
 
 This phase plan defines the milestone order. P1-M4–P1-M27 are 24 theme-level milestones derived from the architecture; the owner (2026-11-07) moved release qualification to P1-M32 and inserted P1-M28–P1-M31. The [implementation handoff](implementation-handoff.md) maps this sequence to contracts and required evidence. Detailed milestone overviews, work plans and verifiable completion checklists will be written before each milestone's implementation, not as part of this theme-planning change. P1-M4 is Done; P1-M5 is Done; P1-M6 is Done; P1-M7 is Done; P1-M8 is Done; P1-M9 is Done; P1-M10 is Done; P1-M11–P1-M15 are Done; P1-M16 is Done; P1-M17 is Done; P1-M18 is Done; P1-M19 is Done; P1-M20 is Done; P1-M21 is Done; P1-M22 is Done; P1-M23 is Done; P1-M24 is Done; P1-M25–P1-M27 are Delivered; P1-M28 is Done; P1-M29 is Done; P1-M30 is Done; P1-M31 is Done, including changeability, text-only snippet support and Generate/Chat/Review progress; P1-M32 remains Planned.
@@ -226,10 +231,10 @@ Notes: The owner accepted changeability refactoring as the first task set on 202
 ### P1-M32: Personal release qualification
 
 Status: Planned
-Goal: Qualify Diary v1.0.0 on the owner's Apple Silicon Mac with separate shell launch, complete workflow/recovery/native evidence and the full release gate.
+Goal: Qualify Diary v1.0.0 on the owner's Apple Silicon Mac with separate shell launch, automated workflow/recovery/artifact evidence and the full release gate; document exempt by-human observations.
 Plan: [release overview/checklist](milestone-32-personal-release-overview.md), [qualification work plan](milestone-32-personal-release-architecture.md).
 
-The release plan consolidates E1–E13 and remaining native/live evidence from the implemented M32 feature work. Planning adds no runtime acceptance; release execution and final qualification remain pending.
+The release plan consolidates required E1–E13 automated/artifact evidence and exempt by-human native/live observations from the implemented M32 feature work. Planning adds no runtime acceptance; release execution and final qualification remain pending.
 
 Implemented GUI task (owner, 2026-11-09): replace Draft candidates with the four-column candidate table; see [overview/checklist](milestone-32-draft-candidate-table-overview.md) and [work plan](milestone-32-draft-candidate-table-architecture.md). The owner subsequently requested implementation matching the Snippet tab table; implementation and the full gate pass; narrow-Explorer visual evidence is pending.
 

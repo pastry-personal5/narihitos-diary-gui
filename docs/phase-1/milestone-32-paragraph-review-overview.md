@@ -6,6 +6,14 @@ Review and correct the owner's paragraph toolbar request. Use an isolated transi
 
 See the [work plan](milestone-32-paragraph-review-architecture.md) for transport, lifecycle and editor details.
 
+## Manual evidence policy (owner update, 2026-11-09)
+
+Remaining native/visual/live observations are documented in the [by-human test guide](milestone-32-by-human-tests.md)
+and exempt from M32/Phase 1 exit gates. Earlier statements below that keep this
+feature open solely for human evidence are superseded. Preserve the historical
+results; unrun manual checks are unverified, not passed. Automated requirements
+and disposition of observed defects still apply.
+
 ## Completion checklist
 
 - [x] Paragraph Review works without a generated candidate and respects connection, profile, composition and review availability.

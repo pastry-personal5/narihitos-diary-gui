@@ -100,6 +100,16 @@ export class AgentProgressMessages {
       (!generation || ["queued", "running"].includes(generation.job.state)) &&
       (!generationKnown ||
         ["queued", "running"].includes(generationKnown.state));
+    const turn = chat.state.chat?.turn;
+    const chatKnown = turn
+      ? this.activity.state.jobs.get(turn.job_id)?.job
+      : undefined;
+    // The transcript read can lag behind the authoritative job acknowledgement.
+    // A fresh submission may still refer to the previous turn, so keep it visible.
+    const chatFinished =
+      turn?.state === "running" &&
+      chatKnown &&
+      !["queued", "running"].includes(chatKnown.state);
     return [
       {
         profile: generation?.profile ?? generator.state.profile,
@@ -117,8 +127,8 @@ export class AgentProgressMessages {
         label: "AI Chat",
         submitting:
           chat.state.submitting ||
-          !!chat.state.pending ||
-          chat.state.chat?.turn?.state === "running",
+          (!chatFinished &&
+            (!!chat.state.pending || turn?.state === "running")),
         stage: chat.state.submitting
           ? "request: submitting message"
           : (PHASE[chat.state.chat?.turn?.stage ?? ""] ??
