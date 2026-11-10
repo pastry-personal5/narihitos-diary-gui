@@ -113,11 +113,19 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
             with (base / 'client.log').open('w+') as client_log:
                 client = subprocess.Popen([str(app), '--connect', str(discovery)], stdout=client_log, stderr=client_log, text=True)
                 processes.append(client)
+                def native_failure(message):
+                    client_log.seek(0)
+                    current_log = client_log.read()
+                    print('Native editor diagnostics: ' + ', '.join(line for line in current_log.splitlines() if line.startswith('SMOKE editor_probe ')))
+                    print('Native client log tail: ' + ' | '.join(l[:300] for l in current_log.splitlines() if 'editor_probe' not in l)[-3000:])
+                    raise AssertionError(message)
                 for _ in range(180):
                     client_log.seek(0)
                     if 'SMOKE main_running_job_read' in client_log.read(): break
-                    if client.poll() is not None: raise AssertionError('native client exited before editor readiness')
+                    if client.poll() is not None: native_failure('native client exited before editor readiness')
                     time.sleep(0.05)
+                else:
+                    native_failure('native editor readiness timeout before keyboard injection')
                 keyboard_script = f'tell application "System Events"\nset targetProcess to first application process whose unix id is {client.pid}\nset frontmost of targetProcess to true\ndelay 0.3\ntell targetProcess to keystroke "synthetic keyboard sentinel"\nreturn {{frontmost of targetProcess, count of windows of targetProcess}}\nend tell'
                 keyboard = subprocess.run(['osascript', '-e', keyboard_script], check=True, capture_output=True, text=True, timeout=5)
                 print('Native target activation/window count: ' + keyboard.stdout.strip())
@@ -128,9 +136,7 @@ with tempfile.TemporaryDirectory(prefix='diary-server-smoke-') as temporary:
                 client_log.seek(0)
                 current_log=client_log.read()
                 if 'SMOKE main_cancelled_job_read' not in current_log:
-                    print('Native editor diagnostics: ' + ', '.join(line for line in current_log.splitlines() if line.startswith('SMOKE editor_probe ')))
-                    print('Native client log tail: ' + ' | '.join(l[:300] for l in current_log.splitlines() if 'editor_probe' not in l)[-3000:])
-                    raise AssertionError('native editor did not observe typed sentinel')
+                    native_failure('native editor did not observe typed sentinel')
                 with (base / 'competitor.log').open('w+') as competitor_log:
                     competitor = subprocess.Popen([str(app), '--connect', str(discovery)], stdout=competitor_log, stderr=competitor_log, text=True)
                     processes.append(competitor)

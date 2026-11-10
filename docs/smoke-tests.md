@@ -4,6 +4,13 @@ Status: Active
 
 Built-binary smoke scripts and the redacted log trace command. Run from the repository root; live scripts spend account usage and are env-gated.
 
+`make smoke` rebuilds the scaffold fixture server and packaged client, then runs
+the native IPC/session and keyboard checks in an isolated workspace. It requires
+a macOS GUI session and System Events accessibility permission. The fixture waits
+for automatic connection, the enabled Create Empty action and an editable
+Authentic buffer before focusing the editor. The harness sends native keys only
+after readiness is observed; readiness failures include editor diagnostics.
+
 ```sh
 python3 scripts/tests/test_run_gui.py # Synthetic launcher exit/failure/signal/TERM-resistant descendant regressions
 python3 scripts/smoke/gui-close.py # Ordinary run-gui.sh native window-close proof; built diary-server, free port 1420, macOS GUI/System Events accessibility required

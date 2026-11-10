@@ -2,6 +2,26 @@
 
 Status: Active
 
+## Native scaffold smoke repair (2026-11-10)
+
+- [x] Wait for automatic UI connection and an editable Authentic editor without relying on the Settings-only Connect button.
+- [x] Fail before keyboard injection when native editor readiness is missing, with fixture diagnostics.
+- [x] Pass delegated readiness regressions, `make smoke` and all seven repository gate lanes; record evidence and limitations.
+
+Delegated evidence: all three embedded-fixture readiness regressions pass,
+including delayed connection, a read-only editor and a readiness timeout.
+`make smoke` passed with loopback/GUI access: the packaged editor observed 27
+trusted native keystrokes and matched the synthetic sentinel; all required
+IPC/session markers were present. All seven `scripts/gate.sh` lanes, all 13 Python
+harness tests and `git diff --check` passed. Initial sandbox loopback/process
+denials were resolved by rerunning with authorized access. These are debug
+scaffold fixtures, not ordinary release artifacts or live-provider/IME qualification.
+
+Successful fixture SHA-256:
+
+- Server: `46037a53ad9a029d854cdf82229d07aa6d2bc3bd5090899e110400c86b617c7c`
+- Packaged client: `2dbe41842ee5179e62b37c88c4d09cff0d4d19a9256b5fc8fb6d901db5bb6205`
+
 ## Current UX documentation review (2026-11-10)
 
 Review the maintained UX contracts against current decisions, Settings, editor,

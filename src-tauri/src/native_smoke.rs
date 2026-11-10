@@ -30,7 +30,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 main.is_visible().unwrap_or(false),
                 main.is_focused().unwrap_or(false)
             );
-            let _=main.eval_with_callback("JSON.stringify({focused:document.hasFocus(),activeIsEditor:document.activeElement?.classList.contains('cm-content'),editable:document.querySelector('.cm-content')?.getAttribute('contenteditable'),step:window.__smokeStep||'none',status:document.querySelector('.connection [role=status]')?.textContent,error:window.__smokeError||null,notice:[...document.querySelectorAll('.notice')].map(n=>n.textContent).join(' / '),length:document.querySelector('.cm-content')?.textContent.length,keys:window.__smokeKeys||0,trusted:window.__smokeTrusted||0,matched:document.querySelector('.cm-content')?.textContent.includes('synthetic keyboard sentinel')})",|result|eprintln!("SMOKE editor_probe {result}"));
+            let _=main.eval_with_callback("JSON.stringify({focused:document.hasFocus(),activeIsEditor:document.activeElement?.classList.contains('cm-content'),editable:document.querySelector('.cm-content')?.getAttribute('contenteditable'),step:window.__smokeStep||'none',createDisabled:document.querySelector('button[aria-label=\"Create Empty\"]')?.disabled,error:window.__smokeError||null,notice:[...document.querySelectorAll('.notice')].map(n=>n.textContent).join(' / '),length:document.querySelector('.cm-content')?.textContent.length,keys:window.__smokeKeys||0,trusted:window.__smokeTrusted||0,matched:document.querySelector('.cm-content')?.textContent.includes('synthetic keyboard sentinel')})",|result|eprintln!("SMOKE editor_probe {result}"));
         }
         let _ = main.close();
     });
@@ -44,11 +44,18 @@ pub fn main_loaded(webview: &tauri::Webview) -> Result<(), Box<dyn std::error::E
       try {
         const invoke=window.__TAURI_INTERNALS__.invoke;
         await invoke('get_app_metadata');
-        // Connect through the UI, as a user does: the Authentic editor stays read-only until the UI is connected.
-        for(let attempt=0;attempt<100&&![...document.querySelectorAll('button')].some(b=>b.textContent==='Connect');attempt++)await new Promise(resolve=>setTimeout(resolve,50));
-        [...document.querySelectorAll('button')].find(b=>b.textContent==='Connect').click();
-        for(let attempt=0;attempt<300&&document.querySelector('.connection [role=status]')?.textContent!=='Connected';attempt++)await new Promise(resolve=>setTimeout(resolve,50));
-        if(document.querySelector('.connection [role=status]')?.textContent!=='Connected')throw Error('ui connect failed: '+document.querySelector('.connection [role=status]')?.textContent);
+        // Automatic connection opens the date before Create Empty becomes available.
+        // Scratch buffers alone can be editable even before the UI has connected.
+        window.__smokeStep='ui-ready';
+        let editor;
+        for(let attempt=0;attempt<100;attempt++){
+          const create=document.querySelector('button[aria-label="Create Empty"]');
+          editor=document.querySelector('.editor-surface .cm-content');
+          if(create&&!create.disabled&&editor?.getAttribute('contenteditable')==='true')break;
+          editor=null;
+          await new Promise(resolve=>setTimeout(resolve,50));
+        }
+        if(!editor)throw Error('automatic UI connection/editor readiness timeout');
         if(window.location.origin!=='tauri://localhost')throw Error('unexpected packaged origin');
         await new Promise((resolve,reject)=>{
           const timer=setTimeout(()=>reject(Error('missing CSP violation')),1500);
@@ -74,16 +81,8 @@ pub fn main_loaded(webview: &tauri::Webview) -> Result<(), Box<dyn std::error::E
           }).catch(failed);
         },false);
         window.__smokeStep='sub';await invoke('subscribe_events',{request:{action:'start',channel:'__CHANNEL__:'+id}});window.__smokeStep='subbed';
-        let editor;
-        for(let attempt=0;attempt<30;attempt++){
-          editor=document.querySelector('.cm-content');if(editor)break;
-          await new Promise(resolve=>setTimeout(resolve,50));
-        }
-        if(!editor)throw Error('missing native editor');
         window.__smokeKeys=0;window.__smokeTrusted=0;
         document.addEventListener('keydown',event=>{window.__smokeKeys++;if(event.isTrusted)window.__smokeTrusted++;});
-        // The editor is read-only until the Authentic session opens; focus only works once it is editable.
-        for(let attempt=0;attempt<100&&editor.getAttribute('contenteditable')!=='true';attempt++)await new Promise(resolve=>setTimeout(resolve,50));
         editor.focus();
         if(document.activeElement!==editor)throw Error('native focus failed');
         await invoke('get_job',{id:'scaffold-fake-job'});
