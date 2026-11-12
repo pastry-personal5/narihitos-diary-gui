@@ -23,8 +23,9 @@ impl From<Job> for JobDto {
     }
 }
 pub(crate) fn job_value(s: &ServerState, session: &str, job: Job) -> Value {
-    let progress =
-        generations::progress(s, session, &job).or_else(|| chats::progress(s, session, &job));
+    let progress = generations::progress(s, session, &job)
+        .or_else(|| chats::progress(s, session, &job))
+        .or_else(|| illustrated::progress(s, session, &job.id));
     let mut value = serde_json::to_value(JobDto::from(job)).expect("fixed DTO");
     if let Some(Value::Object(p)) = progress {
         value["progress"] = Value::Object(p.clone());
@@ -105,6 +106,33 @@ pub(crate) async fn cancel_job(
         return exports::cancel(&s, id, &job).await;
     }
     let mut c = s.coordinator.lock().expect("coordinator poisoned");
+    // Validate lease/job ownership before signalling a worker.
+    let current = match c.get(id, s.now(), &job) {
+        Ok(j) => j,
+        Err(e) => return app_error(e),
+    };
+    let mut illustrated_changed = false;
+    let illustrated_job = {
+        let jobs = s.illustrated_jobs.lock().unwrap();
+        jobs.get(&job).is_some_and(|j| {
+            if j.session != id {
+                return false;
+            }
+            if !j.terminal && !current.state.is_terminal() {
+                illustrated_changed = j.run.request_cancel();
+            }
+            true
+        })
+    };
+    if illustrated_job {
+        if illustrated_changed && let Ok(j) = c.touch(id, s.now(), &job) {
+            imports::publish(&s, &mut c, id, &j);
+        }
+        return match c.get(id, s.now(), &job) {
+            Ok(job) => Json(job_value(&s, id, job)).into_response(),
+            Err(e) => app_error(e),
+        };
+    }
     let was_terminal = c
         .get(id, s.now(), &job)
         .is_ok_and(|j| j.state.is_terminal());

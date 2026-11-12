@@ -277,9 +277,14 @@ impl Protocol for Claude {
         _: &RunDir,
         prompt: &AgentExecutionSettings,
         chat: bool,
+        schema: &str,
     ) -> Result<Invocation, AgentError> {
+        let mut argv = Self::argv(&prompt.model, &prompt.reasoning_effort, chat);
+        if let Some(i) = argv.iter().position(|v| v == "--json-schema") {
+            argv[i + 1] = schema.into();
+        }
         Ok(Invocation {
-            argv: Self::argv(&prompt.model, &prompt.reasoning_effort, chat),
+            argv,
             result_file: None,
         })
     }

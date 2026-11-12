@@ -135,7 +135,11 @@ fn no_fallback_to_another_agent_type() {
 #[test]
 fn capabilities_follow_assets_and_adapter() {
     let a = EmbeddedPromptCatalog::embedded();
-    for action in [PromptAction::Chat, PromptAction::GenerateCandidate] {
+    for action in [
+        PromptAction::Chat,
+        PromptAction::GenerateCandidate,
+        PromptAction::Illustrated,
+    ] {
         for k in [
             AgentKind::Codex,
             AgentKind::Claude,
@@ -176,6 +180,7 @@ fn embedded_table_equals_disk_and_registers_every_file() {
     let mut table: Vec<_> = EMBEDDED
         .iter()
         .chain(CLIENT_TASKS.iter())
+        .chain(ILLUSTRATED_ASSETS.iter())
         .map(|(k, n, t)| (k.asset_dir().to_owned(), n.to_string(), t.to_string()))
         .collect();
     disk.sort();
@@ -299,5 +304,42 @@ fn chat_asset_matches_packet() {
         for gone in ["reviewed_memory", "reflection_ranges", "prior_draft"] {
             assert!(!b.contains(gone));
         }
+    }
+}
+
+#[test]
+fn illustrated_assets_render_captured_context_and_locale_for_all_providers() {
+    let c = EmbeddedPromptCatalog::embedded();
+    for kind in [
+        AgentKind::Codex,
+        AgentKind::Claude,
+        AgentKind::Qwen,
+        AgentKind::AppleFoundationModels,
+    ] {
+        let request = AgentRequest::new(
+            ProfileHandle {
+                alias: "test".into(),
+                kind,
+            },
+            Locale::parse("ko-KR").unwrap(),
+            Mode::Illustrated(diary_application::illustrated::Packet {
+                body: "PRIVATE {{data}}".into(),
+                date: diary_domain::authentic::DiaryDate::parse("2026-11-13").unwrap(),
+                settings: diary_application::illustrated::PromptSettings {
+                    trigger: "tag".into(),
+                    directives: vec!["photo".into()],
+                },
+                max_photos: 4,
+            }),
+        );
+        let p = c
+            .resolve(PromptSelection::for_request(&request))
+            .unwrap()
+            .prepare(request)
+            .unwrap();
+        assert!(p.task().contains("ko-KR"));
+        assert!(p.task().contains("PRIVATE {{data}}"));
+        assert!(p.task().contains("prompt_directives"));
+        assert!(p.task().contains("tag"));
     }
 }

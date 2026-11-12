@@ -2,7 +2,7 @@
 
 Status: Done
 
-Add an image-engine port with a registry of configured engines, and prove it standalone with a fake engine and the owner's local Krea 2 engine. No diary feature and no GUI yet. First of three stages toward the Illustrated diary ([P1-M34](../../../phase-1/milestone-34-illustrated-diary-overview.md), [P1-M35](../../../phase-1/milestone-35-illustrated-diary-gui-overview.md)).
+Add an image-engine port with a registry of configured engines, and prove it standalone with a fake engine and the owner's local Krea 2 engine. No diary feature and no GUI yet. First of three stages toward the Illustrated diary ([P1-M34](../p1-m34/milestone-34-illustrated-diary-overview.md), [P1-M35](../../../phase-1/milestone-35-illustrated-diary-gui-overview.md)).
 
 ## Entry conditions
 

@@ -353,6 +353,21 @@ fn decode(bytes: &[u8]) -> bool {
         ok
     }
 }
+struct ConfiguredEngine {
+    engine: CommandEngine,
+    settings: diary_application::illustrated::PromptSettings,
+}
+impl ImageEngine for ConfiguredEngine {
+    fn check(&self) -> Availability {
+        self.engine.check()
+    }
+    fn render(&self, r: &RenderRequest) -> Result<Rendered, EngineError> {
+        self.engine.render(r)
+    }
+    fn prompt_settings(&self) -> diary_application::illustrated::PromptSettings {
+        self.settings.clone()
+    }
+}
 pub fn configured(c: &crate::config::Config) -> Vec<(String, String, Arc<dyn ImageEngine>)> {
     c.image_engines
         .iter()
@@ -360,10 +375,16 @@ pub fn configured(c: &crate::config::Config) -> Vec<(String, String, Arc<dyn Ima
             (
                 id.clone(),
                 e.label.clone(),
-                Arc::new(CommandEngine {
-                    program: e.program.clone(),
-                    root: image_root(c),
-                    timeout: Duration::from_secs(e.timeout_seconds),
+                Arc::new(ConfiguredEngine {
+                    settings: diary_application::illustrated::PromptSettings {
+                        trigger: e.trigger.clone(),
+                        directives: e.prompt_directives.clone(),
+                    },
+                    engine: CommandEngine {
+                        program: e.program.clone(),
+                        root: image_root(c),
+                        timeout: Duration::from_secs(e.timeout_seconds),
+                    },
                 }) as Arc<dyn ImageEngine>,
             )
         })

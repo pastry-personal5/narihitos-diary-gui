@@ -64,6 +64,9 @@ pub struct EngineView {
     pub status: Availability,
 }
 pub trait ImageEngine: Send + Sync {
+    fn prompt_settings(&self) -> crate::illustrated::PromptSettings {
+        Default::default()
+    }
     fn check(&self) -> Availability;
     fn render(&self, request: &RenderRequest) -> Result<Rendered, EngineError>;
 }
@@ -131,6 +134,16 @@ impl Registry {
             })
             .collect();
         Ok(())
+    }
+    pub fn prompt_settings(
+        &self,
+        id: &str,
+    ) -> Result<crate::illustrated::PromptSettings, EngineError> {
+        let entries = self.entries.try_lock().map_err(|_| EngineError::Busy)?;
+        entries
+            .get(id)
+            .map(|e| e.engine.prompt_settings())
+            .ok_or(EngineError::Unavailable)
     }
     pub fn list(&self) -> Vec<EngineView> {
         self.views.lock().unwrap().clone()

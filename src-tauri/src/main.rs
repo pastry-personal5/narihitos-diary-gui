@@ -474,6 +474,55 @@ async fn resolve_source_time(
         .await
 }
 #[tauri::command]
+async fn list_illustrated(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+) -> Result<bridge::IllustratedList, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.list_illustrated().await
+}
+#[tauri::command]
+async fn read_illustrated(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    date: String,
+) -> Result<bridge::IllustratedEntry, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.read_illustrated(date).await
+}
+#[tauri::command]
+async fn create_illustrated(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    date: String,
+    input: bridge::IllustratedInput,
+) -> Result<bridge::TurnAccepted, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.create_illustrated(date, input).await
+}
+#[tauri::command]
+async fn delete_illustrated(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    date: String,
+    version: String,
+    confirmed: bool,
+) -> Result<(), bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.delete_illustrated(date, version, confirmed).await
+}
+#[tauri::command]
+async fn read_illustrated_photo(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    date: String,
+    version: String,
+    n: u8,
+) -> Result<Vec<u8>, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.read_illustrated_photo(date, version, n).await
+}
+#[tauri::command]
 async fn list_authentic(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -727,6 +776,11 @@ fn main() {
             import_date,
             list_sources,
             resolve_source_time,
+            list_illustrated,
+            read_illustrated,
+            create_illustrated,
+            delete_illustrated,
+            read_illustrated_photo,
             list_authentic,
             load_authentic,
             save_authentic,

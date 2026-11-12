@@ -50,12 +50,14 @@ pub struct PromptProvenance {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptAction {
+    Illustrated,
     Chat,
     GenerateCandidate,
 }
 impl PromptAction {
     pub fn of(mode: &Mode) -> Self {
         match mode {
+            Mode::Illustrated(_) => Self::Illustrated,
             Mode::Chat(_) => Self::Chat,
             Mode::Candidate { .. } => Self::GenerateCandidate,
         }

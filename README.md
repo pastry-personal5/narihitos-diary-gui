@@ -40,3 +40,5 @@ Apache-2.0. See [LICENSE](LICENSE) and the [third-party notices](third-party-not
 ## Contributing
 
 See [AGENTS.md](AGENTS.md) and the [contribution guide](docs/contribution-guide.md).
+
+The server can create an **Illustrated diary** from a saved Authentic entry: AI Agent theme analysis and rewritten text plus one photo per resulting theme group, combining related groups to the configured cap (default four). Complete versions are stored as Markdown and a photo directory, separately from Authentic. Replacement is silent after successful generation; deletion requires confirmation. The GUI is planned in M35; server routes and the isolated [smoke procedure](docs/smoke-tests.md) are available first.

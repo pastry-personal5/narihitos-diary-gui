@@ -2,12 +2,14 @@
 
 Status: Active
 
+- [M34 creation evidence](archive/milestones/p1-m34/milestone-34-illustrated-diary-evidence.md): synthetic server proof, focused regression coverage and isolated xpp8 + Krea 2 creation.
+
 - [Atomic Editor research](research/atomic-editor.md): P1-M34/M35 source review of inline Markdown, local photos, immutable reading mode and proposed integration.
 
 - [Version v1.0.0 release note](release-notes-v1.0.0.md): user-facing summary,
   availability and qualification limits for the first personal release.
 
-- P1-M33 to P1-M35 Illustrated diary (engines done; format/GUI planned): [image engines](archive/milestones/p1-m33/milestone-33-image-engines-overview.md) ([work plan](archive/milestones/p1-m33/milestone-33-image-engines-architecture.md)), [format and creation](phase-1/milestone-34-illustrated-diary-overview.md) ([work plan](phase-1/milestone-34-illustrated-diary-architecture.md)), [GUI](phase-1/milestone-35-illustrated-diary-gui-overview.md) ([work plan](phase-1/milestone-35-illustrated-diary-gui-architecture.md)).
+- P1-M33 to P1-M35 Illustrated diary (engines/format done; GUI planned): [image engines](archive/milestones/p1-m33/milestone-33-image-engines-overview.md) ([work plan](archive/milestones/p1-m33/milestone-33-image-engines-architecture.md)), [format and creation](archive/milestones/p1-m34/milestone-34-illustrated-diary-overview.md) ([work plan](archive/milestones/p1-m34/milestone-34-illustrated-diary-architecture.md)), [GUI](phase-1/milestone-35-illustrated-diary-gui-overview.md) ([work plan](phase-1/milestone-35-illustrated-diary-gui-architecture.md)).
 
 - [Paragraph review module boundaries](architecture/paragraph-review.md): application policy, AI/editor ports, composition, conversation ownership and future extension guidance.
 

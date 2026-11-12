@@ -374,6 +374,27 @@ pub(crate) fn revision_of(bytes: &[u8], header: &AuthenticHeader) -> AuthenticRe
 }
 
 impl AuthenticStore for Store {
+    fn capture_saved(&self, date: &DiaryDate) -> Result<Loaded, StoreError> {
+        let _guard = self
+            .write_lock
+            .try_lock()
+            .map_err(|_| StoreError::Reserved)?;
+        let reserved = self
+            .db
+            .with(|c| {
+                c.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM operation_resources WHERE resource_key=?1)",
+                    [diary_application::authentic::resource_key(date)],
+                    |r| r.get::<_, bool>(0),
+                )
+                .map_err(|_| crate::sqlite::DbError::Storage)
+            })
+            .map_err(|_| StoreError::Storage)?;
+        if reserved {
+            return Err(StoreError::Reserved);
+        }
+        self.load(date)
+    }
     fn load(&self, date: &DiaryDate) -> Result<Loaded, StoreError> {
         load_from(&self.path_of(date), date)
     }

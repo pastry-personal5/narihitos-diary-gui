@@ -109,6 +109,8 @@ pub(crate) async fn authenticate(
                 .is_some_and(|id| !id.contains('/'))
             {
                 !imports::valid_read_query(query)
+            } else if request.uri().path().starts_with("/api/v1/illustrated/") {
+                !illustrated::valid_photo_query(request.uri().path(), query)
             } else if request.uri().path() == "/api/v1/sources" {
                 !imports::valid_query(query)
             } else if request.uri().path() == "/api/v1/operations" {

@@ -194,3 +194,9 @@ retains the required boundary, including when earlier appended paragraphs are
 rejected. Initial presentation refuses changed or composing Authentic buffers.
 Watcher reads recheck after newer decisions; obsolete transient decision replies
 end the review and reload saved state instead of retaining stale buttons.
+
+## Illustrated creation agent
+
+The `illustrated` prompt action has provider-specific bundled assets and a structured packet containing exactly one saved Authentic body, date, selected engine trigger/directives and photo cap. The response lists theme labels plus grouped theme indices, rewritten text, alt text and scene prompts. Strict validation requires complete nonduplicate theme coverage, bounded counts/text/prompts and no agent-authored image links or HTML. The application prefixes the configured trigger, assembles paths/header and renders sequentially. The parent job reports only text/photo steps and uses the same cancellation token for agent and image children. Source text and resulting prompts are never progress payloads. See the [creation contract](../archive/milestones/p1-m34/milestone-34-illustrated-diary-architecture.md).
+
+Before starting any render, creation validates the complete assembled Markdown, including photo slots and final prompt metadata. A malformed block that consumes a photo slot or a body exceeding its limit fails without calling the image engine. Closing the session signals cancellation before waiting for acknowledgement; lease expiry retains active date reservations until workers finish, including a publication already past its commit boundary. Explicit cancellation advances the job sequence and publishes a change so subscribers can fetch the stopping state.

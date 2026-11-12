@@ -6,8 +6,23 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AiProgress {
+    Illustrated(IllustratedProgress),
     Generation(generation::Progress),
     Chat(ChatProgress),
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IllustratedProgress {
+    pub job_id: String,
+    pub instance_id: String,
+    pub session_id: String,
+    pub kind: String,
+    pub origin_date: String,
+    pub phase: String,
+    pub photo_index: usize,
+    pub photo_count: usize,
+    pub error_code: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -48,6 +63,30 @@ impl TryFrom<WireJob> for Job {
             return Err("invalid job identity");
         }
         let valid = match &w.progress {
+            Some(AiProgress::Illustrated(p)) => {
+                p.job_id == w.id
+                    && valid_id(&p.instance_id)
+                    && valid_id(&p.session_id)
+                    && p.kind == "illustrated"
+                    && super::validate::date_shape(&p.origin_date)
+                    && p.photo_index <= p.photo_count
+                    && p.photo_count <= 99
+                    && ["text", "photo", "stopping", "finished"].contains(&p.phase.as_str())
+                    && p.error_code.as_deref().is_none_or(|e| {
+                        [
+                            "cancelled",
+                            "agent_failed",
+                            "render_failed",
+                            "no_authentic",
+                            "invalid_illustrated",
+                            "unavailable",
+                            "profile_unavailable",
+                            "engine_unavailable",
+                            "source_busy",
+                        ]
+                        .contains(&e)
+                    })
+            }
             None => true,
             Some(AiProgress::Chat(p)) => {
                 p.kind == "chat"

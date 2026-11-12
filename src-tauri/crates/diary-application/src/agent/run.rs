@@ -46,6 +46,7 @@ pub struct Candidate {
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AgentOutput {
+    Illustrated(crate::illustrated::Plan),
     Candidate(Candidate),
     Reply(String),
 }

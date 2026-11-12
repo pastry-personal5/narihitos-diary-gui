@@ -2,7 +2,7 @@
 
 Status: Planned
 
-Put the Illustrated diary in the app: create it from a day that has an Authentic diary, watch progress, read it with its photos, replace or delete it, and see engine status in Settings. Requires [P1-M34](milestone-34-illustrated-diary-overview.md).
+Put the Illustrated diary in the app: create it from a day that has an Authentic diary, watch progress, read it with its photos, replace or delete it, and see engine status in Settings. Requires [P1-M34](../archive/milestones/p1-m34/milestone-34-illustrated-diary-overview.md).
 
 ## Entry conditions
 
@@ -11,7 +11,7 @@ P1-M33 and P1-M34 are Done; the kind's name (P1-M34 Q1) is fixed.
 ## Scope
 
 - Stage A: application controller and bridge adapters for the P1-M34 routes; Explorer shows which days have an Illustrated diary.
-- Stage B: **Create Illustrated Diary** action (toolbar and palette), enabled only when the selected day has a saved Authentic diary; progress and cancel in AI Activities; replace confirmation.
+- Stage B: **Create Illustrated Diary** action (toolbar and palette), enabled only when the selected day has a saved Authentic diary; progress and cancel in AI Activities; silent replacement.
 - Stage C: read-only viewer tab: rendered Markdown with photos; delete action with confirmation.
 - Stage D: Settings card listing image engines with availability and a Check button; UX docs, user guide, native smoke, full gate.
 
@@ -43,7 +43,7 @@ Check only when evidence exists.
 
 - [ ] C03 - The action is disabled with a visible reason when the day has no saved Authentic diary, no engine is available or no agent profile is usable. Evidence: action-decision tests.
 - [ ] C04 - A running creation appears in AI Activities with step progress (text, photo k of N) and Cancel; editing and autosave of the Authentic diary keep working meanwhile. Evidence: vitest plus synthetic smoke.
-- [ ] C05 - Creating over an existing version asks for confirmation first; declining changes nothing. Evidence: vitest.
+- [ ] C05 - Creating over an existing version silently replaces it only after successful publication; failed creation preserves the previous version. Evidence: vitest.
 - [ ] C06 - Failure and cancel show a Global Message and leave the previous version on screen. Evidence: vitest.
 
 ### Stage C - view and delete

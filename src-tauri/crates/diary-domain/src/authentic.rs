@@ -181,7 +181,7 @@ pub fn valid_uuid(s: &str) -> bool {
         })
 }
 
-fn valid_instant(s: &str) -> bool {
+pub(crate) fn valid_instant(s: &str) -> bool {
     let b = s.as_bytes();
     b.len() == 20
         && s.get(..10).and_then(DiaryDate::parse).is_some()

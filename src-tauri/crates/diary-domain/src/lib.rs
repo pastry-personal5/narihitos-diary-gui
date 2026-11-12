@@ -34,3 +34,5 @@ mod tests {
         assert!(!client.accepts(client, &["storage"], &["status"]));
     }
 }
+
+pub mod illustrated;

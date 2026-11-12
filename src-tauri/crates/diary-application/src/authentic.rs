@@ -113,6 +113,10 @@ pub enum StoreError {
 }
 
 pub trait AuthenticStore: Send + Sync {
+    /// Capture a saved revision only when no save is pending.
+    fn capture_saved(&self, date: &DiaryDate) -> Result<Loaded, StoreError> {
+        self.load(date)
+    }
     fn load(&self, date: &DiaryDate) -> Result<Loaded, StoreError>;
     /// Dates strictly after `after`, ascending, at most `limit` (≤ `PAGE_LIMIT`).
     fn list(&self, after: Option<DiaryDate>, limit: usize) -> Result<Page, StoreError>;

@@ -6,16 +6,16 @@ This document defines domain identity, authoritative storage and durable save/re
 
 ## Values and ownership
 
-| Value                                 | Invariant                                                                                                                                                 |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AssetType` / `DiaryKind`             | Explicit `diary`; `source_view`, `authentic`, `candidate`. Only Authentic is managed durable content. Reserve separate asset namespaces for future types. |
-| `DiaryDate`                           | Valid Gregorian civil date, ISO text, no implicit time/UTC conversion                                                                                     |
-| `Instant`, `ImportZone`               | UTC instant and captured IANA zone with timezone-database version; never interchange date and instant                                                     |
-| `AuthenticId`                         | Random UUID in Markdown; one date/path per workspace, unique catalog ID                                                                                   |
-| `AuthenticRevision`                   | Positive sequence plus SHA-256 of complete file; creation starts at 1                                                                                     |
-| `SourceIdentity`, `SourceObservation` | Path-based key plus bounded fresh-read token; producer ID is metadata                                                                                     |
-| `Candidate`, `Review`                 | Session-owned, fixed source/baseline snapshots, transient; cannot be exported or treated as saved content                                                 |
-| `OperationId`, `JobId`                | Durable action identity versus progress identity; retries reuse operation ID                                                                              |
+| Value                                 | Invariant                                                                                                                                                                                                                                |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AssetType` / `DiaryKind`             | Explicit `diary`; `source_view`, `authentic`, `candidate`. Authentic and Illustrated diary are managed durable content; Illustrated is a separate immutable derived version per day. Reserve separate asset namespaces for future types. |
+| `DiaryDate`                           | Valid Gregorian civil date, ISO text, no implicit time/UTC conversion                                                                                                                                                                    |
+| `Instant`, `ImportZone`               | UTC instant and captured IANA zone with timezone-database version; never interchange date and instant                                                                                                                                    |
+| `AuthenticId`                         | Random UUID in Markdown; one date/path per workspace, unique catalog ID                                                                                                                                                                  |
+| `AuthenticRevision`                   | Positive sequence plus SHA-256 of complete file; creation starts at 1                                                                                                                                                                    |
+| `SourceIdentity`, `SourceObservation` | Path-based key plus bounded fresh-read token; producer ID is metadata                                                                                                                                                                    |
+| `Candidate`, `Review`                 | Session-owned, fixed source/baseline snapshots, transient; cannot be exported or treated as saved content                                                                                                                                |
+| `OperationId`, `JobId`                | Durable action identity versus progress identity; retries reuse operation ID                                                                                                                                                             |
 
 Pure domain rules enforce date validity, unique Authentic date, chronological packet order and review decisions. Application use cases authorize session/resource access and coordinate ports. Infrastructure reports observed failures rather than deciding product conflict policy.
 
@@ -119,3 +119,7 @@ OS advisory locks serialize Diary instances, not uncooperative editors or cloud 
 ## Required implementation evidence
 
 Temporary-workspace tests must cover single-instance exclusion, stale/ABA revisions, ordered autosave acknowledgements, first-create collision, external edits, failed sync/disk full, corrupt/missing DB/stage, catalog rebuild preserving receipts, interrupted migrations and every durable boundary above. Real macOS tests must establish atomic publication/directory durability and coordinated-access behavior on the supported filesystem. Until those pass, durable-save/recovery capability is unverified; UI labels must not certify it merely from this design.
+
+## Illustrated diary persistence
+
+The [creation work plan](../archive/milestones/p1-m34/milestone-34-illustrated-diary-architecture.md) specifies the schema and journal contract. One canonical Markdown file lives beside a same-date directory of numbered PNGs under `assets/diary/illustrated/YYYY/MM/`. Source identity/revision/hash, engine/profile, theme count, exact final prompts, captured trigger/directives and actual seeds are private file metadata. Authentic catalogs, autosave and exports continue to address only the Authentic tree. A separate `.diary/illustrated-pending` journal is recovered under the workspace OS lock before the store is exposed. No SQLite schema or dependency change is introduced.

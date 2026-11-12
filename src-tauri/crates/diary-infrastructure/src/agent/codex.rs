@@ -244,6 +244,7 @@ impl Protocol for Codex {
         dir: &RunDir,
         prompt: &AgentExecutionSettings,
         chat: bool,
+        schema: &str,
     ) -> Result<Invocation, AgentError> {
         let last = dir.path().join("last-message.txt");
         let schema = if chat {
@@ -256,7 +257,7 @@ impl Protocol for Codex {
                 .mode(0o600)
                 .open(&p)
                 .map_err(|_| AgentError::from(AgentErrorCode::Failed))?;
-            std::io::Write::write_all(&mut f, GENERATION_SCHEMA.as_bytes())
+            std::io::Write::write_all(&mut f, schema.as_bytes())
                 .map_err(|_| AgentError::from(AgentErrorCode::Failed))?;
             Some(p)
         };

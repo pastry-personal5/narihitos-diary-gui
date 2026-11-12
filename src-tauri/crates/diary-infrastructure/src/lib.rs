@@ -19,3 +19,5 @@ pub mod source;
 pub mod zone;
 
 pub mod image;
+
+pub mod illustrated;

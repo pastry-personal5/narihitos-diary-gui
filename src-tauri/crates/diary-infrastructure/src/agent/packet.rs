@@ -7,6 +7,9 @@ use serde_json::{Value, json};
 
 pub fn encode_packet(mode: &Mode) -> Result<String, AgentError> {
     let v = match mode {
+        Mode::Illustrated(p) => {
+            json!({"schema_version":1,"body":p.body,"date":p.date.to_string(),"trigger":p.settings.trigger,"prompt_directives":p.settings.directives,"max_photos":p.max_photos})
+        }
         Mode::Chat(c) => json!({
             "schema_version": SCHEMA_VERSION,
             "document": c.document().map(|d| json!({

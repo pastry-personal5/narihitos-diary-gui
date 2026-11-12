@@ -469,6 +469,10 @@ fn a_quarantined_operation_blocks_only_its_own_date() {
         o.store.save(save(op(1), "2026-11-04", None, "x")),
         Err(StoreError::Reserved)
     );
+    assert_eq!(
+        o.store.capture_saved(&d("2026-11-04")),
+        Err(StoreError::Reserved)
+    );
     assert!(o.store.save(save(op(2), "2026-11-05", None, "x")).is_ok());
 }
 
@@ -748,4 +752,197 @@ fn review_accept_reconciles_at_every_crash_boundary() {
             clean(&o, date);
         }
     }
+}
+
+#[test]
+fn illustrated_creation_freezes_source_and_engine_settings_and_preserves_on_failure() {
+    use diary_application::{
+        agent::*,
+        illustrated::{Creation, Group, Plan, PromptSettings, Store as IllustratedPort},
+        image::*,
+    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    struct Agent;
+    impl PromptResolver for Agent {
+        fn resolve(&self, s: PromptSelection) -> Result<ResolvedPrompt, AgentError> {
+            crate::agent::prompts::EmbeddedPromptCatalog::embedded().resolve(s)
+        }
+    }
+    impl AgentRunner for Agent {
+        fn check(&self, p: &ProfileHandle) -> ProfileCheck {
+            if p.alias == "missing" {
+                return ProfileStatus::Unavailable.into();
+            }
+            ProfileStatus::Ready.into()
+        }
+        fn run_prepared(
+            &self,
+            p: PreparedAgentRun,
+            _: &mut dyn EventSink,
+            _: &CancelToken,
+        ) -> Result<AgentOutput, AgentError> {
+            let Mode::Illustrated(packet) = p.request().mode() else {
+                panic!("wrong mode")
+            };
+            assert_eq!(packet.body, "Had tea and walked.");
+            assert_eq!(packet.max_photos, 4);
+            assert_eq!(packet.settings.directives, vec!["photo"]);
+            let text = match p.request().profile().alias.as_str() {
+                "unclosed" => "```text".into(),
+                "oversize" => "x".repeat(1024 * 1024 - 10),
+                _ => "Had tea.".into(),
+            };
+            Ok(AgentOutput::Illustrated(Plan {
+                themes: vec!["tea".into(), "walk".into()],
+                groups: vec![
+                    Group {
+                        themes: vec![1],
+                        text,
+                        alt: "Tea".into(),
+                        prompt: "tea".into(),
+                    },
+                    Group {
+                        themes: vec![2],
+                        text: "Walked.".into(),
+                        alt: "Walk".into(),
+                        prompt: "walk".into(),
+                    },
+                ],
+            }))
+        }
+    }
+    struct Engine {
+        calls: Mutex<Vec<String>>,
+        fail: AtomicUsize,
+    }
+    impl ImageEngine for Engine {
+        fn prompt_settings(&self) -> PromptSettings {
+            PromptSettings {
+                trigger: "tag".into(),
+                directives: vec!["photo".into()],
+            }
+        }
+        fn check(&self) -> Availability {
+            Availability::Ready
+        }
+        fn render(&self, r: &RenderRequest) -> Result<Rendered, EngineError> {
+            let mut calls = self.calls.lock().unwrap();
+            calls.push(r.prompt.clone());
+            if self.fail.load(Ordering::SeqCst) == calls.len() {
+                return Err(EngineError::Failed);
+            }
+            let dir = tempfile::tempdir().unwrap().keep();
+            let path = dir.join("image.png");
+            fs::write(&path, b"synthetic rendered bytes").unwrap();
+            Ok(Rendered {
+                path,
+                staging: dir,
+                bytes: 24,
+                width: 1,
+                height: 1,
+                seed: r.seed,
+            })
+        }
+    }
+    let e = env();
+    let o = open(&e.root);
+    o.store
+        .save(save(op(1), "2026-11-13", None, "Had tea and walked."))
+        .unwrap();
+    let original = bytes(&e.root, "2026-11-13");
+    let store = crate::illustrated::Store::open(e.root.clone()).unwrap();
+    let registry = Registry::default();
+    let engine = Arc::new(Engine {
+        calls: Mutex::new(vec![]),
+        fail: AtomicUsize::new(0),
+    });
+    registry
+        .replace(vec![("local".into(), "Local".into(), engine.clone())])
+        .unwrap();
+    let run = Run::new();
+    let settings = registry.prompt_settings("local").unwrap();
+    let make = |id: &str| Creation {
+        authentic: &*o.store,
+        store: &store,
+        runner: &Agent,
+        images: &registry,
+        profile: ProfileHandle {
+            alias: "synthetic".into(),
+            kind: AgentKind::Codex,
+        },
+        locale: Locale::parse("en-US").unwrap(),
+        engine: "local".into(),
+        settings: settings.clone(),
+        max_photos: 4,
+        date: d("2026-11-13"),
+        id: id.into(),
+        created_at: "2026-11-13T00:00:00Z".into(),
+        cancel: run.token(),
+    };
+    let mut absent = make(op(5).as_str());
+    absent.date = d("2026-11-14");
+    assert_eq!(
+        absent.execute(&mut || 1, &mut |_, _| {}),
+        Err(diary_application::illustrated::Error::NotFound)
+    );
+    let mut missing = make(op(6).as_str());
+    missing.engine = "missing".into();
+    assert_eq!(
+        missing.execute(&mut || 1, &mut |_, _| {}),
+        Err(diary_application::illustrated::Error::EngineUnavailable)
+    );
+    let mut profile = make(op(7).as_str());
+    profile.profile.alias = "missing".into();
+    assert_eq!(
+        profile.execute(&mut || 1, &mut |_, _| {}),
+        Err(diary_application::illustrated::Error::ProfileUnavailable)
+    );
+    {
+        let _guard = o.store.write_lock.lock().unwrap();
+        assert_eq!(
+            make(op(8).as_str()).execute(&mut || 1, &mut |_, _| {}),
+            Err(diary_application::illustrated::Error::SourceBusy)
+        );
+    }
+    for alias in ["unclosed", "oversize"] {
+        let mut invalid = make(op(9).as_str());
+        invalid.profile.alias = alias.into();
+        assert_eq!(
+            invalid.execute(
+                &mut || panic!("invalid plan must not render"),
+                &mut |_, _| {}
+            ),
+            Err(diary_application::illustrated::Error::Invalid)
+        );
+        assert!(engine.calls.lock().unwrap().is_empty());
+        assert!(store.read(d("2026-11-13")).unwrap().is_none());
+    }
+    make(op(2).as_str())
+        .execute(&mut || 7, &mut |_, _| {})
+        .unwrap();
+    let entry = store.read(d("2026-11-13")).unwrap().unwrap();
+    assert_eq!(
+        entry
+            .photos
+            .iter()
+            .map(|p| p.prompt.as_str())
+            .collect::<Vec<_>>(),
+        vec!["tag tea", "tag walk"]
+    );
+    assert!(entry.photos.iter().all(|p| p.seed == 7));
+    assert_eq!(entry.source_sha256, sha_hex(&original));
+    assert_eq!(o.store.list(None, 200).unwrap().rows.len(), 1);
+    engine.fail.store(4, Ordering::SeqCst);
+    assert_eq!(
+        make(op(3).as_str()).execute(&mut || 8, &mut |_, _| {}),
+        Err(diary_application::illustrated::Error::Render)
+    );
+    assert_eq!(store.read(entry.date).unwrap().unwrap().id, entry.id);
+    assert_eq!(bytes(&e.root, "2026-11-13"), original);
+    run.request_cancel();
+    assert_eq!(
+        make(op(4).as_str()).execute(&mut || 9, &mut |_, _| {}),
+        Err(diary_application::illustrated::Error::Cancelled)
+    );
+    assert_eq!(store.read(entry.date).unwrap().unwrap().id, entry.id);
 }

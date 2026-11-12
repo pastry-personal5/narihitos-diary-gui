@@ -168,3 +168,7 @@ reaches the WebView. Failure, overflow or replacement subscription leaves the
 frontend stale until a subsequent complete reconciliation succeeds.
 
 The main-window-only `reveal_configuration_folder` command calls authenticated, session-bound `GET /settings/configuration-folder`. The server supplies the canonical folder of its launch configuration (`unavailable` if not configured). The native bridge opens that absolute directory in Finder with fixed arguments to `/usr/bin/open`, without a shell or webview-supplied path; it returns only success or a closed error. The directory is never returned to React or logged; ordinary `/settings` stays redacted.
+
+## Illustrated diary routes
+
+Session-authorized routes: `GET /api/v1/illustrated` lists dates; `GET /api/v1/illustrated/{date}` returns body and metadata; `POST` on that date takes `{request_id, profile, locale, engine?}` and returns an admitted job. Creation silently replaces on success. Existing job read/cancel/event routes expose an `illustrated` progress projection (text or numbered photo step) without content. `GET /api/v1/illustrated/{date}/photos/NN.png?version=<uuid>` returns bounded PNG bytes, rejects obsolete versions and arbitrary query/path values, and disables caching. `DELETE` on the date requires `{version, confirmed:true}` and acknowledges `{deleted:true}`; stale/unconfirmed requests cannot delete a version. Explicit Tauri commands mirror list/read/create/delete/photo operations with bounded response validation. Client save settling and GUI controls belong to M35.

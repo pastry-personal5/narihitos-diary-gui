@@ -38,6 +38,8 @@ pub enum ConfigError {
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
+    pub illustrated: IllustratedConfig,
+    #[serde(default)]
     pub image_engines: std::collections::BTreeMap<String, ImageEngineConfig>,
     pub schema_version: u32,
     pub paths: Paths,
@@ -52,6 +54,10 @@ pub struct Config {
 #[derive(Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ImageEngineConfig {
+    #[serde(default)]
+    pub trigger: String,
+    #[serde(default)]
+    pub prompt_directives: Vec<String>,
     pub label: String,
     pub program: PathBuf,
     #[serde(default = "image_timeout")]
@@ -213,12 +219,26 @@ pub fn parse(bytes: &[u8]) -> Result<Config, ConfigError> {
     }) {
         return Err(ConfigError::Schema);
     }
+    if !(1..=99).contains(&config.illustrated.max_photos)
+        || config
+            .illustrated
+            .engine
+            .as_ref()
+            .is_some_and(|id| !config.image_engines.contains_key(id))
+    {
+        return Err(ConfigError::Schema);
+    }
     if config.image_engines.len() > 64 {
         return Err(ConfigError::Limit);
     }
     aliases(config.image_engines.keys().map(String::as_str))?;
     for e in config.image_engines.values() {
-        if e.label.trim().is_empty()
+        if !(diary_application::illustrated::PromptSettings {
+            trigger: e.trigger.clone(),
+            directives: e.prompt_directives.clone(),
+        })
+        .validate()
+            || e.label.trim().is_empty()
             || e.label.len() > 128
             || !e.program.is_absolute()
             || !(1..=3600).contains(&e.timeout_seconds)
@@ -545,4 +565,19 @@ pub fn select_executable(
     }
     std::env::split_paths(launch_path)
         .find_map(|directory| executable(&launch_cwd.join(directory).join(default)))
+}
+
+#[derive(Clone, PartialEq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct IllustratedConfig {
+    pub engine: Option<String>,
+    pub max_photos: usize,
+}
+impl Default for IllustratedConfig {
+    fn default() -> Self {
+        Self {
+            engine: None,
+            max_photos: 4,
+        }
+    }
 }

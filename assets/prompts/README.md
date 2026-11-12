@@ -112,3 +112,5 @@ synthetic one-snippet packet; quality is unproven. P1-M20 ran the Apple template
 and the embedded table, not output quality. P1-M17 links the loader into
 `diary-server` through profile status; `scripts/smoke/agent.py` checks that the built binary contains the
 embedded Codex prompts. The pins `gpt-5.6-luna`/`medium` were accepted by a live Codex 0.167.0 turn.
+
+Each provider also bundles `illustrated.md` for saved-Authentic theme analysis and rewritten text/photo scenes. Its separate inventory preserves the historical Generate/Chat render fixture; strict parsing and illustrated rendering tests cover these new assets. The application adds the selected engine trigger and supplies directives from the captured server configuration.

@@ -4,6 +4,12 @@ use sha2::{Digest, Sha256};
 
 fn request(provider: AgentKind, action: PromptAction) -> AgentRequest {
     let mode = match action {
+        PromptAction::Illustrated => Mode::Illustrated(diary_application::illustrated::Packet {
+            body: "PRIVATE".into(),
+            date: DiaryDate::parse("2026-11-13").unwrap(),
+            settings: Default::default(),
+            max_photos: 4,
+        }),
         PromptAction::Chat => {
             Mode::Chat(ChatPacket::new(None, vec![], "{{locale}} PRIVATE".into()).unwrap())
         }

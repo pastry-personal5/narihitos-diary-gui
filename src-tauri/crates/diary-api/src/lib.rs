@@ -9,6 +9,7 @@ mod chats;
 mod exports;
 mod generations;
 mod guard;
+mod illustrated;
 mod images;
 mod imports;
 mod jobs;
@@ -72,6 +73,12 @@ pub struct ServerState {
     source_trash: Option<Arc<dyn diary_application::source_trash::SourceTrash>>,
     exports: Option<Arc<dyn diary_application::export::Exports>>,
     export_jobs: Mutex<std::collections::BTreeMap<String, (String, u64, &'static str)>>,
+    illustrated: Option<(
+        diary_application::illustrated::SharedStore,
+        diary_application::illustrated::Settings,
+    )>,
+    illustrated_jobs:
+        Mutex<std::collections::BTreeMap<String, diary_application::illustrated::JobProgress>>,
     images: Arc<diary_application::image::Registry>,
     profiles: Option<Arc<dyn diary_application::agent::ProfileDirectory>>,
     agent_runner: Option<Arc<dyn diary_application::agent::AgentRunner + Send + Sync>>,
@@ -118,6 +125,8 @@ impl ServerState {
             source_trash: None,
             exports: None,
             export_jobs: Mutex::new(std::collections::BTreeMap::new()),
+            illustrated: None,
+            illustrated_jobs: Mutex::new(Default::default()),
             images: Arc::new(Default::default()),
             profiles: None,
             agent_runner: None,
@@ -233,6 +242,12 @@ impl ServerState {
     }
     fn lease_ended(&self) {
         // The chat and its transcript belong to the lease; a running turn is cancelled first.
+        self.illustrated_jobs.lock().unwrap().retain(|_, job| {
+            job.run.request_cancel();
+            // Blocking workers may already be committing. Keep their date reserved
+            // across leases until they acknowledge completion.
+            !job.terminal
+        });
         self.conversations.clear();
         self.reviews.clear();
         self.generations
@@ -267,6 +282,13 @@ impl ServerState {
         Arc::get_mut(state)
             .expect("startup precedes shared use")
             .agent_runner = Some(runner);
+    }
+    pub fn set_illustrated(
+        state: &mut Arc<Self>,
+        store: diary_application::illustrated::SharedStore,
+        settings: diary_application::illustrated::Settings,
+    ) {
+        Arc::get_mut(state).expect("startup unshared").illustrated = Some((store, settings));
     }
     pub fn set_images(state: &mut Arc<Self>, images: Arc<diary_application::image::Registry>) {
         Arc::get_mut(state)
@@ -384,6 +406,17 @@ pub fn router(state: Arc<ServerState>) -> Router {
             post(reviews::decide).layer(DefaultBodyLimit::max(reviews::BODY_LIMIT)),
         )
         .route("/api/v1/reviews/{id}", delete(reviews::end))
+        .route("/api/v1/illustrated", get(illustrated::list))
+        .route(
+            "/api/v1/illustrated/{date}",
+            get(illustrated::read)
+                .post(illustrated::create)
+                .delete(illustrated::delete),
+        )
+        .route(
+            "/api/v1/illustrated/{date}/photos/{n}",
+            get(illustrated::photo),
+        )
         .route("/api/v1/image-engines", get(images::list))
         .route("/api/v1/image-engines/{id}/check", post(images::check))
         .route("/api/v1/profiles", get(profiles::list))

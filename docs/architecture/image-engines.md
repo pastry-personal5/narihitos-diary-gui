@@ -16,9 +16,12 @@ image_engines:
     label: "Krea 2 (local)"
     program: "/Volumes/Work_Volume/narihitos-diary-gui/scripts/run-krea2-diary.sh"
     timeout_seconds: 1800
+    trigger: "v02realphoto"
+    prompt_directives:
+      - "photo of a woman in her early 20s"
 ```
 
-IDs use ASCII letters, digits, underscores and hyphens, up to 64 bytes. Labels are nonempty and bounded to 128 bytes. Programs must be absolute paths. Timeouts are 1–3600 seconds, default 1800. Schema errors reject the entire snapshot. Missing programs affect only that engine's availability.
+IDs use ASCII letters, digits, underscores and hyphens, up to 64 bytes. Labels are nonempty and bounded to 128 bytes. Programs must be absolute paths. Timeouts are 1–3600 seconds, default 1800. Optional trigger defaults to empty (up to 1024 bytes, no NUL/newline); prompt_directives defaults to an empty list (up to 64 nonempty directives, each at most 4096 bytes and NUL-free). Schema errors reject the entire snapshot. Missing programs affect only that engine's availability.
 
 ## Command contract
 
@@ -49,3 +52,5 @@ selection, and live proof requires matching selection and content hashes before
 and after inference. `scripts/tests/test_image_generation_live.py` verifies
 interruption cleanup with the real Rust owner and a fake renderer, without GPU
 weights or accounts. See the [implementation review](../archive/milestones/p1-m33/milestone-33-implementation-review.md).
+
+Illustrated creation captures these prompt settings before deriving scenes, then prefixes the trigger in the application before rendering; the command adapter receives the complete prompt and does not prefix it. `illustrated.max_photos` defaults to 4 (1–99); the agent combines related theme groups to meet that cap. `illustrated.engine` defaults to the sole configured engine; multiple engines require explicit selection. Illustrated settings changes require restart.

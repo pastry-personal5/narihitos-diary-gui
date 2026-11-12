@@ -103,6 +103,7 @@ pub trait Protocol: Send + Sync + 'static {
         dir: &RunDir,
         prompt: &AgentExecutionSettings,
         chat: bool,
+        schema: &str,
     ) -> Result<Invocation, AgentError>;
     fn stream(&self) -> Box<dyn Stream>;
 }
@@ -344,7 +345,16 @@ impl<P: Protocol> Adapter<P> {
         })?;
         let inv = self
             .proto
-            .invocation(&dir, prompt, chat)
+            .invocation(
+                &dir,
+                prompt,
+                chat,
+                if matches!(request.mode(), Mode::Illustrated(_)) {
+                    super::host::ILLUSTRATED_SCHEMA
+                } else {
+                    super::host::GENERATION_SCHEMA
+                },
+            )
             .map_err(|e| diag.fail(Reason::RunDirUnavailable, e.0))?;
         let spec = Spec {
             argv: inv.argv.clone(),
@@ -408,6 +418,8 @@ impl<P: Protocol> Adapter<P> {
             .collect(&inv)
             .map_err(|e| diag.fail(Reason::ResultMissing, e.0))?;
         match request.mode() {
+            Mode::Illustrated(p) => super::output::validate_illustrated(&out.bytes, p.max_photos)
+                .map(AgentOutput::Illustrated),
             Mode::Candidate { packet, .. } => {
                 if out.structured == Some(false) {
                     return Err(C::InvalidOutput.into());
@@ -536,6 +548,7 @@ impl<P: Protocol> Adapter<P> {
         }
         let mut d = AgentDetail::new(self.proto.kind());
         d.action = Some(match request.mode() {
+            Mode::Illustrated(_) => ActionTag::Generate,
             Mode::Chat(_) => ActionTag::Chat,
             Mode::Candidate { .. } => ActionTag::Generate,
         });

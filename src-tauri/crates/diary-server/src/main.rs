@@ -307,6 +307,19 @@ async fn run() -> Result<(), &'static str> {
         .replace(diary_infrastructure::image::configured(&config))
         .map_err(|_| "image configuration unavailable")?;
     diary_api::ServerState::set_images(&mut state, images.clone());
+    if workspace.readiness == Readiness::Ready {
+        let store =
+            diary_infrastructure::illustrated::Store::open(config.paths.entries_root.clone())
+                .map_err(|_| "illustrated recovery unavailable")?;
+        diary_api::ServerState::set_illustrated(
+            &mut state,
+            Arc::new(store),
+            diary_application::illustrated::Settings {
+                engine: config.illustrated.engine.clone(),
+                max_photos: config.illustrated.max_photos,
+            },
+        );
+    }
     let profile_table =
         Arc::new(diary_infrastructure::agent::profiles::ProfileTable::from_config(&config));
     let host = Arc::new(diary_infrastructure::agent::host::Host::new(

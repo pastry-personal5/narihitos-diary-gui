@@ -239,9 +239,9 @@ Real GPU follow-up (2026-11-13): Krea 2 render/cancel passed; see the [execution
 
 ### P1-M34: Illustrated diary format and creation
 
-Status: Planned
+Status: Done
 Goal: Store an AI-rewritten version of a day's Authentic diary as one Markdown file plus a photo directory, created by a server job.
-Plan: [overview](milestone-34-illustrated-diary-overview.md), [work plan](milestone-34-illustrated-diary-architecture.md)
+Plan: [overview](../archive/milestones/p1-m34/milestone-34-illustrated-diary-overview.md), [work plan](../archive/milestones/p1-m34/milestone-34-illustrated-diary-architecture.md)
 
 ### P1-M35: Illustrated diary GUI
 

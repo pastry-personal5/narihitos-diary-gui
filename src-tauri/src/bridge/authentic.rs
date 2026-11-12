@@ -71,6 +71,9 @@ pub struct AuthenticError {
 }
 
 const SERVER_CODES: &[&str] = &[
+    "stale_version",
+    "confirmation_required",
+    "invalid_illustrated",
     "revision_conflict",
     "already_exists",
     "external_change",

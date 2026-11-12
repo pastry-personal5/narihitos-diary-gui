@@ -531,6 +531,21 @@ mod reload_tests {
             registry.list()[0].status,
             diary_application::image::Availability::Unchecked
         );
+        let prompt_extra = "image_engines: {local: {label: Changed, program: /missing/engine, trigger: updated, prompt_directives: [photo]}}\n";
+        write(&f.file, &text(&f.root, 8781, prompt_extra));
+        assert!(matches!(f.handle.reload(true), ReloadOutcome::Busy));
+        assert!(
+            registry
+                .prompt_settings("local")
+                .unwrap()
+                .trigger
+                .is_empty()
+        );
+        assert!(matches!(f.handle.reload(false), ReloadOutcome::Applied(_)));
+        assert_eq!(
+            registry.prompt_settings("local").unwrap().trigger,
+            "updated"
+        );
         write(
             &f.file,
             &text(&f.root, 8781, &extra.replace("/missing/engine", "relative")),
@@ -605,4 +620,23 @@ fn image_engine_schema_is_optional_strict_and_bounded() {
         parse(format!("{valid}  local: {{label: Duplicate, program: /bin/true}}\n").as_bytes())
             .is_err()
     );
+}
+
+#[test]
+fn engine_prompt_settings_and_illustrated_limits_are_strict() {
+    let yaml = format!(
+        "{MINIMAL}image_engines:\n  local:\n    label: Local\n    program: /bin/false\n    trigger: v02realphoto\n    prompt_directives: [photo of a woman in her early 20s]\nillustrated:\n  engine: local\n  max_photos: 4\n"
+    );
+    let c = parse(yaml.as_bytes()).unwrap();
+    assert_eq!(c.image_engines["local"].trigger, "v02realphoto");
+    assert_eq!(c.image_engines["local"].prompt_directives.len(), 1);
+    assert_eq!(c.illustrated.max_photos, 4);
+    for bad in [
+        yaml.replace("max_photos: 4", "max_photos: 0"),
+        yaml.replace("engine: local", "engine: unknown"),
+        yaml.replace("[photo of a woman in her early 20s]", "[\"\"]"),
+        yaml.replace("trigger: v02realphoto", "trigger: [wrong]"),
+    ] {
+        assert!(parse(bad.as_bytes()).is_err());
+    }
 }

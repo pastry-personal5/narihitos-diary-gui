@@ -247,3 +247,5 @@ impl Host {
         self.diagnostics.emit(record);
     }
 }
+
+pub const ILLUSTRATED_SCHEMA: &str = r#"{"type":"object","additionalProperties":false,"required":["themes","groups"],"properties":{"themes":{"type":"array","items":{"type":"string"}},"groups":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["themes","text","alt","prompt"],"properties":{"themes":{"type":"array","items":{"type":"integer"}},"text":{"type":"string"},"alt":{"type":"string"},"prompt":{"type":"string"}}}}}}"#;

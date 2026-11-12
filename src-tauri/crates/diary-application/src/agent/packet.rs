@@ -162,6 +162,7 @@ impl ChatPacket {
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Mode {
+    Illustrated(crate::illustrated::Packet),
     Chat(ChatPacket),
     Candidate {
         index: u8,

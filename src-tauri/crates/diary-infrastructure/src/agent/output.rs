@@ -160,3 +160,62 @@ mod tests {
         }
     }
 }
+
+/// Strict illustrated response; no prose/fence extraction or partial acceptance.
+pub fn validate_illustrated(
+    bytes: &[u8],
+    cap: usize,
+) -> Result<diary_application::illustrated::Plan, AgentError> {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Raw {
+        themes: Vec<String>,
+        groups: Vec<Group>,
+    }
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Group {
+        themes: Vec<usize>,
+        text: String,
+        alt: String,
+        prompt: String,
+    }
+    if bytes.len() > MAX_RESULT_BYTES {
+        return Err(bad());
+    }
+    let raw: Raw = serde_json::from_slice(bytes).map_err(|_| bad())?;
+    let plan = diary_application::illustrated::Plan {
+        themes: raw.themes,
+        groups: raw
+            .groups
+            .into_iter()
+            .map(|g| diary_application::illustrated::Group {
+                themes: g.themes,
+                text: g.text,
+                alt: g.alt,
+                prompt: g.prompt,
+            })
+            .collect(),
+    };
+    plan.validate(cap).map_err(|_| bad())?;
+    Ok(plan)
+}
+
+#[cfg(test)]
+mod illustrated_tests {
+    use super::*;
+    #[test]
+    fn themes_must_be_covered_once_and_cap_enforced() {
+        let good=br#"{"themes":["walk","work"],"groups":[{"themes":[1,2],"text":"Walked, then worked.","alt":"Morning","prompt":"morning light"}]}"#;
+        assert!(validate_illustrated(good, 1).is_ok());
+        for bad in [
+            String::from_utf8_lossy(good).replace("[1,2]", "[1,1]"),
+            String::from_utf8_lossy(good).replace("[1,2]", "[1]"),
+            String::from_utf8_lossy(good).replace("morning light", ""),
+            format!("```{}```", String::from_utf8_lossy(good)),
+        ] {
+            assert!(validate_illustrated(bad.as_bytes(), 4).is_err());
+        }
+        assert!(validate_illustrated(good, 0).is_err());
+    }
+}

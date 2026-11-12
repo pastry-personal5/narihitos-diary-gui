@@ -30,7 +30,7 @@ Work plan for the [P1-M35 overview](milestone-35-illustrated-diary-gui-overview.
 
 - T04 - Action, disabled reasons, palette entry and shortcut-table entry.
 - T05 - Activity kind with step progress and cancel.
-- T06 - Replace confirmation and failure messages.
+- T06 - Silent replacement and failure messages.
 
 ### Stage C - view and delete (T07-T09)
 

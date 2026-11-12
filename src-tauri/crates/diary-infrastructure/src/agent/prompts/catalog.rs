@@ -8,14 +8,14 @@ pub struct EmbeddedPromptCatalog {
 }
 
 fn known(name: &str) -> Option<&'static str> {
-    [GENERATE, CHAT, SESSION, PARAGRAPH_REVIEW]
+    [GENERATE, CHAT, SESSION, PARAGRAPH_REVIEW, ILLUSTRATED]
         .into_iter()
         .find(|n| *n == name)
 }
 
 impl EmbeddedPromptCatalog {
     pub fn embedded() -> Self {
-        Self::from_table(EMBEDDED)
+        Self::from_table(&[EMBEDDED, ILLUSTRATED_ASSETS].concat())
     }
     pub fn from_table(table: &Table) -> Self {
         // An unknown asset name is not loadable by any action; ignore it.
@@ -47,10 +47,10 @@ impl EmbeddedPromptCatalog {
         }
     }
     pub fn required(kind: AgentKind, action: PromptAction) -> Vec<&'static str> {
-        let task = if action == PromptAction::Chat {
-            CHAT
-        } else {
-            GENERATE
+        let task = match action {
+            PromptAction::Chat => CHAT,
+            PromptAction::Illustrated => ILLUSTRATED,
+            PromptAction::GenerateCandidate => GENERATE,
         };
         let mut v = vec![task];
         if kind.spec().session_asset {
@@ -84,6 +84,7 @@ impl EmbeddedPromptCatalog {
 impl PromptResolver for EmbeddedPromptCatalog {
     fn resolve(&self, selection: PromptSelection) -> Result<ResolvedPrompt, AgentError> {
         let name = match selection.action {
+            PromptAction::Illustrated => ILLUSTRATED,
             PromptAction::Chat => CHAT,
             PromptAction::GenerateCandidate => GENERATE,
         };

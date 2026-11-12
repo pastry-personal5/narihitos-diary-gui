@@ -205,6 +205,13 @@ fn codex(args: &[String]) {
         std::process::exit(1);
     };
     match file("scenario").as_str() {
+        "illustrated" => {
+            let text = r#"{"themes":["tea","walk"],"groups":[{"themes":[1],"text":"I had tea.","alt":"Tea","prompt":"morning tea"},{"themes":[2],"text":"I walked outside.","alt":"Walk","prompt":"a quiet walk"}]}"#;
+            let _ = std::fs::write(&last, text);
+            started();
+            message(text);
+            done();
+        }
         "flood" => flood(),
         "malformed" => {
             let _ = std::fs::write(&last, "not json");

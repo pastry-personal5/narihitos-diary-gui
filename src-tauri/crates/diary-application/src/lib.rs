@@ -675,3 +675,5 @@ pub mod imports;
 pub mod source;
 
 pub mod image;
+
+pub mod illustrated;

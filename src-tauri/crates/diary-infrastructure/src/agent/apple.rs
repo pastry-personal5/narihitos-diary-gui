@@ -357,7 +357,7 @@ impl Protocol for Apple {
             "instructions": session,
             "prompt": prepared.task(),
             "locale": prepared.request().locale().as_str(),
-            "mode": if matches!(prepared.request().mode(), Mode::Chat(_)) { "chat" } else { "generate" },
+            "mode": if matches!(prepared.request().mode(), Mode::Candidate{..}) { "generate" } else { "chat" },
         })).map_err(|_| Reason::AssetsInvalid)
     }
     /// Availability, never inference: the helper's `availability` command.
@@ -378,6 +378,7 @@ impl Protocol for Apple {
         _: &RunDir,
         _: &AgentExecutionSettings,
         _: bool,
+        _: &str,
     ) -> Result<Invocation, AgentError> {
         // Fixed argv: no model, effort, path or user text.
         Ok(Invocation {

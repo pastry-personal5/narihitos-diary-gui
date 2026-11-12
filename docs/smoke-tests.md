@@ -48,3 +48,5 @@ but no GPU: an injected monitor failure must cancel the separately supervised
 fake renderer, dispose staging and preserve an unrelated sentinel. The live
 harness retains failure causes and requests cooperative cancellation on
 interruption; its report also checks that provenance did not change mid-run.
+
+`python3 scripts/smoke/illustrated.py` builds an isolated ordinary server plus synthetic Codex/image commands and verifies create/read/photo, request replay, failure/cancel preservation, silent replacement, version checks and confirmed deletion without touching ordinary data. `DIARY_ILLUSTRATED_LIVE=1 python3 scripts/smoke/illustrated.py --live` is the owner-authorized isolated xpp8 + Krea 2 proof: it reads the selected local config settings, uses the actual repository `.sh` wrapper in the generated test config and retains the workspace/evidence under `tmp/`. It never edits the private ordinary config. The live lane uses an existing account and local installed weights; it is not part of the default gate.

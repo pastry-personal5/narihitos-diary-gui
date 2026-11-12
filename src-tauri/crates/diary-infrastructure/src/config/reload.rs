@@ -10,6 +10,7 @@ use std::{
 /// Fields that cannot change beneath a buffer or job: a change needs a restart.
 #[derive(PartialEq)]
 struct Fixed {
+    illustrated: super::IllustratedConfig,
     entries_root: PathBuf,
     runtime_root: PathBuf,
     port: u16,
@@ -27,6 +28,7 @@ struct Guarded {
 
 fn fingerprints(c: &Config) -> (Fixed, Guarded) {
     let fixed = Fixed {
+        illustrated: c.illustrated.clone(),
         entries_root: c.paths.entries_root.clone(),
         runtime_root: c.paths.runtime_root.clone(),
         port: c.server.port,
@@ -150,6 +152,7 @@ impl ConfigReloader for ConfigHandle {
                         });
                     }
                 };
+                note(fixed.illustrated != current.0.illustrated, "illustrated");
                 note(
                     fixed.entries_root != current.0.entries_root,
                     "paths.entries_root",

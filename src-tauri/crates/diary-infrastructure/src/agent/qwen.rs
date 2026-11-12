@@ -298,9 +298,14 @@ impl Protocol for Qwen {
         _: &RunDir,
         prompt: &AgentExecutionSettings,
         chat: bool,
+        schema: &str,
     ) -> Result<Invocation, AgentError> {
+        let mut argv = Self::argv(&prompt.model, chat);
+        if let Some(i) = argv.iter().position(|v| v == "--json-schema") {
+            argv[i + 1] = schema.into();
+        }
         Ok(Invocation {
-            argv: Self::argv(&prompt.model, chat),
+            argv,
             result_file: None,
         })
     }

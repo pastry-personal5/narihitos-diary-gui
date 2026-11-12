@@ -24,6 +24,17 @@ macro_rules! asset {
     };
 }
 
+pub const ILLUSTRATED: &str = "illustrated";
+pub const ILLUSTRATED_ASSETS: &Table<'static> = &[
+    asset!(AgentKind::Codex, "codex", "illustrated"),
+    asset!(AgentKind::Claude, "claude", "illustrated"),
+    asset!(AgentKind::Qwen, "qwen", "illustrated"),
+    asset!(
+        AgentKind::AppleFoundationModels,
+        "apple-foundation-models",
+        "illustrated"
+    ),
+];
 pub const EMBEDDED: &Table<'static> = &[
     asset!(AgentKind::Codex, "codex", "generate-candidate"),
     asset!(AgentKind::Codex, "codex", "chat"),

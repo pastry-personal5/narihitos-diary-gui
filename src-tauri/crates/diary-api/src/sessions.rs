@@ -99,6 +99,9 @@ pub(crate) async fn close_session(
             Err(e) => return app_error(e),
         };
         if let Some(job) = &active {
+            if let Some(p) = s.illustrated_jobs.lock().unwrap().get(&job.id) {
+                p.run.request_cancel();
+            }
             s.generations
                 .lock()
                 .expect("generations poisoned")

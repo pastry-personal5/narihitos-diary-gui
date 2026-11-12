@@ -3,7 +3,9 @@ mod calendar;
 mod chat;
 mod export;
 mod generation;
+mod illustrated;
 mod imports;
+pub use illustrated::{IllustratedEntry, IllustratedInput, IllustratedList};
 mod profiles;
 mod progress;
 mod review;
@@ -175,6 +177,9 @@ impl Job {
     fn owned_by(&self, instance: &str, session: &str) -> bool {
         match &self.progress {
             None => true,
+            Some(progress::AiProgress::Illustrated(p)) => {
+                p.instance_id == instance && p.session_id == session
+            }
             Some(progress::AiProgress::Chat(p)) => {
                 p.instance_id == instance && p.session_id == session
             }
