@@ -6,6 +6,12 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 ## Decided
 
+- **P1-M33 image-engine configuration (owner, 2026-11-12):** Approved the `image_engines.krea2` YAML format with label `Krea 2 (local)`, program `/Volumes/Work_Volume/narihitos-diary-gui/scripts/run-krea2-diary.sh` and `timeout_seconds: 1800`. See the exact [approved configuration](archive/milestones/p1-m33/milestone-33-image-engines-architecture.md#configuration-and-availability).
+
+- **P1-M33 image-engine interview (owner, 2026-11-12):** Keep the Krea wrapper in repository `scripts/`; disable upscaling for now at the proposed 1248 × 1664 size; default to 30 minutes per image, configurable per engine. Exempt live GPU render/cancel proof at the owner's request (no additional reason supplied); real Krea rendering/cancellation was initially unverified. Allow prompts in local descendant command arguments, while keeping the outer adapter environment-based, app logs/API errors prompt-free and temporary sidecars in disposable private staging. All five M33 interview questions are resolved; implementation is complete; the owner-authorized 2026-11-13 real GPU follow-up below supersedes the exemption and passed. See the [interview record](archive/milestones/p1-m33/milestone-33-image-engines-overview.md#interview-decisions-2026-11-12).
+
+- **Illustrated diary plan (owner, 2026-11-12):** A day with an Authentic diary may get one other diary version: text rewritten by an AI Agent, kept separate from the Authentic entry, with photos whose prompts the agent derives. Storage is one Markdown file plus a dedicated directory of `.png` files. Image engines are pluggable; the local Krea 2 setup is one. Work is staged engine first as P1-M33, P1-M34 and P1-M35, before P1-M32 closes. This will extend "only Authentic is managed durable content" when P1-M34 is implemented. Engine decisions: [P1-M33](archive/milestones/p1-m33/milestone-33-image-engines-overview.md#interview-decisions-2026-11-12). Name, replace/delete policy and other open items: [P1-M34](phase-1/milestone-34-illustrated-diary-overview.md#open-items), [P1-M35](phase-1/milestone-35-illustrated-diary-gui-overview.md#open-items).
+
 - **M32 by-human acceptance (owner, 2026-11-09):** Document by-human tests but exempt their execution from M32 and Phase 1 exit gates, including earlier packaged/native, phone/live-iCloud and live-model manual deferrals. Required automated regressions, ordinary release artifact/process checks, feasible packaged automation (or A06 feasibility evidence), docs and final gate remain. Unrun observations stay unverified; known defects still need triage and disposition. This supersedes earlier human-only release evidence requirements below without changing historical results or service/data authorization. See the [release policy](phase-1/milestone-32-personal-release-overview.md#acceptance-policy-owner-update-2026-11-09) and [by-human procedures](phase-1/milestone-32-by-human-tests.md).
 
 - **Qwen by-human completion note (owner report, 2026-11-09):** Qwen AI Agent Generate Draft, Review Paragraphs and AI Chat by-human run is done. Record this as owner-reported completion; no CLI/model version, artifact identity, exact review surface or detailed assertions were supplied. This is not final artifact qualification or broad model-quality proof. Further human/live runs remain non-gating; automated Qwen compatibility coverage remains required. See the [scoped record](phase-1/milestone-32-by-human-tests.md#qwen-ai-agent-owner-reported-completion).
@@ -123,6 +129,8 @@ The owner-decision log and the open ("Undecided") items, moved out of `AGENTS.md
 
 - **M32 review hardening (owner, 2026-11-10):** Approved resolving the five historical M24 findings: guarded paragraph append separators, disk reads outside the review mutex, startup stale-buffer protection, revision-safe watcher checks and obsolete lost-reply decision cleanup. Rejection remains transient and writes no diary data; stale controls may end the review and reload acknowledged saved state.
 
+- **Image engine implementation:** PNG decode validation uses macOS ImageIO through system framework FFI, with no new dependency or build tool. Seeds use unsigned 32-bit values; the Krea CLI accepts non-negative integer seeds. The wrapper supplies a prompt directly and reads no private trigger or prompt defaults. See the [image engine contract](architecture/image-engines.md).
+
 ## Undecided
 
 The [P1-M2 owner interview](phase-1/milestone-02-owner-decisions.md) resolves the earlier product choices. The maintained [architecture](architecture.md) resolves delegated internal design work; do not ask again about already approved choices. Ask before changing those choices or inventing new product behavior outside the delegation.
@@ -131,3 +139,11 @@ The [P1-M2 owner interview](phase-1/milestone-02-owner-decisions.md) resolves th
 - **Evidence gaps:** producer-compatible source saves/deletes, packaged macOS/iCloud access, process supervision, and service recovery remain unverified. Record the blocked feature and required acceptance evidence; do not turn an interview preference into a runtime capability claim.
 - **Agents/privacy:** the owner chose trusted installed CLIs, superseding the proposed confinement prerequisite. Do not infer selected-text confinement or CLI/provider retention guarantees. Account terms and actual CLI capabilities are not verified by that trust choice.
 - **Delivery/assets:** personal Apple Silicon/shell-launch scope and SF Symbols are chosen. The [platform design](architecture/configuration-and-exports.md#version-and-platform-strategy) selects the owner's macOS research baseline as an acceptance target and native AppKit runtime symbols; actual support/rendering remain unverified. The owner's instruction to proceed despite licensing concerns is not evidence of license clearance. No new dependency/build tool is approved by a research recommendation or a documentation-level architecture choice.
+
+## Image engine live-proof follow-up (2026-11-13)
+
+The owner explicitly requested implementing and running the Krea 2 end-to-end
+test on a real GPU and gathering evidence. This authorizes a successful render
+and separate in-flight cancellation and supersedes the earlier M33 Q4 exemption
+for this follow-up. Keep inference offline with existing installed weights;
+record results in the M33 follow-up evidence.

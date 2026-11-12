@@ -1,0 +1,140 @@
+{
+  "status": "passed",
+  "started_utc": "2026-11-12T15:30:11.101607+00:00",
+  "finished_utc": "2026-11-12T15:32:59.937676+00:00",
+  "git_head": "2b2ef6bfc8404dc5a7595837fee5cdc4a56ef623",
+  "gpu_runtime": {
+    "device": {
+      "device_name": "Apple M5 Max",
+      "max_recommended_working_set_size": 115448725504,
+      "memory_size": 137438953472,
+      "architecture": "applegpu_g17s",
+      "max_buffer_length": 86586540032,
+      "resource_limit": 499000
+    },
+    "default_device": "Device(gpu, 0)",
+    "mlx": "0.32.4",
+    "mflux": "0.23.0",
+    "gpu_probe_peak_bytes": 8388612
+  },
+  "settings": {
+    "seed": 42,
+    "width": 1248,
+    "height": 1664,
+    "steps": 8,
+    "scheduler": "euler",
+    "upscale": false,
+    "lora_scale": 1.0,
+    "offline": true,
+    "prompt": "A blue ceramic cup on a plain wooden table, soft daylight, still life photograph"
+  },
+  "binary_sha256": "c11b9d975e30b6a10e9f2d988824e556a689b93811be55d8ca2c0aea3e56c73b",
+  "adapter": {
+    "bytes": 1873430,
+    "cancel_seconds": 10.295046375,
+    "cancelled_processes": [31501, 31507, 31541],
+    "height": 1664,
+    "png_validation": "production CRC, bounds and ImageIO pixel decode",
+    "render_seconds": 144.4842475,
+    "seed": 42,
+    "sentinel_survived": true,
+    "staging_empty_after_success_and_cancel": true,
+    "width": 1248
+  },
+  "image_sha256": "fa8a0d240bcf4d29851df8b789065601ce82f2f367b01aa678a753d9e433c088",
+  "owned_gpu_submission_samples": 40,
+  "renderer_gpu_stack": {
+    "pid": 27977,
+    "file": "renderer-stack-27977.txt",
+    "sha256": "6b5e8917fae4a5e585f743bfddf7554b7c66171c93935d45f6c47a962ab8d09a"
+  },
+  "worktree_dirty": true,
+  "provenance": [
+    {
+      "file": "scripts/krea-image-engine.py",
+      "bytes": 2328,
+      "sha256": "ad625b5458f84708ffcf1c1ae887a5a9dd88a095e9265c1e9c9fe215e637c40a"
+    },
+    {
+      "file": "scripts/run-krea2-diary.sh",
+      "bytes": 236,
+      "sha256": "35338c675cc45aaa1057961da828baeb0052592dd107fbd186ce70cb8cc8e942"
+    },
+    {
+      "file": "mflux-generate-krea2",
+      "bytes": 361,
+      "sha256": "b528265008782c40df5d7b490a95c2d0f886d66118b4489587b4a5a3cd335b10"
+    },
+    {
+      "file": "adapter/output_20261025_031657/lora/0002021_adapter.safetensors",
+      "bytes": 381857812,
+      "sha256": "dc282fbefbb436a4d193ef77da6c50ff8078dabb0f642b015bd8259cf5edba9e"
+    },
+    {
+      "file": "scripts/smoke/image-generation-live.py",
+      "bytes": 9341,
+      "sha256": "456df1ab476d1a223b736dd37820b638dcda81004a37cdb80807d4e3b0d53462"
+    },
+    {
+      "file": "src-tauri/crates/diary-infrastructure/examples/image_engine_live.rs",
+      "bytes": 5135,
+      "sha256": "e0113ed119c40715dd7018a6b805029ba34116a3f044326b409d02f00d549e87"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/text_encoder/config.json",
+      "bytes": 1559,
+      "sha256": "1a1006851200920f53ab7e17ca14a8b3d1b91075dfbbff493307ba894cab0abb"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/text_encoder/model.safetensors",
+      "bytes": 8875715136,
+      "sha256": "8434db05292f95e0041589a7c82abeb39385be59c85b54ae11caa7b45e9f4f13"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/tokenizer/chat_template.jinja",
+      "bytes": 5292,
+      "sha256": "3636d0f0bd6bef02654cdffdc447b79cb2cef8ab02cc75267345946291a489e4"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/tokenizer/tokenizer.json",
+      "bytes": 11422650,
+      "sha256": "be75606093db2094d7cd20f3c2f385c212750648bd6ea4fb2bf507a6a4c55506"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/tokenizer/tokenizer_config.json",
+      "bytes": 664,
+      "sha256": "c871ed314285a377eccf509b906aa5fe015d5e79a3ddab2c198467329127ead6"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/turbo.safetensors",
+      "bytes": 26283332608,
+      "sha256": "78bbf8f4165eda19cea3cb06c78089221932a39e2eed8af9da741f942c47ffb3"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/vae/config.json",
+      "bytes": 791,
+      "sha256": "54949c79def0d1060353c3fbfd4d2d2c4815ae241da6d6d28c99634c4eac6e6e"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/vae/diffusion_pytorch_model.safetensors",
+      "bytes": 507591892,
+      "sha256": "ab1b61103959913d6c7e628cf793dbb2ca4726a40a3b3ae206c52b8e75bf6f08"
+    }
+  ],
+  "raw_evidence_directory": "tmp/krea GPU evidence rz5bxrs3",
+  "gpu_sample_count": 143,
+  "peak_device_utilization_percent": 100,
+  "limits": [
+    "Standalone engine port; no diary workflow or GUI coverage.",
+    "Device utilization is machine-wide; renderer stack establishes per-process GPU evaluation.",
+    "Cancellation after ten seconds proves in-flight process cancellation, not interruption at a specific diffusion step.",
+    "Seed alone does not guarantee byte-identical reproduction."
+  ],
+  "validation": {
+    "gate": "G01-G07 PASS",
+    "gate_log_directory": "run.GTBGTJ",
+    "python_harness_regressions": "13 passed",
+    "wrapper_contract": "passed",
+    "opt_in_skip": "passed"
+  }
+}

@@ -228,6 +228,27 @@ Goal: Again bug fixes, UX fixes, GUI fixes, behavior changes, refactoring and ar
 Plan: [Generate/Chat/Review progress checklist](../archive/milestones/p1-m31/milestone-31-review-progress-overview.md), [AI Agent progress follow-up/checklist](../archive/milestones/p1-m31/milestone-31-agent-progress-overview.md), [completed text-only snippet follow-up/checklist](../archive/milestones/p1-m31/milestone-31-text-only-snippets-overview.md), [completed changeability overview/checklist](../archive/milestones/p1-m31/milestone-31-changeability-overview.md), [work plan](../archive/milestones/p1-m31/milestone-31-changeability-architecture.md).
 Notes: The owner accepted changeability refactoring as the first task set on 2026-11-09: editor/resource separation, transport-independent generation/chat policy, shared action decisions, extension contracts and dependency enforcement. Changeability refactoring is complete: all checklist tasks, the seven-lane gate and eight synthetic/native smokes pass, including ordinary GUI close. Text-only schema 2 support is also complete, with producer round trips and the full gate passing; text-only Trash remains disabled. The owner added T02: per-profile, default-on Global Messages progress for ongoing AI Agent request/response turns every two seconds. T02 is complete with focused regressions and all seven gate lanes passing; M32 retains release qualification.
 
+### P1-M33: Pluggable image engines
+
+Status: Done (2026-11-13)
+Goal: Add an image-engine port, a generic local command engine and the owner's Krea 2 engine, proven standalone.
+Plan: [overview](../archive/milestones/p1-m33/milestone-33-image-engines-overview.md), [work plan](../archive/milestones/p1-m33/milestone-33-image-engines-architecture.md)
+Notes: Owner request 2026-11-12; P1-M33 to P1-M35 run before P1-M32 closes.
+
+Real GPU follow-up (2026-11-13): Krea 2 render/cancel passed; see the [execution evidence](../archive/milestones/p1-m33/milestone-33-gpu-evidence.md).
+
+### P1-M34: Illustrated diary format and creation
+
+Status: Planned
+Goal: Store an AI-rewritten version of a day's Authentic diary as one Markdown file plus a photo directory, created by a server job.
+Plan: [overview](milestone-34-illustrated-diary-overview.md), [work plan](milestone-34-illustrated-diary-architecture.md)
+
+### P1-M35: Illustrated diary GUI
+
+Status: Planned
+Goal: Create, watch, read, replace and delete the Illustrated diary in the app.
+Plan: [overview](milestone-35-illustrated-diary-gui-overview.md), [work plan](milestone-35-illustrated-diary-gui-architecture.md)
+
 ### P1-M32: Personal release qualification
 
 Status: Active

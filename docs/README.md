@@ -2,8 +2,12 @@
 
 Status: Active
 
+- [Atomic Editor research](research/atomic-editor.md): P1-M34/M35 source review of inline Markdown, local photos, immutable reading mode and proposed integration.
+
 - [Version v1.0.0 release note](release-notes-v1.0.0.md): user-facing summary,
   availability and qualification limits for the first personal release.
+
+- P1-M33 to P1-M35 Illustrated diary (engines done; format/GUI planned): [image engines](archive/milestones/p1-m33/milestone-33-image-engines-overview.md) ([work plan](archive/milestones/p1-m33/milestone-33-image-engines-architecture.md)), [format and creation](phase-1/milestone-34-illustrated-diary-overview.md) ([work plan](phase-1/milestone-34-illustrated-diary-architecture.md)), [GUI](phase-1/milestone-35-illustrated-diary-gui-overview.md) ([work plan](phase-1/milestone-35-illustrated-diary-gui-architecture.md)).
 
 - [Paragraph review module boundaries](architecture/paragraph-review.md): application policy, AI/editor ports, composition, conversation ownership and future extension guidance.
 
@@ -137,3 +141,5 @@ This index lists the design and process docs, one line each. Read only the doc y
 - P1-M32 implemented feature work: Draft candidate table [overview](phase-1/milestone-32-draft-candidate-table-overview.md) and [work plan](phase-1/milestone-32-draft-candidate-table-architecture.md); caret paragraph review [overview](phase-1/milestone-32-paragraph-review-overview.md) and [work plan](phase-1/milestone-32-paragraph-review-architecture.md); [Settings and Status Line checklist](phase-1/milestone-32-status-line-overview.md). Remaining native evidence is consolidated in the release plan.
 
 - [M32 release execution evidence](phase-1/milestone-32-release-evidence.md)
+
+- [Image engines](architecture/image-engines.md): local command contract, configuration and discovery.

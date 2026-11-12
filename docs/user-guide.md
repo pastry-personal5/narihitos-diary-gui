@@ -94,3 +94,7 @@ workspace ledger. AI results and chat are session memory and do not survive a
 server restart. Missing AI tools disable their actions while editing remains
 available. Local export read-back does not establish remote iCloud upload;
 text-only snippet Trash remains unavailable.
+
+## Local image engine configuration
+
+The optional private YAML `image_engines` map configures local PNG generators. See the [configuration and command contract](architecture/image-engines.md). Discovery is available through authenticated list/check API routes; diary and GUI integration are separate work.

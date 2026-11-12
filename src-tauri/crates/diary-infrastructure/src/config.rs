@@ -37,6 +37,8 @@ pub enum ConfigError {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(default)]
+    pub image_engines: std::collections::BTreeMap<String, ImageEngineConfig>,
     pub schema_version: u32,
     pub paths: Paths,
     #[serde(default)]
@@ -46,6 +48,17 @@ pub struct Config {
     #[serde(default)]
     pub agents: Agents,
     pub notion: Option<Notion>,
+}
+#[derive(Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImageEngineConfig {
+    pub label: String,
+    pub program: PathBuf,
+    #[serde(default = "image_timeout")]
+    pub timeout_seconds: u64,
+}
+fn image_timeout() -> u64 {
+    1800
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -199,6 +212,19 @@ pub fn parse(bytes: &[u8]) -> Result<Config, ConfigError> {
             || n.root_page_id.len() > 128
     }) {
         return Err(ConfigError::Schema);
+    }
+    if config.image_engines.len() > 64 {
+        return Err(ConfigError::Limit);
+    }
+    aliases(config.image_engines.keys().map(String::as_str))?;
+    for e in config.image_engines.values() {
+        if e.label.trim().is_empty()
+            || e.label.len() > 128
+            || !e.program.is_absolute()
+            || !(1..=3600).contains(&e.timeout_seconds)
+        {
+            return Err(ConfigError::Schema);
+        }
     }
     Ok(config)
 }

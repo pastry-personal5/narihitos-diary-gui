@@ -1,0 +1,138 @@
+{
+  "status": "passed",
+  "started_utc": "2026-11-12T15:43:36.235162+00:00",
+  "finished_utc": "2026-11-12T15:46:02.852364+00:00",
+  "git_head": "2b2ef6bfc8404dc5a7595837fee5cdc4a56ef623",
+  "gpu_runtime": {
+    "device": {
+      "device_name": "Apple M5 Max",
+      "max_recommended_working_set_size": 115448725504,
+      "memory_size": 137438953472,
+      "architecture": "applegpu_g17s",
+      "max_buffer_length": 86586540032,
+      "resource_limit": 499000
+    },
+    "default_device": "Device(gpu, 0)",
+    "mlx": "0.32.4",
+    "mflux": "0.23.0",
+    "gpu_probe_peak_bytes": 8388612
+  },
+  "settings": {
+    "seed": 42,
+    "width": 1248,
+    "height": 1664,
+    "steps": 8,
+    "scheduler": "euler",
+    "upscale": false,
+    "lora_scale": 1.0,
+    "offline": true,
+    "prompt": "A blue ceramic cup on a plain wooden table, soft daylight, still life photograph"
+  },
+  "binary_sha256": "35c7ca57c9f5005a3d817df0f207d90bba9c08a5aebb079c4fdbc87cb1f79b9d",
+  "adapter": {
+    "bytes": 1873430,
+    "cancel_seconds": 10.238635792,
+    "cancelled_processes": [36956, 36960, 36991],
+    "height": 1664,
+    "png_validation": "production CRC, bounds and ImageIO pixel decode",
+    "render_seconds": 111.283396708,
+    "seed": 42,
+    "sentinel_survived": true,
+    "staging_empty_after_success_and_cancel": true,
+    "width": 1248
+  },
+  "image_sha256": "650609b1283278adc26f0754407b30002743dde0ac2426041a08b85354b70043",
+  "renderer_gpu_stack": {
+    "pid": 36353,
+    "file": "renderer-stack-36353.txt",
+    "sha256": "1e90528157c0b44921ba403466a42e495de06acc86d84b327c9a09342e647028"
+  },
+  "owned_gpu_submission_samples": 18,
+  "provenance_unchanged_after_run": true,
+  "worktree_dirty": true,
+  "raw_evidence_directory": "tmp/krea GPU evidence nkkojta8",
+  "provenance": [
+    {
+      "file": "scripts/krea-image-engine.py",
+      "bytes": 2719,
+      "sha256": "2c5440720997c773badaddc1fef9732a1c7f062fd177ce73d564f8e7c42bb1b1"
+    },
+    {
+      "file": "scripts/run-krea2-diary.sh",
+      "bytes": 236,
+      "sha256": "35338c675cc45aaa1057961da828baeb0052592dd107fbd186ce70cb8cc8e942"
+    },
+    {
+      "file": "mflux-generate-krea2",
+      "bytes": 361,
+      "sha256": "b528265008782c40df5d7b490a95c2d0f886d66118b4489587b4a5a3cd335b10"
+    },
+    {
+      "file": "adapter/output_20261025_031657/lora/0002021_adapter.safetensors",
+      "bytes": 381857812,
+      "sha256": "dc282fbefbb436a4d193ef77da6c50ff8078dabb0f642b015bd8259cf5edba9e"
+    },
+    {
+      "file": "scripts/smoke/image-generation-live.py",
+      "bytes": 10546,
+      "sha256": "197e996981669ff8c390e541c09a18a13bc204dc32f50d1bdd25580dab422b9d"
+    },
+    {
+      "file": "src-tauri/crates/diary-infrastructure/examples/image_engine_live.rs",
+      "bytes": 5737,
+      "sha256": "be3a5b142837755ec59c8c6dc78c8fe02a908dc9ca87cf0b09f4c81597bd8c7a"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/text_encoder/config.json",
+      "bytes": 1559,
+      "sha256": "1a1006851200920f53ab7e17ca14a8b3d1b91075dfbbff493307ba894cab0abb"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/text_encoder/model.safetensors",
+      "bytes": 8875715136,
+      "sha256": "8434db05292f95e0041589a7c82abeb39385be59c85b54ae11caa7b45e9f4f13"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/tokenizer/chat_template.jinja",
+      "bytes": 5292,
+      "sha256": "3636d0f0bd6bef02654cdffdc447b79cb2cef8ab02cc75267345946291a489e4"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/tokenizer/tokenizer.json",
+      "bytes": 11422650,
+      "sha256": "be75606093db2094d7cd20f3c2f385c212750648bd6ea4fb2bf507a6a4c55506"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/tokenizer/tokenizer_config.json",
+      "bytes": 664,
+      "sha256": "c871ed314285a377eccf509b906aa5fe015d5e79a3ddab2c198467329127ead6"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/turbo.safetensors",
+      "bytes": 26283332608,
+      "sha256": "78bbf8f4165eda19cea3cb06c78089221932a39e2eed8af9da741f942c47ffb3"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/vae/config.json",
+      "bytes": 791,
+      "sha256": "54949c79def0d1060353c3fbfd4d2d2c4815ae241da6d6d28c99634c4eac6e6e"
+    },
+    {
+      "file": "model/98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7/vae/diffusion_pytorch_model.safetensors",
+      "bytes": 507591892,
+      "sha256": "ab1b61103959913d6c7e628cf793dbb2ca4726a40a3b3ae206c52b8e75bf6f08"
+    }
+  ],
+  "gpu_sample_count": 112,
+  "peak_device_utilization_percent": 100,
+  "validation": {
+    "gate": "G01-G07 PASS",
+    "gate_log_directory": "run.R4C6Zo",
+    "python_harness_regressions": "15 passed",
+    "image_infrastructure_tests": "5 passed",
+    "image_api_tests": "1 passed",
+    "wrapper_contract": "passed",
+    "opt_in_skip": "passed",
+    "post_capture_change": "Clippy-equivalent is_multiple_of palette-length expression; final source validated by full gate"
+  }
+}

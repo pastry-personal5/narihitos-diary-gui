@@ -1,0 +1,9 @@
+Owned renderer PID: 36353
+Full stack SHA-256: 1e90528157c0b44921ba403466a42e495de06acc86d84b327c9a09342e647028
+
+    +                                   3 mlx::core::gpu::eval(mlx::core::array&)  (in libmlx.dylib) + 200  [0x10aa82288]
+    +                                     1 mlx::core::Compiled::eval_gpu(std::vector<mlx::core::array> const&, std::vector<mlx::core::array>&)  (in libmlx.dylib) + 876  [0x10aa547f8]
+    +                                     :   1 -[AGXG17XFamilyCommandBuffer computeCommandEncoderWithDispatchType:]  (in AGXMetalG17X) + 320  [0x256d9cc28]
+    +                                     :     1 -[AGXG17XFamilyCommandBuffer computeCommandEncoderWithConfig:]  (in AGXMetalG17X) + 172  [0x256d9c954]
+    +                                     1 mlx::core::Matmul::eval_gpu(std::vector<mlx::core::array> const&, mlx::core::array&)  (in libmlx.dylib) + 200  [0x10aaa2260]
+    +                                     1 mlx::core::Matmul::eval_gpu(std::vector<mlx::core::array> const&, mlx::core::array&)  (in libmlx.dylib) + 1328  [0x10aaa26c8]

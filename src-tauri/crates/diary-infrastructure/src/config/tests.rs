@@ -509,6 +509,37 @@ mod reload_tests {
     }
 
     #[test]
+    fn image_reload_rejects_invalid_snapshots_and_resets_cached_status() {
+        let mut f = fx();
+        let registry = std::sync::Arc::new(diary_application::image::Registry::default());
+        f.handle = f.handle.with_images(registry.clone());
+        let extra = "image_engines: {local: {label: Local, program: /missing/engine}}\n";
+        write(&f.file, &text(&f.root, 8781, extra));
+        assert!(matches!(f.handle.reload(true), ReloadOutcome::Busy));
+        assert!(registry.list().is_empty());
+        assert!(matches!(f.handle.reload(false), ReloadOutcome::Applied(_)));
+        assert_eq!(
+            registry.check("local").unwrap().unwrap().status,
+            diary_application::image::Availability::Unavailable
+        );
+        write(
+            &f.file,
+            &text(&f.root, 8781, &extra.replace("Local", "Changed")),
+        );
+        assert!(matches!(f.handle.reload(false), ReloadOutcome::Applied(_)));
+        assert_eq!(
+            registry.list()[0].status,
+            diary_application::image::Availability::Unchecked
+        );
+        write(
+            &f.file,
+            &text(&f.root, 8781, &extra.replace("/missing/engine", "relative")),
+        );
+        assert!(matches!(f.handle.reload(false), ReloadOutcome::Rejected(_)));
+        assert_eq!(registry.list()[0].label, "Changed");
+    }
+
+    #[test]
     fn unchanged_and_profile_changes_apply_and_a_busy_profile_change_waits() {
         let f = fx();
         assert!(matches!(f.handle.reload(false), ReloadOutcome::Applied(_)));
@@ -550,4 +581,28 @@ mod reload_tests {
         };
         assert_eq!(issues[0].code, "permissions");
     }
+}
+
+#[test]
+fn image_engine_schema_is_optional_strict_and_bounded() {
+    assert!(parse(MINIMAL.as_bytes()).unwrap().image_engines.is_empty());
+    let valid =
+        format!("{MINIMAL}image_engines:\n  local:\n    label: Local\n    program: /bin/false\n");
+    assert_eq!(
+        parse(valid.as_bytes()).unwrap().image_engines["local"].timeout_seconds,
+        1800
+    );
+    for extra in [
+        "    timeout_seconds: 0\n",
+        "    timeout_seconds: 3601\n",
+        "    unknown: true\n",
+    ] {
+        assert!(parse(format!("{valid}{extra}").as_bytes()).is_err());
+    }
+    assert!(parse(valid.replace("/bin/false", "relative").as_bytes()).is_err());
+    assert!(parse(valid.replace("label: Local", "label: ''").as_bytes()).is_err());
+    assert!(
+        parse(format!("{valid}  local: {{label: Duplicate, program: /bin/true}}\n").as_bytes())
+            .is_err()
+    );
 }

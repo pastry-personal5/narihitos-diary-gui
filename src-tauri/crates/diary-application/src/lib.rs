@@ -673,3 +673,5 @@ pub enum UnavailableReason {
 
 pub mod imports;
 pub mod source;
+
+pub mod image;

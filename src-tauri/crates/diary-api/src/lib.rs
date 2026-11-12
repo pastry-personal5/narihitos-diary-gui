@@ -9,6 +9,7 @@ mod chats;
 mod exports;
 mod generations;
 mod guard;
+mod images;
 mod imports;
 mod jobs;
 mod profiles;
@@ -71,6 +72,7 @@ pub struct ServerState {
     source_trash: Option<Arc<dyn diary_application::source_trash::SourceTrash>>,
     exports: Option<Arc<dyn diary_application::export::Exports>>,
     export_jobs: Mutex<std::collections::BTreeMap<String, (String, u64, &'static str)>>,
+    images: Arc<diary_application::image::Registry>,
     profiles: Option<Arc<dyn diary_application::agent::ProfileDirectory>>,
     agent_runner: Option<Arc<dyn diary_application::agent::AgentRunner + Send + Sync>>,
     conversations: diary_application::chat::conversations::Conversations,
@@ -116,6 +118,7 @@ impl ServerState {
             source_trash: None,
             exports: None,
             export_jobs: Mutex::new(std::collections::BTreeMap::new()),
+            images: Arc::new(Default::default()),
             profiles: None,
             agent_runner: None,
             conversations: Default::default(),
@@ -265,6 +268,11 @@ impl ServerState {
             .expect("startup precedes shared use")
             .agent_runner = Some(runner);
     }
+    pub fn set_images(state: &mut Arc<Self>, images: Arc<diary_application::image::Registry>) {
+        Arc::get_mut(state)
+            .expect("state shared before composition")
+            .images = images;
+    }
     /// Enables `GET /profiles` and `POST /profiles/{alias}/check`; read-only, never starts a run.
     pub fn set_profiles(
         state: &mut Arc<Self>,
@@ -376,6 +384,8 @@ pub fn router(state: Arc<ServerState>) -> Router {
             post(reviews::decide).layer(DefaultBodyLimit::max(reviews::BODY_LIMIT)),
         )
         .route("/api/v1/reviews/{id}", delete(reviews::end))
+        .route("/api/v1/image-engines", get(images::list))
+        .route("/api/v1/image-engines/{id}/check", post(images::check))
         .route("/api/v1/profiles", get(profiles::list))
         .route("/api/v1/profiles/{alias}/check", post(profiles::check))
         .route("/api/v1/calendar", get(calendar::get_calendar))

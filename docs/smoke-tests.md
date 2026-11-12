@@ -25,3 +25,26 @@ python3 scripts/smoke/review.py                                                 
 python3 scripts/smoke/export.py # Export coordination: create/no-op/confirmation/duplicate/kill-recovery on the fault-injection server with the directory-backed fake destination
 cargo run --manifest-path src-tauri/Cargo.toml -p diary-server -- trace --config PATH --select recent:20        # redacted debugging trace of the logs
 ```
+
+Real image-engine proof (requires the installed Krea 2 runtime, cached weights,
+Metal GPU access and process visibility; no downloads):
+
+```sh
+python3 scripts/smoke/image-engines.py # GPU-free wrapper contract
+DIARY_IMAGE_LIVE=1 python3 scripts/smoke/image-generation-live.py
+```
+
+The live harness runs outside the checkout working directory and retains private
+`report.json`, `adapter.json`, `gpu-samples.json`, build/run logs and `image.png`
+under a new `tmp/krea GPU evidence *` directory. It exercises the application
+registry, production wrapper and PNG validator, followed by a distinct in-flight
+cancel, process cleanup, staging disposal and unrelated process survival. Without
+`DIARY_IMAGE_LIVE=1` it skips; failures exit nonzero and retain evidence. This is
+standalone engine proof, with no diary generation or GUI coverage.
+
+The GPU-free `scripts/tests/test_image_generation_live.py` regressions build the
+Rust example with the existing Cargo toolchain. They require process visibility
+but no GPU: an injected monitor failure must cancel the separately supervised
+fake renderer, dispose staging and preserve an unrelated sentinel. The live
+harness retains failure causes and requests cooperative cancellation on
+interruption; its report also checks that provenance did not change mid-run.

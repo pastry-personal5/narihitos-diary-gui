@@ -17,3 +17,5 @@ pub mod workspace;
 pub mod import_repository;
 pub mod source;
 pub mod zone;
+
+pub mod image;

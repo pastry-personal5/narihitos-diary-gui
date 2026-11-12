@@ -301,6 +301,12 @@ async fn run() -> Result<(), &'static str> {
     );
     // Profile status is read-only; chat turns (P1-M21) are the only run-starting route.
     diary_infrastructure::agent::host::sweep_stale_runs(&config.paths.runtime_root);
+    diary_infrastructure::image::prepare(&config).map_err(|_| "image staging unavailable")?;
+    let images = Arc::new(diary_application::image::Registry::default());
+    images
+        .replace(diary_infrastructure::image::configured(&config))
+        .map_err(|_| "image configuration unavailable")?;
+    diary_api::ServerState::set_images(&mut state, images.clone());
     let profile_table =
         Arc::new(diary_infrastructure::agent::profiles::ProfileTable::from_config(&config));
     let host = Arc::new(diary_infrastructure::agent::host::Host::new(
@@ -340,7 +346,8 @@ async fn run() -> Result<(), &'static str> {
         &mut state,
         Arc::new(
             config::ConfigHandle::new(&path, &config, launch_path.clone(), launch_cwd.clone())
-                .with_profiles(profile_table),
+                .with_profiles(profile_table)
+                .with_images(images),
         ),
     );
     #[cfg(feature = "scaffold-smoke")]

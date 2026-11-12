@@ -19,6 +19,7 @@ struct Fixed {
 /// Fields that may change only while no operation can be using them. Never Debug or Serialize.
 #[derive(PartialEq)]
 struct Guarded {
+    images: std::collections::BTreeMap<String, super::ImageEngineConfig>,
     icloud: Option<PathBuf>,
     notion: Option<(String, String)>,
     profiles: Vec<(String, u8, Option<PathBuf>, Option<PathBuf>)>,
@@ -43,6 +44,7 @@ fn fingerprints(c: &Config) -> (Fixed, Guarded) {
             .collect(),
     };
     let guarded = Guarded {
+        images: c.image_engines.clone(),
         icloud: c.paths.icloud_entries_root.clone(),
         notion: c
             .notion
@@ -95,6 +97,7 @@ fn issue(e: ConfigError) -> ReloadIssue {
 }
 
 pub struct ConfigHandle {
+    images: Option<std::sync::Arc<diary_application::image::Registry>>,
     path: PathBuf,
     launch_path: OsString,
     launch_cwd: PathBuf,
@@ -109,7 +112,15 @@ impl ConfigHandle {
             launch_cwd,
             current: Mutex::new(fingerprints(config)),
             profiles: None,
+            images: None,
         }
+    }
+    pub fn with_images(
+        mut self,
+        images: std::sync::Arc<diary_application::image::Registry>,
+    ) -> Self {
+        self.images = Some(images);
+        self
     }
     /// Keep the agent profile table in step with adopted reloads.
     pub fn with_profiles(
@@ -156,6 +167,11 @@ impl ConfigReloader for ConfigHandle {
             }
             if guarded != current.1 {
                 if busy {
+                    return ReloadOutcome::Busy;
+                }
+                if let Some(images) = &self.images
+                    && images.replace(crate::image::configured(&config)).is_err()
+                {
                     return ReloadOutcome::Busy;
                 }
                 current.1 = guarded;

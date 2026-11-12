@@ -1,0 +1,4 @@
+Owned renderer PID: 27977
+Full stack SHA-256: 6b5e8917fae4a5e585f743bfddf7554b7c66171c93935d45f6c47a962ab8d09a
+
+    +                                   1 mlx::core::gpu::eval(mlx::core::array&)  (in libmlx.dylib) + 200  [0x10a5ee288]
