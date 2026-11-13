@@ -9,8 +9,11 @@ src-tauri/gen/
 tmp/
 tmp/initial-owner-ideas.md
 
+config/
 config/global_config.yaml
 config/.global_config.yaml.swp
+!config/global_config_example.yaml
+
 
 __pycache__/
 
