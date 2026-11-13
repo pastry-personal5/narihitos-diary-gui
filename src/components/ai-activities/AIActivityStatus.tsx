@@ -21,7 +21,7 @@ export function AIActivityStatus({
     ? "AI status unavailable · reconnect to refresh"
     : preparing ||
       (job && progress
-        ? `${progress.cancellation_requested ? "Stopping" : (progress.silence_ms ?? 0) >= 30_000 ? "Waiting for" : job.state === "queued" ? "Preparing" : "Running"} ${progress.kind === "chat" ? "AI Chat" : `generation for ${progress.origin_date}`}${active.length > 1 ? ` · ${active.length} active` : ""}`
+        ? `${(progress.kind === "illustrated" ? progress.phase === "stopping" : progress.cancellation_requested) ? "Stopping" : progress.kind !== "illustrated" && (progress.silence_ms ?? 0) >= 30_000 ? "Waiting for" : job.state === "queued" ? "Preparing" : "Running"} ${progress.kind === "chat" ? "AI Chat" : progress.kind === "illustrated" ? `Illustrated diary for ${progress.origin_date}${progress.phase === "photo" ? ` · photo ${progress.photo_index} of ${progress.photo_count}` : ""}` : `generation for ${progress.origin_date}`}${active.length > 1 ? ` · ${active.length} active` : ""}`
         : unread
           ? `AI idle · ${unread} unread results`
           : "AI idle");

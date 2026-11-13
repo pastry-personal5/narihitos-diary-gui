@@ -71,6 +71,8 @@ impl TryFrom<WireJob> for Job {
                     && super::validate::date_shape(&p.origin_date)
                     && p.photo_index <= p.photo_count
                     && p.photo_count <= 99
+                    && (p.phase != "photo" || p.photo_index > 0)
+                    && (p.phase != "text" || (p.photo_index == 0 && p.photo_count == 0))
                     && ["text", "photo", "stopping", "finished"].contains(&p.phase.as_str())
                     && p.error_code.as_deref().is_none_or(|e| {
                         [
@@ -191,6 +193,26 @@ mod tests {
         assert!(job.owned_by("i", "s"));
         assert!(!job.owned_by("i", "foreign"));
         assert_eq!(serde_json::to_value(job).unwrap(), value);
+    }
+    #[test]
+    fn illustrated_progress_round_trips_and_rejects_inconsistent_photo_steps() {
+        let progress = json!({"kind":"illustrated","job_id":"j","instance_id":"i","session_id":"s","origin_date":"2026-11-13","phase":"photo","photo_index":1,"photo_count":2,"error_code":null});
+        let wire = json!({"id":"j","sequence":2,"state":"running","progress":progress});
+        let job: Job = serde_json::from_value(wire.clone()).unwrap();
+        assert!(job.owned_by("i", "s"));
+        assert!(!job.owned_by("i", "foreign"));
+        assert_eq!(serde_json::to_value(job).unwrap(), wire);
+        for (field, value) in [
+            ("photo_index", json!(0)),
+            ("photo_count", json!(100)),
+            ("phase", json!("text")),
+            ("error_code", json!("private details")),
+            ("job_id", json!("other")),
+        ] {
+            let mut invalid = wire.clone();
+            invalid["progress"][field] = value;
+            assert!(serde_json::from_value::<Job>(invalid).is_err(), "{field}");
+        }
     }
     #[test]
     fn ordinary_jobs_remain_compatible() {

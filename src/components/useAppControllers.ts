@@ -13,7 +13,7 @@ import { ChatParagraphReviewer } from "../adapters/paragraph-review/chat-reviewe
 export function useAppControllers(bridge: Bridge) {
   const { graph, buffers } = useMemo(() => {
     const budget = new SessionBudget();
-    const buffers = new CodeMirrorBuffers(budget);
+    const buffers = new CodeMirrorBuffers(budget, bridge);
     return {
       graph: createAppControllers(
         bridge,
@@ -34,6 +34,7 @@ export function useAppControllers(bridge: Bridge) {
     paragraphReview,
     generator,
     activity,
+    illustrated,
     exporter,
   } = graph;
   const chatState = useAIChat(chat);
@@ -42,7 +43,10 @@ export function useAppControllers(bridge: Bridge) {
   const chatContext = useCallback(() => {
     const a = model.resources.active;
     // Candidates are transient suggestions; chat context stays the saved Entry.
-    const r = a?.kind === "candidate" ? model.resources.authentic : a;
+    const r =
+      a?.kind === "candidate" || a?.kind === "illustrated"
+        ? model.resources.authentic
+        : a;
     const date = r?.date ?? model.resources.selectedDate;
     if (!r || !date) return { document: null, chip: "No document" };
     const what =
@@ -83,13 +87,15 @@ export function useAppControllers(bridge: Bridge) {
     const release = graph.acquire();
     const off = model.subscribe(update);
     const offTrash = trash.subscribe(update);
+    const offIllustrated = illustrated.subscribe(update);
     return () => {
       off();
       offTrash();
+      offIllustrated();
       buffers.attach(null);
       release();
     };
-  }, [graph, model, trash, buffers]);
+  }, [graph, model, trash, buffers, illustrated]);
   return {
     model,
     messages,
@@ -101,6 +107,7 @@ export function useAppControllers(bridge: Bridge) {
     paragraphReview,
     generator,
     activity,
+    illustrated,
     exporter,
     exportState,
     generationState,

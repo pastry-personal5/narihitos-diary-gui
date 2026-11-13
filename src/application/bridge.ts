@@ -1,3 +1,4 @@
+import type { IllustratedBridge } from "./illustrated/contracts";
 import type { GenerationBridge } from "./generation/contracts";
 import type { ReviewBridge } from "./review/contracts";
 import type { NavigationBridge } from "./navigation/contracts";
@@ -147,7 +148,11 @@ export interface ProfileInfo {
   status: ProfileState;
   /** `null` when ready, unchecked or not attributed. */
   reason: ProfileStatusReason | null;
-  capabilities: { chat: ProfileCapability; generate: ProfileCapability };
+  capabilities: {
+    chat: ProfileCapability;
+    generate: ProfileCapability;
+    illustrated?: ProfileCapability;
+  };
 }
 /** The active editor snapshot sent with one chat message. */
 export interface ChatDocumentSnapshot {
@@ -232,7 +237,8 @@ export interface Bridge
     TrashBridge,
     GenerationBridge,
     ReviewBridge,
-    ExportBridge {
+    ExportBridge,
+    IllustratedBridge {
   logClientEvent?(event: ClientEvent): Promise<void>;
   listJobs?(cursor?: string): Promise<JobPage>;
   metadata(): Promise<AppMetadata>;

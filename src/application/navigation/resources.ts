@@ -102,7 +102,9 @@ export class ResourceCoordinator {
           ? "Authentic Markdown"
           : kind === "candidate"
             ? "Candidate Markdown"
-            : "Source Markdown",
+            : kind === "illustrated"
+              ? "Illustrated diary · read-only"
+              : "Source Markdown",
         {
           edit: () => {
             resource.editGeneration++;
@@ -143,6 +145,27 @@ export class ResourceCoordinator {
         epoch: 0,
       };
       this.resources.set(key, resource);
+      if (kind === "authentic" || kind === "illustrated") {
+        const ordered = [...this.resources.values()];
+        this.resources.clear();
+        for (const item of ordered) {
+          if (
+            item.kind === "illustrated" &&
+            ordered.some(
+              (other) => other.kind === "authentic" && other.date === item.date,
+            )
+          )
+            continue;
+          this.resources.set(item.key, item);
+          if (item.kind === "authentic") {
+            const illustrated = ordered.find(
+              (other) =>
+                other.kind === "illustrated" && other.date === item.date,
+            );
+            if (illustrated) this.resources.set(illustrated.key, illustrated);
+          }
+        }
+      }
       this.emit();
       return resource;
     } catch {
@@ -236,7 +259,10 @@ export class ResourceCoordinator {
       const pauses: Promise<void>[] = [];
       for (const resource of this.resources.values()) {
         resource.buffer.setEditable(false);
-        if (resource.kind === "source") resource.stale = true;
+        if (resource.kind === "source" || resource.kind === "illustrated")
+          resource.stale = true;
+        if (resource.illustrated)
+          resource.buffer.setIllustrated?.(resource.illustrated, false);
         if (resource.session) pauses.push(resource.session.setConnected(false));
       }
       await Promise.all(pauses);
@@ -246,6 +272,13 @@ export class ResourceCoordinator {
     for (const r of this.resources.values()) {
       if (epoch !== this.connectionEpoch || this.disposed) return;
       r.buffer.setEditable(false);
+      if (r.kind === "illustrated") {
+        r.stale = true;
+        if (r.illustrated) r.buffer.setIllustrated?.(r.illustrated, false);
+        await this.openIllustrated(r.date!, false, true);
+        continue;
+      }
+      if (r.kind === "candidate") continue;
       if (r.kind === "source") {
         // The digest check makes a save safe on a stale-flagged tab, so Save comes back.
         r.stale = true;
@@ -347,6 +380,7 @@ export class ResourceCoordinator {
       );
     } else {
       r.buffer.dispose();
+      this.budget.release(`illustrated:${r.instance}`);
       this.budget.release(`source-metadata:${r.key}`);
       this.resources.delete(r.key);
       if (this.activeKey === r.key) {
@@ -359,6 +393,8 @@ export class ResourceCoordinator {
     this.emit();
   }
   private async settle(r: EditorResource): Promise<boolean> {
+    // Immutable observations have no edits to settle; closing must not wait on transport.
+    if (r.kind === "illustrated") return !r.buffer.composing;
     await r.pending;
     await r.saving;
     if (r.buffer.composing) return false;
@@ -430,6 +466,77 @@ export class ResourceCoordinator {
       }
     }
     if (changed) this.emit();
+  }
+  /** Illustrated bodies have no save session. Stable date identity survives publication changes. */
+  async openIllustrated(
+    date: string,
+    activate = true,
+    refresh = false,
+  ): Promise<boolean> {
+    if (this.active?.buffer.composing || !this.bridge.readIllustrated)
+      return false;
+    const r = this.record(
+      `illustrated:${date}`,
+      `${date} · Illustrated`,
+      "illustrated",
+      date,
+    );
+    if (!r) return false;
+    if (activate) this.activate(r);
+    if (!this.online) return !!r.illustrated;
+    const connection = this.connectionEpoch;
+    if (r.pending) {
+      const loadingEpoch = r.epoch;
+      await r.pending;
+      if (!this.current(r, loadingEpoch, connection)) return false;
+      if (!refresh) return !!r.illustrated;
+    }
+    if (r.illustrated && !r.stale && !refresh) return true;
+    const epoch = ++r.epoch;
+    const key = `illustrated-load:${r.instance}:${epoch}`;
+    if (!this.budget.reserve(key, 5 * 1024 * 1024)) {
+      r.error = "session_limit";
+      this.emit();
+      return false;
+    }
+    r.loading = true;
+    this.emit();
+    const pending = (async () => {
+      try {
+        const entry = await this.bridge.readIllustrated!(date);
+        if (!this.current(r, epoch, connection)) return;
+        if (entry.date !== date)
+          throw new AuthenticError("invalid_response", false);
+        if (
+          !this.budget.reserve(`illustrated:${r.instance}`, payloadBytes(entry))
+        )
+          throw new AuthenticError("session_limit", false);
+        r.buffer.setEditable(false);
+        if (r.buffer.setIllustrated) {
+          if (r.illustrated?.version !== entry.version || r.stale)
+            r.buffer.setIllustrated(entry, true);
+        } else r.buffer.setText(entry.markdown);
+        r.illustrated = entry;
+        r.stale = false;
+        r.error = null;
+      } catch (error) {
+        if (this.current(r, epoch, connection)) {
+          r.error = code(error);
+          r.stale = true;
+          if (r.illustrated) r.buffer.setIllustrated?.(r.illustrated, false);
+        }
+      } finally {
+        this.budget.release(key);
+        if (r.epoch === epoch) {
+          r.loading = false;
+          r.pending = undefined;
+          this.emit();
+        }
+      }
+    })();
+    r.pending = pending;
+    await pending;
+    return this.resources.get(r.key) === r && !r.error && !!r.illustrated;
   }
   async openCandidate(key: string) {
     return this.switchTab(key);
@@ -669,6 +776,7 @@ export class ResourceCoordinator {
       r.epoch++;
       r.session?.dispose();
       r.buffer.dispose();
+      this.budget.release(`illustrated:${r.instance}`);
       this.budget.release(`source-metadata:${r.key}`);
       this.resources.delete(closingKey);
       if (this.activeKey === closingKey) {
@@ -720,6 +828,8 @@ export class ResourceCoordinator {
     if (!resource || !this.online) return;
     if (resource.session) await resource.session.retryLoad();
     else if (resource.kind === "authentic") await this.loadAuthentic(resource);
+    else if (resource.kind === "illustrated")
+      await this.openIllustrated(resource.date!, false, true);
     this.emit();
   }
   dispatch(action: Action) {
@@ -742,6 +852,7 @@ export class ResourceCoordinator {
       r.epoch++;
       r.session?.dispose();
       r.buffer.dispose();
+      this.budget.release(`illustrated:${r.instance}`);
       this.budget.release(`source-metadata:${r.key}`);
     }
     this.resources.clear();

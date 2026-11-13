@@ -234,6 +234,7 @@ mod tests {
                 reason: None,
                 chat: Capability::Ready,
                 generate: Capability::Ready,
+                illustrated: Capability::Ready,
             })
         }
     }

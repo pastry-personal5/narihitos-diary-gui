@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn registry_parity() {
         let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
-        let want: [(&str, &str, Vec<String>); 13] = [
+        let want: [(&str, &str, Vec<String>); 15] = [
             ("palette.open", "app", s(&["Shift+Command+P"])),
             ("editor.save", "app", s(&["Command+S"])),
             ("authentic.create_empty", "app", s(&[])),
@@ -254,6 +254,8 @@ mod tests {
                 ]),
             ),
             ("source.refresh", "app", s(&[])),
+            ("illustrated.create", "app", s(&[])),
+            ("illustrated.delete", "app", s(&[])),
             ("generate.start", "app", s(&[])),
             ("ai.activity.open", "app", s(&[])),
             ("ai.run.cancel", "app", s(&[])),

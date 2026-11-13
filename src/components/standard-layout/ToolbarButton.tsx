@@ -1,3 +1,4 @@
+import illustratedCreate from "../../assets/toolbar/illustrated-create.png";
 import type { ComponentProps } from "react";
 import createEmpty from "../../assets/toolbar/create-empty.png";
 import exportIcloud from "../../assets/toolbar/export-icloud.png";
@@ -14,6 +15,7 @@ import entry from "../../assets/controls/entry.png";
 import close from "../../assets/controls/close.png";
 
 const ICONS = {
+  illustratedCreate,
   createEmpty,
   exportIcloud,
   exportNotion,

@@ -245,9 +245,11 @@ Plan: [overview](../archive/milestones/p1-m34/milestone-34-illustrated-diary-ove
 
 ### P1-M35: Illustrated diary GUI
 
-Status: Planned
+Status: Done
 Goal: Create, watch, read, replace and delete the Illustrated diary in the app.
-Plan: [overview](milestone-35-illustrated-diary-gui-overview.md), [work plan](milestone-35-illustrated-diary-gui-architecture.md)
+Plan: [overview](../archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-overview.md), [work plan](../archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-architecture.md)
+
+Notes: Completed 2026-11-13; [native, test and release-artifact evidence](../archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-evidence.md).
 
 ### P1-M32: Personal release qualification
 

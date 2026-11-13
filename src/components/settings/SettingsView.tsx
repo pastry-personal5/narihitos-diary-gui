@@ -1,3 +1,5 @@
+import type { IllustratedController } from "../../application/illustrated/controller";
+import { ImageEnginesCard } from "../illustrated/ImageEnginesCard";
 import type { AIChatController } from "../../application/ai-chat/controller";
 import type { GenerationController } from "../../application/generation/controller";
 import { ProfilePicker } from "../ai-agents/ProfilePicker";
@@ -29,6 +31,7 @@ export function SettingsView({
   model,
   chat,
   generator,
+  illustrated,
   connected,
   connection,
   onConnect,
@@ -41,6 +44,7 @@ export function SettingsView({
   model: Model;
   chat: AIChatController;
   generator: GenerationController;
+  illustrated?: IllustratedController;
   connected: boolean;
   connection: Connection;
   onConnect: () => void;
@@ -267,6 +271,12 @@ export function SettingsView({
           <div>
             <h2>AI Agents</h2>
             <ProfilePicker chat={chat} generator={generator} />
+            {illustrated && (
+              <ImageEnginesCard
+                controller={illustrated}
+                connected={connected}
+              />
+            )}
             <div className="card" aria-label="Paragraph Review profile">
               <h3>Paragraph Review profile</h3>
               <label htmlFor="paragraph-review-profile">

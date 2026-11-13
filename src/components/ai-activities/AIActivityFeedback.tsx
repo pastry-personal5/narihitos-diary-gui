@@ -78,7 +78,7 @@ export function AIActivityFeedback({
       // not have an observation yet. They are still represented by the
       // activity status, but cannot produce progress-specific announcements.
       const p = job.progress;
-      if (!p) continue;
+      if (!p || p.kind === "illustrated") continue;
       if (
         !progressReady ||
         !agentProgressEnabled(progressPreferences, p.profile_id)

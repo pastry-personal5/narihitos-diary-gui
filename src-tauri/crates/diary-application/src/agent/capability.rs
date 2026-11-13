@@ -42,6 +42,7 @@ pub struct ProfileView {
     pub reason: Option<Reason>,
     pub chat: Capability,
     pub generate: Capability,
+    pub illustrated: Capability,
 }
 /// Read-only profile status; implementations never start inference.
 pub trait ProfileDirectory: Send + Sync {

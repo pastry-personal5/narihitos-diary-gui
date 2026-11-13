@@ -7,6 +7,10 @@ Required artifact results remain separate from automated application coverage an
 exempt human observations. Dated execution records below distinguish passing coverage from open release
 scenarios; the existence of a test is not a passing result.
 
+## Illustrated GUI follow-up (2026-11-13)
+
+M35 adds a rendered, immutable Illustrated diary tab, dedicated Explorer catalog, bounded authenticated PNGs, create/replace/delete, shared activities and engine probes. Final M35 G01–G07 passed (`run.9Sko0I`), with 500 frontend tests, 15 Python harness tests, refreshed ordinary release scans and unchanged-server process/agent smokes. Its [acceptance record](../archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-evidence.md) records native fixture results and refreshed ordinary release artifact hashes/process checks. Atomic Editor/CM search notices are bundled, and the new fixture markers are scanned out of ordinary artifacts. This supersedes the prior statement that dependencies were unchanged for that earlier M32 run; it does not close unrelated M32 items or establish live Apple/GPU behavior.
+
 ## Coverage inventory
 
 All rows below are required. The linked H01–H12 observations are separately exempt

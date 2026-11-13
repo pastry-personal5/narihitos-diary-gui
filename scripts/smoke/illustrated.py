@@ -18,7 +18,10 @@ from isolation import server_configuration
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--live', action='store_true')
+parser.add_argument('--gui-app', type=Path, help='Packaged scaffold-smoke app for the isolated native GUI leg')
 args = parser.parse_args()
+if args.live and args.gui_app:
+    parser.error('--gui-app uses synthetic fixtures only')
 if args.live and os.environ.get('DIARY_ILLUSTRATED_LIVE') != '1':
     parser.error('live mode requires DIARY_ILLUSTRATED_LIVE=1')
 subprocess.run(['cargo', 'build', '--quiet', '--manifest-path', str(ROOT / 'src-tauri/Cargo.toml'), '-p', 'diary-server'], check=True)
@@ -55,6 +58,7 @@ control=Path(__file__).with_name('control')
 mode=control.read_text() if control.exists() else ''
 if mode=='fail':sys.exit(1)
 if mode=='slow':time.sleep(60)
+if mode=='gui':time.sleep(0.5)
 assert os.environ['DIARY_IMAGE_PROMPT'].startswith('synthetic-trigger ')
 def chunk(k,b):return struct.pack('>I',len(b))+k+b+struct.pack('>I',zlib.crc32(k+b))
 png=b'\\x89PNG\\r\\n\\x1a\\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',1,1,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(b'\\x00\\xff\\x00\\x00'))+chunk(b'IEND',b'')
@@ -164,8 +168,49 @@ Path(os.environ['DIARY_IMAGE_OUT']).write_bytes(png)
         assert call('/illustrated/' + date, 'DELETE', {'version': new_version, 'confirmed': False})[0] == 409
         assert call('/illustrated/' + date, 'DELETE', {'version': new_version, 'confirmed': True})[0] == 200
         assert call('/illustrated/' + date)[0] == 404
+        illustrated_root = workspace / 'assets/diary/illustrated/2026/11'
+        assert not (illustrated_root / (date + '.md')).exists()
+        assert not (illustrated_root / date).exists()
         assert authentic_path.read_bytes() == original
-    evidence = {'profile': alias, 'engine': engine, 'job': job, 'photos': len(entry['photos']), 'themes': entry['theme_count'], 'authentic_unchanged': True, 'seconds': round(time.monotonic() - started, 2), 'server_sha256': hashlib.sha256(binary.read_bytes()).hexdigest()}
+    gui_evidence = None
+    if args.gui_app:
+        assert call('/sessions/' + session, 'DELETE')[0] == 204
+        session = None
+        app = args.gui_app.resolve(strict=True)
+        client = app / 'Contents/MacOS/diary-client'
+        assert client.is_file(), 'packaged client missing'
+        (base / 'control').write_text('gui')
+        settings = base / 'gui-settings'
+        settings.mkdir(mode=0o700)
+        env = dict(os.environ, DIARY_ILLUSTRATED_GUI_SMOKE='1', DIARY_ILLUSTRATED_SMOKE_SETTINGS=str(settings))
+        gui_log = base / 'gui.stderr'
+        with gui_log.open('w') as output:
+            gui = subprocess.Popen([str(client), '--connect', str(next(runtime.glob('*/discovery.json')))], env=env, stdout=output, stderr=output)
+            try:
+                deadline = time.monotonic() + 180
+                while gui.poll() is None:
+                    if time.monotonic() > deadline:
+                        raise AssertionError('packaged Illustrated GUI timed out; inspect retained gui.stderr: ' + str(base))
+                    lines = gui_log.read_text().splitlines()
+                    if any('SMOKE illustrated_gui ' in line and 'failed' in line for line in lines):
+                        raise AssertionError('packaged Illustrated GUI assertion failed; inspect retained gui.stderr: ' + str(base))
+                    time.sleep(0.1)
+            finally:
+                if gui.poll() is None:
+                    gui.terminate()
+                    try:
+                        gui.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        gui.kill()
+                        gui.wait(timeout=5)
+        lines = gui_log.read_text().splitlines()
+        passed = [line for line in lines if 'SMOKE illustrated_gui ' in line and 'passed' in line]
+        assert gui.returncode == 0 and passed, 'packaged Illustrated GUI did not pass; inspect retained gui.stderr: ' + str(base)
+        assert not list((workspace / 'assets/diary/illustrated').rglob('*.md')), 'GUI deletion left Illustrated Markdown'
+        assert not list((workspace / 'assets/diary/illustrated').rglob('*.png')), 'GUI deletion left generated photos'
+        gui_evidence = {'client_sha256':hashlib.sha256(client.read_bytes()).hexdigest(), 'result':passed[-1]}
+        print('PASS illustrated packaged GUI')
+    evidence = {'profile': alias, 'engine': engine, 'job': job, 'photos': len(entry['photos']), 'themes': entry['theme_count'], 'authentic_unchanged': True, 'seconds': round(time.monotonic() - started, 2), 'server_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'gui': gui_evidence}
     (base / 'evidence.json').write_text(json.dumps(evidence, indent=2) + '\n')
     print('PASS illustrated live' if args.live else 'PASS illustrated synthetic')
     print('Evidence:', base)

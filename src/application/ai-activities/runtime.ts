@@ -138,6 +138,9 @@ export class AIActivitiesRuntime {
       }
     }
   }
+  refresh(id: string) {
+    if (this.connected) void this.read(id);
+  }
   forget(id: string) {
     this.discarded.add(id);
     this.pending.delete(id);

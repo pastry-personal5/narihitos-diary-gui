@@ -28,6 +28,7 @@ impl Fake {
             } else {
                 Some(Reason::HelperMissing)
             },
+            illustrated: Capability::Ready,
             chat: if codex {
                 Capability::Ready
             } else {

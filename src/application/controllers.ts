@@ -1,3 +1,4 @@
+import { IllustratedController } from "./illustrated/controller";
 import type { ResourceBuffers } from "./editor/buffers";
 import type { SessionBudget } from "./navigation/budget";
 import { SourceTrashController } from "./trash/source-controller";
@@ -97,6 +98,18 @@ export function createAppControllers(
     ),
     budget,
   );
+  const illustrated = new IllustratedController(
+    bridge,
+    model,
+    messages,
+    budget,
+    () => activity.store.state,
+    (id) => activity.refresh(id),
+    async (date) => {
+      if (review.date === date && !(await review.end())) return false;
+      return settleAuthentic(model)(date);
+    },
+  );
   const activity = new AIActivitiesRuntime(
     bridge,
     (job) => {
@@ -117,6 +130,12 @@ export function createAppControllers(
     },
     budget,
   );
+  const offIllustratedSources = model.resources.subscribe(() =>
+    illustrated.observeSources(),
+  );
+  const offIllustratedActivity = activity.store.subscribe(() =>
+    illustrated.observeActivity(),
+  );
   const exporter = new ExportController(bridge, {
     flush: settleAuthentic(model),
     notify: (text, severity) => messages.add(text, severity),
@@ -133,6 +152,9 @@ export function createAppControllers(
     unguard();
     offParagraphNavigation();
     paragraphReview.dispose();
+    offIllustratedSources();
+    offIllustratedActivity();
+    illustrated.dispose();
     activity.dispose();
     exporter.dispose();
     generator.dispose();
@@ -151,6 +173,7 @@ export function createAppControllers(
     paragraphReview,
     generator,
     activity,
+    illustrated,
     exporter,
     /** Effect rehearsal reacquires before the final-release microtask runs. */
     acquire() {

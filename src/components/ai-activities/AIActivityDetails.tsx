@@ -11,7 +11,7 @@ const PHASE_LABEL: Record<string, string> = {
   stopping: "Stopping the request",
   finished: "Finished",
 };
-/** Textual progress and explicit access: completion never moves focus or navigates. */
+/** Textual progress and explicit result access; feature controllers own completion presentation. */
 export function AIActivityDetails({
   store,
   view,
@@ -75,8 +75,12 @@ export function AIActivityDetails({
             return (
               <li key={job.id}>
                 <p>
-                  {p.kind === "chat" ? "AI Chat" : "Generation"} ·{" "}
-                  {p.origin_date ?? "No document selected"} ·{" "}
+                  {p.kind === "chat"
+                    ? "AI Chat"
+                    : p.kind === "illustrated"
+                      ? "Illustrated diary"
+                      : "Generation"}{" "}
+                  · {p.origin_date ?? "No document selected"} ·{" "}
                   {
                     {
                       queued: "Waiting to start",
@@ -88,23 +92,38 @@ export function AIActivityDetails({
                   }
                   {unread ? " · Unread" : ""}
                 </p>
-                <p>
-                  Profile: {p.profile_id} · Writing Language: {p.locale}
-                </p>
-                <p>
-                  {PHASE_LABEL[p.phase ?? ""] ?? "Preparing"} ·{" "}
-                  {Math.floor(p.elapsed_ms / 1000)}s elapsed
-                  {p.last_agent_activity_at === null
-                    ? " · Waiting for the AI Agent to respond"
-                    : " · Response received from the AI Agent"}
-                  {running &&
-                    !state.stale &&
-                    (p.silence_ms ?? 0) >= 30_000 &&
-                    " · Still waiting for the agent; you can keep editing or cancel."}
-                  {p.cancellation_requested
-                    ? " · Stopping; waiting for the AI Agent to finish"
-                    : ""}
-                </p>
+                {p.kind !== "illustrated" && (
+                  <>
+                    <p>
+                      Profile: {p.profile_id} · Writing Language: {p.locale}
+                    </p>
+                    <p>
+                      {PHASE_LABEL[p.phase ?? ""] ?? "Preparing"} ·{" "}
+                      {Math.floor(p.elapsed_ms / 1000)}s elapsed
+                      {p.last_agent_activity_at === null
+                        ? " · Waiting for the AI Agent to respond"
+                        : " · Response received from the AI Agent"}
+                      {running &&
+                        !state.stale &&
+                        (p.silence_ms ?? 0) >= 30_000 &&
+                        " · Still waiting for the agent; you can keep editing or cancel."}
+                      {p.cancellation_requested
+                        ? " · Stopping; waiting for the AI Agent to finish"
+                        : ""}
+                    </p>
+                  </>
+                )}
+                {p.kind === "illustrated" && (
+                  <p>
+                    {p.phase === "photo"
+                      ? `Creating photo ${p.photo_index} of ${p.photo_count}`
+                      : p.phase === "text"
+                        ? "Preparing illustrated text"
+                        : p.phase === "stopping"
+                          ? "Stopping; waiting for acknowledgement"
+                          : "Finished"}
+                  </p>
+                )}
                 {p.kind === "generation" && (
                   <p>
                     {p.ready_count} ready · {p.failed_count} failed ·{" "}
@@ -114,20 +133,28 @@ export function AIActivityDetails({
                 )}
                 {job.state === "failed" && (
                   <p>
-                    The AI Agent could not finish this request. Any completed
-                    candidates remain available. Check Global Messages for
-                    details before trying again.
+                    {p.kind === "illustrated"
+                      ? "Illustrated creation failed. Any previous published version is preserved."
+                      : "The AI Agent could not finish this request. Any completed candidates remain available."}{" "}
+                    Check Global Messages for details before trying again.
                   </p>
                 )}
                 {job.state === "cancelled" && (
                   <p>
-                    This activity was stopped. Completed candidates remain
-                    available.
+                    This activity was stopped.{" "}
+                    {p.kind === "illustrated"
+                      ? "Any previous published version is preserved."
+                      : "Completed candidates remain available."}
                   </p>
                 )}
                 {running ? (
                   <button
-                    disabled={state.stale || p.cancellation_requested}
+                    disabled={
+                      state.stale ||
+                      (p.kind === "illustrated"
+                        ? p.phase === "stopping"
+                        : p.cancellation_requested)
+                    }
                     onClick={() => act(() => cancel(job))}
                   >
                     Cancel AI run

@@ -1,3 +1,4 @@
+import type { IllustratedController } from "../../application/illustrated/controller";
 import type { TrashCoordinator } from "../../application/trash/coordinator";
 import type { GlobalMessagesStore } from "../../application/global-messages/store";
 import { useEffect, useRef, useState } from "react";
@@ -24,6 +25,7 @@ export function useConnection(
     generator,
     activity,
     review,
+    illustrated,
   }: {
     model: NavigationModel;
     trash: TrashCoordinator;
@@ -32,6 +34,7 @@ export function useConnection(
     generator: GenerationController;
     activity: AIActivitiesRuntime;
     review: ReviewController;
+    illustrated?: IllustratedController;
   },
 ) {
   async function connectNavigation(
@@ -40,9 +43,11 @@ export function useConnection(
     generation: number,
     writable: boolean,
   ) {
+    illustrated?.connect(online, writable);
     const recovery = trash.connect(online, writable);
     await model.connect(online, instance, generation, writable);
     await recovery;
+    if (online) illustrated?.observeActivity();
   }
   const mounted = useRef(true);
   const attempts = useRef(0);
@@ -106,10 +111,11 @@ export function useConnection(
     if (!connected) return;
     const focus = () => {
       void model.browse(model.calendar?.anchor, "month");
+      void illustrated?.resync();
     };
     window.addEventListener("focus", focus);
     return () => window.removeEventListener("focus", focus);
-  }, [connected, model]);
+  }, [connected, model, illustrated]);
   function adviseSources(sources: Parameters<typeof sourceImportAdvice>[0]) {
     const advice = sourceImportAdvice(sources);
     if (advice) messages.add(advice, "warning", true);
@@ -139,8 +145,12 @@ export function useConnection(
         chat.onEvent(event);
         generator.onEvent(event);
         activity.event(event);
-        if (event.kind === "authentic_changed")
+        if (event.kind === "authentic_changed") {
           void review.onAuthenticChanged();
+          illustrated?.onSourceChanged();
+        }
+        if (event.kind === "job_snapshot" && event.complete)
+          illustrated?.observeActivity();
         if (event.kind === "disconnected") {
           connectionEpoch.current++;
           void dispose.current?.();
@@ -151,7 +161,8 @@ export function useConnection(
             message: "Connection interrupted. Reconnecting automatically.",
           });
         }
-        if (event.kind === "resync_required" && ready)
+        if (event.kind === "resync_required" && ready) {
+          void illustrated?.resync();
           void bridge
             .status()
             .then((fresh) => {
@@ -170,6 +181,7 @@ export function useConnection(
                 });
               }
             });
+        }
       });
       if (!current()) {
         await stop();

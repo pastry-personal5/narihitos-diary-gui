@@ -11305,6 +11305,24 @@
   },
   {
     "ecosystem": "npm",
+    "name": "@atomic-editor/editor",
+    "version": "0.6.2",
+    "license": "MIT",
+    "source_archive": "https://registry.npmjs.org/@atomic-editor/editor/-/editor-0.6.2.tgz",
+    "installed": true,
+    "dev": false,
+    "optional": false,
+    "notices": [
+      {
+        "original_name": "LICENSE",
+        "file": "licenses/e1ce7da88958b6876939f6e6fd9c970b51c44ef3fcdb317ee9679eef78b6c58f.txt",
+        "sha256": "e1ce7da88958b6876939f6e6fd9c970b51c44ef3fcdb317ee9679eef78b6c58f"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "npm",
     "name": "@babel/code-frame",
     "version": "7.29.7",
     "license": "MIT",
@@ -11795,6 +11813,24 @@
     "version": "6.9.7",
     "license": "MIT",
     "source_archive": "https://registry.npmjs.org/@codemirror/lint/-/lint-6.9.7.tgz",
+    "installed": true,
+    "dev": false,
+    "optional": false,
+    "notices": [
+      {
+        "original_name": "LICENSE",
+        "file": "licenses/05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07.txt",
+        "sha256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
+      }
+    ],
+    "selected_licenses": ["MIT"]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@codemirror/search",
+    "version": "6.7.2",
+    "license": "MIT",
+    "source_archive": "https://registry.npmjs.org/@codemirror/search/-/search-6.7.2.tgz",
     "installed": true,
     "dev": false,
     "optional": false,

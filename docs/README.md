@@ -9,7 +9,7 @@ Status: Active
 - [Version v1.0.0 release note](release-notes-v1.0.0.md): user-facing summary,
   availability and qualification limits for the first personal release.
 
-- P1-M33 to P1-M35 Illustrated diary (engines/format done; GUI planned): [image engines](archive/milestones/p1-m33/milestone-33-image-engines-overview.md) ([work plan](archive/milestones/p1-m33/milestone-33-image-engines-architecture.md)), [format and creation](archive/milestones/p1-m34/milestone-34-illustrated-diary-overview.md) ([work plan](archive/milestones/p1-m34/milestone-34-illustrated-diary-architecture.md)), [GUI](phase-1/milestone-35-illustrated-diary-gui-overview.md) ([work plan](phase-1/milestone-35-illustrated-diary-gui-architecture.md)).
+- P1-M33 to P1-M35 Illustrated diary (Done): [image engines](archive/milestones/p1-m33/milestone-33-image-engines-overview.md) ([work plan](archive/milestones/p1-m33/milestone-33-image-engines-architecture.md)), [format and creation](archive/milestones/p1-m34/milestone-34-illustrated-diary-overview.md) ([work plan](archive/milestones/p1-m34/milestone-34-illustrated-diary-architecture.md)), [GUI](archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-overview.md) ([work plan](archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-architecture.md), [evidence](archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-evidence.md)).
 
 - [Paragraph review module boundaries](architecture/paragraph-review.md): application policy, AI/editor ports, composition, conversation ownership and future extension guidance.
 

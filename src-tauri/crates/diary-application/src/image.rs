@@ -102,16 +102,34 @@ impl Drop for BusyView<'_> {
 }
 #[derive(Default)]
 pub struct Registry {
+    shutdown: Arc<AtomicBool>,
     views: Mutex<Vec<EngineView>>,
     entries: Mutex<BTreeMap<String, Entry>>,
 }
 impl Registry {
+    /// Shared with process adapters, including replacements installed by reload.
+    pub fn shutdown_signal(&self) -> Arc<AtomicBool> {
+        self.shutdown.clone()
+    }
+    /// Never takes the operation lock: active engines must be able to observe this.
+    pub fn shutdown(&self) {
+        self.shutdown.store(true, Ordering::SeqCst);
+    }
+    /// Call on a blocking worker before releasing the workspace lock.
+    pub fn shutdown_and_wait(&self) {
+        self.shutdown();
+        drop(self.entries.lock().unwrap());
+    }
+
     /// Holds the same lock as render/probe for an atomic configuration replacement.
     pub fn replace(
         &self,
         engines: Vec<(String, String, Arc<dyn ImageEngine>)>,
     ) -> Result<(), EngineError> {
         let mut entries = self.entries.try_lock().map_err(|_| EngineError::Busy)?;
+        if self.shutdown.load(Ordering::SeqCst) {
+            return Err(EngineError::Cancelled);
+        }
         *entries = engines
             .into_iter()
             .map(|(id, label, engine)| {
@@ -140,6 +158,9 @@ impl Registry {
         id: &str,
     ) -> Result<crate::illustrated::PromptSettings, EngineError> {
         let entries = self.entries.try_lock().map_err(|_| EngineError::Busy)?;
+        if self.shutdown.load(Ordering::SeqCst) {
+            return Err(EngineError::Cancelled);
+        }
         entries
             .get(id)
             .map(|e| e.engine.prompt_settings())
@@ -150,6 +171,9 @@ impl Registry {
     }
     pub fn check(&self, id: &str) -> Result<Option<EngineView>, EngineError> {
         let mut entries = self.entries.try_lock().map_err(|_| EngineError::Busy)?;
+        if self.shutdown.load(Ordering::SeqCst) {
+            return Err(EngineError::Cancelled);
+        }
         let Some(e) = entries.get_mut(id) else {
             return Ok(None);
         };
@@ -167,6 +191,9 @@ impl Registry {
     pub fn render(&self, id: &str, request: &RenderRequest) -> Result<Rendered, EngineError> {
         request.validate()?;
         let entries = self.entries.try_lock().map_err(|_| EngineError::Busy)?;
+        if self.shutdown.load(Ordering::SeqCst) {
+            return Err(EngineError::Cancelled);
+        }
         let e = entries.get(id).ok_or(EngineError::Unavailable)?;
         RENDERING
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -186,7 +213,7 @@ impl Registry {
         };
         request.validate()?;
         let result = e.engine.render(request)?;
-        if request.cancel.is_cancelled() {
+        if request.cancel.is_cancelled() || self.shutdown.load(Ordering::SeqCst) {
             return Err(EngineError::Cancelled);
         }
         Ok(result)
@@ -245,6 +272,61 @@ mod tests {
             Err(EngineError::Failed)
         }
     }
+    #[test]
+    fn shutdown_drains_active_probe_and_permanently_rejects_new_work() {
+        struct Probe {
+            shutdown: Arc<AtomicBool>,
+            entered: std::sync::mpsc::Sender<()>,
+        }
+        impl ImageEngine for Probe {
+            fn check(&self) -> Availability {
+                self.entered.send(()).unwrap();
+                while !self.shutdown.load(Ordering::SeqCst) {
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Availability::Unavailable
+            }
+            fn render(&self, _: &RenderRequest) -> Result<Rendered, EngineError> {
+                panic!("stopped registries must not start rendering")
+            }
+        }
+        let registry = Arc::new(Registry::default());
+        let (tx, rx) = std::sync::mpsc::channel();
+        registry
+            .replace(vec![(
+                "local".into(),
+                "Local".into(),
+                Arc::new(Probe {
+                    shutdown: registry.shutdown_signal(),
+                    entered: tx,
+                }),
+            )])
+            .unwrap();
+        let active = registry.clone();
+        let worker = std::thread::spawn(move || active.check("local"));
+        rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
+        registry.shutdown_and_wait();
+        assert_eq!(
+            worker.join().unwrap().unwrap().unwrap().status,
+            Availability::Unavailable
+        );
+        assert_eq!(registry.check("local").err(), Some(EngineError::Cancelled));
+        assert_eq!(registry.replace(vec![]), Err(EngineError::Cancelled));
+        assert_eq!(
+            registry
+                .render(
+                    "local",
+                    &RenderRequest {
+                        prompt: "synthetic".into(),
+                        seed: 0,
+                        cancel: Default::default()
+                    }
+                )
+                .err(),
+            Some(EngineError::Cancelled)
+        );
+    }
+
     #[test]
     fn validation_and_failure_release() {
         let registry = Registry::default();

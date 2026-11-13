@@ -131,6 +131,7 @@ impl ProfileService {
                 None
             },
             chat: catalog.capability(e.kind, PromptAction::Chat, registered),
+            illustrated: catalog.capability(e.kind, PromptAction::Illustrated, registered),
             generate: catalog.capability(e.kind, PromptAction::GenerateCandidate, registered),
         }
     }

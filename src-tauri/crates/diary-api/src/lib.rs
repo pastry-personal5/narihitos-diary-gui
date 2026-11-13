@@ -343,9 +343,23 @@ impl ServerState {
         self.diagnostics.emit(record);
     }
     pub fn shutdown(&self) {
+        self.images.shutdown();
         self.stopping
             .store(true, std::sync::atomic::Ordering::Release);
         self.expire_leases(u64::MAX);
+    }
+    /// Cancelled Illustrated workers may still own completed photo staging or be
+    /// finishing publication. Keep the workspace locked until they acknowledge.
+    pub async fn drain_illustrated(&self) {
+        while self
+            .illustrated_jobs
+            .lock()
+            .unwrap()
+            .values()
+            .any(|job| !job.terminal)
+        {
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
     }
     pub async fn sweep(self: Arc<Self>) {
         while !self.stopping.load(std::sync::atomic::Ordering::Acquire) {

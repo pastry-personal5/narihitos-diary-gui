@@ -1,3 +1,4 @@
+import type { IllustratedEntry } from "../illustrated/contracts";
 import type { BufferPort } from "../authentic/session";
 import type { ReviewView } from "../review/contracts";
 import type { ParagraphReviewEditor } from "../paragraph-review/contracts";
@@ -10,6 +11,7 @@ export interface ResourceBufferPort extends BufferPort {
   readonly reviewing: boolean;
   readonly paragraphReview?: ParagraphReviewEditor;
   setEditable(editable: boolean): void;
+  setIllustrated?(entry: IllustratedEntry, online: boolean): void;
   setReview(view: ReviewView | null, decide: ReviewDecide): void;
   focus(): void;
   dispose(): void;

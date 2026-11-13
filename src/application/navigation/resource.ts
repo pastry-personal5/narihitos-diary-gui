@@ -1,3 +1,4 @@
+import type { IllustratedEntry } from "../illustrated/contracts";
 import type { AuthenticSession } from "../authentic/session";
 import type { SourceBody } from "./contracts";
 import type { ResourceBufferPort } from "../editor/buffers";
@@ -7,7 +8,8 @@ export interface EditorResource {
   editGeneration: number;
   key: string;
   label: string;
-  kind: "authentic" | "source" | "candidate";
+  kind: "authentic" | "source" | "candidate" | "illustrated";
+  illustrated?: IllustratedEntry;
   date?: string;
   buffer: ResourceBufferPort;
   session?: AuthenticSession;

@@ -447,3 +447,52 @@ describe("close acknowledgement", () => {
     ).toHaveLength(2);
   });
 });
+
+describe("Illustrated command adapters", () => {
+  it("validates create/delete acknowledgements and engine identity without forwarding malformed native values", async () => {
+    mocks.invoke.mockResolvedValue({
+      job: { id: "job", sequence: 1, state: "running" },
+    });
+    await expect(
+      tauriBridge.createIllustrated!("2026-11-13", {
+        request_id: "request",
+        profile: "main",
+        locale: "en-US",
+        engine: null,
+      }),
+    ).resolves.toEqual({ job_id: "job" });
+    mocks.invoke.mockResolvedValue({
+      job: { id: "../private", sequence: 0, state: "running" },
+    });
+    await expect(
+      tauriBridge.createIllustrated!("2026-11-13", {
+        request_id: "request",
+        profile: "main",
+        locale: "en-US",
+        engine: null,
+      }),
+    ).rejects.toMatchObject({ code: "invalid_response" });
+    mocks.invoke.mockResolvedValue({
+      id: "other",
+      label: "Other",
+      status: "ready",
+      reason: null,
+    });
+    await expect(
+      tauriBridge.checkImageEngine!("selected"),
+    ).rejects.toMatchObject({ code: "invalid_response" });
+    mocks.invoke.mockResolvedValue({ deleted: true });
+    await expect(
+      tauriBridge.deleteIllustrated!("2026-11-13", "version"),
+    ).rejects.toMatchObject({ code: "invalid_response" });
+    mocks.invoke.mockResolvedValue(null);
+    await expect(
+      tauriBridge.deleteIllustrated!("2026-11-13", "version"),
+    ).resolves.toBeUndefined();
+    expect(mocks.invoke).toHaveBeenLastCalledWith("delete_illustrated", {
+      date: "2026-11-13",
+      version: "version",
+      confirmed: true,
+    });
+  });
+});

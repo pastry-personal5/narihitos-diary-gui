@@ -304,7 +304,10 @@ async fn run() -> Result<(), &'static str> {
     diary_infrastructure::image::prepare(&config).map_err(|_| "image staging unavailable")?;
     let images = Arc::new(diary_application::image::Registry::default());
     images
-        .replace(diary_infrastructure::image::configured(&config))
+        .replace(diary_infrastructure::image::configured(
+            &config,
+            images.shutdown_signal(),
+        ))
         .map_err(|_| "image configuration unavailable")?;
     diary_api::ServerState::set_images(&mut state, images.clone());
     if workspace.readiness == Readiness::Ready {
@@ -360,7 +363,7 @@ async fn run() -> Result<(), &'static str> {
         Arc::new(
             config::ConfigHandle::new(&path, &config, launch_path.clone(), launch_cwd.clone())
                 .with_profiles(profile_table)
-                .with_images(images),
+                .with_images(images.clone()),
         ),
     );
     #[cfg(feature = "scaffold-smoke")]
@@ -404,24 +407,32 @@ async fn run() -> Result<(), &'static str> {
         let _ = stop_rx.await;
     });
     let mut service = std::pin::pin!(std::future::IntoFuture::into_future(service));
-    tokio::select! {
-        result = &mut service => { result.map_err(|_| "server transport failed")?; },
+    let result = tokio::select! {
+        result = &mut service => result.map_err(|_| "server transport failed"),
         _ = async { tokio::select! { _ = interrupt.recv() => (), _ = term.recv() => () } } => {
             diagnostics.emit(Record::new(EventCode::ServerStopping, Level::Info));
             adapter.shutdown();
             state.shutdown();
             let _ = stop_tx.send(());
-            // No durable work is implemented; stop streams and cap network drain.
-            if let Ok(result) = tokio::time::timeout(std::time::Duration::from_secs(10), &mut service).await {
-                result.map_err(|_| "server transport failed")?;
+            // Stop streams and cap network drain; process cleanup is awaited below.
+            match tokio::time::timeout(std::time::Duration::from_secs(10), &mut service).await {
+                Ok(result) => result.map_err(|_| "server transport failed"),
+                Err(_) => Ok(()),
             }
         },
-    }
+    };
+    // Transport failures must cancel owned work too. Retain the workspace lock
+    // until the image supervisor has reaped children and removed render staging.
+    adapter.shutdown();
+    state.shutdown();
+    let drained = tokio::task::spawn_blocking(move || images.shutdown_and_wait()).await;
+    state.drain_illustrated().await;
     sweeper.abort();
     drop(published);
     drop(workspace);
     drop(lock);
-    Ok(())
+    drained.map_err(|_| "image shutdown failed")?;
+    result
 }
 
 #[cfg(test)]

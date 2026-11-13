@@ -1,3 +1,4 @@
+import type { IllustratedProgress } from "../illustrated/contracts";
 import type { GenerationProgress } from "../generation/contracts";
 export interface ChatProgress {
   kind: "chat";
@@ -16,7 +17,8 @@ export interface ChatProgress {
   cancellation_requested: boolean;
   error_code: string | null;
 }
-export type AiProgress = ChatProgress | GenerationProgress;
+export type AiProgress =
+  ChatProgress | GenerationProgress | IllustratedProgress;
 const phases = [
   "preparing_context",
   "starting_agent",
@@ -59,6 +61,48 @@ function locale(v: unknown): string {
 /** Project allowlisted metadata only; never retain arbitrary response fields. */
 export function aiProgress(value: unknown, jobId: string): AiProgress {
   const p = object(value);
+  if (p.kind === "illustrated") {
+    if (
+      p.job_id !== jobId ||
+      !["text", "photo", "stopping", "finished"].includes(p.phase as string)
+    )
+      return bad();
+    const index = integer(p.photo_index),
+      count = integer(p.photo_count);
+    if (
+      count > 99 ||
+      index > count ||
+      (p.phase === "photo" && index < 1) ||
+      (p.phase === "text" && (index !== 0 || count !== 0))
+    )
+      return bad();
+    if (
+      p.error_code !== null &&
+      ![
+        "cancelled",
+        "agent_failed",
+        "render_failed",
+        "no_authentic",
+        "invalid_illustrated",
+        "unavailable",
+        "profile_unavailable",
+        "engine_unavailable",
+        "source_busy",
+      ].includes(p.error_code as string)
+    )
+      return bad();
+    return {
+      kind: "illustrated",
+      job_id: id(p.job_id),
+      instance_id: id(p.instance_id),
+      session_id: id(p.session_id),
+      origin_date: day(p.origin_date),
+      phase: p.phase as IllustratedProgress["phase"],
+      photo_index: index,
+      photo_count: count,
+      error_code: p.error_code as string | null,
+    };
+  }
   if (p.kind !== "chat" && p.kind !== "generation") return bad();
   if (p.job_id !== jobId || typeof p.cancellation_requested !== "boolean")
     return bad();

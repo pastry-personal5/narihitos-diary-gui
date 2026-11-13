@@ -421,6 +421,9 @@ export function profileDto(value: unknown): ProfileInfo {
     capabilities: {
       chat: profileCapabilityDto(caps.chat),
       generate: profileCapabilityDto(caps.generate),
+      ...(caps.illustrated === undefined
+        ? {}
+        : { illustrated: profileCapabilityDto(caps.illustrated) }),
     },
   };
 }

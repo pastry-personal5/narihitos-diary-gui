@@ -13,6 +13,16 @@ Product scope: what the app does and what it deliberately does not do.
 - AI writing language is chosen in Settings, initially uses the Mac's preferred language, and is remembered across sessions. Generate requires at least one selected eligible source snippet; changing dates lets generation finish in the background for its original date. **Create Empty** immediately saves an empty Authentic draft for the selected date without requiring snippets, and it remains visible after restart. See the [architecture review interview](phase-1/milestone-02-architecture-review.md#owner-interview).
 - Long AI work keeps ordinary editing/navigation available, with visible progress, cancellation and in-app completion feedback; no macOS notifications are used. If the saved Authentic changes during generation, its candidates require regeneration before review. See the [background AI experience](architecture/ai-job-experience.md).
 
+## Illustrated diaries
+
+A saved Authentic diary can produce a separate Illustrated diary with rewritten text and generated photos. Create Illustrated Diary shares the Generation profile and Writing Language, settles pending Authentic saves and captures that date before submission. Engine selection and the photo cap remain server configuration. The action explains unavailable source, profile, engine, storage, language or activity state.
+
+A dedicated Illustrated Explorer tab lists published dates independently of Authentic catalog membership. Each opens a rendered, strictly read-only Atomic Editor tab in the existing Tabbed Editor. It has no save, review, candidate adoption or export action. Generated PNGs load through authenticated, version-bound bridge reads as temporary object URLs; image content is limited to generated diary photos. Tab close, replacement, disconnect and obsolete results release owned photo resources. Failed images retain alt text and an explicit Retry.
+
+AI Activities shows text preparation, photo k of N and cancellation. Editing and Authentic autosave remain usable during creation. Publication replaces silently only after every photo succeeds. Failure or pre-publication cancellation retains any previous version; cancellation after publication reconciles to the successful result. Completion opens the result while still on its originating day; otherwise Global Messages reports completion without moving the working date or focus. Saved source changes produce a quiet, deduplicated Global Message, without automatic regeneration. Deletion requires confirmation tied to the displayed version; a conflict requires refresh and new confirmation.
+
+Settings > AI Agents contains Image engines with availability, effective selection and Check. Checks probe prerequisites without rendering. Illustrated configuration changes require a server restart. The [GUI plan](archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-overview.md) records the owner interview and evidence requirements.
+
 ## P1-M2 owner-confirmed contracts
 
 The [owner interview](phase-1/milestone-02-owner-decisions.md) is the detailed decision record; its D01–D17 identifiers provide provenance.

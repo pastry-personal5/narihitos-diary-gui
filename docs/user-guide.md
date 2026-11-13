@@ -97,4 +97,19 @@ text-only snippet Trash remains unavailable.
 
 ## Local image engine configuration
 
-The optional private YAML `image_engines` map configures local PNG generators. See the [configuration and command contract](architecture/image-engines.md). Discovery is available through authenticated list/check API routes; diary and GUI integration are separate work.
+The optional private YAML `image_engines` map configures local PNG generators. See the [configuration and command contract](architecture/image-engines.md). Settings > AI Agents > Image engines shows configured engines and their effective Illustrated selection. Readiness is checked automatically in the background on connection and when opening AI Agents. Problems appear in Global Messages. Use Check to retry a prerequisite check; it does not generate a photo. Engine selection, prompts and the photo cap remain in private server configuration, and Illustrated configuration changes need a server restart. Stopping the server with SIGTERM or Ctrl+C also stops its active image engines and waits for cleanup.
+
+## Illustrated diaries
+
+1. Save an Authentic diary for the working date. In Settings > AI Agents, choose a ready Generation profile and wait for the automatic image engine check to finish. Choose a Writing Language if it is unresolved.
+2. Choose **Create Illustrated Diary** in the toolbar or Command palette. Pending Authentic saves finish before capture. The action’s tooltip explains why creation is unavailable.
+3. Follow text preparation and photo progress in **AI Activities**. Use Cancel AI run there to request cancellation; the same dialog can be closed while work continues. Ordinary Authentic editing and autosave keep working.
+4. On success, a separate rendered, read-only Illustrated tab opens if you are still on that day. Otherwise Global Messages tells you where to open it. The **Illustrated** Explorer tab lists all published Illustrated dates, including dates whose Authentic file is absent.
+
+Creating again silently replaces the previous version only when the complete new version is published. Failure or cancellation before publication preserves the previous version. Cancellation can arrive too late to prevent publication; the displayed result follows the final server outcome. A quiet Global Message tells you when the saved Authentic changes after creation; nothing regenerates automatically.
+
+The viewer shows text and generated photos in order. Photos load as needed; an unavailable photo shows its description and Retry. A failed refresh keeps the previous text and releases its photos; reconnect or retry the refresh before loading them again. The viewer is read-only: no save, Paragraph Review or export. AI Chat uses the working day’s open Authentic buffer when an Illustrated tab is active; if that buffer is closed, it shows No document. Reading links can be selected/copied; the viewer does not open them automatically.
+
+To delete, open an Illustrated tab and choose **Delete Illustrated diary**. The dialog starts on Cancel. Confirm to remove the displayed Markdown and its photo directory; Authentic is kept. If the version changed, refresh and confirm the current version again. Close an Illustrated tab to release its loaded photos without deleting the saved diary. Closing stays available while a refresh is waiting for the server.
+
+If admission is uncertain, use **Retry Illustrated admission**. It checks the original request identity; starting a new request is held until that outcome or a new server session is reconciled. No live AI or GPU call is needed for the repository’s synthetic smoke tests.

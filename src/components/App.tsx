@@ -1,3 +1,4 @@
+import { IllustratedDeleteDialog } from "./illustrated/IllustratedDeleteDialog";
 import { TabbedEditor } from "./tabbed-editor/TabbedEditor";
 import { StandardLayout } from "./standard-layout/StandardLayout";
 import { MainToolbarStrip } from "./standard-layout/MainToolbarStrip";
@@ -54,6 +55,7 @@ export function App({ bridge }: { bridge: Bridge }) {
     paragraphReview,
     generator,
     activity,
+    illustrated,
     exporter,
     exportState,
     generationState,
@@ -92,6 +94,7 @@ export function App({ bridge }: { bridge: Bridge }) {
     createReason,
     bindings,
     generationReason,
+    illustratedReason,
     exportReason,
     handlers,
     hint,
@@ -102,6 +105,7 @@ export function App({ bridge }: { bridge: Bridge }) {
     connection,
     settings,
     generator,
+    illustrated,
     chat,
     exporter,
     setPaletteOpen,
@@ -135,6 +139,7 @@ export function App({ bridge }: { bridge: Bridge }) {
     !connected ||
     !storage ||
     generator.running ||
+    illustrated.running ||
     chat.running ||
     reviewState.busy ||
     !!reviewState.view;
@@ -275,6 +280,20 @@ export function App({ bridge }: { bridge: Bridge }) {
             )}
             onClick={() => void handlers["generate.start"].run()}
           />
+          <ToolbarButton
+            action="illustratedCreate"
+            label={
+              illustrated.state.submitting
+                ? "Creating Illustrated Diary…"
+                : "Create Illustrated Diary"
+            }
+            disabled={!!illustratedReason}
+            title={hint(
+              "illustrated.create",
+              illustratedReason ?? "Create Illustrated Diary",
+            )}
+            onClick={() => void handlers["illustrated.create"].run()}
+          />
           <ParagraphReviewButton controller={paragraphReview} />
         </MainToolbarStrip>
         {selectedView?.createError && (
@@ -348,6 +367,7 @@ export function App({ bridge }: { bridge: Bridge }) {
           <SettingsView
             chat={chat}
             generator={generator}
+            illustrated={illustrated}
             paragraphProfiles={paragraphProfiles}
             paragraphProfile={paragraphSelection}
             onParagraphProfile={setParagraphAlias}
@@ -365,7 +385,13 @@ export function App({ bridge }: { bridge: Bridge }) {
             onClose={() => {
               setSettingsOpen(false);
               void generator.loadProfiles();
-              requestAnimationFrame(() => settingsButton.current?.focus());
+              requestAnimationFrame(() => {
+                if (
+                  document.activeElement === document.body ||
+                  document.activeElement?.closest(".settings")
+                )
+                  settingsButton.current?.focus();
+              });
             }}
           />
         )}
@@ -384,16 +410,20 @@ export function App({ bridge }: { bridge: Bridge }) {
             store={activity.store}
             retry={() => latestConnect.current()}
             view={async (job) => {
-              if (job.progress?.kind === "generation") {
+              if (
+                job.progress?.kind === "generation" ||
+                job.progress?.kind === "illustrated"
+              ) {
                 // Let the modal release focus before navigation can ask about unsaved text.
                 setActivitiesOpen(false);
                 await new Promise<void>((resolve) =>
                   requestAnimationFrame(() => resolve()),
                 );
                 try {
-                  const opened = await model.chooseDate(
-                    job.progress.origin_date,
-                  );
+                  const opened =
+                    job.progress.kind === "illustrated"
+                      ? await illustrated.open(job.progress.origin_date)
+                      : await model.chooseDate(job.progress.origin_date);
                   if (!opened) setActivitiesOpen(true);
                   return opened;
                 } catch (error) {
@@ -423,6 +453,18 @@ export function App({ bridge }: { bridge: Bridge }) {
             }}
           />
         )}
+        {illustrated.state.uncertain && (
+          <div role="alert" className="notice">
+            Illustrated creation admission is uncertain.{" "}
+            <button
+              disabled={illustrated.state.submitting}
+              onClick={() => void illustrated.retryAdmission()}
+            >
+              Retry Illustrated admission
+            </button>
+          </div>
+        )}
+        <IllustratedDeleteDialog controller={illustrated} />
         <GenerationDialog controller={generator} />
         <ExportDialog controller={exporter} />
         <MainContent
@@ -454,11 +496,13 @@ export function App({ bridge }: { bridge: Bridge }) {
               model={model}
               sourceTrash={sourceTrash}
               generator={generator}
+              illustrated={illustrated}
             />
           }
           tabbedEditor={
             <TabbedEditor
               model={model}
+              illustrated={illustrated}
               messages={messages}
               generator={generator}
               settings={settings}
@@ -483,9 +527,11 @@ export function App({ bridge }: { bridge: Bridge }) {
                 locale={settings.user?.writing_locale ?? null}
                 context={chatContext}
                 otherRun={
-                  generator.running
-                    ? (generationState.originDate ?? "generation")
-                    : null
+                  illustrated.running
+                    ? "Illustrated creation"
+                    : generator.running
+                      ? (generationState.originDate ?? "generation")
+                      : null
                 }
               />
             </div>
@@ -508,6 +554,7 @@ export function App({ bridge }: { bridge: Bridge }) {
             !!settings.user?.writing_locale &&
             !chat.running &&
             !generator.running &&
+            !illustrated.running &&
             paragraphState.phase !== "reviewing" && (
               <span className="status-line-chat">Chat ready</span>
             )}

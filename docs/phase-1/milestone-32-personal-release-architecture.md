@@ -225,3 +225,27 @@ Update the user guide and README with tested release artifact layout, notices fo
 For every result record: checklist/scenario ID and required/exempt gate classification; date; revision and artifact hash/build mode; environment; sanitized command/procedure; expected and observed outcome; metrics or screenshot/log reference; limitations; pass/fail/blocked/exempt with decision link. Keep raw credentials, private paths, content and logs outside the repo. Use synthetic screenshots and redacted diagnostic IDs; copy only reviewable evidence into the docs.
 
 Finish with an A01–A07/R01–R15/E1–E13 coverage audit and Phase 1 exit-criteria review. Update linked M32 feature checklists with actual automated/native results and explicit exemptions for unrun human observations, then close/archive milestone plans and update roadmap, phase, handoff and index links together. This plan leaves implementation and release acceptance pending.
+
+## Automatic image engine readiness follow-up
+
+The Illustrated controller owns an epoch-bound, coalesced automatic check pass
+on connection and Settings > AI Agents entry. Discover first, then await each
+configured engine probe sequentially because the server registry serializes
+engine access. Reuse the asynchronous bridge and server `spawn_blocking` check
+route; no renderer or UI worker is needed. Check replies update cached readiness
+through a fresh discovery read. Publish app-authored warnings for discovery,
+probe and prerequisite failures, deduplicate unchanged problems until recovery,
+and discard obsolete connection/disposal replies. Keep explicit Check as retry.
+
+## Image engine server shutdown follow-up
+
+The image registry owns a permanent shutdown flag shared with configured command
+engines at startup and reload. ServerState shutdown sets it without taking the
+registry's operation mutex, allowing an active probe/render to observe shutdown.
+The command adapter passes it to the existing supervisor and rejects new work
+once stopped. After either a termination signal or transport completion/error,
+server cleanup stops agents and API work and waits on a blocking worker for the
+image registry operation mutex, then awaits Illustrated worker acknowledgement
+before dropping discovery and the workspace lock. This also releases already
+completed photo staging held by a cancelled multi-photo job. The existing supervisor owns TERM/grace/KILL/reap and disposable render staging.
+SIGKILL cannot run shutdown handlers; it is outside graceful termination.

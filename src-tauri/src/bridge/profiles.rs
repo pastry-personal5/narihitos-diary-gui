@@ -27,6 +27,8 @@ pub struct ActionCapability {
 pub struct Capabilities {
     pub chat: ActionCapability,
     pub generate: ActionCapability,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub illustrated: Option<ActionCapability>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProfileStatus {
@@ -63,6 +65,7 @@ fn sound(p: &ProfileStatus) -> bool {
         })
         && cap(&p.capabilities.chat)
         && cap(&p.capabilities.generate)
+        && p.capabilities.illustrated.as_ref().is_none_or(cap)
 }
 
 impl Bridge {

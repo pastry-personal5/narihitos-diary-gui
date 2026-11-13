@@ -75,6 +75,7 @@ fn main() {
             "krea2".into(),
             "Krea 2 (local)".into(),
             Arc::new(CommandEngine {
+                shutdown: registry.shutdown_signal(),
                 program,
                 root: root.path().into(),
                 timeout: Duration::from_secs(1800),

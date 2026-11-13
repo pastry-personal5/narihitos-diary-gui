@@ -2,7 +2,11 @@
 
 Status: Proposal
 
-Research requested for P1-M34 on 2026-11-13: can Atomic Editor provide an Obsidian-style inline Markdown surface with images? Yes, technically, with an app-owned image adapter and editing guards. Adoption remains a proposal; the current plans put format/creation in [M34](../archive/milestones/p1-m34/milestone-34-illustrated-diary-overview.md) and the read-only GUI in [M35](../phase-1/milestone-35-illustrated-diary-gui-overview.md).
+Research requested for P1-M34 on 2026-11-13: can Atomic Editor provide an Obsidian-style inline Markdown surface with images? Yes, technically, with an app-owned image adapter and editing guards. Adoption remains a proposal; the current plans put format/creation in [M34](../archive/milestones/p1-m34/milestone-34-illustrated-diary-overview.md) and the read-only GUI in [M35](../archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-overview.md).
+
+## M35 adoption update
+
+The owner approved the rendered read-only viewer and dependency qualification on 2026-11-13. M35 now composes the pinned published package with strict app mutation guards and app-owned photos, without the upstream wrapper, image/table widgets or global stylesheet. The [implementation evidence](../archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-evidence.md) supersedes the immediate-viewer proposal below; editable live preview remains a separate proposal.
 
 ## Evidence and conclusion
 

@@ -54,6 +54,7 @@ export function ProfileTable({
             <th>Status</th>
             <th>Chat</th>
             <th>Generate</th>
+            <th>Illustrated</th>
             <th>
               <span className="visually-hidden">Actions</span>
             </th>
@@ -62,7 +63,7 @@ export function ProfileTable({
         <tbody>
           {list?.length === 0 && (
             <tr>
-              <td colSpan={5}>None configured</td>
+              <td colSpan={6}>None configured</td>
             </tr>
           )}
           {list?.map((p) => {
@@ -120,6 +121,16 @@ export function ProfileTable({
                 </td>
                 <td>
                   <Capability cap={p.capabilities.generate} />
+                </td>
+                <td>
+                  <Capability
+                    cap={
+                      p.capabilities.illustrated ?? {
+                        available: false,
+                        reason: "assets_missing",
+                      }
+                    }
+                  />
                 </td>
                 <td>
                   <button

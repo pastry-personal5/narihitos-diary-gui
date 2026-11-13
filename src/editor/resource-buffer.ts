@@ -1,3 +1,9 @@
+import type { IllustratedEntry } from "../application/illustrated/contracts";
+import type { IllustratedPhotos } from "../adapters/illustrated-photos";
+import {
+  illustratedViewer,
+  inertIllustratedControls,
+} from "./illustrated-viewer";
 import { Compartment, EditorState, Text } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { CodeMirrorParagraphReview } from "./paragraph-review";
@@ -7,7 +13,7 @@ import {
   historyField,
   historyKeymap,
 } from "@codemirror/commands";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { SessionBudget, payloadBytes } from "../application/navigation/budget";
 import type {
   ResourceBufferPort,
@@ -61,6 +67,8 @@ export class ResourceBuffer implements ResourceBufferPort {
       else if (transaction.docChanged) this.handlers.edit();
     },
   });
+  private illustrated: { entry: IllustratedEntry; online: boolean } | null =
+    null;
   private editable = false;
   private review: { view: ReviewView; decide: ReviewDecide } | null = null;
   private scroll = { top: 0, left: 0 };
@@ -70,6 +78,7 @@ export class ResourceBuffer implements ResourceBufferPort {
     private readonly label: string,
     private readonly pool: EditorPayloadPool,
     private readonly handlers: ResourceEditorHandlers,
+    private readonly photos?: IllustratedPhotos,
   ) {
     this.state = this.create("");
     if (!this.account(this.state)) throw new ResourceLimit();
@@ -88,7 +97,14 @@ export class ResourceBuffer implements ResourceBufferPort {
             )
           : [],
         history({ minDepth: 50 }),
-        markdown(),
+        this.illustrated ? markdown({ base: markdownLanguage }) : markdown(),
+        this.illustrated
+          ? illustratedViewer(
+              this.illustrated.entry,
+              this.photos,
+              this.illustrated.online,
+            )
+          : [],
         EditorView.lineWrapping,
         keymap.of([
           {
@@ -108,6 +124,7 @@ export class ResourceBuffer implements ResourceBufferPort {
         }),
         EditorState.transactionFilter.of((tr) => {
           if (!tr.docChanged) return tr;
+          if (this.illustrated) return [];
           if (!this.editable || !this.account(tr.state)) {
             this.handlers.limit();
             return [];
@@ -133,7 +150,7 @@ export class ResourceBuffer implements ResourceBufferPort {
   }
   /** Editing is paused while a review is shown; reading and selection stay available. */
   private accessExtensions(editable: boolean) {
-    const live = editable && !this.review;
+    const live = editable && !this.review && !this.illustrated;
     return [EditorView.editable.of(live), EditorState.readOnly.of(!live)];
   }
   /** Shows a review (the editor text becomes the server's saved body) or clears it, keeping
@@ -171,7 +188,29 @@ export class ResourceBuffer implements ResourceBufferPort {
     this.state = next;
     this.view?.setState(next);
   }
+  setIllustrated(entry: IllustratedEntry, online: boolean) {
+    const previous = this.illustrated;
+    const selection = this.state.selection,
+      sameBody = this.getText() === entry.markdown;
+    const scroll = this.view?.scrollDOM.scrollTop;
+    this.illustrated = { entry, online };
+    this.editable = false;
+    try {
+      this.setText(entry.markdown);
+      if (sameBody) {
+        const tr = this.state.update({ selection });
+        this.state = tr.state;
+        this.view?.update([tr]);
+      }
+      if (this.view && scroll !== undefined)
+        this.view.scrollDOM.scrollTop = scroll;
+    } catch (error) {
+      this.illustrated = previous;
+      throw error;
+    }
+  }
   setEditable(editable: boolean) {
+    if (this.illustrated) editable = false;
     if (editable === this.editable) return;
     this.editable = editable;
     const tr = this.state.update({
@@ -182,7 +221,16 @@ export class ResourceBuffer implements ResourceBufferPort {
   }
   attach(parent: HTMLElement) {
     this.detach();
-    this.view = new EditorView({ parent, state: this.state });
+    this.view = new EditorView({
+      parent,
+      state: this.state,
+      dispatchTransactions: (transactions, view) => {
+        if (this.illustrated && transactions.some((tr) => tr.docChanged))
+          return;
+        view.update(transactions);
+      },
+    });
+    if (this.illustrated) inertIllustratedControls(this.view);
     this.view.scrollDOM.scrollTop = this.scroll.top;
     this.view.scrollDOM.scrollLeft = this.scroll.left;
   }

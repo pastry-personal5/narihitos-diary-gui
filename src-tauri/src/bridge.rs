@@ -4,6 +4,8 @@ mod chat;
 mod export;
 mod generation;
 mod illustrated;
+mod images;
+pub use images::{ImageEngine, ImageEngines};
 mod imports;
 pub use illustrated::{IllustratedEntry, IllustratedInput, IllustratedList};
 mod profiles;
@@ -73,6 +75,7 @@ pub struct Settings {
     pub sources: Vec<Availability>,
     pub profiles: Vec<Availability>,
     #[cfg(feature = "scaffold-smoke")]
+    #[serde(default)]
     pub folder_checks: Vec<crate::native_smoke::FolderCheck>,
 }
 /// A redacted reload problem: a coarse config area and a stable code, never a value.

@@ -413,6 +413,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn server_shutdown_waits_for_illustrated_worker_cleanup() {
+        let s = state();
+        running(&s);
+        s.shutdown();
+        assert!(
+            s.images
+                .shutdown_signal()
+                .load(std::sync::atomic::Ordering::SeqCst)
+        );
+        assert!(
+            s.illustrated_jobs.lock().unwrap()[JOB]
+                .run
+                .token()
+                .is_cancelled()
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), s.drain_illustrated())
+                .await
+                .is_err()
+        );
+        s.illustrated_jobs.lock().unwrap().remove(JOB);
+        tokio::time::timeout(Duration::from_secs(1), s.drain_illustrated())
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
     async fn cancellation_advances_sequence_and_publishes_once() {
         let s = state();
         running(&s);

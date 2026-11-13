@@ -63,6 +63,7 @@ impl Bridge {
             || v.photos.is_empty()
             || v.photos.len() > 99
             || v.theme_count < v.photos.len()
+            || v.theme_count > 1024
             || !super::valid_id(&v.agent_profile)
             || !super::valid_id(&v.image_engine)
             || v.photos.iter().enumerate().any(|(i, p)| {

@@ -1,3 +1,4 @@
+import type { IllustratedController } from "../illustrated/controller";
 import type { SourceTrashController } from "../trash/source-controller";
 import type { GlobalMessagesStore } from "../global-messages/store";
 import type { Connection, UserSettings } from "../bridge";
@@ -13,6 +14,7 @@ export interface AppActionContext {
   messages: GlobalMessagesStore;
   sourceTrash: SourceTrashController;
   generator: GenerationController;
+  illustrated?: IllustratedController;
   chat: AIChatController;
   exporter: ExportController;
   connection(): Connection;
@@ -28,6 +30,7 @@ function deriveAppActions(context: AppActionContext) {
     generator,
     chat,
     exporter,
+    illustrated,
     openPalette,
     openSettings,
   } = context;
@@ -64,8 +67,9 @@ function deriveAppActions(context: AppActionContext) {
   const sourceReserved = active?.source
     ? model.resources.sourceReserved(active.source.source.id)
     : false;
-  const generationReason =
-    connected && !connection.status.capabilities.includes("generation")
+  const generationReason = illustrated?.running
+    ? "Wait for Illustrated creation to finish."
+    : connected && !connection.status.capabilities.includes("generation")
       ? "Generation is not supported by this server."
       : generator.reason(
           model.resources.selectedDate,
@@ -78,10 +82,39 @@ function deriveAppActions(context: AppActionContext) {
                   "source" in item && !!item.source && !item.source.eligible,
               ),
         );
-  const exportReason = !connected
-    ? "Connect to the server first."
-    : exporter.reason(model.resources.selectedDate, !!selectedView?.exists);
+  const exportReason =
+    active?.kind === "illustrated"
+      ? "Illustrated diaries do not support export."
+      : !connected
+        ? "Connect to the server first."
+        : exporter.reason(model.resources.selectedDate, !!selectedView?.exists);
+  const illustratedProfile = generator.state.profiles.find(
+    (p) => p.alias === generator.state.profile,
+  );
+  const illustratedReason =
+    illustrated?.reason(
+      model.resources.selectedDate,
+      illustratedProfile,
+      user?.writing_locale ?? null,
+      generator.running || chat.running,
+    ) ?? (illustrated ? null : "Illustrated creation is unavailable.");
   const handlers: Handlers = {
+    "illustrated.create": {
+      reason: illustratedReason,
+      run: () => {
+        const date = model.resources.selectedDate,
+          locale = user?.writing_locale;
+        if (date && locale && illustratedProfile)
+          return illustrated?.create(date, illustratedProfile, locale);
+      },
+    },
+    "illustrated.delete": {
+      reason: !storage
+        ? "Connect to writable storage first."
+        : (illustrated?.deleteReason() ??
+          (illustrated ? null : "Illustrated deletion is unavailable.")),
+      run: () => illustrated?.requestDelete(),
+    },
     "palette.open": {
       reason: null,
       run: () => {
@@ -90,17 +123,19 @@ function deriveAppActions(context: AppActionContext) {
     },
     "editor.save": {
       reason:
-        active?.kind === "source"
-          ? active.detached
-            ? "The original source moved to Trash; this copy is read-only."
-            : sourceReserved
-              ? "This source is reserved by an unfinished Move to Trash operation."
-              : active.source?.capabilities.save
-                ? null
-                : saveOff(active.source?.capabilities.reason ?? "")
-          : activeView
-            ? null
-            : "No file is open.",
+        active?.kind === "illustrated"
+          ? "Illustrated diaries are read-only."
+          : active?.kind === "source"
+            ? active.detached
+              ? "The original source moved to Trash; this copy is read-only."
+              : sourceReserved
+                ? "This source is reserved by an unfinished Move to Trash operation."
+                : active.source?.capabilities.save
+                  ? null
+                  : saveOff(active.source?.capabilities.reason ?? "")
+            : activeView
+              ? null
+              : "No file is open.",
       run: () => {
         if (active?.kind === "source") void model.resources.saveSource();
         else model.resources.dispatch({ kind: "flush" });
@@ -137,8 +172,16 @@ function deriveAppActions(context: AppActionContext) {
     },
     "ai.activity.open": { reason: later("AI Activities"), run: () => {} },
     "ai.run.cancel": {
-      reason: generator.running || chat.running ? null : "No AI run is active.",
-      run: () => (generator.running ? generator.cancel() : chat.cancel()),
+      reason:
+        generator.running || chat.running || illustrated?.canCancel
+          ? null
+          : "No AI run is active.",
+      run: () =>
+        illustrated?.canCancel
+          ? illustrated.cancel()
+          : generator.running
+            ? generator.cancel()
+            : chat.cancel(),
     },
     "ai.results.open": { reason: later("AI results"), run: () => {} },
     "ai.results.discard": { reason: later("AI results"), run: () => {} },
@@ -165,6 +208,7 @@ function deriveAppActions(context: AppActionContext) {
     canCreate,
     createReason,
     generationReason,
+    illustratedReason,
     exportReason,
     handlers,
   };

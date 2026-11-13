@@ -43,6 +43,7 @@ flowchart TB
   AG --> GP[Generation profile card]
   AG --> PP[Paragraph Review profile card]
   AG --> AP[Agent profiles card and Profile table]
+  AG --> IE[Image engines card and Check]
   S --> WL[Writing Language]
   S --> GE[Generation]
   S --> SL[Status Line]
@@ -52,6 +53,9 @@ flowchart TB
   E --> N[Snippet tab]
   E --> F[Draft tab]
   E --> R[Entry tab]
+  E --> IL[Illustrated tab]
+  IL -. opens .-> IT[Read-only Illustrated Editor tab]
+  C --> IT
 ```
 
 The Main Toolbar Strip spans the top. Main Content runs left to right: Icon Bar, Explorer, editor column and AI column. The editor column contains the Tabbed Editor and Global Messages, separated by a horizontal Pane separator; vertical Pane separators resize Explorer, editor and AI Chat. Save status belongs in Global Messages. The Status line sits below Main Content and remains visible in Settings.
@@ -62,6 +66,8 @@ Trash Recovery is a modal dialog over the current window, separate from Settings
 
 AI Agents names the configured providers and their Settings category. AI Chat is the conversation surface and AI Activities is the activity/results dialog. Closing that dialog keeps work running. Paragraph Review is a toolbar action with an inline editor suggestion; its conversation is isolated from AI Chat.
 
-Date selects the working civil date; Snippet groups views of originals by source and local date. Draft lists Authentic access and transient candidates for that date, including results completed in the background (flagged by the Results badge) after navigating away; Entry lists saved Authentic dates, including explicitly created empty files. Authentic access from Draft and Entry opens the same Authentic resource/buffer in the Tabbed Editor; choosing a candidate in Draft activates that candidate's read-only Editor tab, which Generate has already opened. Opening a snippet does not change generation inclusion. AI Chat snapshots the active source or Authentic buffer on each send; a Candidate tab uses Authentic context instead. The [AI Chat contract](ux-gui.md#ai-chat) defines unsaved-edit disclosure. The containment model introduces no preview pane, financial workflow, separate saved draft, or history view.
+Date selects the working civil date; Snippet groups views of originals by source and local date. Draft lists Authentic access and transient candidates for that date, including results completed in the background (flagged by the Results badge) after navigating away; Entry lists saved Authentic dates, including explicitly created empty files. Authentic access from Draft and Entry opens the same Authentic resource/buffer in the Tabbed Editor; choosing a candidate in Draft activates that candidate's read-only Editor tab, which Generate has already opened. Opening a snippet does not change generation inclusion. AI Chat snapshots the active source or Authentic buffer on each send; a Candidate or Illustrated tab uses its open Authentic buffer instead (or No document if that buffer is closed). The [AI Chat contract](ux-gui.md#ai-chat) defines unsaved-edit disclosure. The containment model introduces no preview pane, financial workflow, separate saved draft, or history view.
 
 The Command palette is a separate non-modal overlay below the Main Toolbar Strip, containing a search combobox and a scrollable recommended-command list. See the [keyboard contract](architecture/keyboard-shortcuts.md#command-palette-overlay) for ranking, dismissal and focus behavior.
+
+Illustrated is a dedicated Explorer tab listing published Illustrated dates independently of Entry. It opens a separate rendered, read-only Editor tab beside Authentic; that resource has confirmed version-bound deletion but no save, review or export. Creation shares the Generation profile and Writing Language; image engine readiness is in Settings > AI Agents. AI Activities owns creation progress/cancellation. Off-day completion and saved-source changes use Global Messages. AI Chat uses Authentic context while an Illustrated tab is active.

@@ -10,13 +10,15 @@ import {
 import { createDispatcher } from "../src/application/actions/dispatcher";
 
 describe("registry and canonical form", () => {
-  it("registry_parity: 12 actions with the contract's scopes and defaults", () => {
+  it("registry_parity: actions with the contract's scopes and defaults", () => {
     expect(ACTIONS.map((a) => [a.id, a.scope, a.defaults.length])).toEqual([
       ["palette.open", "app", 1],
       ["editor.save", "app", 1],
       ["authentic.create_empty", "app", 0],
       ["source.trash", "snippetTree", 4],
       ["source.refresh", "app", 0],
+      ["illustrated.create", "app", 0],
+      ["illustrated.delete", "app", 0],
       ["generate.start", "app", 0],
       ["ai.activity.open", "app", 0],
       ["ai.run.cancel", "app", 0],

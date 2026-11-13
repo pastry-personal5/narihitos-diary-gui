@@ -1,3 +1,5 @@
+import type { Bridge } from "../application/bridge";
+import { IllustratedPhotos } from "../adapters/illustrated-photos";
 import type {
   ResourceBuffers,
   ResourceBufferPort,
@@ -12,7 +14,9 @@ export class CodeMirrorBuffers implements ResourceBuffers {
   private readonly buffers = new WeakMap<ResourceBufferPort, ResourceBuffer>();
   private active: ResourceBuffer | null = null;
   private host: HTMLElement | null = null;
-  constructor(budget: SessionBudget) {
+  private readonly photos?: IllustratedPhotos;
+  constructor(budget: SessionBudget, bridge?: Bridge) {
+    if (bridge) this.photos = new IllustratedPhotos(bridge, budget);
     this.pool = new EditorPayloadPool(budget);
   }
   create(
@@ -20,7 +24,13 @@ export class CodeMirrorBuffers implements ResourceBuffers {
     label: string,
     handlers: ResourceEditorHandlers,
   ): ResourceBufferPort {
-    const buffer = new ResourceBuffer(key, label, this.pool, handlers);
+    const buffer = new ResourceBuffer(
+      key,
+      label,
+      this.pool,
+      handlers,
+      this.photos,
+    );
     this.buffers.set(buffer, buffer);
     return buffer;
   }

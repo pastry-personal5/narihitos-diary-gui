@@ -207,6 +207,7 @@ impl ProfileDirectory for Profiles {
             reason: None,
             chat: Capability::Ready,
             generate: Capability::Ready,
+            illustrated: Capability::Ready,
         })
     }
 }

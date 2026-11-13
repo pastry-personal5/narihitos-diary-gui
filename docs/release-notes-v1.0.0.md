@@ -16,6 +16,8 @@ diary entries and related source snippets in one desktop workspace.
 - Manage settings, AI-agent status, keyboard shortcuts, diagnostics and
   recoverable source Trash operations from the app.
 
+- Create a separate Illustrated diary from saved Authentic text, follow photo progress/cancellation, read it in a rendered read-only tab, replace or confirm deletion, and check image engines in Settings.
+
 ## Availability and limitations
 
 Version v1.0.0 is scoped to the owner's Apple Silicon Mac. Public distribution,

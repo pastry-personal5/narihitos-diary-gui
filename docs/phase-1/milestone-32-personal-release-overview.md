@@ -2,6 +2,100 @@
 
 Status: Active
 
+## Illustrated GUI implementation review (2026-11-13)
+
+Review the completed [M35 implementation](../archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-overview.md)
+as a release follow-up, preserving its approved behavior and dependencies.
+
+- [x] Reflush Authentic saves when reconnect interrupted preparation before any creation request was sent; preserve request identity for uncertain admission.
+- [x] Suspend photo loading and release viewer leases when an Illustrated refresh fails, while retaining the previous readable text.
+- [x] Close immutable Illustrated tabs without waiting on transport and stop queued refreshes after tab close or connection replacement; cover these lifecycle races with regressions.
+- [x] Pass focused regressions and all seven repository gate lanes through the delegated test runner; record evidence and limitations.
+
+Evidence: the delegated runner first reproduced all four lifecycle regressions,
+then passed 33 controller, viewer, UI and validation tests after the fixes.
+Controller tests verify renewed save settling after interrupted preparation,
+retained-photo suspension and recovery, immediate immutable-tab close and
+rejection of queued reads after close/disconnect. Existing viewer tests verify
+that suspension releases URLs and suppresses transport.
+
+All seven `scripts/gate.sh` lanes passed (`run.cseF2t`, 512 frontend tests across
+68 files) with localhost access and `RUST_TEST_THREADS=1`; the initial sandbox
+run's only failure was G03 fixture socket binding. Documentation Prettier,
+local Markdown link targets and whitespace checks passed. This
+follow-up changes frontend lifecycle handling only; it does not rerun packaged
+WKWebView or live AI/GPU qualification and does not close M32.
+
+## Image engine server shutdown follow-up (2026-11-13)
+
+Ensure server SIGTERM/SIGINT and transport-error exits cancel owned image renders
+and readiness probes, wait for supervised process cleanup, and retain the
+workspace lock until image staging cleanup finishes.
+
+- [x] Share a registry shutdown signal with configured engines, including reloads; reject work after shutdown and cancel running renders/probes through TERM, grace, KILL and reap.
+- [x] Run image shutdown on signal and transport-error exits and drain image work before releasing the workspace lock.
+- [x] Verify render/probe shutdown, graceful termination, stubborn-child escalation, staging cleanup and unrelated-process survival using isolated regressions; update contracts and pass the repository gate.
+
+Evidence: application/API shutdown regressions verify a running probe is drained,
+new work stays rejected, jobs receive cancellation and worker acknowledgement
+precedes resource release. `python3 -m unittest scripts/tests/test_image_shutdown.py`
+passed four tests covering seven isolated real-server scenarios: SIGTERM/SIGINT
+in actual render and probe modes, stubborn descendant escalation, reload signal
+retention and cleanup of a completed first photo while the second render runs.
+Every fixture server exited within three seconds; TERM markers, descendant exit,
+empty staging, removed discovery, no partial publication and sentinel survival
+were asserted. Test log: `/tmp/diary-image-shutdown-smoke.log`.
+
+Final gate `run.XMghLq` passed G01–G07 with localhost/process access and
+`RUST_TEST_THREADS=1`; all 508 frontend tests passed. The prior gate's only failure
+was workspace-wide Rust formatting, corrected with `cargo fmt --all`. Final
+changed-document Prettier and whitespace checks passed. Transport-error cleanup
+was checked in the common exit path by source review; the signal scenarios use
+synthetic programs, not real GPU inference. SIGKILL remains outside graceful
+shutdown guarantees.
+
+## Automatic image engine readiness follow-up (2026-11-13)
+
+Automatically probe configured image engines on connection and when opening
+Settings > AI Agents. Run sequential asynchronous checks through the existing
+server blocking worker; keep successful checks quiet and report readiness or
+transport failures in Global Messages without repeating an unchanged problem.
+
+- [x] Automatically check all configured engines without blocking the interface or overlapping probes.
+- [x] Report unavailable prerequisites and check failures in Global Messages; ignore stale replies after disconnect/disposal and deduplicate unchanged problems.
+- [x] Cover automatic checks, multiple engines, failure/recovery, stale replies and Settings entry in regressions; update docs and pass the repository gate.
+
+Evidence: the controller and Settings regressions cover automatic connection and
+Settings-entry checks, sequential/coalesced probes, manual-check coordination,
+prerequisite/discovery/busy/transport warnings, deduplication and recovery,
+failed-engine preservation across other successes, and obsolete replies after
+disconnect, disposal and reconnect. All 508 frontend tests pass. Gate
+`run.pYuuWy` passed G01/G02/G04/G05/G06/G07; G03's sandbox socket failures were
+resolved by a complete Rust rerun with localhost access and `--test-threads=1`
+(`/tmp/diary-auto-image-checks-rust.log`, exit 0). Final TypeScript, changed-file
+ESLint, Prettier and whitespace checks passed. No real image render or packaged
+GUI run was needed for this client scheduling change; the existing server
+blocking-worker probe route is reused.
+
+## Illustrated prompt directives follow-up (2026-11-13)
+
+The owner requires every configured image prompt directive in every scene prompt.
+Update all four providers' Illustrated assets while preserving faithful diary text
+and the application-owned trigger prefix.
+
+- [x] Require every directive verbatim in every scene prompt across all four provider assets, with a final completeness check by the agent.
+- [x] Update the current prompt contract and owner decision; review provider parity and pass the repository gate.
+
+Evidence: all four provider instruction bodies match and explicitly require full,
+verbatim inclusion plus a completeness check. Gate `run.c5mkZj` passed
+G01/G02/G04/G05/G06/G07. G03 initially hit sandbox localhost restrictions;
+with localhost access, a concurrent run hit `WorkspaceBusy` in an unrelated
+Authentic storage test. The full Rust suite then passed with `--test-threads=1`
+(`/tmp/diary-prompt-directives-cargo-test-serial.log`). Final changed-document
+Prettier and whitespace checks passed. No live generation was run; prompt
+compliance remains agent-instructed. Rebuild and restart the server to load the
+embedded assets.
+
 ## Native scaffold smoke repair (2026-11-10)
 
 - [x] Wait for automatic UI connection and an editable Authentic editor without relying on the Settings-only Connect button.

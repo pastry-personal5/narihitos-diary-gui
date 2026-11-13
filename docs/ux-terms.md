@@ -6,51 +6,52 @@ This is the canonical vocabulary for visible user interface components, and thei
 
 ## Canonical components
 
-| Visible term        | Code-facing name     | Meaning                                                                                                                                                                                |
-| ------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Standard Layout     | `standardLayout`     | The whole application window arrangement                                                                                                                                               |
-| Main Toolbar Strip  | `mainToolbarStrip`   | App title, distinct custom bitmap icon buttons (named with tooltips)                                                                                                                   |
-| Main Content        | `mainContent`        | Region below the Main Toolbar Strip: Icon Bar, Explorer, Tabbed Editor and the AI column                                                                                               |
-| Icon Bar            | `iconBar`            | Left strip of flat icon-only buttons (no visible label), including Settings                                                                                                            |
-| Explorer            | `explorer`           | Left pane containing the four navigation tabs                                                                                                                                          |
-| Date tab            | `dateTab`            | Civil-date selection                                                                                                                                                                   |
-| Snippet tab         | `snippetTab`         | Source-grouped snippet hierarchy and inclusion checkboxes                                                                                                                              |
-| Draft tab           | `draftTab`           | Authentic access and the transient generated candidates for the selected date; choosing one activates its Editor tab                                                                   |
-| Entry tab           | `entryTab`           | Saved Authentic files by date                                                                                                                                                          |
-| Tabbed Editor       | `tabbedEditor`       | Body-only Markdown editor, read-only Candidate tabs and review views                                                                                                                   |
-| Global Messages     | `globalMessages`     | Pane below the Tabbed Editor listing notices and global messages to the user, oldest first, newest at the bottom                                                                       |
-| Message severity    | `messageSeverity`    | Visual level of a global message: info, warning or error, shown by color plus an icon and text label                                                                                   |
-| Editor tab          | `editorTab`          | One open buffer (source, Authentic or read-only Candidate) in the Tabbed Editor; distinct from the Explorer tabs                                                                       |
-| AI Agents           | `aiAgents`           | Configured AI providers used by AI Chat, Generate and Paragraph Review; also the Settings category for their profiles                                                                  |
-| AI Agent            | `aiAgent`            | One configured AI provider, such as Codex, Claude Code, Qwen Code or Apple Foundation Models                                                                                           |
-| AI Chat             | `aiChat`             | Transient conversation and composer; fills the AI column                                                                                                                               |
-| Settings            | `settings`           | Redacted configuration/capability status in cards; server config remains private YAML                                                                                                  |
-| Settings sidebar    | `settingsSidebar`    | Category list inside Settings: Server, Status, Sources, AI Agents, Writing Language, Generation, Status Line and Keyboard Shortcuts, under a Go back button                            |
-| Writing Language    | `writingLanguage`    | Persistent AI prose locale, initially the Mac's preferred language                                                                                                                     |
-| Keyboard Shortcuts  | `keyboardShortcuts`  | Settings category: table of Action, Original shortcuts, Current shortcuts, Info with editing                                                                                           |
-| Command palette     | `commandPalette`     | Search overlay with ranked commands, toggled by the toolbar button or opened by its shortcut                                                                                           |
-| Authentic           | `authentic`          | The one autosaved managed Diary file for a date, shared by Draft/Entry                                                                                                                 |
-| Candidate           | `candidate`          | A transient suggestion shown in a read-only Editor tab that can be reviewed against Authentic                                                                                          |
-| Paragraph review    | `paragraphReview`    | Candidate review of paragraph or indivisible Markdown structure changes against saved Authentic                                                                                        |
-| Review controls     | `reviewControls`     | Per-unit Accept/Reject controls shown during Paragraph review                                                                                                                          |
-| Create Empty        | `createEmpty`        | Explicitly save an empty Authentic file for the selected date if it does not exist                                                                                                     |
-| AI Activities       | `aiActivity`         | Toolbar button and modal dialog: run details, guidance, Cancel and result access                                                                                                       |
-| Connection status   | `connectionStatus`   | Local server connection indicator in Settings > Server                                                                                                                                 |
-| Save status         | `saveStatus`         | Dirty/saving/saved/failed/conflict feedback in Global Messages, based on the acknowledged revision                                                                                     |
-| Profile selector    | `profileSelector`    | Selection control inside the Chat profile, Generation profile or Paragraph Review profile card in Settings > AI Agents                                                                 |
-| Metadata warning    | `metadataWarning`    | Per-snippet notice of parse, availability or timestamp problems, with the explicit header/filename authority choice                                                                    |
-| Snippet checkbox    | `snippetCheckbox`    | Generation-inclusion toggle in the Snippet tab; independent of snippet focus                                                                                                           |
-| Pane separator      | `paneSeparator`      | Resizable, keyboard-operable boundary between Explorer, Tabbed Editor, AI Chat and Global Messages (the last resizes height)                                                           |
-| Trash Recovery      | `trashRecovery`      | Main Toolbar Strip button and modal dialog for saved Trash results, unfinished moves and recovery guidance; separate from Global Messages                                              |
-| Completion message  | `completionMessage`  | One polite in-app message per AI completion, with View results; posted to Global Messages                                                                                              |
-| Results badge       | `resultsBadge`       | Marker in the AI Activities dialog and bottom status line that completed AI results await, until opened or dismissed                                                                   |
-| Confirmation dialog | `confirmationDialog` | Explicit confirmation for moving a snippet to Trash, discarding edits or replacing export output                                                                                       |
-| Settings card       | `settingsCard`       | Titled group in a Settings category (Server, Sources, Agent profiles, Chat profile, Generation profile, Paragraph Review profile, Advanced, Generation, Writing Language, Status Line) |
-| Profile table       | `profileTable`       | Agent profiles with status SF Symbol, reason and per-row Check; refreshed by background checks                                                                                         |
-| Advanced card       | `advancedCard`       | Settings card listing what currently blocks Chat, Generate or saving                                                                                                                   |
-| Export preview      | `exportPreview`      | Fresh preview shown before replacing externally changed iCloud/Notion output                                                                                                           |
+| Visible term        | Code-facing name     | Meaning                                                                                                                                                                                               |
+| ------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Standard Layout     | `standardLayout`     | The whole application window arrangement                                                                                                                                                              |
+| Main Toolbar Strip  | `mainToolbarStrip`   | App title, distinct custom bitmap icon buttons (named with tooltips)                                                                                                                                  |
+| Main Content        | `mainContent`        | Region below the Main Toolbar Strip: Icon Bar, Explorer, Tabbed Editor and the AI column                                                                                                              |
+| Icon Bar            | `iconBar`            | Left strip of flat icon-only buttons (no visible label), including Settings                                                                                                                           |
+| Explorer            | `explorer`           | Left pane containing the five navigation tabs                                                                                                                                                         |
+| Date tab            | `dateTab`            | Civil-date selection                                                                                                                                                                                  |
+| Snippet tab         | `snippetTab`         | Source-grouped snippet hierarchy and inclusion checkboxes                                                                                                                                             |
+| Draft tab           | `draftTab`           | Authentic access and the transient generated candidates for the selected date; choosing one activates its Editor tab                                                                                  |
+| Illustrated tab     | `illustratedTab`     | Published Illustrated diary dates; opens the separate read-only Illustrated Editor tab                                                                                                                |
+| Entry tab           | `entryTab`           | Saved Authentic files by date                                                                                                                                                                         |
+| Tabbed Editor       | `tabbedEditor`       | Body-only Markdown editor, read-only Candidate/Illustrated tabs and review views                                                                                                                      |
+| Global Messages     | `globalMessages`     | Pane below the Tabbed Editor listing notices and global messages to the user, oldest first, newest at the bottom                                                                                      |
+| Message severity    | `messageSeverity`    | Visual level of a global message: info, warning or error, shown by color plus an icon and text label                                                                                                  |
+| Editor tab          | `editorTab`          | One open buffer (source, Authentic, read-only Candidate or read-only Illustrated) in the Tabbed Editor; distinct from the Explorer tabs                                                               |
+| AI Agents           | `aiAgents`           | Configured AI providers used by AI Chat, Generate and Paragraph Review; also the Settings category for their profiles                                                                                 |
+| AI Agent            | `aiAgent`            | One configured AI provider, such as Codex, Claude Code, Qwen Code or Apple Foundation Models                                                                                                          |
+| AI Chat             | `aiChat`             | Transient conversation and composer; fills the AI column                                                                                                                                              |
+| Settings            | `settings`           | Redacted configuration/capability status in cards; server config remains private YAML                                                                                                                 |
+| Settings sidebar    | `settingsSidebar`    | Category list inside Settings: Server, Status, Sources, AI Agents, Writing Language, Generation, Status Line and Keyboard Shortcuts, under a Go back button                                           |
+| Writing Language    | `writingLanguage`    | Persistent AI prose locale, initially the Mac's preferred language                                                                                                                                    |
+| Keyboard Shortcuts  | `keyboardShortcuts`  | Settings category: table of Action, Original shortcuts, Current shortcuts, Info with editing                                                                                                          |
+| Command palette     | `commandPalette`     | Search overlay with ranked commands, toggled by the toolbar button or opened by its shortcut                                                                                                          |
+| Authentic           | `authentic`          | The one autosaved managed Diary file for a date, shared by Draft/Entry                                                                                                                                |
+| Candidate           | `candidate`          | A transient suggestion shown in a read-only Editor tab that can be reviewed against Authentic                                                                                                         |
+| Paragraph review    | `paragraphReview`    | Candidate review of paragraph or indivisible Markdown structure changes against saved Authentic                                                                                                       |
+| Review controls     | `reviewControls`     | Per-unit Accept/Reject controls shown during Paragraph review                                                                                                                                         |
+| Create Empty        | `createEmpty`        | Explicitly save an empty Authentic file for the selected date if it does not exist                                                                                                                    |
+| AI Activities       | `aiActivity`         | Toolbar button and modal dialog: run details, guidance, Cancel and result access                                                                                                                      |
+| Connection status   | `connectionStatus`   | Local server connection indicator in Settings > Server                                                                                                                                                |
+| Save status         | `saveStatus`         | Dirty/saving/saved/failed/conflict feedback in Global Messages, based on the acknowledged revision                                                                                                    |
+| Profile selector    | `profileSelector`    | Selection control inside the Chat profile, Generation profile or Paragraph Review profile card in Settings > AI Agents                                                                                |
+| Metadata warning    | `metadataWarning`    | Per-snippet notice of parse, availability or timestamp problems, with the explicit header/filename authority choice                                                                                   |
+| Snippet checkbox    | `snippetCheckbox`    | Generation-inclusion toggle in the Snippet tab; independent of snippet focus                                                                                                                          |
+| Pane separator      | `paneSeparator`      | Resizable, keyboard-operable boundary between Explorer, Tabbed Editor, AI Chat and Global Messages (the last resizes height)                                                                          |
+| Trash Recovery      | `trashRecovery`      | Main Toolbar Strip button and modal dialog for saved Trash results, unfinished moves and recovery guidance; separate from Global Messages                                                             |
+| Completion message  | `completionMessage`  | One polite in-app message per AI completion, with View results; posted to Global Messages                                                                                                             |
+| Results badge       | `resultsBadge`       | Marker in the AI Activities dialog and bottom status line that completed AI results await, until opened or dismissed                                                                                  |
+| Confirmation dialog | `confirmationDialog` | Explicit confirmation for moving a snippet to Trash, discarding edits or replacing export output                                                                                                      |
+| Settings card       | `settingsCard`       | Titled group in a Settings category (Server, Sources, Agent profiles, Chat profile, Generation profile, Paragraph Review profile, Image engines, Advanced, Generation, Writing Language, Status Line) |
+| Profile table       | `profileTable`       | Agent profiles with status SF Symbol, reason and per-row Check; refreshed by background checks                                                                                                        |
+| Advanced card       | `advancedCard`       | Settings card listing what currently blocks Chat, Generate or saving                                                                                                                                  |
+| Export preview      | `exportPreview`      | Fresh preview shown before replacing externally changed iCloud/Notion output                                                                                                                          |
 
-Casing: named regions use Title Case (Standard Layout, Icon Bar, Tabbed Editor, Main Content, AI Activities); sub-parts and controls use sentence case (Date tab, Editor tab, Settings sidebar, Settings card, Command palette). "Tab" alone is ambiguous: say Explorer tab (Date, Snippet, Draft, Entry) or Editor tab.
+Casing: named regions use Title Case (Standard Layout, Icon Bar, Tabbed Editor, Main Content, AI Activities); sub-parts and controls use sentence case (Date tab, Editor tab, Settings sidebar, Settings card, Command palette). "Tab" alone is ambiguous: say Explorer tab (Date, Snippet, Draft, Entry, Illustrated) or Editor tab.
 
 Draft and Entry are navigation terms, not two persisted asset kinds. Use these names for control labels and accessibility; use ordinary action verbs such as Save, Generate, Export, Accept and Reject for commands.
 
@@ -86,25 +87,25 @@ Trash Recovery names both the toolbar action and the dialog it opens. Use the ex
 
 Use these exact category names in the Settings sidebar, in this order. A category contains cards; it is distinct from an Explorer tab or an Editor tab.
 
-| Category           | Code-facing name     | Contents                                                                            |
-| ------------------ | -------------------- | ----------------------------------------------------------------------------------- |
-| Server             | `serverSettings`     | Connection status, Connect and the Server configuration status/reload card          |
-| Status             | `statusSettings`     | Advanced card; initial page when Settings opens                                     |
-| Sources            | `sourcesSettings`    | Sources availability and Server configuration folder reveal cards                   |
-| AI Agents          | `aiAgentsSettings`   | Chat profile, Generation profile, Paragraph Review profile and Agent profiles cards |
-| Writing Language   | `writingLanguage`    | Saved language and language editing                                                 |
-| Generation         | `generationSettings` | Candidates per generation                                                           |
-| Status Line        | `statusLine`         | Saved visibility toggles for Generate ready, Review ready and Chat ready            |
-| Keyboard Shortcuts | `keyboardShortcuts`  | Shortcut table and binding editing                                                  |
+| Category           | Code-facing name     | Contents                                                                                           |
+| ------------------ | -------------------- | -------------------------------------------------------------------------------------------------- |
+| Server             | `serverSettings`     | Connection status, Connect and the Server configuration status/reload card                         |
+| Status             | `statusSettings`     | Advanced card; initial page when Settings opens                                                    |
+| Sources            | `sourcesSettings`    | Sources availability and Server configuration folder reveal cards                                  |
+| AI Agents          | `aiAgentsSettings`   | Chat profile, Generation profile, Paragraph Review profile, Agent profiles and Image engines cards |
+| Writing Language   | `writingLanguage`    | Saved language and language editing                                                                |
+| Generation         | `generationSettings` | Candidates per generation                                                                          |
+| Status Line        | `statusLine`         | Saved visibility toggles for Generate ready, Review ready and Chat ready                           |
+| Keyboard Shortcuts | `keyboardShortcuts`  | Shortcut table and binding editing                                                                 |
 
-| Visible term                          | Code-facing name            | Meaning                                                                                                                 |
-| ------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Chat profile                          | `chatProfile`               | Card in AI Agents containing the profile selector for AI Chat                                                           |
-| Generation profile                    | `generationProfile`         | Card in AI Agents containing the profile selector for Generate; distinct from the Generation category's candidate count |
-| Paragraph Review profile              | `paragraphReviewProfile`    | Independent profile selector for caret paragraph review                                                                 |
-| Agent profiles                        | `agentProfiles`             | Card in AI Agents containing the Profile table of configured agents and their availability                              |
-| Server configuration                  | `serverConfiguration`       | Card in Sources containing the action to reveal the active configuration folder                                         |
-| Reveal configuration folder in Finder | `revealConfigurationFolder` | Open the folder containing the active server configuration file in macOS Finder                                         |
+| Visible term                          | Code-facing name            | Meaning                                                                                                                                              |
+| ------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chat profile                          | `chatProfile`               | Card in AI Agents containing the profile selector for AI Chat                                                                                        |
+| Generation profile                    | `generationProfile`         | Card in AI Agents containing the profile selector for Generate and Create Illustrated Diary; distinct from the Generation category's candidate count |
+| Paragraph Review profile              | `paragraphReviewProfile`    | Independent profile selector for caret paragraph review                                                                                              |
+| Agent profiles                        | `agentProfiles`             | Card in AI Agents containing the Profile table of configured agents and their availability                                                           |
+| Server configuration                  | `serverConfiguration`       | Card in Sources containing the action to reveal the active configuration folder                                                                      |
+| Reveal configuration folder in Finder | `revealConfigurationFolder` | Open the folder containing the active server configuration file in macOS Finder                                                                      |
 
 Profile choices are configured in Settings > AI Agents. AI Activities in the Main Toolbar Strip opens run status and result access.
 
@@ -125,7 +126,7 @@ These terms describe the prompt's requested style, rather than the Candidate's s
 
 Views are grouped under `src/components/{standard-layout,explorer,tabbed-editor,
 paragraph-review,global-messages,ai-chat,ai-activities,ai-agents,settings,
-trash-recovery,export}`. Matching state/use cases live under `src/application`;
+trash-recovery,export,illustrated}`. Matching state/use cases live under `src/application`;
 bridge validation remains under `src/adapters`, and CodeMirror integration under
 `src/editor`. Main Content, Tabbed Editor and AI Chat use the matching
 `main-content`, `tabbed-editor` and `ai-chat` CSS selectors. Editor tabs and
@@ -133,3 +134,5 @@ Explorer tabs name their accessible groups; Review controls names the React
 control group. The technical `cm-review-bar` is a decorative gutter marker.
 Transport jobs, HTTP sessions, transcript role `assistant`, source identities,
 provider kinds and generation styles retain their distinct technical meanings.
+
+Illustrated (`illustrated`) names the separate immutable, photo-bearing diary version for a date. **Create Illustrated Diary** (`illustrated.create`) is the toolbar/palette action; **Delete Illustrated diary** (`illustrated.delete`) opens version-bound confirmation. **Image engines** (`imageEngines`) is the status/probe card in Settings > AI Agents. The dedicated Illustrated Explorer tab and an Illustrated Editor tab are different navigation surfaces.

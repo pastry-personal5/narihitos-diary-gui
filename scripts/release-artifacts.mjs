@@ -4,7 +4,12 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 
 export const fixtureMarkers = {
-  client: ["SMOKE main_cancelled_job_read", "smoke-unexpected-allow"],
+  client: [
+    "SMOKE main_cancelled_job_read",
+    "smoke-unexpected-allow",
+    "SMOKE illustrated_gui",
+    "DIARY_ILLUSTRATED_GUI_SMOKE",
+  ],
   server: [
     "DIARY_FAULT",
     "scaffold-fake-request",

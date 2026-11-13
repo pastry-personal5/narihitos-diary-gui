@@ -1,4 +1,12 @@
 import {
+  illustratedAcceptedDto,
+  illustratedDatesDto,
+  illustratedEntryDto,
+  illustratedPhotoDto,
+  imageEngineDto,
+  imageEnginesDto,
+} from "./illustrated-validation";
+import {
   calendarDto,
   importAckDto,
   importPageDto,
@@ -88,6 +96,36 @@ export async function logClientEvent(event: ClientEvent): Promise<void> {
   await invoke("log_client_event", { event: payload }).catch(() => {});
 }
 export const tauriBridge: Bridge = {
+  listIllustrated: () =>
+    authentic("list_illustrated", undefined, illustratedDatesDto),
+  readIllustrated: (date) =>
+    authentic("read_illustrated", { date }, (v) =>
+      illustratedEntryDto(v, date),
+    ),
+  createIllustrated: (date, input) =>
+    authentic("create_illustrated", { date, input }, illustratedAcceptedDto),
+  deleteIllustrated: (date, version) =>
+    authentic(
+      "delete_illustrated",
+      { date, version, confirmed: true },
+      (value) => {
+        if (value !== null) throw new Error("Invalid deletion acknowledgement");
+      },
+    ),
+  readIllustratedPhoto: (date, version, n) =>
+    authentic(
+      "read_illustrated_photo",
+      { date, version, n },
+      illustratedPhotoDto,
+    ),
+  listImageEngines: () =>
+    authentic("list_image_engines", undefined, imageEnginesDto),
+  checkImageEngine: (id) =>
+    authentic("check_image_engine", { id }, (value) => {
+      const engine = imageEngineDto(value);
+      if (engine.id !== id) throw new Error("Invalid engine identity");
+      return engine;
+    }),
   logClientEvent,
   startExport: (request) =>
     authentic("start_export", { request }, startOutcomeDto),

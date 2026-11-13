@@ -206,5 +206,5 @@ export class AIActivitiesStore {
 
 function completion(job: SnapshotJob) {
   const p = job.progress!;
-  return `${p.kind === "chat" ? "AI Chat" : "Generation"}${p.origin_date ? ` for ${p.origin_date}` : ""} ${job.state}. View results in activity details.`;
+  return `${p.kind === "chat" ? "AI Chat" : p.kind === "illustrated" ? "Illustrated diary" : "Generation"}${p.origin_date ? ` for ${p.origin_date}` : ""} ${job.state}. View results in activity details.`;
 }

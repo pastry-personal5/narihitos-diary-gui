@@ -1,6 +1,35 @@
 //! Explicit fixture build only. No command, path access or capability is added.
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+pub fn illustrated_enabled() -> bool {
+    std::env::var("DIARY_ILLUSTRATED_GUI_SMOKE").is_ok_and(|v| v == "1")
+}
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    if illustrated_enabled() {
+        app.set_activation_policy(tauri::ActivationPolicy::Regular);
+        app.handle().show()?;
+        let main = app
+            .get_webview_window("main")
+            .ok_or("missing main window")?;
+        main.show()?;
+        main.set_focus()?;
+        tauri::async_runtime::spawn(async move {
+            for _ in 0..180 {
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                let close = main.clone();
+                let _ = main.eval_with_callback(
+                    "JSON.stringify(window.__illustratedSmoke || null)",
+                    move |result| {
+                        eprintln!("SMOKE illustrated_gui {result}");
+                        if result.contains("passed") || result.contains("failed") {
+                            let _ = close.close();
+                        }
+                    },
+                );
+            }
+            let _ = main.close();
+        });
+        return Ok(());
+    }
     WebviewWindowBuilder::new(app,"denied-smoke",WebviewUrl::App("index.html".into()))
         .title("Scaffold permission test").visible(false)
         .initialization_script(r#"window.addEventListener('DOMContentLoaded', async()=>{
@@ -39,6 +68,10 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
 pub fn main_loaded(webview: &tauri::Webview) -> Result<(), Box<dyn std::error::Error>> {
     webview.set_focus()?;
+    if illustrated_enabled() {
+        webview.eval(include_str!("native_smoke/illustrated.js"))?;
+        return Ok(());
+    }
     webview.eval(
         r#"(async()=>{
       try {

@@ -173,7 +173,9 @@ impl ConfigReloader for ConfigHandle {
                     return ReloadOutcome::Busy;
                 }
                 if let Some(images) = &self.images
-                    && images.replace(crate::image::configured(&config)).is_err()
+                    && images
+                        .replace(crate::image::configured(&config, images.shutdown_signal()))
+                        .is_err()
                 {
                     return ReloadOutcome::Busy;
                 }

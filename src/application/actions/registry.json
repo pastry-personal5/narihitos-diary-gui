@@ -41,6 +41,20 @@
       "defaults": []
     },
     {
+      "id": "illustrated.create",
+      "label": "Create Illustrated Diary",
+      "info": "Creates or replaces the Illustrated diary from the saved Authentic diary for the working date.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
+      "id": "illustrated.delete",
+      "label": "Delete Illustrated diary",
+      "info": "Asks for confirmation before deleting the displayed Illustrated diary and photos.",
+      "scope": "app",
+      "defaults": []
+    },
+    {
       "id": "generate.start",
       "label": "Generate candidates",
       "info": "Starts AI generation of Authentic candidates.",

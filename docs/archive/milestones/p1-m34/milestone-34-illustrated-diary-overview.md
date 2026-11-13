@@ -2,7 +2,7 @@
 
 Status: Done
 
-Add a second durable diary kind: an AI-rewritten version of a day's Authentic diary with generated photos, stored as one Markdown file plus one photo directory. This milestone delivers the format, the store and the server-side creation job; the GUI is [P1-M35](../../../phase-1/milestone-35-illustrated-diary-gui-overview.md). Requires [P1-M33](../p1-m33/milestone-33-image-engines-overview.md).
+Add a second durable diary kind: an AI-rewritten version of a day's Authentic diary with generated photos, stored as one Markdown file plus one photo directory. This milestone delivers the format, the store and the server-side creation job; the GUI is [P1-M35](../p1-m35/milestone-35-illustrated-diary-gui-overview.md). Requires [P1-M33](../p1-m33/milestone-33-image-engines-overview.md).
 
 The owner confirmed "Illustrated diary" (kind `illustrated`) on 2026-11-13.
 

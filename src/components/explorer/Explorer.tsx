@@ -1,3 +1,5 @@
+import type { IllustratedController } from "../../application/illustrated/controller";
+import illustratedIcon from "../../assets/toolbar/illustrated-create.png";
 import type { SourceTrashController } from "../../application/trash/source-controller";
 import { useRef, useState } from "react";
 import type { CalendarAction } from "../../application/navigation/contracts";
@@ -12,12 +14,19 @@ import { SymbolLabel } from "../Symbol";
 import { SnippetTable } from "./SnippetTable";
 import type { NavigationModel } from "../../application/navigation/model";
 
-const views = ["Date tab", "Snippet tab", "Draft tab", "Entry tab"] as const;
+const views = [
+  "Date tab",
+  "Snippet tab",
+  "Draft tab",
+  "Entry tab",
+  "Illustrated tab",
+] as const;
 const viewIcons = {
   "Date tab": dateIcon,
   "Snippet tab": snippetIcon,
   "Draft tab": draftIcon,
   "Entry tab": entryIcon,
+  "Illustrated tab": illustratedIcon,
 };
 import { CandidateTable } from "./CandidateTable";
 import type { GenerationController } from "../../application/generation/controller";
@@ -25,10 +34,12 @@ export function Explorer({
   model,
   sourceTrash,
   generator,
+  illustrated,
 }: {
   model: NavigationModel;
   sourceTrash: SourceTrashController;
   generator: GenerationController;
+  illustrated?: IllustratedController;
 }) {
   const [view, setView] = useState<(typeof views)[number]>("Date tab");
   const date = model.resources.selectedDate;
@@ -274,6 +285,39 @@ export function Explorer({
             date={date}
           />
         </>
+      )}
+      {view === "Illustrated tab" && illustrated && (
+        <section aria-label="Illustrated diaries">
+          <button
+            disabled={illustrated.state.loading}
+            onClick={() => void illustrated.refresh()}
+          >
+            Refresh Illustrated diaries
+          </button>
+          {illustrated.state.loading && (
+            <p role="status">Loading Illustrated diaries…</p>
+          )}
+          {illustrated.state.error && (
+            <p role="alert">{illustrated.state.error}</p>
+          )}
+          {!illustrated.state.loading &&
+            !illustrated.state.error &&
+            illustrated.state.dates.length === 0 && (
+              <p>
+                No Illustrated diaries yet. Save an Authentic diary, then choose
+                Create Illustrated Diary.
+              </p>
+            )}
+          <ul aria-label="Illustrated dates">
+            {illustrated.state.dates.map((day) => (
+              <li key={day}>
+                <button onClick={() => void illustrated.open(day)}>
+                  {day} · Illustrated
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       {view === "Entry tab" && (
         <>

@@ -1,6 +1,8 @@
 import type { GenerationController } from "../generation/controller";
 import type { AIChatController } from "../ai-chat/controller";
 import type { ParagraphReviewController } from "../paragraph-review/controller";
+import type { ChatProgress } from "./progress";
+import type { GenerationProgress } from "../generation/contracts";
 import type { SnapshotJob } from "../events";
 import type { GlobalMessagesStore } from "../global-messages/store";
 import type { AIActivitiesStore } from "./store";
@@ -60,18 +62,27 @@ export class AgentProgressMessages {
     this.sync();
   }
 
-  private active(): SnapshotJob[] {
+  private active(): (SnapshotJob & {
+    progress: ChatProgress | GenerationProgress;
+  })[] {
     return [...this.activity.state.jobs.values()]
       .map(({ job }) => job)
-      .filter((job) => {
-        const p = job.progress;
-        return (
-          p &&
-          ["queued", "running"].includes(job.state) &&
-          p.phase !== "finished" &&
-          agentProgressEnabled(this.preferences, p.profile_id)
-        );
-      });
+      .filter(
+        (
+          job,
+        ): job is SnapshotJob & {
+          progress: ChatProgress | GenerationProgress;
+        } => {
+          const p = job.progress;
+          return (
+            !!p &&
+            p.kind !== "illustrated" &&
+            ["queued", "running"].includes(job.state) &&
+            p.phase !== "finished" &&
+            agentProgressEnabled(this.preferences, p.profile_id)
+          );
+        },
+      );
   }
 
   private reviewProgress() {

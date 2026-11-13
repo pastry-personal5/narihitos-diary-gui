@@ -1,3 +1,4 @@
+import type { IllustratedController } from "../../application/illustrated/controller";
 import type { SourceTrashController } from "../../application/trash/source-controller";
 import type { GlobalMessagesStore } from "../../application/global-messages/store";
 import { useEffect, useRef } from "react";
@@ -21,6 +22,7 @@ export function useAppActions({
   connection,
   settings,
   generator,
+  illustrated,
   chat,
   exporter,
   setPaletteOpen,
@@ -32,6 +34,7 @@ export function useAppActions({
   connection: Connection;
   settings: { user?: UserSettings };
   generator: GenerationController;
+  illustrated?: IllustratedController;
   chat: AIChatController;
   exporter: ExportController;
   setPaletteOpen: (open: boolean) => void;
@@ -42,6 +45,7 @@ export function useAppActions({
     messages,
     sourceTrash,
     generator,
+    illustrated,
     chat,
     exporter,
     connection: () => connection,

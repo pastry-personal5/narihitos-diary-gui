@@ -8,12 +8,13 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
 static NEXT: AtomicU64 = AtomicU64::new(0);
 pub struct CommandEngine {
+    pub shutdown: Arc<AtomicBool>,
     pub program: PathBuf,
     pub root: PathBuf,
     pub timeout: Duration,
@@ -35,6 +36,9 @@ impl CommandEngine {
         cancel: &diary_application::agent::CancelToken,
         probe: bool,
     ) -> Result<(), EngineError> {
+        if self.shutdown.load(Ordering::SeqCst) {
+            return Err(EngineError::Cancelled);
+        }
         let mut limits = Limits::probe();
         if !probe {
             limits.wall = self.timeout;
@@ -50,7 +54,7 @@ impl CommandEngine {
                 stdin: vec![],
                 cwd,
                 limits,
-                shutdown: None,
+                shutdown: Some(self.shutdown.clone()),
             },
             cancel,
             &mut |_| {},
@@ -368,7 +372,10 @@ impl ImageEngine for ConfiguredEngine {
         self.settings.clone()
     }
 }
-pub fn configured(c: &crate::config::Config) -> Vec<(String, String, Arc<dyn ImageEngine>)> {
+pub fn configured(
+    c: &crate::config::Config,
+    shutdown: Arc<AtomicBool>,
+) -> Vec<(String, String, Arc<dyn ImageEngine>)> {
     c.image_engines
         .iter()
         .map(|(id, e)| {
@@ -381,6 +388,7 @@ pub fn configured(c: &crate::config::Config) -> Vec<(String, String, Arc<dyn Ima
                         directives: e.prompt_directives.clone(),
                     },
                     engine: CommandEngine {
+                        shutdown: shutdown.clone(),
                         program: e.program.clone(),
                         root: image_root(c),
                         timeout: Duration::from_secs(e.timeout_seconds),
@@ -521,6 +529,7 @@ mod tests {
         fs::write(&program,format!("#!/bin/sh\n[ \"$1\" = --check ] && exit 0\n/bin/cp '{}' \"$DIARY_IMAGE_OUT\"\necho \"$DIARY_IMAGE_PROMPT\" >&2\n",fixture.display())).unwrap();
         fs::set_permissions(&program, fs::Permissions::from_mode(0o700)).unwrap();
         let engine = CommandEngine {
+            shutdown: Arc::default(),
             program,
             root: root.path().into(),
             timeout: Duration::from_secs(2),
@@ -561,6 +570,7 @@ mod lifecycle_tests {
             fs::write(&program, format!("#!/bin/sh\n{body}\n")).unwrap();
             fs::set_permissions(&program, fs::Permissions::from_mode(0o700)).unwrap();
             let engine = CommandEngine {
+                shutdown: Arc::default(),
                 program: program.clone(),
                 root: root.path().into(),
                 timeout: Duration::from_millis(300),
@@ -591,6 +601,7 @@ mod lifecycle_tests {
             run.request_cancel();
         });
         let engine = CommandEngine {
+            shutdown: Arc::default(),
             program,
             root: root.path().into(),
             timeout: Duration::from_secs(5),
@@ -655,6 +666,7 @@ mod live {
         let sentinel = root.path().join("sentinel");
         fs::write(&sentinel, b"keep").unwrap();
         let engine = CommandEngine {
+            shutdown: Arc::default(),
             program,
             root: root.path().into(),
             timeout: Duration::from_secs(1800),

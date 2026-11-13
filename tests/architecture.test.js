@@ -125,6 +125,8 @@ describe("explicit command permission boundary", () => {
     "import_date",
     "list_sources",
     "resolve_source_time",
+    "list_image_engines",
+    "check_image_engine",
     "list_illustrated",
     "read_illustrated",
     "create_illustrated",

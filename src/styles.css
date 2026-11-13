@@ -1151,3 +1151,55 @@ footer {
   gap: 6px;
   margin-top: 6px;
 }
+
+.illustrated-reading-view {
+  color: var(--text);
+  background: var(--bg);
+}
+.illustrated-host .cm-content {
+  max-width: 76ch;
+  margin-inline: auto;
+}
+.illustrated-reading-view .cm-atomic-h1 {
+  font-size: 1.7em;
+  font-weight: 700;
+}
+.illustrated-reading-view .cm-atomic-h2 {
+  font-size: 1.4em;
+  font-weight: 650;
+}
+.illustrated-reading-view .cm-atomic-h3 {
+  font-size: 1.15em;
+  font-weight: 650;
+}
+.illustrated-reading-view .cm-atomic-blockquote {
+  border-inline-start: 3px solid var(--accent);
+  padding-inline-start: 1em;
+}
+.illustrated-reading-view .cm-atomic-link {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.illustrated-reading-view .cm-atomic-inline-code {
+  font-family: monospace;
+  background: var(--surface);
+}
+.illustrated-photo {
+  margin: 1rem 0;
+  min-height: 3rem;
+  max-width: 100%;
+  overflow: hidden;
+}
+.illustrated-photo img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+}
+.illustrated-photo img[hidden] {
+  display: none;
+}
+.illustrated-photo p {
+  color: var(--muted);
+  white-space: normal;
+}

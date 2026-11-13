@@ -474,6 +474,23 @@ async fn resolve_source_time(
         .await
 }
 #[tauri::command]
+async fn list_image_engines(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+) -> Result<bridge::ImageEngines, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.list_image_engines().await
+}
+#[tauri::command]
+async fn check_image_engine(
+    window: WebviewWindow,
+    state: State<'_, Bridge>,
+    id: String,
+) -> Result<bridge::ImageEngine, bridge::AuthenticError> {
+    main_window(&window).map_err(|_| bridge::AuthenticError::denied())?;
+    state.check_image_engine(id).await
+}
+#[tauri::command]
 async fn list_illustrated(
     window: WebviewWindow,
     state: State<'_, Bridge>,
@@ -718,7 +735,17 @@ fn main() {
         .manage(log)
         .manage(CloseGate::default())
         .setup(|app| {
-            app.manage(user_settings::Store::new(app.path().app_config_dir()?));
+            let settings_dir = app.path().app_config_dir()?;
+            #[cfg(feature = "scaffold-smoke")]
+            let settings_dir = if native_smoke::illustrated_enabled() {
+                std::path::PathBuf::from(
+                    std::env::var("DIARY_ILLUSTRATED_SMOKE_SETTINGS")
+                        .map_err(|_| "missing isolated smoke settings")?,
+                )
+            } else {
+                settings_dir
+            };
+            app.manage(user_settings::Store::new(settings_dir));
             #[cfg(feature = "scaffold-smoke")]
             native_smoke::setup(app)?;
             Ok(())
@@ -776,6 +803,8 @@ fn main() {
             import_date,
             list_sources,
             resolve_source_time,
+            list_image_engines,
+            check_image_engine,
             list_illustrated,
             read_illustrated,
             create_illustrated,

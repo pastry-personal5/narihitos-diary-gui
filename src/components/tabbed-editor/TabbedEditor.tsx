@@ -1,3 +1,4 @@
+import type { IllustratedController } from "../../application/illustrated/controller";
 import type { ComponentProps } from "react";
 import type { createAppControllers } from "../../application/controllers";
 import type { createAppActions } from "../../application/actions/app-actions";
@@ -14,6 +15,7 @@ type Controllers = ReturnType<typeof createAppControllers>;
 type Actions = ReturnType<typeof createAppActions>;
 interface Props {
   model: Controllers["model"];
+  illustrated?: IllustratedController;
   messages: Controllers["messages"];
   generator: Controllers["generator"];
   settings: { user?: UserSettings };
@@ -32,6 +34,7 @@ interface Props {
 /** Open Editor tabs and their shared retained CodeMirror host. */
 export function TabbedEditor({
   model,
+  illustrated,
   messages,
   generator,
   settings,
@@ -107,37 +110,77 @@ export function TabbedEditor({
             Retry loading
           </button>
         )}
-      <AuthenticEditor
-        messages={messages}
-        hostRef={editorHost}
-        date={active?.kind === "source" ? active.label : (active?.date ?? "")}
-        view={activeView ?? null}
-        error={active?.error ?? activeView?.loadError ?? null}
-        notice={
-          active?.detached
-            ? "The original moved to Trash. This detached copy retains your unsaved text and cannot be saved to the original."
-            : active?.stale
-              ? "This source requires a fresh import."
-              : null
-        }
-        banner={<ReviewControls controller={review} />}
-        dispatch={(action) => model.resources.dispatch(action)}
-        readOnlyReason={
-          active?.kind === "candidate"
-            ? "Candidate · read-only suggestion"
-            : active?.kind === "source"
-              ? active.detached
-                ? "Detached copy · read-only"
-                : active.source?.capabilities.save
-                  ? null
-                  : saveOff(active.source?.capabilities.reason ?? "")
-              : !connected
-                ? "Connect to the server to open this date."
-                : !storage
-                  ? "Storage is unavailable: files are read-only."
-                  : null
-        }
-      />
+      {active?.kind === "illustrated" ? (
+        <section
+          className="editor-surface"
+          aria-label="Illustrated diary viewer"
+        >
+          <div className="pane-heading">
+            <span>{active.label} · Read-only</span>
+            <button
+              disabled={!!handlers["illustrated.delete"].reason}
+              onClick={() => void handlers["illustrated.delete"].run()}
+            >
+              Delete Illustrated diary
+            </button>
+          </div>
+          {active.loading && <p role="status">Loading Illustrated diary…</p>}
+          {active.stale && (
+            <p>
+              Retained copy; reconnect or refresh to check the current version.
+            </p>
+          )}
+          {active.error && (
+            <p role="alert">
+              Illustrated diary could not be refreshed.{" "}
+              <button onClick={() => void model.resources.retryActiveLoad()}>
+                Retry Illustrated diary
+              </button>
+            </p>
+          )}
+          {illustrated?.state.uncertain && (
+            <p role="alert">
+              Creation admission is uncertain.{" "}
+              <button onClick={() => void illustrated.retryAdmission()}>
+                Retry Illustrated admission
+              </button>
+            </p>
+          )}
+          <div className="editor-host illustrated-host" ref={editorHost} />
+        </section>
+      ) : (
+        <AuthenticEditor
+          messages={messages}
+          hostRef={editorHost}
+          date={active?.kind === "source" ? active.label : (active?.date ?? "")}
+          view={activeView ?? null}
+          error={active?.error ?? activeView?.loadError ?? null}
+          notice={
+            active?.detached
+              ? "The original moved to Trash. This detached copy retains your unsaved text and cannot be saved to the original."
+              : active?.stale
+                ? "This source requires a fresh import."
+                : null
+          }
+          banner={<ReviewControls controller={review} />}
+          dispatch={(action) => model.resources.dispatch(action)}
+          readOnlyReason={
+            active?.kind === "candidate"
+              ? "Candidate · read-only suggestion"
+              : active?.kind === "source"
+                ? active.detached
+                  ? "Detached copy · read-only"
+                  : active.source?.capabilities.save
+                    ? null
+                    : saveOff(active.source?.capabilities.reason ?? "")
+                : !connected
+                  ? "Connect to the server to open this date."
+                  : !storage
+                    ? "Storage is unavailable: files are read-only."
+                    : null
+          }
+        />
+      )}
       <CandidateEditor
         messages={messages}
         review={review}

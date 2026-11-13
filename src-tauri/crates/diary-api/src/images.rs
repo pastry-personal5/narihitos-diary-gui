@@ -23,9 +23,25 @@ pub async fn list(State(s): State<Arc<ServerState>>, headers: HeaderMap) -> Resp
         return r;
     }
     let images = s.images.clone();
+    let configured = s
+        .illustrated
+        .as_ref()
+        .and_then(|(_, settings)| settings.engine.clone());
+    let available = s.storage_ready && s.illustrated.is_some() && s.agent_runner.is_some();
     match tokio::task::spawn_blocking(move || images.list()).await {
-        Ok(v) => Json(json!({"image_engines":v.into_iter().map(view).collect::<Vec<_>>()}))
-            .into_response(),
+        Ok(v) => {
+            let selected = configured
+                .filter(|id| v.iter().any(|e| e.id == *id))
+                .or_else(|| {
+                    (v.len() == 1
+                        && s.illustrated
+                            .as_ref()
+                            .is_some_and(|(_, settings)| settings.engine.is_none()))
+                    .then(|| v[0].id.clone())
+                });
+            Json(json!({"image_engines":v.into_iter().map(view).collect::<Vec<_>>(),
+                "illustrated_available":available && selected.is_some(), "illustrated_engine":selected})).into_response()
+        }
         Err(_) => failure(StatusCode::INTERNAL_SERVER_ERROR, "internal"),
     }
 }
