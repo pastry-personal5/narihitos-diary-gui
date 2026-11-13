@@ -53,6 +53,8 @@ class WrapperContract(unittest.TestCase):
                     self.assertNotIn("--shell", args[0])
                     self.assertEqual(args[0][args[0].index("--model") + 1], str(model))
                     self.assertEqual(args[0][args[0].index("--base-model") + 1], "krea-2")
+                    self.assertEqual(args[0][args[0].index("--width") + 1], "624")
+                    self.assertEqual(args[0][args[0].index("--height") + 1], "832")
                     self.assertNotIn("--model-path", args[0])
                     self.assertEqual(args[0][args[0].index("--lora") + 1], str(adapter))
                 adapter.unlink()

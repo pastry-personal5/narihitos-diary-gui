@@ -2,6 +2,21 @@
 
 Status: Active
 
+## Krea factory image size follow-up (2026-11-13)
+
+Apply the owner's requested half-width, half-height factory default through the
+repository wrapper, preserving the 3:4 portrait ratio and no-upscaler policy.
+
+- [x] Set the Krea wrapper to 624 × 832 and verify the CLI dimensions in the existing GPU-free wrapper contract smoke; align the live harness expectations and metadata.
+- [x] Update current user/architecture documentation and the owner decision; pass the delegated wrapper smoke and repository gate.
+
+Evidence: delegated GPU-free wrapper smoke passed (one test), changed-Markdown
+Prettier and whitespace checks passed, and all seven gate lanes passed in
+`run.8kYwJ3` with localhost access after the initial sandbox denied bridge socket
+binding. The live harness/example expectations and metadata use the new size and
+were included in the passing gate. No live GPU render was run for this argument
+change; historical render evidence retains its original dimensions.
+
 ## Illustrated GUI implementation review (2026-11-13)
 
 Review the completed [M35 implementation](../archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-overview.md)

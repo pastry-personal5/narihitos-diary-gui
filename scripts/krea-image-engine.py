@@ -45,9 +45,9 @@ def main():
     output = Path(os.environ["DIARY_IMAGE_OUT"])
     if not output.is_absolute() or os.path.lexists(output):
         return 1
-    # Same baseline CLI as 07_render.sh; no upscaler, extra LoRA or private trigger.
+    # Factory portrait size; no upscaler, extra LoRA or private trigger.
     command = [str(python), str(cli), "--prompt", os.environ["DIARY_IMAGE_PROMPT"],
-               "--model", str(model), "--base-model", "krea-2", "--lora", str(adapter), "1.0", "--width", "1248", "--height", "1664",
+               "--model", str(model), "--base-model", "krea-2", "--lora", str(adapter), "1.0", "--width", "624", "--height", "832",
                "--steps", "8", "--scheduler", "euler", "--seed",
                os.environ["DIARY_IMAGE_SEED"], "--output", str(output)]
     return subprocess.call(command, cwd=output.parent, stdout=subprocess.DEVNULL,

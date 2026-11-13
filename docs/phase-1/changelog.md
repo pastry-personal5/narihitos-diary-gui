@@ -36,6 +36,8 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-13 — Owner, Krea factory size — Halve the default width and height to 624 × 832 pixels, preserving 3:4 portrait and no upscaling; tracked in the [M32 follow-up](milestone-32-personal-release-overview.md#krea-factory-image-size-follow-up-2026-11-13).
+
 - 2026-11-13 — Owner and agent, M36 implementation — Owner approved the hosted-byte-hash correction after the metadata counterexample. Added explicit export content kinds, strict independent `notion.pages` roots with typed legacy migration, durable bounded JPEG snapshots, ordered stable day pages, native uploads and per-request ownership checkpoints. Added the selected-date bitmap/palette action, progress/cancellation/recovery wording, fake/server/native/live acceptance and refreshed release qualification. [Implementation evidence](../archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md#implementation-acceptance) records actual results; M32 remains Active.
 
 - 2026-11-13 — Agent, M36 image qualification — Read back the owner's manual replacement/caption/deletion edits successfully, then found a same-minute blue-to-red replacement that kept block ID, caption and `last_edited_time` unchanged while the old upload still reported `uploaded`. Stopped dependent implementation as required by Q01. The [counterexample and proposed resolution](../archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md#image-drift-counterexample-and-proposed-resolution) propose hashing hosted image bytes for fresh observations; read-only downloads of both synthetic JPEGs matched their prepared-byte hashes. Owner review is pending; no application upload behavior is enabled.

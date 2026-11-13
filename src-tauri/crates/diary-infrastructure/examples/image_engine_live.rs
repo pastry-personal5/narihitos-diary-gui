@@ -96,7 +96,7 @@ fn main() {
     let result = registry
         .render("krea2", &request)
         .expect("real Krea render");
-    assert_eq!((result.width, result.height, result.seed), (1248, 1664, 42));
+    assert_eq!((result.width, result.height, result.seed), (624, 832, 42));
     fs::copy(&result.path, evidence.join("image.png")).unwrap();
     let render_seconds = start.elapsed().as_secs_f64();
     let bytes = result.bytes;
@@ -149,7 +149,7 @@ fn main() {
     fs::write(
         evidence.join("adapter.json"),
         serde_json::to_vec_pretty(&serde_json::json!({
-            "render_seconds": render_seconds, "bytes": bytes, "width": 1248, "height": 1664,
+            "render_seconds": render_seconds, "bytes": bytes, "width": 624, "height": 832,
             "seed": 42, "cancel_seconds": start.elapsed().as_secs_f64(),
             "cancelled_processes": owned, "sentinel_survived": sentinel_survived,
             "staging_empty_after_success_and_cancel": true,

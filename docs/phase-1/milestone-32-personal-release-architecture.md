@@ -249,3 +249,10 @@ image registry operation mutex, then awaits Illustrated worker acknowledgement
 before dropping discovery and the workspace lock. This also releases already
 completed photo staging held by a cancelled multi-photo job. The existing supervisor owns TERM/grace/KILL/reap and disposable render staging.
 SIGKILL cannot run shutdown handlers; it is outside graceful termination.
+
+## Krea factory image size follow-up
+
+Set the repository Krea command wrapper's explicit width and height to 624 and
+832, respectively. Keep generation settings and upscaling policy unchanged.
+Verify the emitted CLI dimensions with the existing synthetic wrapper smoke;
+no live GPU render is needed for this default argument change.

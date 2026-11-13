@@ -130,7 +130,7 @@ print(json.dumps({"device": mx.device_info(), "default_device": str(mx.default_d
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         report["git_status"] = subprocess.check_output(
             ["git", "status", "--short"], cwd=ROOT, text=True).splitlines()
-        report["settings"] = {"seed": 42, "width": 1248, "height": 1664,
+        report["settings"] = {"seed": 42, "width": 624, "height": 832,
                               "steps": 8, "scheduler": "euler", "upscale": False,
                               "lora_scale": 1.0, "offline": True,
                               "prompt": "A blue ceramic cup on a plain wooden table, soft daylight, still life photograph"}
