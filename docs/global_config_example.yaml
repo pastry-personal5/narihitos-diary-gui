@@ -1,0 +1,38 @@
+# Example global configuration for Narihito's Diary (schema 1).
+# Copy to a private location such as config/global_config.yaml (git-ignored), set mode 0600,
+# and replace every placeholder. All paths are absolute. Unknown keys are rejected.
+# Field rules: docs/architecture/configuration-and-exports.md
+
+schema_version: 1
+
+paths:
+  entries_root: "/absolute/path/to/entries" # durable diary workspace
+  runtime_root: "/absolute/path/to/runtime" # transient server state; keep separate
+  icloud_entries_root: "/absolute/path/to/icloud/export" # omit to disable iCloud export
+
+server: # optional; these are the defaults
+  port: 8781
+  port_fallback_count: 8 # 0-8
+
+sources: # optional; up to 64, aliases unique
+  - alias: "mobile"
+    type: "narihito" # narihito | ayumi
+    root: "/absolute/path/to/source"
+
+agents:
+  profiles: # optional; up to 64, aliases unique
+    - alias: "personal"
+      type: "codex" # codex | claude | qwen | apple-foundation-models
+      profile_home: "/absolute/path/to/codex-home"
+      # executable: "/absolute/bin/codex" # optional; otherwise found on PATH
+    - alias: "on-device"
+      type: "apple-foundation-models" # takes no profile_home or executable
+
+notion: # omit to disable Notion export
+  token: "<notion-integration-token>"
+  # Invented, syntactically valid IDs below are placeholders; replace both privately.
+  pages:
+    - type: normal
+      root_page_id: "01234567-89ab-cdef-0123-456789abcdef"
+    - type: illustrated
+      root_page_id: "01234567-89ab-cdef-0123-456789abcdee"

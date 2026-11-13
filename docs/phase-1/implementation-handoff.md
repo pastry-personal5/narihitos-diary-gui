@@ -128,7 +128,7 @@ records targeted tests and the synthetic built-server smoke; the full seven-comm
 wake/reconnect and measured performance obligations in the phase plan. Native
 VoiceOver proof remains exempt; no real Qwen leg ran (exempt: GPU throttling).
 
-P1-M27 delivered the Notion adapter (E8), proven by the fake-service matrix and a live round trip on a throwaway root page; see its [checklist](milestone-27-notion-export-overview.md) and [work plan](milestone-27-notion-export-architecture.md). Notion writes beyond `scripts/smoke/notion-live.py` on the throwaway root remain unauthorized for tests.
+P1-M27 delivered the Notion adapter (E8), proven by the fake-service matrix and a live round trip on a throwaway root page; see its [checklist](milestone-27-notion-export-overview.md) and [work plan](milestone-27-notion-export-architecture.md). Illustrated fixture tests are additionally authorized only beneath the dedicated M36 test root; the [M36 qualification and implementation record](../archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md) records retained pages and exact commands. Production roots are never test fallbacks.
 
 P1-M26 delivered the macOS iCloud adapter, export cancel, abandon of uncertain exports and a minimal Export UI against temp directories only (E7); live iCloud proof is P1-M32. See its [checklist](milestone-26-icloud-export-overview.md).
 
@@ -157,3 +157,5 @@ The [completed checklist](../archive/milestones/p1-m31/milestone-31-changeabilit
 M31 T02 is also Done: [AI Agent progress completion/evidence](../archive/milestones/p1-m31/milestone-31-agent-progress-overview.md#completion-evidence-2026-11-09) and [work plan](../archive/milestones/p1-m31/milestone-31-agent-progress-architecture.md). Per-profile settings and periodic content-free feedback pass focused regressions and all seven gate lanes; M32 retains packaged/native qualification.
 
 M31’s [Generate/Chat/Review progress extension](../archive/milestones/p1-m31/milestone-31-review-progress-overview.md#completion-evidence-2026-11-09) is Done: preparation and execution share the profile-controlled two-second cadence, Review exposes content-free observations without user-chat discovery, and stale connections keep an explicit unavailable heartbeat. Focused regressions and all seven gate lanes pass; M32 retains packaged/native evidence.
+
+P1-M36 adds selected-date Illustrated Notion upload with independently configured roots, durable JPEG snapshots, sorted stable day pages and hosted-byte drift evidence. Its [checklist](../archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-overview.md) and [work plan/evidence](../archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md) cover the counterexample, owner-approved correction, fake/live/native proof and final validation. M32 release closure remains independently gated.

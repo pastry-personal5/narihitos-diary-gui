@@ -22,6 +22,8 @@ mod confirm;
 #[cfg(any(test, feature = "fault-injection"))]
 pub mod fake;
 pub mod icloud;
+mod illustrated_snapshot;
+mod jpeg;
 pub mod notion;
 mod recovery;
 mod run;
@@ -87,6 +89,7 @@ struct ExportCoordinatorState {
     db: Arc<Db>,
     identity: Identity,
     authentic: Arc<dyn AuthenticStore>,
+    illustrated: Option<diary_application::illustrated::SharedStore>,
     adapters: Vec<Arc<dyn ExportAdapter>>,
     previews: Mutex<BTreeMap<String, Prepared>>,
     /// Running exports asked to stop before `apply`.
@@ -112,6 +115,7 @@ impl ExportCoordinator {
             db,
             identity,
             authentic,
+            illustrated: None,
             adapters,
             previews: Mutex::new(BTreeMap::new()),
             cancels: Mutex::new(Default::default()),
@@ -121,6 +125,12 @@ impl ExportCoordinator {
             #[cfg(any(test, feature = "fault-injection"))]
             fault: Mutex::new(None),
         }))
+    }
+    pub fn with_illustrated(mut self, store: diary_application::illustrated::SharedStore) -> Self {
+        Arc::get_mut(&mut self.0)
+            .expect("unshared coordinator")
+            .illustrated = Some(store);
+        self
     }
     #[cfg(test)]
     pub(crate) fn with_fault(self, point: &str) -> Self {
@@ -155,10 +165,14 @@ impl ExportCoordinatorState {
         Ok(())
     }
 
-    fn adapter(&self, target: Target) -> Result<&Arc<dyn ExportAdapter>, ExportError> {
+    fn adapter(
+        &self,
+        kind: ContentKind,
+        target: Target,
+    ) -> Result<&Arc<dyn ExportAdapter>, ExportError> {
         self.adapters
             .iter()
-            .find(|a| a.target() == target)
+            .find(|a| a.target() == target && a.content_kind() == kind)
             .ok_or(ExportError::Disabled)
     }
 
@@ -185,6 +199,17 @@ impl ExportCoordinatorState {
             OperationState::Cancelled => ExportState::Cancelled,
         };
         ExportResult {
+            progress: if state == ExportState::Running {
+                DiaryDate::parse(&row.date).and_then(|d| {
+                    self.adapter(row.content_kind, row.target)
+                        .ok()?
+                        .progress(&d)
+                })
+            } else {
+                None
+            },
+            content_kind: row.content_kind,
+            illustrated_version: row.illustrated_version.clone(),
             operation_id: rec.id.clone(),
             input_hash: rec.input_hash.clone(),
             target: row.target,
@@ -258,7 +283,19 @@ impl ExportCoordinatorState {
 
 impl Exports for ExportCoordinator {
     fn available(&self, target: Target) -> bool {
-        self.0.adapter(target).is_ok() && self.0.ready.load(Ordering::SeqCst)
+        self.0.adapter(ContentKind::Authentic, target).is_ok()
+            && self.0.ready.load(Ordering::SeqCst)
+    }
+    fn available_kind(&self, kind: ContentKind, target: Target) -> bool {
+        self.0.adapter(kind, target).is_ok() && self.0.ready.load(Ordering::SeqCst)
+    }
+    fn start_illustrated(
+        &self,
+        session: &str,
+        generation: u64,
+        request: IllustratedStartRequest,
+    ) -> Result<Started, ExportError> {
+        self.0.start_illustrated(session, generation, request)
     }
     fn start(
         &self,

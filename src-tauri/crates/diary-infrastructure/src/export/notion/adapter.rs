@@ -26,7 +26,7 @@ use std::{
 const CHUNK_BYTES: usize = 400_000;
 
 pub struct Notion {
-    client: Client,
+    client: Arc<Client>,
     root_page: String,
     /// Notion's `bot.workspace_id`, fetched on first use (O9).
     workspace: OnceLock<String>,
@@ -131,6 +131,9 @@ impl Notion {
     /// Registers the destination for a valid root page ID. The workspace identity is fetched
     /// lazily by [`ExportAdapter::ready`], so an unreachable service never blocks startup.
     pub fn new(client: Client, root_page_id: &str, db: Arc<Db>) -> Option<Self> {
+        Self::shared(Arc::new(client), root_page_id, db)
+    }
+    pub fn shared(client: Arc<Client>, root_page_id: &str, db: Arc<Db>) -> Option<Self> {
         let root_page = normalize_page_id(root_page_id)?;
         let destination = hex_sha(format!("notion:{root_page}").as_bytes());
         Some(Self {

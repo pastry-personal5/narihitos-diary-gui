@@ -18,6 +18,13 @@ import urllib.error
 import urllib.request
 import uuid
 
+if '--qualify-pages' in sys.argv:
+    # Qualification has its own fixed authorized root and never starts the server.
+    import runpy
+    sys.argv.remove('--qualify-pages')
+    runpy.run_path(str(Path(__file__).with_name('notion-page-qualification.py')), run_name='__main__')
+    sys.exit(0)
+
 if os.environ.get('DIARY_NOTION_LIVE') != '1':
     sys.exit('skipped: set DIARY_NOTION_LIVE=1 (and TOKEN/ROOT) to run the live Notion round trip')
 TOKEN = os.environ.get('DIARY_NOTION_LIVE_TOKEN', '').strip()
@@ -75,7 +82,7 @@ with tempfile.TemporaryDirectory(prefix='diary-notion-live-') as temporary:
     for folder in [workspace, runtime]:
         folder.mkdir(mode=0o700)
     config = base / 'config.yaml'
-    config.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nnotion:\n  root_page_id: "{ROOT_PAGE}"\n  token: "{TOKEN}"\n')
+    config.write_text(f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nnotion:\n  pages:\n    - type: normal\n      root_page_id: "{ROOT_PAGE}"\n  token: "{TOKEN}"\n')
     config.chmod(0o600)
 
     def start():

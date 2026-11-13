@@ -6,7 +6,7 @@ use crate::{
     sqlite::{Db, DbError},
 };
 use diary_application::{
-    export::{Receipt, Target},
+    export::{ContentKind, Receipt, Target},
     operations::{
         Admission, LedgerError, NewOperation, NewStep, OperationId, OperationState, StepOutcome,
     },
@@ -31,6 +31,9 @@ fn sql(_: rusqlite::Error) -> DbError {
 
 /// What is persisted before any destination call.
 pub struct Intent {
+    pub content_kind: ContentKind,
+    pub illustrated_version: Option<String>,
+    pub photos: Vec<Vec<u8>>,
     pub target: Target,
     pub destination_key: String,
     pub authentic_id: String,
@@ -45,6 +48,8 @@ pub const API_VERSION: u32 = 1;
 
 #[derive(Debug, Clone)]
 pub struct Row {
+    pub content_kind: ContentKind,
+    pub illustrated_version: Option<String>,
     pub target: Target,
     pub destination_key: String,
     pub authentic_id: String,
@@ -69,7 +74,11 @@ impl Db {
         op: &NewOperation,
         intent: &Intent,
     ) -> Result<Admission, StoreError> {
-        if intent.snapshot.len() > diary_application::export::MAX_SNAPSHOT_BYTES {
+        if intent.snapshot.len() > diary_application::export::MAX_SNAPSHOT_BYTES
+            || intent.photos.len() > 99
+            || intent.photos.iter().any(|p| p.len() > 5 * 1024 * 1024)
+            || intent.photos.iter().map(Vec::len).sum::<usize>() > 64 * 1024 * 1024
+        {
             return Err(StoreError::Invalid);
         }
         self.transact(|tx| {
@@ -79,7 +88,7 @@ impl Db {
             };
             if matches!(admitted, Admission::New(_)) {
                 tx.execute(
-                    "INSERT INTO export_operations VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
+                    "INSERT INTO export_operations VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
                     params![
                         op.id.as_str(),
                         intent.target.as_str(),
@@ -92,10 +101,15 @@ impl Db {
                         intent.snapshot,
                         RENDERER_VERSION,
                         API_VERSION,
-                        intent.reason
+                        intent.reason,
+                        intent.content_kind.as_str(),
+                        intent.illustrated_version,
                     ],
                 )
                 .map_err(sql)?;
+                for (n, jpeg) in intent.photos.iter().enumerate() {
+                    tx.execute("INSERT INTO export_photos VALUES (?1,?2,?3)", params![op.id.as_str(), n as i64, jpeg]).map_err(sql)?;
+                }
                 tx.execute(
                     "INSERT INTO export_checkpoints VALUES (?1, 0, ?2, 'pending', NULL, 1)",
                     params![op.id.as_str(), intent.revision_sha],
@@ -109,12 +123,15 @@ impl Db {
     pub fn export_row(&self, id: &OperationId) -> Result<Option<Row>, StoreError> {
         Ok(self.with(|c| {
             c.query_row(
-                "SELECT target,destination_key,authentic_id,date,revision_sequence,revision_sha,snapshot,reason \
+                "SELECT target,destination_key,authentic_id,date,revision_sequence,revision_sha,snapshot,reason,content_kind,illustrated_version \
                  FROM export_operations WHERE operation_id=?1",
                 [id.as_str()],
                 |r| {
                     let target: String = r.get(0)?;
+                    let kind: String = r.get(8)?;
                     Ok(Row {
+                        content_kind: ContentKind::parse(&kind).ok_or(rusqlite::Error::InvalidQuery)?,
+                        illustrated_version: r.get(9)?,
                         target: Target::parse(&target).ok_or(rusqlite::Error::InvalidQuery)?,
                         destination_key: r.get(1)?,
                         authentic_id: r.get(2)?,
@@ -298,6 +315,7 @@ impl Db {
                 ],
             )
             .map_err(sql)?;
+            tx.execute("DELETE FROM export_photos WHERE operation_id=?1", [id.as_str()]).map_err(sql)?;
             if let Some(p) = publication {
                 tx.execute(
                     "INSERT INTO export_receipts VALUES (?1,?2,?3,?4,?5,?6,?7) \
@@ -391,6 +409,21 @@ impl Db {
             stmt.query_map(params![workspace, after, limit as i64], |r| r.get(0))
                 .map_err(sql)?
                 .collect::<Result<_, _>>()
+                .map_err(sql)
+        })?)
+    }
+}
+
+impl Db {
+    pub fn export_photos(&self, id: &OperationId) -> Result<Vec<Vec<u8>>, StoreError> {
+        Ok(self.with(|c| {
+            let mut query = c
+                .prepare("SELECT jpeg FROM export_photos WHERE operation_id=?1 ORDER BY n")
+                .map_err(sql)?;
+            query
+                .query_map([id.as_str()], |r| r.get(0))
+                .map_err(sql)?
+                .collect::<Result<Vec<_>, _>>()
                 .map_err(sql)
         })?)
     }

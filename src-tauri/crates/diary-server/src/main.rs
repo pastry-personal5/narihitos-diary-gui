@@ -72,7 +72,13 @@ fn parse_trace_args(
 }
 fn trace_mode(args: impl Iterator<Item = std::ffi::OsString>) -> Result<(), &'static str> {
     let (config, selector, limit) = parse_trace_args(args)?;
-    let config = config::load(&config).map_err(|_| "configuration rejected")?;
+    let config = config::load(&config).map_err(|e| {
+        if e == config::ConfigError::NotionPagesRequired {
+            "legacy Notion configuration: replace notion.root_page_id with notion.pages"
+        } else {
+            "configuration rejected"
+        }
+    })?;
     let key = diary_infrastructure::lifecycle::workspace_key(&config.paths.entries_root);
     let report = PrivateDir::open(&config.paths.runtime_root)
         .and_then(|d| d.open_child(&key))
@@ -101,22 +107,27 @@ fn connect_notion(
     workspace: &diary_infrastructure::workspace::Workspace,
     notion: &diary_infrastructure::config::Notion,
     diag: &Arc<dyn Diagnostics>,
-) -> Option<diary_infrastructure::export::notion::Notion> {
+) -> Vec<Arc<dyn diary_application::export::ExportAdapter>> {
     use diary_infrastructure::export::notion::client::Client;
     #[cfg(feature = "fault-injection")]
     if let Some(file) = std::env::var_os("DIARY_FAKE_NOTION_FILE") {
-        use diary_infrastructure::export::notion::{adapter::normalize_page_id, fake::FakeNotion};
-        let root = normalize_page_id(&notion.root_page_id)?;
-        let fake = Arc::new(FakeNotion::persistent(&root, file.into()));
-        let client = Client::new(fake, Arc::new(|_| {}), Duration::ZERO);
-        return workspace.notion(client, &notion.root_page_id);
+        use diary_infrastructure::export::notion::fake::FakeNotion;
+        let root = &notion.pages[0].root_page_id;
+        let fake = Arc::new(FakeNotion::persistent(root, file.into()));
+        for page in &notion.pages {
+            fake.add_root(&page.root_page_id);
+        }
+        let client = Arc::new(Client::new(fake, Arc::new(|_| {}), Duration::ZERO));
+        return workspace.notion_adapters(client, &notion.pages);
     }
-    let http = notion_http::Reqwest::new(&notion.token)?;
+    let Some(http) = notion_http::Reqwest::new(&notion.token) else {
+        return vec![];
+    };
     let http = export_log::LoggedHttp {
         inner: http,
         diag: diag.clone(),
     };
-    workspace.notion(Client::production(Arc::new(http)), &notion.root_page_id)
+    workspace.notion_adapters(Arc::new(Client::production(Arc::new(http))), &notion.pages)
 }
 
 async fn run() -> Result<(), &'static str> {
@@ -143,7 +154,13 @@ async fn run() -> Result<(), &'static str> {
     if args.next().is_some() {
         return Err("invalid arguments");
     }
-    let config = config::load(&path).map_err(|_| "configuration rejected")?;
+    let config = config::load(&path).map_err(|e| {
+        if e == config::ConfigError::NotionPagesRequired {
+            "legacy Notion configuration: replace notion.root_page_id with notion.pages"
+        } else {
+            "configuration rejected"
+        }
+    })?;
     let lock = WorkspaceLock::acquire(&config.paths.entries_root).map_err(|e| match e {
         LifecycleError::RootNotEmpty => {
             "workspace folder has files but no .diary: inspect it first"
@@ -246,6 +263,15 @@ async fn run() -> Result<(), &'static str> {
             Arc::new(diary_infrastructure::authentic::Sha256Hasher),
         );
     }
+    let illustrated_store: Option<diary_application::illustrated::SharedStore> =
+        if workspace.readiness == Readiness::Ready {
+            Some(Arc::new(
+                diary_infrastructure::illustrated::Store::open(config.paths.entries_root.clone())
+                    .map_err(|_| "illustrated recovery unavailable")?,
+            ))
+        } else {
+            None
+        };
     // Each configured destination registers one adapter; with none, every target is disabled
     // while lookup, recovery and the settings-reload guard still work. The directory-backed
     // fake and the in-memory Notion fake are fault-injection only.
@@ -273,20 +299,22 @@ async fn run() -> Result<(), &'static str> {
         }
         if let Some(notion) = &config.notion {
             // The workspace identity is fetched on first use, so startup never waits on Notion.
-            match connect_notion(
+            adapters.extend(connect_notion(
                 &workspace,
                 notion,
                 &(diagnostics.clone() as Arc<dyn Diagnostics>),
-            ) {
-                Some(a) => adapters.push(Arc::new(a)),
-                None => diagnostics.emit(Record::new(EventCode::OperationBlocked, Level::Warn)),
-            }
+            ));
         }
         let adapters = adapters
             .into_iter()
             .map(|a| Arc::new(export_log::LoggedAdapter::new(a, diagnostics.clone())) as _)
             .collect();
         if let Some(service) = workspace.exports_with(store, adapters) {
+            let service = if let Some(store) = &illustrated_store {
+                service.with_illustrated(store.clone())
+            } else {
+                service
+            };
             if service.recover().is_err() {
                 diagnostics.emit(Record::new(EventCode::OperationBlocked, Level::Error));
             }
@@ -310,19 +338,17 @@ async fn run() -> Result<(), &'static str> {
         ))
         .map_err(|_| "image configuration unavailable")?;
     diary_api::ServerState::set_images(&mut state, images.clone());
-    if workspace.readiness == Readiness::Ready {
-        let store =
-            diary_infrastructure::illustrated::Store::open(config.paths.entries_root.clone())
-                .map_err(|_| "illustrated recovery unavailable")?;
+    if let Some(store) = illustrated_store {
         diary_api::ServerState::set_illustrated(
             &mut state,
-            Arc::new(store),
+            store,
             diary_application::illustrated::Settings {
                 engine: config.illustrated.engine.clone(),
                 max_photos: config.illustrated.max_photos,
             },
         );
     }
+
     let profile_table =
         Arc::new(diary_infrastructure::agent::profiles::ProfileTable::from_config(&config));
     let host = Arc::new(diary_infrastructure::agent::host::Host::new(

@@ -12,7 +12,7 @@ diary entries and related source snippets in one desktop workspace.
   their producer-owned metadata and audio.
 - Use optional AI Chat, Draft candidate generation and Paragraph Review with
   guarded accept/reject workflows.
-- Export saved entries through the supported iCloud and Notion workflows.
+- Export saved Authentic entries through iCloud and Notion, and upload published Illustrated diaries to ordered, stable Notion day pages with resized JPEG photos. Configure independent roots with `notion.pages`; legacy `notion.root_page_id` requires explicit migration and server restart.
 - Manage settings, AI-agent status, keyboard shortcuts, diagnostics and
   recoverable source Trash operations from the app.
 

@@ -1,7 +1,10 @@
 //! Explicit fixture build only. No command, path access or capability is added.
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 pub fn illustrated_enabled() -> bool {
-    std::env::var("DIARY_ILLUSTRATED_GUI_SMOKE").is_ok_and(|v| v == "1")
+    std::env::var("DIARY_ILLUSTRATED_GUI_SMOKE").is_ok_and(|v| v == "1") || upload_enabled()
+}
+fn upload_enabled() -> bool {
+    std::env::var("DIARY_ILLUSTRATED_UPLOAD_GUI_SMOKE").is_ok_and(|v| v == "1")
 }
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     if illustrated_enabled() {
@@ -69,7 +72,11 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 pub fn main_loaded(webview: &tauri::Webview) -> Result<(), Box<dyn std::error::Error>> {
     webview.set_focus()?;
     if illustrated_enabled() {
-        webview.eval(include_str!("native_smoke/illustrated.js"))?;
+        webview.eval(if upload_enabled() {
+            include_str!("native_smoke/illustrated-upload.js")
+        } else {
+            include_str!("native_smoke/illustrated.js")
+        })?;
         return Ok(());
     }
     webview.eval(

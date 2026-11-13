@@ -160,6 +160,34 @@ impl Workspace {
         };
         crate::export::notion::Notion::new(client, root_page_id, db.clone())
     }
+    pub fn notion_adapters(
+        &self,
+        client: std::sync::Arc<crate::export::notion::client::Client>,
+        pages: &[crate::config::NotionPage],
+    ) -> Vec<std::sync::Arc<dyn diary_application::export::ExportAdapter>> {
+        let Some(db) = &self.db else {
+            return vec![];
+        };
+        pages
+            .iter()
+            .filter_map(|page| match page.kind {
+                crate::config::NotionKind::Normal => crate::export::notion::Notion::shared(
+                    client.clone(),
+                    &page.root_page_id,
+                    db.clone(),
+                )
+                .map(|a| std::sync::Arc::new(a) as _),
+                crate::config::NotionKind::Illustrated => {
+                    crate::export::notion::illustrated::Illustrated::new(
+                        client.clone(),
+                        &page.root_page_id,
+                        db.clone(),
+                    )
+                    .map(|a| std::sync::Arc::new(a) as _)
+                }
+            })
+            .collect()
+    }
     /// The lock proves exclusivity; recovery and inspection modes expose no ledger.
     pub fn open(lock: &WorkspaceLock) -> Result<Self, WorkspaceError> {
         open_with(lock, None)

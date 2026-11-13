@@ -13,6 +13,27 @@ pub const MAX_SNAPSHOT_BYTES: usize = MAX_BODY_BYTES + 65_536;
 pub const KIND: &str = "export";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentKind {
+    Authentic,
+    Illustrated,
+}
+impl ContentKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Authentic => "authentic",
+            Self::Illustrated => "illustrated",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "authentic" => Some(Self::Authentic),
+            "illustrated" => Some(Self::Illustrated),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Target {
     Icloud,
     Notion,
@@ -35,6 +56,10 @@ impl Target {
 /// sources never become snapshots.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Snapshot {
+    pub content_kind: ContentKind,
+    pub illustrated_version: Option<String>,
+    /// Prepared JPEGs only, bounded before admission; empty for Authentic.
+    pub photos: Vec<Vec<u8>>,
     pub date: DiaryDate,
     pub authentic_id: String,
     pub revision: AuthenticRevision,
@@ -232,6 +257,12 @@ pub enum Applied {
 /// The destination port. A real adapter (P1-M26/M27) supplies availability evidence; the
 /// fake in `diary-infrastructure` exists only for tests and the fault-injection build.
 pub trait ExportAdapter: Send + Sync {
+    fn progress(&self, _date: &DiaryDate) -> Option<ExportProgress> {
+        None
+    }
+    fn content_kind(&self) -> ContentKind {
+        ContentKind::Authentic
+    }
     fn target(&self) -> Target;
     /// Canonical root path or root page ID; part of the destination key.
     fn root(&self) -> String;
@@ -246,6 +277,19 @@ pub trait ExportAdapter: Send + Sync {
         expected: &Observation,
     ) -> Applied;
     fn read_back(&self, date: &DiaryDate) -> Observation;
+    fn apply_snapshot(
+        &self,
+        snapshot: &Snapshot,
+        write: Write,
+        expected: &Observation,
+        _cancelled: &dyn Fn() -> bool,
+    ) -> Applied {
+        self.apply(&snapshot.date, &snapshot.bytes, write, expected)
+    }
+    /// A matching body alone cannot establish ownership after an ambiguous write.
+    fn verified(&self, _date: &DiaryDate, _seen: &Observation) -> bool {
+        true
+    }
     /// `Err` while the destination's identity cannot be established yet (Notion fetches its
     /// workspace lazily). The service builds no destination key and creates no intent until
     /// this succeeds, so a placeholder `root()` can never be persisted.
@@ -295,6 +339,12 @@ pub struct StartRequest {
     pub target: Target,
     pub expected: AuthenticRevision,
 }
+#[derive(Debug, Clone)]
+pub struct IllustratedStartRequest {
+    pub operation_id: OperationId,
+    pub date: DiaryDate,
+    pub expected_version: String,
+}
 #[derive(Clone)]
 pub struct ConfirmRequest {
     pub operation_id: OperationId,
@@ -332,6 +382,9 @@ impl fmt::Debug for Preview {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExportResult {
+    pub progress: Option<ExportProgress>,
+    pub content_kind: ContentKind,
+    pub illustrated_version: Option<String>,
     pub operation_id: OperationId,
     /// Business-input hash, for job correlation only.
     pub input_hash: String,
@@ -343,6 +396,11 @@ pub struct ExportResult {
     pub checkpoint: u64,
     /// `changed|deleted|unowned` while confirmation is needed; a bounded tag after failure.
     pub reason: Option<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportProgress {
+    pub stage: String,
+    pub photos_uploaded: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -393,6 +451,17 @@ pub type Notifier = std::sync::Arc<dyn Fn(&ExportResult) + Send + Sync>;
 
 pub trait Exports: Send + Sync {
     fn available(&self, target: Target) -> bool;
+    fn available_kind(&self, kind: ContentKind, target: Target) -> bool {
+        kind == ContentKind::Authentic && self.available(target)
+    }
+    fn start_illustrated(
+        &self,
+        _session: &str,
+        _generation: u64,
+        _request: IllustratedStartRequest,
+    ) -> Result<Started, ExportError> {
+        Err(ExportError::Disabled)
+    }
     fn start(
         &self,
         session: &str,

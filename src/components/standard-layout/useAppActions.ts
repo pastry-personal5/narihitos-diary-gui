@@ -32,7 +32,10 @@ export function useAppActions({
   messages: GlobalMessagesStore;
   sourceTrash: SourceTrashController;
   connection: Connection;
-  settings: { user?: UserSettings };
+  settings: {
+    user?: UserSettings;
+    server?: import("../../application/bridge").ServerSettings;
+  };
   generator: GenerationController;
   illustrated?: IllustratedController;
   chat: AIChatController;
@@ -50,6 +53,7 @@ export function useAppActions({
     exporter,
     connection: () => connection,
     user: () => settings.user,
+    server: () => settings.server,
     openPalette: () => {
       if (!document.querySelector('[aria-modal="true"], [data-capture]'))
         setPaletteOpen(true);

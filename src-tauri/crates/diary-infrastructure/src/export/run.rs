@@ -16,7 +16,7 @@ impl ExportCoordinatorState {
 
     pub(super) fn run(&self, job: &Job) -> Result<(), ExportError> {
         self.hit("after_admission")?;
-        let adapter = self.adapter(job.target)?.clone();
+        let adapter = self.adapter(job.snapshot.content_kind, job.target)?.clone();
         let date = job.snapshot.date;
         // Re-read immediately before mutation; a changed observation needs a new preview.
         let now = adapter.observe(&date);
@@ -54,7 +54,12 @@ impl ExportCoordinatorState {
             .export_chunk(&job.id, "applying", None)
             .map_err(stored)?;
         self.hit("before_apply")?;
-        let applied = adapter.apply(&date, &job.snapshot.bytes, job.write, &job.expected);
+        let applied = adapter.apply_snapshot(&job.snapshot, job.write, &job.expected, &|| {
+            self.cancels
+                .lock()
+                .map(|c| c.contains(job.id.as_str()))
+                .unwrap_or(true)
+        });
         self.hit("after_apply")?;
         if applied == Applied::Failed {
             self.db
@@ -71,9 +76,7 @@ impl ExportCoordinatorState {
             &job.snapshot.bytes,
             &job.snapshot.revision.sha256,
         );
-        if applied == Applied::Done && back.available && back.present && &back.digest == sha
-            || applied == Applied::Unknown && back.available && back.present && &back.digest == sha
-        {
+        if adapter.verified(&date, &back) && back.available && back.present && &back.digest == sha {
             self.hit("before_receipt")?;
             let (_, row) = self.load(&job.id)?;
             self.db

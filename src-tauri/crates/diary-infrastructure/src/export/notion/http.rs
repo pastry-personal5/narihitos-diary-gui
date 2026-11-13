@@ -11,6 +11,7 @@ pub enum Method {
 
 #[derive(Debug, Clone)]
 pub struct Request {
+    pub multipart: bool,
     pub method: Method,
     /// Path and query, starting with `/v1/`. The transport owns host, credential and version.
     pub path: String,
@@ -35,4 +36,8 @@ pub enum Failure {
 
 pub trait Http: Send + Sync {
     fn send(&self, request: &Request) -> Result<Response, Failure>;
+    /// Hosted attachment bytes, with no integration credential. No redirects.
+    fn download(&self, _url: &str, _limit: usize) -> Result<Vec<u8>, Failure> {
+        Err(Failure::NotSent)
+    }
 }

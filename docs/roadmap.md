@@ -18,4 +18,6 @@ Owner request (2026-11-12): P1-M33 [pluggable image engines](archive/milestones/
 
 Completed milestones and delivery evidence are indexed in the [phase plan](phase-1/phase-1.md#milestones). Decisions, waivers and plan changes belong in the [Phase 1 changelog](phase-1/changelog.md); current owner decisions and open questions are in [decisions](decisions.md). Research recommendations remain proposals unless adopted there or under documented delegated design authority.
 
+Owner request (2026-11-13): P1-M36 [Illustrated diary Notion upload](archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-overview.md) is Done (2026-11-13) before M32 release closure. The [work plan](archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md) covers separate configured roots, year/month/day pages, stable day URLs and 480-pixel-high JPEG upload copies. Acceptance includes the owner-approved hosted-byte drift correction, sorted stable day pages, fake/server/native/live proof, final seven-lane gate and refreshed ordinary release artifacts. M32 remains Active.
+
 Multiple-prompt management and evaluation are [Phase 2 ideas](phase-2-ideas.md) for Diary v2.0.0. Phase 2 scheduling and its detailed plan remain deferred.

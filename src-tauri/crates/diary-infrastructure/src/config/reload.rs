@@ -22,7 +22,7 @@ struct Fixed {
 struct Guarded {
     images: std::collections::BTreeMap<String, super::ImageEngineConfig>,
     icloud: Option<PathBuf>,
-    notion: Option<(String, String)>,
+    notion: Option<(Vec<super::NotionPage>, String)>,
     profiles: Vec<(String, u8, Option<PathBuf>, Option<PathBuf>)>,
 }
 
@@ -51,7 +51,7 @@ fn fingerprints(c: &Config) -> (Fixed, Guarded) {
         notion: c
             .notion
             .as_ref()
-            .map(|n| (n.root_page_id.clone(), n.token.clone())),
+            .map(|n| (n.pages.clone(), n.token.clone())),
         profiles: c
             .agents
             .profiles
@@ -86,6 +86,7 @@ fn issue(e: ConfigError) -> ReloadIssue {
     let (path, code) = match e {
         ConfigError::Syntax => ("config", "syntax"),
         ConfigError::Schema => ("config", "schema"),
+        ConfigError::NotionPagesRequired => ("notion.pages", "migration_required"),
         ConfigError::Limit => ("config", "limit"),
         ConfigError::Version => ("schema_version", "unsupported"),
         ConfigError::Port => ("server.port", "invalid"),
@@ -171,6 +172,12 @@ impl ConfigReloader for ConfigHandle {
             if guarded != current.1 {
                 if busy {
                     return ReloadOutcome::Busy;
+                }
+                if guarded.notion != current.1.notion {
+                    return ReloadOutcome::RestartRequired(vec![ReloadIssue {
+                        path: "notion.pages|notion.token",
+                        code: "restart_required",
+                    }]);
                 }
                 if let Some(images) = &self.images
                     && images

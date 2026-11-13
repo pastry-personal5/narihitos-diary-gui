@@ -117,6 +117,7 @@ export interface ReloadResult {
 }
 /** Redacted server config status: availability only, never paths, tokens or YAML. */
 export interface ServerSettings {
+  illustrated_notion_exports_available?: boolean;
   config_generation: number;
   last_reload: ReloadResult | null;
   storage_ready: boolean;

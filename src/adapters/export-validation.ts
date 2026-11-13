@@ -40,13 +40,42 @@ export function exportResultDto(value: unknown): ExportResult {
   const d = record(value);
   if (d.kind !== "export") return bad();
   const revision = record(d.revision);
+  const contentKind = choice(d.content_kind ?? "authentic", [
+    "authentic",
+    "illustrated",
+  ]);
+  if (contentKind === "illustrated" && d.target !== "notion") return bad();
   return {
     kind: "export",
+    progress:
+      d.progress == null
+        ? null
+        : (() => {
+            const p = record(d.progress);
+            const photos = int(p.photos_uploaded, 0);
+            if (photos > 99) return bad();
+            return {
+              stage: choice(p.stage, [
+                "create_page",
+                "create_upload",
+                "send_upload",
+                "append",
+                "verify",
+                "delete",
+              ]),
+              photos_uploaded: photos,
+            };
+          })(),
+    content_kind: contentKind,
+    illustrated_version:
+      contentKind === "illustrated"
+        ? str(d.illustrated_version, 36, uuid)
+        : null,
     operation_id: str(d.operation_id, 36, uuid),
     target: choice(d.target, ["icloud", "notion"]),
     date: str(d.date, 10, /^\d{4}-\d{2}-\d{2}$/),
     revision: {
-      sequence: int(revision.sequence, 1),
+      sequence: int(revision.sequence, contentKind === "illustrated" ? 0 : 1),
       sha256: str(revision.sha256, 64, /^[0-9a-f]{64}$/),
     },
     state: choice(d.state, STATES),

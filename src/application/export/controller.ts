@@ -1,5 +1,6 @@
 import { AuthenticError, type Bridge } from "../bridge";
 import type {
+  ExportContentKind,
   ExportPreview,
   ExportResult,
   ExportTarget,
@@ -9,6 +10,7 @@ import type {
 export type ExportPhase = "idle" | "working" | "preview" | "uncertain";
 export interface ExportSnapshot {
   phase: ExportPhase;
+  contentKind: ExportContentKind;
   date: string | null;
   target: ExportTarget;
   preview: (ExportPreview & { abandon: boolean }) | null;
@@ -17,6 +19,7 @@ export interface ExportSnapshot {
 }
 const IDLE: ExportSnapshot = {
   phase: "idle",
+  contentKind: "authentic",
   date: null,
   target: "icloud",
   preview: null,
@@ -29,15 +32,23 @@ const NAME: Record<ExportTarget, { place: string; item: string }> = {
   notion: { place: "Notion", item: "Notion section" },
 };
 /** App-authored text only; a server message or exception text never reaches the user. */
-export function exportMessage(error: string, target: ExportTarget): string {
-  const { place, item } = NAME[target];
+export function exportMessage(
+  error: string,
+  target: ExportTarget,
+  contentKind: ExportContentKind = "authentic",
+): string {
+  const { place } = NAME[target];
+  const item =
+    contentKind === "illustrated" ? "Notion day page" : NAME[target].item;
   const text: Record<string, string> = {
     export_disabled:
       target === "icloud"
         ? "Export is not set up. Set an iCloud export folder in the configuration."
         : "Notion export is not set up or could not connect. Check the Notion settings and that the service is reachable, then restart the server.",
     cloud_unavailable:
-      "The iCloud file is not downloaded or not readable. Open it in Finder, then try again.",
+      target === "notion"
+        ? "The Notion page or its hosted images could not be read and verified. No unchanged-content assumption was made."
+        : "The iCloud file is not downloaded or not readable. Open it in Finder, then try again.",
     permission_denied:
       "macOS denied access to the iCloud export folder. Allow access in System Settings, then try again.",
     export_unauthorized:
@@ -48,7 +59,10 @@ export function exportMessage(error: string, target: ExportTarget): string {
     export_structural:
       "The Notion pages contain duplicate or out-of-order sections. Repair them in Notion, then try again.",
     nothing_to_export: "There is no saved entry to export for this date.",
-    stale_revision: "The entry changed. Save it and export again.",
+    stale_revision:
+      contentKind === "illustrated"
+        ? "The Illustrated diary changed during preparation. Upload it again."
+        : "The entry changed. Save it and export again.",
     resource_reserved:
       "Another export is using this destination. Try again soon.",
     outcome_uncertain: `An earlier export to ${place} has an unknown outcome. Resolve it first.`,
@@ -75,15 +89,17 @@ export const EXPORT_MESSAGE = {
 export function exportReasonText(
   reason: string,
   target: ExportTarget = "icloud",
+  contentKind: ExportContentKind = "authentic",
 ) {
-  const { item } = NAME[target];
+  const item =
+    contentKind === "illustrated" ? "Notion day page" : NAME[target].item;
   const text: Record<string, string> = {
     changed: `The ${item} was changed outside this app.`,
     deleted: `The ${item} was deleted outside this app.`,
     unowned:
       target === "icloud"
         ? "A file already exists there that this app did not export."
-        : "A section for this date already exists that this app did not export.",
+        : `A ${contentKind === "illustrated" ? "day page" : "section"} for this date already exists that this app did not export.`,
     uncertain: "The earlier export may or may not have been written.",
   };
   return text[reason] ?? text.changed;
@@ -109,6 +125,8 @@ export class ExportController {
   private step = "";
   private since = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private currentOperation: string | null = null;
+  private cancelRequested = false;
   constructor(
     private readonly bridge: Bridge,
     private readonly deps: ExportDeps,
@@ -160,38 +178,70 @@ export class ExportController {
     for (const l of this.listeners) l();
   }
   private fail(error: string) {
-    const text = exportMessage(error, this.snapshot.target);
+    const text = exportMessage(
+      error,
+      this.snapshot.target,
+      this.snapshot.contentKind,
+    );
     this.deps.notify(text, "error");
     // Keep the destination for the next attempt's wording.
-    this.set({ ...IDLE, target: this.snapshot.target, announcement: text });
+    this.set({
+      ...IDLE,
+      target: this.snapshot.target,
+      contentKind: this.snapshot.contentKind,
+      announcement: text,
+    });
   }
 
-  async start(date: string, target: ExportTarget = "icloud"): Promise<void> {
+  async start(
+    date: string,
+    target: ExportTarget = "icloud",
+    contentKind: ExportContentKind = "authentic",
+  ): Promise<void> {
     if (this.snapshot.phase !== "idle" || !this.bridge.startExport) return;
-    this.set({ ...IDLE, phase: "working", date, target });
+    this.set({ ...IDLE, phase: "working", date, target, contentKind });
+    this.cancelRequested = false;
+    this.currentOperation = null;
     this.say(`export of ${date} requested`);
     try {
-      this.say("saving the open entry first");
-      if (!(await this.deps.flush(date))) return this.fail("save_failed");
-      this.say("loading the saved revision");
-      // The acknowledged revision after the flush, never the editor text.
-      const file = await this.bridge.loadAuthentic(date);
-      if (!file.exists || !file.revision) return this.fail("nothing_to_export");
-      const key = `${target}:${date}:${file.revision.sequence}:${file.revision.sha256}`;
-      // A retry of an unanswered start reuses its operation ID.
+      let expected: {
+        expected_revision?: { sequence: number; sha256: string };
+        expected_version?: string;
+      };
+      let version: string;
+      if (contentKind === "illustrated") {
+        this.say(`capturing published Illustrated diary for ${date}`);
+        if (!this.bridge.readIllustrated) return this.fail("unavailable");
+        const entry = await this.bridge.readIllustrated(date);
+        expected = { expected_version: entry.version };
+        version = entry.version;
+      } else {
+        this.say("saving the open entry first");
+        if (!(await this.deps.flush(date))) return this.fail("save_failed");
+        this.say("loading the saved revision");
+        const file = await this.bridge.loadAuthentic(date);
+        if (!file.exists || !file.revision)
+          return this.fail("nothing_to_export");
+        expected = { expected_revision: file.revision };
+        version = `${file.revision.sequence}:${file.revision.sha256}`;
+      }
+      const key = `${contentKind}:${target}:${date}:${version}`;
       const id =
         this.pending?.key === key ? this.pending.id : this.deps.newId();
       this.pending = { key, id };
+      this.currentOperation = id;
       this.say(
-        `revision ${file.revision.sequence} loaded; asking the server to start (operation ${id.slice(0, 8)}), this checks the destination`,
+        `asking the server to prepare and upload ${contentKind} ${date}; operation ${id.slice(0, 8)}`,
       );
       const outcome = await this.bridge.startExport({
         operation_id: id,
         date,
         target,
-        expected_revision: file.revision,
+        ...(contentKind === "illustrated" ? { content_kind: contentKind } : {}),
+        ...expected,
       });
       this.pending = null;
+      if (this.cancelRequested) await this.bridge.cancelJob(id);
       this.say(
         outcome.outcome === "needs_confirmation"
           ? `the destination needs your confirmation (${outcome.preview.reason}, would ${outcome.preview.write})`
@@ -213,6 +263,7 @@ export class ExportController {
         announcement: exportReasonText(
           outcome.preview.reason,
           this.snapshot.target,
+          this.snapshot.contentKind,
         ),
       });
       return;
@@ -226,15 +277,28 @@ export class ExportController {
         this.deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)))
       )(500);
       if (this.disposed) return;
-      const op = await this.bridge.getOperation(result.operation_id);
+      let op;
+      try {
+        op = await this.bridge.getOperation(result.operation_id);
+      } catch (error) {
+        if (this.snapshot.contentKind !== "illustrated") throw error;
+        this.say(
+          `waiting to reconnect to track Illustrated ${result.date}; the server may still finish`,
+        );
+        continue;
+      }
       if (!op.export) return this.fail("unavailable");
       latest = op.export;
-      this.say(`server state ${latest.state}, checkpoint ${latest.checkpoint}`);
+      this.say(
+        latest.progress
+          ? `${latest.date} Illustrated: ${{ create_page: "preparing the page hierarchy", create_upload: "preparing a photo upload", send_upload: "sending a JPEG photo", append: "adding text and photos", verify: "verifying uploaded content", delete: "moving old body blocks to Notion trash" }[latest.progress.stage] ?? "working"}; ${latest.progress.photos_uploaded} photos uploaded`
+          : `server state ${latest.state}, checkpoint ${latest.checkpoint}`,
+      );
     }
     switch (latest.state) {
       case "succeeded":
         this.deps.notify(
-          `Exported ${latest.date} to ${NAME[latest.target].place}.`,
+          `Exported ${latest.content_kind === "illustrated" ? "Illustrated diary " : ""}${latest.date} to ${NAME[latest.target].place}.`,
           "info",
         );
         if (latest.reason === "projection_warnings")
@@ -249,13 +313,14 @@ export class ExportController {
         });
       case "uncertain":
         this.deps.notify(
-          `The export outcome is unknown. Check the ${NAME[latest.target].item}, then resolve it.`,
+          `The export outcome is unknown. Check the ${latest.content_kind === "illustrated" ? "Notion day page" : NAME[latest.target].item}, then resolve it.`,
           "warning",
         );
         return this.set({
           phase: "uncertain",
           date: latest.date,
           target: latest.target,
+          contentKind: latest.content_kind ?? "authentic",
           preview: null,
           uncertain: latest,
           announcement: "Export outcome unknown.",
@@ -263,8 +328,10 @@ export class ExportController {
       case "cancelled":
         this.deps.notify(
           latest.reason === "abandoned"
-            ? `The unknown export was abandoned. The ${NAME[latest.target].item} was not touched.`
-            : `Export cancelled. The ${NAME[latest.target].item} was not changed.`,
+            ? `The unknown export was abandoned. The ${latest.content_kind === "illustrated" ? "Notion day page" : NAME[latest.target].item} was not touched.`
+            : latest.content_kind === "illustrated"
+              ? "Upload stopped. Any created pages, uploaded files or partial content remain in Notion; cancellation does not roll them back."
+              : `Export cancelled. The ${NAME[latest.target].item} was not changed.`,
           "info",
         );
         return this.set({ ...IDLE });
@@ -273,12 +340,21 @@ export class ExportController {
       case "needs_confirmation": {
         // Drift pauses the existing operation and retains its reservation. Re-preview
         // that exact saved revision instead of stranding it behind a new operation ID.
-        this.snapshot = { ...this.snapshot, target: latest.target };
+        this.snapshot = {
+          ...this.snapshot,
+          target: latest.target,
+          contentKind: latest.content_kind ?? "authentic",
+        };
         const outcome = await this.bridge.startExport!({
           operation_id: latest.operation_id,
           date: latest.date,
           target: latest.target,
-          expected_revision: latest.revision,
+          ...(latest.content_kind === "illustrated"
+            ? {
+                content_kind: "illustrated" as const,
+                expected_version: latest.illustrated_version!,
+              }
+            : { expected_revision: latest.revision }),
         });
         if (
           outcome.outcome === "result" &&
@@ -294,9 +370,18 @@ export class ExportController {
     this.say("an earlier export holds the destination; looking it up");
     try {
       const list = (await this.bridge.listExports?.()) ?? [];
-      const found = list.find((r) => r.target === this.snapshot.target);
+      const found = list.find(
+        (r) =>
+          r.target === this.snapshot.target &&
+          (r.content_kind ?? "authentic") === this.snapshot.contentKind,
+      );
       if (found) {
-        this.set({ phase: "working", date: found.date, target: found.target });
+        this.set({
+          phase: "working",
+          date: found.date,
+          target: found.target,
+          contentKind: found.content_kind ?? "authentic",
+        });
         await this.finish(found);
         return;
       }
@@ -320,6 +405,7 @@ export class ExportController {
     const p = this.snapshot.preview;
     if (this.snapshot.phase !== "preview" || !p) return;
     this.set({ phase: "working", preview: null });
+    this.currentOperation = p.operation_id;
     this.say("sending your confirmation to the server");
     const request = {
       step_id: this.deps.newId(),
@@ -369,5 +455,19 @@ export class ExportController {
   }
   close() {
     if (this.snapshot.phase === "uncertain") this.set({ ...IDLE });
+  }
+  async cancel(): Promise<void> {
+    if (this.snapshot.phase !== "working") return;
+    this.cancelRequested = true;
+    this.say(
+      "cancellation requested; created pages, uploaded files and partial content may remain",
+    );
+    if (this.currentOperation) {
+      try {
+        await this.bridge.cancelJob(this.currentOperation);
+      } catch {
+        /* Start may still be preparing; repeat after its acknowledgement. */
+      }
+    }
   }
 }

@@ -44,6 +44,45 @@ impl Reqwest {
 }
 
 impl Http for Reqwest {
+    fn download(&self, url: &str, limit: usize) -> Result<Vec<u8>, Failure> {
+        let parsed = reqwest::Url::parse(url).map_err(|_| Failure::NotSent)?;
+        if parsed.scheme() != "https"
+            || !parsed.username().is_empty()
+            || parsed.password().is_some()
+            || parsed.port().is_some_and(|p| p != 443)
+            || !matches!(
+                parsed.host_str(),
+                Some(
+                    "prod-files-secure.s3.us-west-2.amazonaws.com"
+                        | "s3.us-west-2.amazonaws.com"
+                        | "file.notion.so"
+                )
+            )
+        {
+            return Err(Failure::NotSent);
+        }
+        self.block(async {
+            let mut response = self
+                .client
+                .get(parsed)
+                .send()
+                .await
+                .map_err(|_| Failure::NotSent)?;
+            if response.status() != reqwest::StatusCode::OK
+                || response.content_length().is_some_and(|n| n > limit as u64)
+            {
+                return Err(Failure::NotSent);
+            }
+            let mut out = Vec::new();
+            while let Some(chunk) = response.chunk().await.map_err(|_| Failure::NotSent)? {
+                if out.len() + chunk.len() > limit {
+                    return Err(Failure::NotSent);
+                }
+                out.extend_from_slice(&chunk);
+            }
+            Ok(out)
+        })
+    }
     fn send(&self, request: &Request) -> Result<Response, Failure> {
         let method = match request.method {
             Method::Get => reqwest::Method::GET,
@@ -61,7 +100,14 @@ impl Http for Reqwest {
         builder = builder.header(reqwest::header::AUTHORIZATION, auth);
         if let Some(body) = &request.body {
             builder = builder
-                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .header(
+                    reqwest::header::CONTENT_TYPE,
+                    if request.multipart {
+                        "multipart/form-data; boundary=diary-jpeg-6a8026b247344aa087726ffb04db8229"
+                    } else {
+                        "application/json"
+                    },
+                )
                 .body(body.clone());
         }
         self.block(async {
@@ -112,6 +158,7 @@ mod tests {
         http.base = format!("http://127.0.0.1:{port}");
         let r = http
             .send(&Request {
+                multipart: false,
                 method: Method::Get,
                 path: "/v1/users/me".into(),
                 body: None,

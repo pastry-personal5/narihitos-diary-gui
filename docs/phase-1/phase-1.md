@@ -251,6 +251,13 @@ Plan: [overview](../archive/milestones/p1-m35/milestone-35-illustrated-diary-gui
 
 Notes: Completed 2026-11-13; [native, test and release-artifact evidence](../archive/milestones/p1-m35/milestone-35-illustrated-diary-gui-evidence.md).
 
+### P1-M36: Illustrated diary Notion upload
+
+Status: Done
+Goal: Upload the selected date's Illustrated diary text and resized JPEG photos to a dedicated Notion year/month/day-page hierarchy.
+Plan: [overview/checklist](../archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-overview.md), [work plan](../archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md).
+Notes: Completed 2026-11-13 with hosted-byte drift protection, fake/server/native/live proof, full gate and refreshed ordinary release artifacts. Evidence is in the work plan; M32 remains Active.
+
 ### P1-M32: Personal release qualification
 
 Status: Active

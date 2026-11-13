@@ -449,3 +449,33 @@ G01–G07. ESLint, changed-document Prettier and `git diff --check` passed. The
 successful gate and Python runs required loopback/process access beyond the
 restricted sandbox; the earlier sandbox-denied failures are superseded by these
 results. Existing M32 native/copy-install qualification gaps remain separate.
+
+## Illustrated upload EXIF regression follow-up (2026-11-13)
+
+- [x] Confirm the reported start rejection from redacted logs and inspect photo metadata without exposing diary content.
+- [x] Accept generated PNG EXIF metadata without weakening the orientation guard or changing local originals; add regression coverage.
+- [x] Verify affected exports and real-photo preparation, then pass `scripts/gate.sh`; record evidence and deployment limits.
+
+The redacted server record at `2026-11-13T22:00:02.505+09:00` reports
+`export.route`, stage `start`, code `invalid_input` in
+`runtime_root/<workspace-key>/logs/server/server-2026-11-13.log` (line 3070).
+The client reported operation prefix `d02b95e0`; the server rejection record has
+no operation ID. The three published photos for November 6 contain `eXIf`
+chunks; the inspected first photo's top-level TIFF tag is an EXIF sub-IFD pointer,
+not an orientation tag. The converter rejected every EXIF chunk before admission,
+so ordinary generated metadata was incorrectly mapped to invalid input.
+
+`export/jpeg.rs` now checks ImageIO's decoded orientation property: absent or
+identity orientation is accepted, and non-default orientation remains rejected.
+The fresh pixel-only JPEG encoder still excludes source metadata. Synthetic
+fixtures cover generation comments, identity orientation and rotated orientation;
+accepted outputs must equal the metadata-free reference JPEG and preserve inputs.
+
+Delegated verification passed: the JPEG tests (including a temporary read-only
+check converting all three affected photos to height 480 with originals unchanged),
+10 Illustrated export tests, formatting and all seven `scripts/gate.sh` lanes.
+The temporary private-photo harness was removed. The initial sandbox-limited Rust
+test failure was superseded by the passing gate with loopback access.
+The ordinary debug `diary-server` build passed. Restart the running server to load
+the correction, then retry upload; no production Notion upload or server restart
+was performed during verification.

@@ -21,6 +21,9 @@ struct Stub {
 }
 fn result(checkpoint: u64, state: ExportState) -> ExportResult {
     ExportResult {
+        progress: None,
+        content_kind: ContentKind::Authentic,
+        illustrated_version: None,
         operation_id: OperationId::parse(OP).unwrap(),
         input_hash: "a".repeat(64),
         target: Target::Icloud,
@@ -33,6 +36,19 @@ fn result(checkpoint: u64, state: ExportState) -> ExportResult {
     }
 }
 impl Exports for Stub {
+    fn start_illustrated(
+        &self,
+        _: &str,
+        _: u64,
+        request: IllustratedStartRequest,
+    ) -> Result<Started, ExportError> {
+        let mut r = result(1, ExportState::Running);
+        r.content_kind = ContentKind::Illustrated;
+        r.target = Target::Notion;
+        r.illustrated_version = Some(request.expected_version);
+        r.revision_sequence = 0;
+        Ok(Started::Result(r))
+    }
     fn available(&self, _: Target) -> bool {
         true
     }
@@ -136,6 +152,44 @@ fn confirm_body() -> Value {
 }
 fn confirm_path() -> String {
     format!("/api/v1/exports/{OP}/confirmation")
+}
+
+#[tokio::test]
+async fn illustrated_start_requires_a_version_and_notion_without_authentic_revision() {
+    let (s, _) = setup(None, false);
+    let valid = json!({"operation_id":OP,"date":"2026-11-05","target":"notion","content_kind":"illustrated","expected_version":STEP});
+    let (status, body) = call(
+        &s,
+        req("POST", "/api/v1/exports", Some(valid.clone()), true),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["content_kind"], "illustrated");
+    assert_eq!(body["illustrated_version"], STEP);
+    for invalid in [
+        {
+            let mut v = valid.clone();
+            v["target"] = json!("icloud");
+            v
+        },
+        {
+            let mut v = valid.clone();
+            v["expected_revision"] = json!({"sequence":1,"sha256":"b".repeat(64)});
+            v
+        },
+        {
+            let mut v = valid.clone();
+            v["expected_version"] = json!("not-a-version");
+            v
+        },
+    ] {
+        assert_eq!(
+            call(&s, req("POST", "/api/v1/exports", Some(invalid), true))
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
 }
 
 #[tokio::test]

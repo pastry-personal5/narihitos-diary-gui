@@ -23,6 +23,8 @@ pub const MAX_CONFIG_BYTES: usize = 256 * 1024;
 pub enum ConfigError {
     Syntax,
     Schema,
+    /// Legacy Notion configuration must be explicitly rewritten as notion.pages.
+    NotionPagesRequired,
     Limit,
     Version,
     Port,
@@ -162,8 +164,21 @@ impl Profile {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Notion {
-    pub root_page_id: String,
+    pub pages: Vec<NotionPage>,
     pub token: String,
+}
+#[derive(Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NotionPage {
+    #[serde(rename = "type")]
+    pub kind: NotionKind,
+    pub root_page_id: String,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NotionKind {
+    Normal,
+    Illustrated,
 }
 
 /// Parsing is independent of filesystem access, for synthetic schema fixtures.
@@ -189,7 +204,14 @@ pub fn parse(bytes: &[u8]) -> Result<Config, ConfigError> {
     if !no_null(&value) {
         return Err(ConfigError::Schema);
     }
-    let config: Config = serde_yaml_ng::from_value(value).map_err(|_| ConfigError::Schema)?;
+    if value
+        .get("notion")
+        .and_then(|n| n.as_mapping())
+        .is_some_and(|n| n.contains_key(serde_yaml_ng::Value::String("root_page_id".into())))
+    {
+        return Err(ConfigError::NotionPagesRequired);
+    }
+    let mut config: Config = serde_yaml_ng::from_value(value).map_err(|_| ConfigError::Schema)?;
     if config.schema_version != 1 {
         return Err(ConfigError::Version);
     }
@@ -211,13 +233,35 @@ pub fn parse(bytes: &[u8]) -> Result<Config, ConfigError> {
     }
     aliases(config.sources.iter().map(|s| s.alias.as_str()))?;
     aliases(config.agents.profiles.iter().map(Profile::alias))?;
-    if config.notion.as_ref().is_some_and(|n| {
-        n.token.is_empty()
+    if let Some(n) = &mut config.notion {
+        if n.token.trim().is_empty()
             || n.token.len() > 4096
-            || n.root_page_id.is_empty()
-            || n.root_page_id.len() > 128
-    }) {
-        return Err(ConfigError::Schema);
+            || n.pages.is_empty()
+            || n.pages.len() > 2
+        {
+            return Err(ConfigError::Schema);
+        }
+        for page in &mut n.pages {
+            if page.root_page_id.len() != 32
+                && (page.root_page_id.len() != 36
+                    || ![8, 13, 18, 23]
+                        .into_iter()
+                        .all(|i| page.root_page_id.as_bytes()[i] == b'-'))
+            {
+                return Err(ConfigError::Schema);
+            }
+            page.root_page_id =
+                crate::export::notion::adapter::normalize_page_id(&page.root_page_id)
+                    .ok_or(ConfigError::Schema)?;
+        }
+        if n.pages.len() == 2
+            && (n.pages[0].kind == n.pages[1].kind
+                || n.pages[0].root_page_id == n.pages[1].root_page_id)
+        {
+            return Err(ConfigError::Schema);
+        }
+        n.pages
+            .sort_by_key(|p| matches!(p.kind, NotionKind::Illustrated));
     }
     if !(1..=99).contains(&config.illustrated.max_photos)
         || config

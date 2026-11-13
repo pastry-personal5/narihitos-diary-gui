@@ -20,6 +20,9 @@ impl ExportCoordinatorState {
                     return Err(ExportError::Storage);
                 }
                 Ok(Snapshot {
+                    content_kind: ContentKind::Authentic,
+                    illustrated_version: None,
+                    photos: Vec::new(),
                     date: request.date,
                     authentic_id: header.id.clone(),
                     revision,

@@ -349,7 +349,7 @@ describe("Command palette and Keyboard Shortcuts", () => {
     const fake = settingsFake({ writing_locale: "en-US", revision: "r0" });
     render(<App bridge={bridge(fake)} />);
     await openSettings("Keyboard Shortcuts");
-    expect(screen.getAllByRole("row")).toHaveLength(16);
+    expect(screen.getAllByRole("row")).toHaveLength(17);
     const edit = screen.getByRole("button", { name: "Edit Open Settings" });
     await waitFor(() => expect(edit.hasAttribute("disabled")).toBe(false));
     fireEvent.click(edit);

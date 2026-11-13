@@ -2,6 +2,10 @@
 
 Status: Active
 
+- [Example global config](global_config_example.yaml): placeholder-only schema 1 sample, parsed by a config test.
+
+- [P1-M36 Illustrated diary Notion upload](archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-overview.md) ([work plan](archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md)): Done: separate roots, bounded JPEG snapshots, ordered stable day pages and hosted-byte drift detection; fake/server/native/live acceptance, full gate and refreshed ordinary release evidence.
+
 - [M34 creation evidence](archive/milestones/p1-m34/milestone-34-illustrated-diary-evidence.md): synthetic server proof, focused regression coverage and isolated xpp8 + Krea 2 creation.
 
 - [Atomic Editor research](research/atomic-editor.md): P1-M34/M35 source review of inline Markdown, local photos, immutable reading mode and proposed integration.

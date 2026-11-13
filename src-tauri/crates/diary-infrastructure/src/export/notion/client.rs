@@ -12,6 +12,7 @@ use std::{
 pub const MAX_ATTEMPTS: u32 = 5;
 pub const BUDGET_SECS: u64 = 60;
 /// Documented ceiling is 500 KB; chunking budgets 400 KB, this is the hard guard.
+pub const BOUNDARY: &str = "diary-jpeg-6a8026b247344aa087726ffb04db8229";
 pub const MAX_REQUEST_BYTES: usize = 500_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,16 +82,44 @@ impl Client {
     }
 
     pub fn call(&self, method: Method, path: &str, body: Option<&Value>) -> Result<Value, Error> {
-        let write = method != Method::Get;
         let bytes = body.and_then(|b| serde_json::to_vec(b).ok());
         if bytes.as_ref().is_some_and(|b| b.len() > MAX_REQUEST_BYTES) {
             return Err(Error::TooLarge);
         }
         let request = Request {
+            multipart: false,
             method,
             path: path.into(),
             body: bytes,
         };
+        self.send(request)
+    }
+    pub fn upload(&self, id: &str, jpeg: &[u8]) -> Result<Value, Error> {
+        if super::adapter::normalize_page_id(id).is_none()
+            || jpeg.len() > 5 * 1024 * 1024
+            || jpeg
+                .windows(BOUNDARY.len())
+                .any(|w| w == BOUNDARY.as_bytes())
+        {
+            return Err(Error::TooLarge);
+        }
+        let mut bytes = format!("--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n").into_bytes();
+        bytes.extend_from_slice(jpeg);
+        bytes.extend_from_slice(format!("\r\n--{BOUNDARY}--\r\n").as_bytes());
+        self.send(Request {
+            method: Method::Post,
+            path: format!("/v1/file_uploads/{id}/send"),
+            body: Some(bytes),
+            multipart: true,
+        })
+    }
+    pub fn download(&self, url: &str) -> Result<Vec<u8>, Error> {
+        self.http
+            .download(url, 5 * 1024 * 1024)
+            .map_err(|_| Error::Network)
+    }
+    fn send(&self, request: Request) -> Result<Value, Error> {
+        let write = request.method != Method::Get;
         let mut waited = 0u64;
         for attempt in 1..=MAX_ATTEMPTS {
             self.pace();

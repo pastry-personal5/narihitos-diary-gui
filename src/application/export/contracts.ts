@@ -6,10 +6,14 @@ export type ExportState =
   | "succeeded"
   | "failed"
   | "cancelled";
+export type ExportContentKind = "authentic" | "illustrated";
 export type ExportTarget = "icloud" | "notion";
 export type ExportReason = "changed" | "deleted" | "unowned" | "uncertain";
 export interface ExportResult {
   kind: "export";
+  progress?: { stage: string; photos_uploaded: number } | null;
+  content_kind?: ExportContentKind;
+  illustrated_version?: string | null;
   operation_id: string;
   target: ExportTarget;
   date: string;
@@ -33,7 +37,9 @@ export interface StartExportRequest {
   operation_id: string;
   date: string;
   target: ExportTarget;
-  expected_revision: { sequence: number; sha256: string };
+  content_kind?: ExportContentKind;
+  expected_revision?: { sequence: number; sha256: string };
+  expected_version?: string;
 }
 export interface ConfirmExportRequest {
   step_id: string;

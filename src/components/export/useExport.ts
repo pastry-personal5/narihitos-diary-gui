@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { ExportController } from "../../application/export/controller";
 const NONE = {
   phase: "idle",
+  contentKind: "authentic",
   date: null,
   target: "icloud",
   preview: null,

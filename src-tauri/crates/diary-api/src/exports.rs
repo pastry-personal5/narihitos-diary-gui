@@ -31,7 +31,10 @@ pub(super) struct StartIn {
     operation_id: String,
     date: String,
     target: String,
-    expected_revision: Revision,
+    expected_revision: Option<Revision>,
+    #[serde(default)]
+    content_kind: Option<String>,
+    expected_version: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -179,7 +182,7 @@ fn digest(s: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 pub(super) fn result(r: &ExportResult) -> Value {
-    json!({"kind":"export","operation_id":r.operation_id.as_str(),"target":r.target.as_str(),"date":r.date,"revision":{"sequence":r.revision_sequence,"sha256":r.revision_sha},"state":r.state.as_str(),"checkpoint":r.checkpoint,"reason":r.reason})
+    json!({"progress":r.progress.as_ref().map(|p| json!({"stage":p.stage,"photos_uploaded":p.photos_uploaded})),"kind":"export","operation_id":r.operation_id.as_str(),"target":r.target.as_str(),"content_kind":r.content_kind.as_str(),"illustrated_version":r.illustrated_version,"date":r.date,"revision":{"sequence":r.revision_sequence,"sha256":r.revision_sha},"state":r.state.as_str(),"checkpoint":r.checkpoint,"reason":r.reason})
 }
 
 /// Mirrors a durable export state into the session's job list and publishes one `job_changed`
@@ -263,9 +266,28 @@ pub(super) async fn start(
     ) else {
         return fail(&s, "start", ExportError::Invalid);
     };
-    if !digest(&input.expected_revision.sha256)
-        || input.expected_revision.sequence > i64::MAX as u64
-    {
+    let kind = match input.content_kind.as_deref().unwrap_or("authentic") {
+        "authentic" => ContentKind::Authentic,
+        "illustrated" => ContentKind::Illustrated,
+        _ => return fail(&s, "start", ExportError::Invalid),
+    };
+    if match kind {
+        ContentKind::Authentic => {
+            input.expected_version.is_some()
+                || input
+                    .expected_revision
+                    .as_ref()
+                    .is_none_or(|r| !digest(&r.sha256) || r.sequence > i64::MAX as u64)
+        }
+        ContentKind::Illustrated => {
+            target != Target::Notion
+                || input.expected_revision.is_some()
+                || input
+                    .expected_version
+                    .as_ref()
+                    .is_none_or(|v| !diary_domain::authentic::valid_uuid(v))
+        }
+    } {
         return fail(&s, "start", ExportError::Invalid);
     }
     let Some(service) = s.exports.clone() else {
@@ -276,21 +298,37 @@ pub(super) async fn start(
         Err(_) => return fail(&s, "start", ExportError::Limit),
     };
     let generation = s.config_generation.load(Ordering::SeqCst);
-    let request = StartRequest {
-        operation_id: operation_id.clone(),
-        date,
-        target,
-        expected: AuthenticRevision {
-            sequence: input.expected_revision.sequence,
-            sha256: input.expected_revision.sha256,
-        },
-    };
     let who = session.clone();
     match tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        service
-            .start(&who, generation, request)
-            .map(|st| (st, service.operation(&operation_id)))
+        match kind {
+            ContentKind::Authentic => {
+                let revision = input.expected_revision.expect("validated revision");
+                service.start(
+                    &who,
+                    generation,
+                    StartRequest {
+                        operation_id: operation_id.clone(),
+                        date,
+                        target,
+                        expected: AuthenticRevision {
+                            sequence: revision.sequence,
+                            sha256: revision.sha256,
+                        },
+                    },
+                )
+            }
+            ContentKind::Illustrated => service.start_illustrated(
+                &who,
+                generation,
+                IllustratedStartRequest {
+                    operation_id: operation_id.clone(),
+                    date,
+                    expected_version: input.expected_version.expect("validated version"),
+                },
+            ),
+        }
+        .map(|st| (st, service.operation(&operation_id)))
     })
     .await
     {

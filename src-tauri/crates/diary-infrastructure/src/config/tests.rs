@@ -70,7 +70,7 @@ fn yaml_language_and_type_confusion_fail_without_echoing_values() {
     // Quoted punctuation is ordinary string data, not a YAML tag or alias.
     assert!(
         parse(
-            format!("{MINIMAL}notion: {{root_page_id: page, token: '!&*invented'}}\n").as_bytes()
+            format!("{MINIMAL}notion: {{pages: [{{type: normal, root_page_id: '00000000000000000000000000000001'}}], token: '!&*invented'}}\n").as_bytes()
         )
         .is_ok()
     );
@@ -509,6 +509,33 @@ mod reload_tests {
     }
 
     #[test]
+    fn notion_reload_preserves_adapters_until_restart_and_reports_typed_migration() {
+        let f = fx();
+        let notion = "notion: {token: invented, pages: [{type: illustrated, root_page_id: '0123456789abcdef0123456789abcdef'}]}\n";
+        write(&f.file, &text(&f.root, 8781, notion));
+        assert!(matches!(f.handle.reload(true), ReloadOutcome::Busy));
+        let ReloadOutcome::RestartRequired(issues) = f.handle.reload(false) else {
+            panic!("root needs restart");
+        };
+        assert_eq!(issues[0].path, "notion.pages|notion.token");
+        write(
+            &f.file,
+            &text(
+                &f.root,
+                8781,
+                "notion: {token: private-token, root_page_id: private-root}\n",
+            ),
+        );
+        let ReloadOutcome::Rejected(issues) = f.handle.reload(false) else {
+            panic!("legacy migration must be explicit");
+        };
+        assert_eq!(
+            (issues[0].path, issues[0].code),
+            ("notion.pages", "migration_required")
+        );
+    }
+
+    #[test]
     fn image_reload_rejects_invalid_snapshots_and_resets_cached_status() {
         let mut f = fx();
         let registry = std::sync::Arc::new(diary_application::image::Registry::default());
@@ -638,5 +665,53 @@ fn engine_prompt_settings_and_illustrated_limits_are_strict() {
         yaml.replace("trigger: v02realphoto", "trigger: [wrong]"),
     ] {
         assert!(parse(bad.as_bytes()).is_err());
+    }
+}
+
+// Keeps the documented example loadable; update the file with the schema.
+#[test]
+fn documented_example_parses() {
+    let example = include_bytes!("../../../../../docs/global_config_example.yaml");
+    assert!(parse(example).is_ok());
+}
+
+#[test]
+fn notion_roots_are_independent_normalized_and_legacy_is_typed() {
+    let root = "01234567-89AB-CDEF-0123-456789ABCDEF";
+    for kind in ["normal", "illustrated"] {
+        let c = parse(format!("{MINIMAL}notion: {{token: invented, pages: [{{type: {kind}, root_page_id: '{root}'}}]}}\n").as_bytes()).unwrap();
+        assert_eq!(
+            c.notion.unwrap().pages[0].root_page_id,
+            "0123456789abcdef0123456789abcdef"
+        );
+    }
+    for fields in [
+        "root_page_id: private-value",
+        "root_page_id: private-value, pages: []",
+    ] {
+        assert_eq!(
+            error(&format!(
+                "{MINIMAL}notion: {{token: private-token, {fields}}}\n"
+            )),
+            ConfigError::NotionPagesRequired
+        );
+    }
+    for pages in [
+        "[]".to_string(),
+        "[{type: unknown, root_page_id: '00000000000000000000000000000001'}]".into(),
+        "[{type: normal, root_page_id: invalid}]".into(),
+        format!(
+            "[{{type: normal, root_page_id: '{root}'}}, {{type: illustrated, root_page_id: '0123456789abcdef0123456789abcdef'}}]"
+        ),
+        format!(
+            "[{{type: normal, root_page_id: '{root}'}}, {{type: normal, root_page_id: '00000000000000000000000000000001'}}]"
+        ),
+    ] {
+        assert_eq!(
+            error(&format!(
+                "{MINIMAL}notion: {{token: invented, pages: {pages}}}\n"
+            )),
+            ConfigError::Schema
+        );
     }
 }

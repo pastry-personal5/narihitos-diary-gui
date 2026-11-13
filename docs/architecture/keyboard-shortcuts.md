@@ -66,3 +66,5 @@ Arrow keys select commands while focus stays in the search combobox; Enter or a 
 ## AI Chat composer
 
 Unmodified Enter sends the message or runs `/clear`. Shift+Enter inserts a newline. Enter during IME composition confirms text without sending. Empty or blocked submission remains unavailable. The composer displays no shortcut hints.
+
+`illustrated.upload.notion` (Upload Illustrated Diary to Notion) has no default shortcut. The command palette and dedicated toolbar bitmap share selected-date guards and handler; it does not inherit the Authentic-open requirement of `export.start.notion`.

@@ -126,6 +126,7 @@ impl Env {
 
 mod cancel_abandon;
 mod concurrency;
+mod illustrated;
 mod notion;
 mod recovery;
 mod start;

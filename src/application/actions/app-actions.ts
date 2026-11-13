@@ -1,7 +1,7 @@
 import type { IllustratedController } from "../illustrated/controller";
 import type { SourceTrashController } from "../trash/source-controller";
 import type { GlobalMessagesStore } from "../global-messages/store";
-import type { Connection, UserSettings } from "../bridge";
+import type { Connection, UserSettings, ServerSettings } from "../bridge";
 import type { AIChatController } from "../ai-chat/controller";
 import type { ExportController } from "../export/controller";
 import type { GenerationController } from "../generation/controller";
@@ -19,6 +19,7 @@ export interface AppActionContext {
   exporter: ExportController;
   connection(): Connection;
   user(): UserSettings | undefined;
+  server?(): ServerSettings | undefined;
   openPalette(): void;
   openSettings(): void;
 }
@@ -88,6 +89,19 @@ function deriveAppActions(context: AppActionContext) {
       : !connected
         ? "Connect to the server first."
         : exporter.reason(model.resources.selectedDate, !!selectedView?.exists);
+  const illustratedUploadReason = !connected
+    ? "Connect to the server first."
+    : !storage
+      ? "Storage is unavailable."
+      : !model.resources.selectedDate
+        ? "Select a date first."
+        : !context.server?.()?.illustrated_notion_exports_available
+          ? "An Illustrated Notion root is not available. Configure notion.pages and restart the server."
+          : !illustrated?.state.dates.includes(model.resources.selectedDate)
+            ? "There is no published Illustrated diary for this date."
+            : exporter.getSnapshot().phase !== "idle"
+              ? "An export is in progress."
+              : null;
   const illustratedProfile = generator.state.profiles.find(
     (p) => p.alias === generator.state.profile,
   );
@@ -99,6 +113,13 @@ function deriveAppActions(context: AppActionContext) {
       generator.running || chat.running,
     ) ?? (illustrated ? null : "Illustrated creation is unavailable.");
   const handlers: Handlers = {
+    "illustrated.upload.notion": {
+      reason: illustratedUploadReason,
+      run: () => {
+        const date = model.resources.selectedDate;
+        if (date) return exporter.start(date, "notion", "illustrated");
+      },
+    },
     "illustrated.create": {
       reason: illustratedReason,
       run: () => {
@@ -209,6 +230,7 @@ function deriveAppActions(context: AppActionContext) {
     createReason,
     generationReason,
     illustratedReason,
+    illustratedUploadReason,
     exportReason,
     handlers,
   };

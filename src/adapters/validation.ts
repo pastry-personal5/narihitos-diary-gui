@@ -253,6 +253,8 @@ export function serverSettingsDto(value: unknown): ServerSettings {
   )
     throw new Error("Invalid server response");
   return {
+    illustrated_notion_exports_available:
+      dto.illustrated_notion_exports_available === true,
     config_generation: dto.config_generation as number,
     last_reload:
       dto.last_reload == null ? null : reloadResultDto(dto.last_reload),

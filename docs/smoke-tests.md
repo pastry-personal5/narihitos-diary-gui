@@ -4,6 +4,43 @@ Status: Active
 
 Built-binary smoke scripts and the redacted log trace command. Run from the repository root; live scripts spend account usage and are env-gated.
 
+The [Illustrated Notion qualification record](archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md#qualification-execution-2026-11-13)
+documents the authorized test-root-only page-position and image-read probes.
+`DIARY_NOTION_LIVE=1 python3 scripts/smoke/notion-live.py --qualify-pages --config config/global_config.yaml`
+creates retained fixture pages using the privately configured token, without
+starting the server or using production destination roots. `--prepare-images ID`
+uploads synthetic JPEG fixtures to a direct child of the authorized root;
+`--observe-images ID` only reads. Neither mode deletes or archives pages. Manual
+Notion image edits are required between preparation and observation. Do not rerun
+preparation after an uncertain write. Offline probe safety tests:
+`python3 -m unittest discover -s scripts/tests -p 'test_notion_qualification.py'`.
+`--probe-rapid-image-edit ID` creates a separate blue fixture and replaces it with
+red pixels to test same-minute drift detection; exit 1 means the proposed metadata
+evidence missed the replacement. `--qualify-image-bytes ID` only reads hosted
+fixture bytes with bounded, credential-free requests and compares hashes with
+synthetic JPEGs. Both modes retain all pages and leave the manually edited fixtures
+intact. The [counterexample](archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md#image-drift-counterexample-and-proposed-resolution)
+records the observed service limitation and pending design review.
+
+Illustrated upload acceptance:
+
+```sh
+python3 scripts/smoke/illustrated-notion.py # isolated persistent fake Notion; no accounts
+DIARY_NOTION_LIVE=1 python3 scripts/smoke/illustrated-notion.py --live # fixture writes only beneath the dedicated authorized test root
+python3 scripts/smoke/illustrated-notion.py --gui-app "src-tauri/target/debug/bundle/macos/Narihito's Diary.app" # scaffold-smoke bundle; isolated fake destination
+```
+
+The upload harness starts an empty private workspace with no AI profile/engine and
+seeds only its own published fixture entries. It verifies first/middle/last
+backdated insertion at year/month/day levels, unchanged upload, stable day page
+replacement, restart, original-file hashes and terminal JPEG-row cleanup. Live
+mode reads only the configured token, verifies the fixed authorized test root and
+creates a fresh retained child; it never substitutes a production root. Native mode
+is synthetic only and verifies the accessible toolbar bitmap/action, pending and
+missing-entry guards, no Authentic/viewer/AI prerequisite, and navigation preserved
+through completion. The [M36 acceptance record](archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md#implementation-acceptance)
+records retained live pages and ordinary artifact validation.
+
 `make smoke` rebuilds the scaffold fixture server and packaged client, then runs
 the native IPC/session and keyboard checks in an isolated workspace. It requires
 a macOS GUI session and System Events accessibility permission. The fixture waits

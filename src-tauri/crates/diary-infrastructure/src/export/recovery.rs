@@ -14,7 +14,7 @@ impl ExportCoordinatorState {
         if rec.state != OperationState::Uncertain {
             return Err(ExportError::CheckpointMismatch);
         }
-        let adapter = self.adapter(row.target)?.clone();
+        let adapter = self.adapter(row.content_kind, row.target)?.clone();
         if self.key(&*adapter)? != row.destination_key || !self.ready.load(Ordering::SeqCst) {
             return Err(ExportError::Disabled);
         }
@@ -23,7 +23,10 @@ impl ExportCoordinatorState {
         if !back.available {
             return Err(ExportError::CloudUnavailable(Self::why(&back)));
         }
-        if back.present && back.digest == Self::row_expected(&*adapter, &row) {
+        if back.present
+            && adapter.verified(&date, &back)
+            && back.digest == Self::row_expected(&*adapter, &row)
+        {
             self.succeed(id, &row, &back)?;
             self.notify(id);
             let (rec, row) = self.load(id)?;
@@ -73,7 +76,7 @@ impl ExportCoordinatorState {
         if rec.state != OperationState::Uncertain || rec.checkpoint != request.expected_checkpoint {
             return Err(ExportError::CheckpointMismatch);
         }
-        let adapter = self.adapter(row.target)?.clone();
+        let adapter = self.adapter(row.content_kind, row.target)?.clone();
         if self.key(&*adapter)? != row.destination_key {
             return Err(ExportError::Disabled);
         }
@@ -155,13 +158,14 @@ impl ExportCoordinatorState {
                 )?;
             } else {
                 let proven = self
-                    .adapter(row.target)
+                    .adapter(row.content_kind, row.target)
                     .ok()
                     .filter(|a| self.key(&***a).is_ok_and(|k| k == row.destination_key))
                     .and_then(|a| {
                         let date = DiaryDate::parse(&row.date)?;
                         let back = a.read_back(&date);
-                        (back.available
+                        (a.verified(&date, &back)
+                            && back.available
                             && back.present
                             && back.digest == Self::row_expected(&**a, &row))
                         .then_some(back)

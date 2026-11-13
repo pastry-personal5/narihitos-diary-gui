@@ -95,6 +95,7 @@ export function App({ bridge }: { bridge: Bridge }) {
     bindings,
     generationReason,
     illustratedReason,
+    illustratedUploadReason,
     exportReason,
     handlers,
     hint,
@@ -293,6 +294,21 @@ export function App({ bridge }: { bridge: Bridge }) {
               illustratedReason ?? "Create Illustrated Diary",
             )}
             onClick={() => void handlers["illustrated.create"].run()}
+          />
+          <ToolbarButton
+            action="illustratedUpload"
+            label={
+              exportState.phase === "working" &&
+              exportState.contentKind === "illustrated"
+                ? "Uploading Illustrated Diary…"
+                : "Upload Illustrated Diary to Notion"
+            }
+            disabled={!!illustratedUploadReason}
+            title={hint(
+              "illustrated.upload.notion",
+              illustratedUploadReason ?? "Upload Illustrated Diary to Notion",
+            )}
+            onClick={() => void handlers["illustrated.upload.notion"].run()}
           />
           <ParagraphReviewButton controller={paragraphReview} />
         </MainToolbarStrip>

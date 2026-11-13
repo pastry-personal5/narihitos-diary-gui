@@ -27,7 +27,7 @@ Your diary stays local-first, with export to iCloud or Notion when configured. A
 - Edit durable diary entries with autosave and recovery safeguards.
 - Import recordings and text snippets, then draft from the material you select.
 - Use configurable AI Agents for chat, draft generation and paragraph-level suggestions; accept or reject every proposed change.
-- Organize work by date, recover interrupted source moves, and export finished entries to iCloud or Notion when configured.
+- Organize work by date, recover interrupted source moves, and export finished entries to iCloud or Notion when configured. Upload a published Illustrated diary to its own Notion day page with text and resized JPEG photos.
 
 - [User guide](docs/user-guide.md): installation, workflows, recovery and current limits
 - [Setup and development](docs/contribution-guide.md#setup-and-development)

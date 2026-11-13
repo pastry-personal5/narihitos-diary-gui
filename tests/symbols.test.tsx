@@ -135,7 +135,7 @@ describe("toolbar bitmaps", () => {
     render(<App bridge={appBridge(load)} />);
     const toolbar = screen.getByLabelText("Main Toolbar Strip");
     const buttons = [...toolbar.querySelectorAll("button")];
-    expect(buttons).toHaveLength(9);
+    expect(buttons).toHaveLength(10);
     const icons = buttons.map((button) => {
       expect(button.getAttribute("aria-label")).toBeTruthy();
       expect(button.getAttribute("title")).toBeTruthy();
@@ -206,7 +206,7 @@ describe("toolbar bitmaps", () => {
       screen
         .getByLabelText("Main Toolbar Strip")
         .querySelectorAll(".bitmap-icon"),
-    ).toHaveLength(9);
+    ).toHaveLength(10);
     expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
   });
   it("keeps accessible names without a symbol bridge", () => {

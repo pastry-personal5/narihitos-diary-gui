@@ -245,7 +245,7 @@ with tempfile.TemporaryDirectory(prefix='diary-export-smoke-') as temporary:
     # 6. Notion over the file-backed fake: hierarchy, no-op, external edit, kill and recovery.
     page = '0123456789abcdef0123456789abcdef'
     notion_cfg = base / 'notion.yaml'
-    notion_cfg.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nnotion:\n  root_page_id: {page}\n  token: smoke-notion-token\n')
+    notion_cfg.write_text(server_configuration() + f'schema_version: 1\npaths:\n  entries_root: {workspace}\n  runtime_root: {runtime}\nnotion:\n  pages:\n    - type: normal\n      root_page_id: {page}\n  token: smoke-notion-token\n')
     notion_cfg.chmod(0o600)
     remote_state = base / 'notion-state.json'
 

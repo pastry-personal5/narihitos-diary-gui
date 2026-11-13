@@ -5,6 +5,7 @@ pub mod client;
 #[cfg(any(test, feature = "fault-injection"))]
 pub mod fake;
 pub mod http;
+pub mod illustrated;
 pub mod steps;
 pub mod wire;
 

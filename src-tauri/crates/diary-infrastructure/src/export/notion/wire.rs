@@ -101,7 +101,7 @@ pub struct Remote {
     /// A code block's language as Notion reports it.
     pub lang: Option<String>,
 }
-fn is_plain(rich: &Value) -> bool {
+pub(crate) fn is_plain(rich: &Value) -> bool {
     rich.as_array().is_none_or(|items| {
         items.iter().all(|i| {
             let a = &i["annotations"];
@@ -115,13 +115,13 @@ fn is_plain(rich: &Value) -> bool {
     })
 }
 /// Block-level settings a plain copy would drop: color, a toggleable heading and a code caption.
-fn block_is_plain(k: &Value) -> bool {
+pub(crate) fn block_is_plain(k: &Value) -> bool {
     is_plain(&k["rich_text"])
         && k["color"].as_str().is_none_or(|c| c == "default")
         && !k["is_toggleable"].as_bool().unwrap_or(false)
         && k["caption"].as_array().is_none_or(Vec::is_empty)
 }
-fn plain(v: &Value) -> String {
+pub(crate) fn plain(v: &Value) -> String {
     v.as_array()
         .map(|items| {
             items

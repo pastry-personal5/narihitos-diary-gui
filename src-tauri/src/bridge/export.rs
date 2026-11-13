@@ -24,7 +24,12 @@ pub struct StartExportRequest {
     pub operation_id: String,
     pub date: String,
     pub target: ExportTarget,
-    pub expected_revision: ExportRevision,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_revision: Option<ExportRevision>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_version: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,6 +55,9 @@ pub struct ExportPage {
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExportResult {
+    pub progress: Option<serde_json::Value>,
+    pub content_kind: Option<String>,
+    pub illustrated_version: Option<String>,
     pub kind: String,
     pub operation_id: String,
     pub target: ExportTarget,
@@ -85,7 +93,15 @@ pub struct ExportAcknowledged {
 /// The server owns calendar validity; this only keeps malformed text off the wire.
 impl ExportResult {
     pub(super) fn valid(&self) -> bool {
-        self.kind == "export"
+        (match self.content_kind.as_deref().unwrap_or("authentic") {
+            "illustrated" => {
+                self.target == ExportTarget::Notion
+                    && self.illustrated_version.as_ref().is_some_and(|v| uuid(v))
+                    && self.revision.sequence == 0
+            }
+            "authentic" => self.illustrated_version.is_none() && self.revision.sequence > 0,
+            _ => false,
+        }) && self.kind == "export"
             && uuid(&self.operation_id)
             && sha256(&self.revision.sha256)
             && self.date.len() == 10
@@ -100,8 +116,21 @@ impl Bridge {
         request: StartExportRequest,
     ) -> Result<StartExportResult, AuthenticError> {
         if !uuid(&request.operation_id)
-            || !sha256(&request.expected_revision.sha256)
-            || request.expected_revision.sequence > i64::MAX as u64
+            || match request.content_kind.as_deref().unwrap_or("authentic") {
+                "authentic" => {
+                    request.expected_version.is_some()
+                        || request
+                            .expected_revision
+                            .as_ref()
+                            .is_none_or(|r| !sha256(&r.sha256) || r.sequence > i64::MAX as u64)
+                }
+                "illustrated" => {
+                    request.target != ExportTarget::Notion
+                        || request.expected_revision.is_some()
+                        || request.expected_version.as_ref().is_none_or(|v| !uuid(v))
+                }
+                _ => true,
+            }
             || !date_shape(&request.date)
         {
             return Err(invalid());

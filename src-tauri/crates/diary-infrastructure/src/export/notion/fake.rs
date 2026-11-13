@@ -20,6 +20,8 @@ pub enum Fault {
     /// The request is lost before it commits.
     Drop,
     NotSent,
+    /// The send succeeds but the unattached upload expires before attachment.
+    ExpiredUpload,
 }
 
 #[derive(Clone)]
@@ -116,6 +118,26 @@ impl FakeNotion {
         fake.file = Some(file);
         fake
     }
+    pub fn add_root(&self, root: &str) {
+        let mut st = self.state.lock().unwrap();
+        st.nodes.entry(root.into()).or_insert_with(|| Node {
+            parent: String::new(),
+            kind: "page".into(),
+            payload: json!({}),
+            children: vec![],
+            title: Some("root".into()),
+        });
+        self.save(&st);
+    }
+    pub fn replace_image_bytes(&self, image: &str, bytes: &[u8]) {
+        let mut st = self.state.lock().unwrap();
+        let id = st.nodes[image].payload["file_upload"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        st.nodes.get_mut(&id).unwrap().payload["bytes"] = json!(bytes);
+        self.save(&st);
+    }
     pub fn chatty(mut self) -> Self {
         self.chatty = true;
         self
@@ -165,10 +187,18 @@ impl FakeNotion {
         let n = &st.nodes[id];
         let mut v =
             json!({"object":"block","id":id,"type":n.kind,"has_children":!n.children.is_empty()});
+        v["last_edited_time"] = json!("2026-01-01T00:00:00.000Z");
         v[n.kind.as_str()] = if n.kind == "child_page" {
             json!({"title": n.title})
         } else {
-            n.payload.clone()
+            let mut payload = n.payload.clone();
+            if n.kind == "image" && payload["type"] == "file_upload" {
+                let upload = payload["file_upload"]["id"].clone();
+                payload.as_object_mut().unwrap().remove("file_upload");
+                payload["type"] = json!("file");
+                payload["file"] = json!({"url":format!("https://file.notion.so/{}", upload.as_str().unwrap()),"expiry_time":"2026-01-01T01:00:00.000Z"});
+            }
+            payload
         };
         v
     }
@@ -283,6 +313,8 @@ impl FakeNotion {
         match (request.method, request.path.as_str()) {
             (Method::Get, p) if p.starts_with("/v1/users/me") => "me",
             (Method::Get, _) => "list",
+            (Method::Post, p) if p.ends_with("/send") => "send_upload",
+            (Method::Post, "/v1/file_uploads") => "create_upload",
             (Method::Post, _) => "create_page",
             (Method::Patch, _) => "append",
             (Method::Delete, _) => "delete",
@@ -309,6 +341,48 @@ impl FakeNotion {
                 200,
                 json!({"object":"user","id":"bot-1","type":"bot","bot":{"workspace_id":"workspace-1"}}),
             ),
+            (Method::Post, ["v1", "file_uploads"]) => {
+                let id = format!("{:032x}", st.next);
+                st.next += 1;
+                st.nodes.insert(
+                    id.clone(),
+                    Node {
+                        parent: String::new(),
+                        kind: "upload".into(),
+                        payload: json!({"status":"pending","bytes":[]}),
+                        children: vec![],
+                        title: None,
+                    },
+                );
+                self.save(&st);
+                Self::reply(200, json!({"id":id,"status":"pending"}))
+            }
+            (Method::Post, ["v1", "file_uploads", id, "send"]) => {
+                let Some(upload) = st.nodes.get_mut(*id) else {
+                    return Self::reply(404, json!({}));
+                };
+                let Some(bytes) = request.body.as_ref().filter(|_| request.multipart) else {
+                    return Self::reply(400, json!({}));
+                };
+                let Some(start) = bytes
+                    .windows(4)
+                    .position(|w| w == b"\r\n\r\n")
+                    .map(|n| n + 4)
+                else {
+                    return Self::reply(400, json!({}));
+                };
+                let end = bytes.len() - super::client::BOUNDARY.len() - 8;
+                if end < start || !bytes[start..end].starts_with(&[0xff, 0xd8]) {
+                    return Self::reply(400, json!({}));
+                }
+                upload.payload = json!({"status":"uploaded","bytes":bytes[start..end]});
+                self.save(&st);
+                Self::reply(200, json!({"id":id,"status":"uploaded"}))
+            }
+            (Method::Get, ["v1", "file_uploads", id]) => match st.nodes.get(*id) {
+                Some(n) => Self::reply(200, json!({"id":id,"status":n.payload["status"]})),
+                None => Self::reply(404, json!({})),
+            },
             (Method::Get, ["v1", "blocks", id, "children"]) => {
                 let Some(node) = st.nodes.get(*id) else {
                     return Self::reply(404, json!({"code":"object_not_found"}));
@@ -408,7 +482,18 @@ impl FakeNotion {
                         title: Some(title),
                     },
                 );
-                st.nodes.get_mut(&parent).unwrap().children.push(id.clone());
+                let kids = &mut st.nodes.get_mut(&parent).unwrap().children;
+                let at = match body["position"]["type"].as_str() {
+                    Some("page_start") => 0,
+                    Some("after_block") => kids
+                        .iter()
+                        .position(|k| {
+                            Some(k.as_str()) == body["position"]["after_block"]["id"].as_str()
+                        })
+                        .map_or(kids.len(), |n| n + 1),
+                    _ => kids.len(),
+                };
+                kids.insert(at, id.clone());
                 self.save(&st);
                 Self::reply(200, json!({"object":"page","id":id}))
             }
@@ -418,6 +503,21 @@ impl FakeNotion {
 }
 
 impl Http for FakeNotion {
+    fn download(&self, url: &str, limit: usize) -> Result<Vec<u8>, Failure> {
+        self.calls.lock().unwrap().push("download".into());
+        let id = url
+            .strip_prefix("https://file.notion.so/")
+            .ok_or(Failure::NotSent)?;
+        let st = self.state.lock().unwrap();
+        let upload = st.nodes.get(id).ok_or(Failure::NotSent)?;
+        let bytes: Vec<u8> = serde_json::from_value(upload.payload["bytes"].clone())
+            .map_err(|_| Failure::NotSent)?;
+        if bytes.len() > limit {
+            return Err(Failure::NotSent);
+        }
+        Ok(bytes)
+    }
+
     fn send(&self, request: &Request) -> Result<Response, Failure> {
         let op = Self::op(request);
         self.calls.lock().unwrap().push(op.into());
@@ -433,6 +533,15 @@ impl Http for FakeNotion {
             }
         };
         match fault {
+            Some(Fault::ExpiredUpload) => {
+                let response = self.run(request)?;
+                let mut st = self.state.lock().unwrap();
+                for node in st.nodes.values_mut().filter(|n| n.kind == "upload") {
+                    node.payload["status"] = json!("expired");
+                }
+                self.save(&st);
+                Ok(response)
+            }
             None => self.run(request),
             Some(Fault::Throttle(s)) => Ok(Response {
                 status: 429,

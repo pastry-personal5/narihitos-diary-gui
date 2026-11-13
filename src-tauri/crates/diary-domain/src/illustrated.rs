@@ -1,6 +1,48 @@
 //! Portable illustrated Markdown with a closed, canonical YAML subset.
 use crate::authentic::{DiaryDate, valid_uuid};
-use pulldown_cmark::{Event, Parser, Tag};
+use pulldown_cmark::{Event, Parser, Tag, TagEnd};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UploadPart {
+    Text(String),
+    Photo { index: usize, alt: String },
+}
+
+/// Split only validated generated-photo references; no front matter or metadata.
+pub fn upload_parts(entry: &Entry) -> Result<Vec<UploadPart>, Error> {
+    entry.validate()?;
+    let mut parts = Vec::new();
+    let mut end = 0;
+    let mut image: Option<(usize, usize, String)> = None;
+    for (event, range) in Parser::new(&entry.body).into_offset_iter() {
+        match event {
+            Event::Start(Tag::Image { dest_url, .. }) => {
+                let prefix = format!("{}/", entry.date);
+                let n = dest_url
+                    .strip_prefix(&prefix)
+                    .and_then(|s| s.strip_suffix(".png"))
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .filter(|n| *n > 0 && *n <= entry.photos.len())
+                    .ok_or(Error::ImageReference)?;
+                image = Some((range.start, n - 1, String::new()));
+            }
+            Event::Text(t) if image.is_some() => image.as_mut().unwrap().2.push_str(&t),
+            Event::End(TagEnd::Image) => {
+                let (start, index, alt) = image.take().ok_or(Error::ImageReference)?;
+                if start > end {
+                    parts.push(UploadPart::Text(entry.body[end..start].into()));
+                }
+                parts.push(UploadPart::Photo { index, alt });
+                end = range.end;
+            }
+            _ => {}
+        }
+    }
+    if end < entry.body.len() {
+        parts.push(UploadPart::Text(entry.body[end..].into()));
+    }
+    Ok(parts)
+}
 
 pub const MAX_PHOTOS: usize = 99;
 #[derive(Clone, Debug, PartialEq, Eq)]

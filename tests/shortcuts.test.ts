@@ -27,6 +27,7 @@ describe("registry and canonical form", () => {
       ["export.start", "app", 0],
       ["export.start.notion", "app", 0],
       ["settings.open", "app", 0],
+      ["illustrated.upload.notion", "app", 0],
     ]);
     expect(ACTIONS[0].defaults).toEqual(["Shift+Command+P"]);
   });

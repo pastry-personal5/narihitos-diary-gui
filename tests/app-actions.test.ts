@@ -54,6 +54,33 @@ async function setup() {
   return { graph, context, state };
 }
 describe("shared application action policy", () => {
+  it("admits selected-date Illustrated upload without a saved Authentic, viewer, profile or engine and rechecks retained handlers", async () => {
+    const { graph, context, state } = await setup();
+    const date = "2026-11-06";
+    graph.illustrated.state.dates = [date];
+    context.server = () => ({
+      config_generation: 1,
+      last_reload: null,
+      storage_ready: true,
+      sources: [],
+      profiles: [],
+      illustrated_notion_exports_available: true,
+    });
+    const start = vi.spyOn(graph.exporter, "start").mockResolvedValue();
+    const handler =
+      createAppActions(context).handlers["illustrated.upload.notion"];
+    expect(handler.reason).toBeNull();
+    await handler.run();
+    expect(start).toHaveBeenCalledWith(date, "notion", "illustrated");
+    const notice = vi.spyOn(context.messages, "add");
+    state.connection = { kind: "disconnected" };
+    await handler.run();
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(notice).toHaveBeenCalledWith(
+      "Connect to the server first.",
+      "warning",
+    );
+  });
   it("uses the same registry and reasons for direct invocation and keyboard dispatch", async () => {
     const { context, state } = await setup();
     state.connection = { kind: "disconnected" } as Connection;

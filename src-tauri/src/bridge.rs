@@ -72,6 +72,8 @@ pub struct Settings {
     pub exports_available: bool,
     #[serde(default)]
     pub notion_exports_available: bool,
+    #[serde(default)]
+    pub illustrated_notion_exports_available: bool,
     pub sources: Vec<Availability>,
     pub profiles: Vec<Availability>,
     #[cfg(feature = "scaffold-smoke")]

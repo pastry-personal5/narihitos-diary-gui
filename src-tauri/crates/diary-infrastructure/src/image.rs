@@ -168,6 +168,10 @@ pub fn validate(path: &Path) -> Result<(u64, u32, u32), EngineError> {
         .take(32 * 1024 * 1024 + 1)
         .read_to_end(&mut b)
         .map_err(|_| invalid)?;
+    validate_bytes(&b)
+}
+pub(crate) fn validate_bytes(b: &[u8]) -> Result<(u64, u32, u32), EngineError> {
+    let invalid = EngineError::InvalidOutput;
     if b.len() > 32 * 1024 * 1024 || b.get(..8) != Some(b"\x89PNG\r\n\x1a\n") {
         return Err(invalid);
     }
@@ -261,7 +265,7 @@ pub fn validate(path: &Path) -> Result<(u64, u32, u32), EngineError> {
     }
     if pos != b.len()
         || b.get(pos.saturating_sub(8)..pos.saturating_sub(4)) != Some(b"IEND")
-        || !decode(&b)
+        || !decode(b)
     {
         return Err(invalid);
     }

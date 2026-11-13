@@ -6,7 +6,7 @@ Practical guidance for using Narihito's Diary, including setup, everyday
 workflows, recovery and current limitations. The root [README](../README.md)
 is a short product introduction.
 
-The app runs a separately launched Rust server and Tauri client, with saved Authentic editing, Create Empty, autosave, Settings, a transient AI Chat, generated candidates and paragraph-by-paragraph review. iCloud export is available when an iCloud folder is configured; Notion export is available when a Notion root page and token are configured. Setup and independent launch commands are in the [contribution guide](contribution-guide.md#setup-and-development). Feature delivery follows the [roadmap](roadmap.md).
+The app runs a separately launched Rust server and Tauri client, with saved Authentic editing, Create Empty, autosave, Settings, a transient AI Chat, generated candidates and paragraph-by-paragraph review. iCloud export is available when an iCloud folder is configured; Notion export is available when a shared Notion token and a root for the required diary kind are configured. Setup and independent launch commands are in the [contribution guide](contribution-guide.md#setup-and-development). Feature delivery follows the [roadmap](roadmap.md).
 
 Open **Settings → Server** to see the connection status or use **Connect**. Automatic connection and reconnection run in the background. Configuration reload is in **Settings → Server**, source diagnostics are in **Settings → Sources**, and profile diagnostics are in **Settings → AI Agents**.
 
@@ -76,6 +76,9 @@ Start the server in one shell using absolute paths:
 "/absolute/Diary Install/diary-server" --config "/absolute/private/config.yaml"
 ```
 
+To write that configuration file, copy the [example configuration](global_config_example.yaml)
+to a private location, replace every placeholder and set its mode to 0600.
+
 Start the client from a second shell, using the discovery file published by
 that server under its configured private runtime directory:
 
@@ -108,8 +111,20 @@ The optional private YAML `image_engines` map configures local PNG generators. S
 
 Creating again silently replaces the previous version only when the complete new version is published. Failure or cancellation before publication preserves the previous version. Cancellation can arrive too late to prevent publication; the displayed result follows the final server outcome. A quiet Global Message tells you when the saved Authentic changes after creation; nothing regenerates automatically.
 
-The viewer shows text and generated photos in order. Photos load as needed; an unavailable photo shows its description and Retry. A failed refresh keeps the previous text and releases its photos; reconnect or retry the refresh before loading them again. The viewer is read-only: no save, Paragraph Review or export. AI Chat uses the working day’s open Authentic buffer when an Illustrated tab is active; if that buffer is closed, it shows No document. Reading links can be selected/copied; the viewer does not open them automatically.
+The viewer shows text and generated photos in order. Photos load as needed; an unavailable photo shows its description and Retry. A failed refresh keeps the previous text and releases its photos; reconnect or retry the refresh before loading them again. The viewer is read-only: no save or Paragraph Review. Use the separate selected-date Upload Illustrated Diary to Notion action for a published entry. AI Chat uses the working day’s open Authentic buffer when an Illustrated tab is active; if that buffer is closed, it shows No document. Reading links can be selected/copied; the viewer does not open them automatically.
 
 To delete, open an Illustrated tab and choose **Delete Illustrated diary**. The dialog starts on Cancel. Confirm to remove the displayed Markdown and its photo directory; Authentic is kept. If the version changed, refresh and confirm the current version again. Close an Illustrated tab to release its loaded photos without deleting the saved diary. Closing stays available while a refresh is waiting for the server.
 
 If admission is uncertain, use **Retry Illustrated admission**. It checks the original request identity; starting a new request is held until that outcome or a new server session is reconciled. No live AI or GPU call is needed for the repository’s synthetic smoke tests.
+
+## Upload an Illustrated diary to Notion
+
+Select the published diary's date and use **Upload Illustrated Diary to Notion** in the toolbar or command palette. Any editor tab may be active. Upload needs a connection, writable storage and a configured Illustrated Notion root; it needs no saved Authentic diary, open viewer, AI profile or image engine.
+
+Private configuration uses `notion.token` with `notion.pages`, a nonempty list of `type: normal` and/or `type: illustrated` entries, each with `root_page_id`. The roots must be distinct. `normal` retains Authentic exports. Legacy `notion.root_page_id` is rejected with a migration message naming `notion.pages`; edit the private config explicitly using the [example](global_config_example.yaml), then restart the server. Reload does not replace active Notion adapters.
+
+The upload contains rendered text and photos, with no prompts, seeds or front matter. Notion pages are ordered as `YYYY / YYYY-MM / YYYY-MM-DD (WED)`. Upload copies are JPEGs, exactly 480 pixels high with proportional width, quality 85 and white transparency background. Original PNGs and Markdown remain unchanged. Preparation is limited to 99 photos, 5 MiB per JPEG and 64 MiB total; invalid or oversized preparation stops before remote writes.
+
+An unchanged upload performs no writes or photo uploads. Changed local content replaces the same day page and keeps its URL. The app reads and hashes hosted image bytes to detect replacements even when Notion's edit timestamp does not change. Externally changed, deleted or unowned destinations require a fresh confirmation. Duplicate/disordered dated pages or unsupported foreign blocks require repair in Notion before retrying.
+
+Global Messages identify the captured date and upload steps. You may navigate while it runs; completion does not change your date or open Notion. **Stop upload** stops before another admitted request; it does not roll back created pages, uploaded files or partial content. New content is verified before old body blocks move to Notion trash. Replacement is not atomic, and an edit racing a Notion request cannot be prevented completely. Unknown outcomes retain their reservation until resolved; recovery observes without replaying writes. Confirmed abandonment stops tracking and does not undo remote effects. Deleting a local Illustrated diary never deletes its Notion page.

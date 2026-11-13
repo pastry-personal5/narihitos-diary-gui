@@ -54,7 +54,44 @@ impl ExportCoordinatorState {
         generation: u64,
         request: StartRequest,
     ) -> Result<Started, ExportError> {
-        let adapter = self.adapter(request.target)?.clone();
+        self.start_inner(session, generation, request, None)
+    }
+
+    pub(super) fn start_illustrated(
+        self: &Arc<Self>,
+        session: &str,
+        generation: u64,
+        request: IllustratedStartRequest,
+    ) -> Result<Started, ExportError> {
+        if !diary_domain::authentic::valid_uuid(&request.expected_version) {
+            return Err(ExportError::Invalid);
+        }
+        let version = request.expected_version;
+        let input = StartRequest {
+            operation_id: request.operation_id,
+            date: request.date,
+            target: Target::Notion,
+            expected: diary_domain::authentic::AuthenticRevision {
+                sequence: 0,
+                sha256: hex_sha(version.as_bytes()),
+            },
+        };
+        self.start_inner(session, generation, input, Some(version))
+    }
+
+    fn start_inner(
+        self: &Arc<Self>,
+        session: &str,
+        generation: u64,
+        request: StartRequest,
+        version: Option<String>,
+    ) -> Result<Started, ExportError> {
+        let kind = if version.is_some() {
+            ContentKind::Illustrated
+        } else {
+            ContentKind::Authentic
+        };
+        let adapter = self.adapter(kind, request.target)?.clone();
         if !self.ready.load(Ordering::SeqCst) {
             return Err(ExportError::Storage);
         }
@@ -97,7 +134,10 @@ impl ExportCoordinatorState {
         {
             self.cancel(&holder)?;
         }
-        let snapshot = self.snapshot(&request)?;
+        let snapshot = match &version {
+            Some(v) => self.illustrated_snapshot(request.date, v)?,
+            None => self.snapshot(&request)?,
+        };
         self.hit("before_intent")?;
         let first = NewStep {
             step_id: StepId::parse(&uuid()?).ok_or(ExportError::Storage)?,
@@ -119,6 +159,9 @@ impl ExportCoordinatorState {
             first_step: Some(first),
         };
         let intent = Intent {
+            content_kind: snapshot.content_kind,
+            illustrated_version: snapshot.illustrated_version.clone(),
+            photos: snapshot.photos.clone(),
             target: request.target,
             destination_key: key.clone(),
             authentic_id: snapshot.authentic_id.clone(),
@@ -154,9 +197,19 @@ impl ExportCoordinatorState {
             .db
             .export_receipt(&key, &snapshot.authentic_id)
             .map_err(stored)?;
+        let projected = if kind == ContentKind::Illustrated {
+            receipt
+                .as_ref()
+                .filter(|r| r.revision_sha == snapshot.revision.sha256)
+                .map(|r| r.projection_digest.clone())
+        } else {
+            None
+        };
         let (confirm, write) = match decide(
             receipt.as_ref(),
-            &Self::expected(&*adapter, &snapshot.bytes, &snapshot.revision.sha256),
+            &projected.unwrap_or_else(|| {
+                Self::expected(&*adapter, &snapshot.bytes, &snapshot.revision.sha256)
+            }),
             &seen,
             false,
         ) {

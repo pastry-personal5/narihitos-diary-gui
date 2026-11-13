@@ -68,6 +68,70 @@ function setup(over: Record<string, unknown> = {}, flush = true) {
   });
   return { c, bridge, notes };
 }
+
+describe("Illustrated upload capture", () => {
+  it("keeps tracking the admitted upload through a temporary disconnect without submitting again", async () => {
+    const version = "00000000-0000-4000-8000-000000000099";
+    const running: ExportResult = {
+      ...result("running"),
+      target: "notion",
+      content_kind: "illustrated",
+      illustrated_version: version,
+    };
+    const getOperation = vi
+      .fn()
+      .mockRejectedValueOnce(new AuthenticError("unavailable"))
+      .mockResolvedValue({ export: { ...running, state: "succeeded" } });
+    const { c, bridge } = setup({
+      readIllustrated: async () => ({ version }),
+      startExport: vi.fn(async () => ({ outcome: "result", result: running })),
+      getOperation,
+    });
+    await c.start("2026-11-05", "notion", "illustrated");
+    expect(getOperation).toHaveBeenCalledTimes(2);
+    expect(bridge.startExport).toHaveBeenCalledTimes(1);
+    expect(c.getSnapshot().phase).toBe("idle");
+    c.dispose();
+  });
+  it("captures the published version without flushing or loading Authentic and blocks duplicate submissions", async () => {
+    const version = "00000000-0000-4000-8000-000000000099";
+    let finish!: (value: StartExportOutcome) => void;
+    const readIllustrated = vi.fn(async () => ({ version }));
+    const startExport = vi.fn(
+      () =>
+        new Promise<StartExportOutcome>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { c, bridge } = setup({ readIllustrated, startExport }, false);
+    const first = c.start("2026-11-05", "notion", "illustrated");
+    await vi.waitFor(() => expect(startExport).toHaveBeenCalledTimes(1));
+    await c.start("2026-11-06", "notion", "illustrated");
+    expect(bridge.loadAuthentic).not.toHaveBeenCalled();
+    expect(readIllustrated).toHaveBeenCalledExactlyOnceWith("2026-11-05");
+    expect(startExport.mock.calls[0]).toEqual([
+      {
+        operation_id: expect.any(String),
+        date: "2026-11-05",
+        target: "notion",
+        content_kind: "illustrated",
+        expected_version: version,
+      },
+    ]);
+    finish({
+      outcome: "result",
+      result: {
+        ...result("succeeded"),
+        target: "notion",
+        content_kind: "illustrated",
+        illustrated_version: version,
+      },
+    });
+    await first;
+    expect(c.getSnapshot().phase).toBe("idle");
+    c.dispose();
+  });
+});
 const uncertainPath = (extra: Record<string, unknown> = {}) => ({
   startExport: vi.fn(async () => {
     throw new AuthenticError("outcome_uncertain", false);

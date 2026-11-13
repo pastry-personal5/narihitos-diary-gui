@@ -349,9 +349,9 @@ async fn configured_unavailable_profiles_have_redacted_reasons() {
     assert_eq!(
         value.as_object().unwrap().len(),
         if cfg!(feature = "scaffold-smoke") {
-            11
+            12
         } else {
-            10
+            11
         }
     );
 }

@@ -36,7 +36,7 @@ impl ExportCoordinatorState {
                 admitted_checkpoint: checkpoint,
             });
         }
-        let adapter = self.adapter(row.target)?.clone();
+        let adapter = self.adapter(row.content_kind, row.target)?.clone();
         if self.key(&*adapter)? != row.destination_key {
             return Err(ExportError::Disabled);
         }
@@ -102,6 +102,12 @@ impl ExportCoordinatorState {
             id: request.operation_id.clone(),
             target: row.target,
             snapshot: Snapshot {
+                content_kind: row.content_kind,
+                illustrated_version: row.illustrated_version.clone(),
+                photos: self
+                    .db
+                    .export_photos(&request.operation_id)
+                    .map_err(stored)?,
                 date,
                 authentic_id: row.authentic_id.clone(),
                 revision: diary_domain::authentic::AuthenticRevision {

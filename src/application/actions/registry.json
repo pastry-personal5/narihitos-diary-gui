@@ -109,6 +109,13 @@
       "info": "Opens Settings.",
       "scope": "app",
       "defaults": []
+    },
+    {
+      "id": "illustrated.upload.notion",
+      "label": "Upload Illustrated Diary to Notion",
+      "info": "Uploads the selected date’s published Illustrated diary to its configured Notion day page.",
+      "scope": "app",
+      "defaults": []
     }
   ],
   "reserved": {

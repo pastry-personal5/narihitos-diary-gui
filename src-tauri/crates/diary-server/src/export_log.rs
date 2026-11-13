@@ -48,6 +48,40 @@ impl LoggedAdapter {
     }
 }
 impl ExportAdapter for LoggedAdapter {
+    fn progress(&self, date: &DiaryDate) -> Option<diary_application::export::ExportProgress> {
+        self.inner.progress(date)
+    }
+    fn content_kind(&self) -> diary_application::export::ContentKind {
+        self.inner.content_kind()
+    }
+    fn verified(&self, date: &DiaryDate, seen: &Observation) -> bool {
+        self.inner.verified(date, seen)
+    }
+    fn apply_snapshot(
+        &self,
+        snapshot: &diary_application::export::Snapshot,
+        write: Write,
+        expected: &Observation,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Applied {
+        let t = Instant::now();
+        let applied = self
+            .inner
+            .apply_snapshot(snapshot, write, expected, cancelled);
+        let (state, level) = match applied {
+            Applied::Done => ("done", Level::Info),
+            Applied::Failed => ("failed", Level::Warn),
+            Applied::Unknown => ("unknown", Level::Warn),
+        };
+        self.emit(
+            level,
+            ExportDetail::new("apply")
+                .state(state)
+                .code(write.as_str())
+                .ms(ms(t)),
+        );
+        applied
+    }
     fn target(&self) -> Target {
         self.inner.target()
     }
@@ -114,6 +148,9 @@ pub struct LoggedHttp<H> {
     pub diag: Arc<dyn Diagnostics>,
 }
 impl<H: Http> Http for LoggedHttp<H> {
+    fn download(&self, url: &str, limit: usize) -> Result<Vec<u8>, Failure> {
+        self.inner.download(url, limit)
+    }
     fn send(&self, request: &Request) -> Result<Response, Failure> {
         let t = Instant::now();
         let result = self.inner.send(request);
