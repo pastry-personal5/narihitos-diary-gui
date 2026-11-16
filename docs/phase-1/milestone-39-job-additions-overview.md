@@ -27,13 +27,13 @@ Out of scope: queues (M38); folding `ExportController`'s client-side step timer 
 
 ## Open items
 
-- **Q1 - Show the information now?** The fields make an informative job list possible. Recommended default: no new UI in M39; M38 already extends the AI Activities dialog with lanes, so the list arrives there once, with kind labels. Alternative: M39 adds a read-only kind/date/state column to the existing dialog now and M38 adds lanes to it.
+- **Q1 - Show the information now? (decided, owner 2026-11-16):** no new UI in M39; the job GUI is [P1-M40](../phase-1/phase-1.md#p1-m40-job-gui).
 
 ## Completion checklist
 
 ### Plan review
 
-- [ ] R01 - Owner confirms Q1 or accepts the default.
+- [x] R01 - Owner decided Q1 (2026-11-16): no UI in M39; job GUI moves to P1-M40.
 
 ### Stage A - contract
 
@@ -45,7 +45,7 @@ Out of scope: queues (M38); folding `ExportController`'s client-side step timer 
 - [ ] B01 - `SnapshotJob` and `validation.ts` accept `kind`/`origin` with bounds tests.
 - [ ] B02 - Illustrated and generation guards read `job.kind`; no `progress?.kind` checks remain (grep evidence); guard behavior unchanged.
 - [ ] B03 - The progress reporter finds post-admission paragraph review by kind; message text and cadence unchanged (existing tests pass unedited).
-- [ ] B04 - Q1 decision implemented (or recorded as no UI change).
+- [ ] B04 - No UI change in M39 (Q1); confirm no component under `src/components` changes.
 
 ### Stage C - proof and docs
 

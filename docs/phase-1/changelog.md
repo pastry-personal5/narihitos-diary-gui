@@ -4,6 +4,8 @@ Status: Active
 
 This log records Phase 1 decisions and material plan changes. Research recommendations remain proposals unless an owner decision is recorded.
 
+- 2026-11-16 — Owner — Requested P1-M40 for the job GUI; M39 adds no UI (M39 Q1 decided). M40 scope awaits an interview.
+
 - 2026-11-16 — Agent, owner-requested M37 implementation — Jobs carry a server-internal kind and origin; one `Coordinator::admit` replaces `admit_agent`; progress and cancel dispatch on kind; import failure codes live on the job. Split `main.rs`, `bridge.rs`, `resources.ts` and the generation tests. Departures (export-cancel fallback, one loader module, window commands kept in `main.rs`, failure code only with the `Failed` transition, one pre-existing `scaffold-smoke` lint fix) are in the [implementation record](milestone-37-job-registry-architecture.md#implementation-record-2026-11-16).
 
 - 2026-11-16 — Owner, M37 interview — M37 is refactoring only (no contract change) and splits all four near-limit files (`resources.ts`, `main.rs`, `bridge.rs`, `generation/tests.rs`); iCloud and Notion exports are separate job kinds. Every addition (job kind/origin and export progress in the contract, client use of them) moves to new [P1-M39](milestone-39-job-additions-overview.md). Order: M37, M39, M38, all before M32 closes.

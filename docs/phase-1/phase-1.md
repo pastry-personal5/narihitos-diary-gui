@@ -277,6 +277,13 @@ Status: Planned
 Goal: Queue jobs in separate agent/image/export lanes instead of refusing them, and render several Illustrated photo candidates per slot for the user to pick, re-roll and publish later.
 Plan: [overview/checklist](milestone-38-job-lanes-overview.md), [work plan](milestone-38-job-lanes-architecture.md).
 
+### P1-M40: Job GUI
+
+Status: Planned
+Goal: Show background jobs (illustration, AI generation, AI review, AI Chat, iCloud and Notion export) to the user as information.
+Plan: pending owner interview; overview and work plan not yet written.
+Notes: Owner request 2026-11-16. Takes all job UI out of M39; whether M38's lane rows and queued positions move here is part of the interview.
+
 ### P1-M32: Personal release qualification
 
 Status: Active
