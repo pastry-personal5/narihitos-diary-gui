@@ -1,6 +1,4 @@
 import type { Bridge } from "../bridge";
-import { AuthenticError } from "../bridge";
-import { AuthenticSession } from "../authentic/session";
 import type { Action } from "../authentic/saveQueue";
 import type { StreamEvent } from "../events";
 import type { Source } from "./contracts";
@@ -13,6 +11,7 @@ import type {
   ResourceEvents,
 } from "./resource";
 import { SourceMutations } from "./source-mutations";
+import { ResourceLoading } from "./resource-loading";
 export type {
   EditorResource,
   DeleteBufferBaseline,
@@ -20,13 +19,12 @@ export type {
   ResourceEvents,
 } from "./resource";
 export { saveOff } from "./source-mutations";
-const code = (e: unknown) =>
-  e instanceof AuthenticError ? e.code : "unavailable";
 
 /** Resource identity, async load epochs, all-session close and one serialized transition guard. */
 export class ResourceCoordinator {
   readonly resources = new Map<string, EditorResource>();
   private readonly sourceMutations: SourceMutations;
+  private readonly loading: ResourceLoading;
   private readonly listeners = new Set<() => void>();
   private online = false;
   private writable = false;
@@ -51,6 +49,24 @@ export class ResourceCoordinator {
       sourceGuard: (resource) => this.events.sourceGuard(resource),
       changed: () => this.emit(),
       transition: (work) => this.transition(work),
+    });
+    this.loading = new ResourceLoading(bridge, budget, {
+      resources: this.resources,
+      online: () => this.online,
+      writable: () => this.writable,
+      disposed: () => this.disposed,
+      connection: () => this.connectionEpoch,
+      selectedDate: () => this.selectedDate,
+      active: () => this.active,
+      record: (key, label, kind, date) => this.record(key, label, kind, date),
+      activate: (resource) => this.activate(resource),
+      current: (r, epoch, connection) => this.current(r, epoch, connection),
+      emit: () => this.emit(),
+      notice: (text) => this.events.notice(text),
+      savedDatesChanged: () => this.events.savedDatesChanged(),
+      transition: (work) => this.transition(work),
+      sourceReserved: (sourceId) => this.sourceReserved(sourceId),
+      settle: (r) => this.settle(r),
     });
   }
   subscribe = (fn: () => void) => {
@@ -184,72 +200,8 @@ export class ResourceCoordinator {
       this.resources.get(r.key) === r
     );
   }
-  private async loadAuthentic(r: EditorResource) {
-    if (r.pending) return r.pending;
-    if (r.session || !this.online || !r.date) return;
-    const epoch = ++r.epoch,
-      connection = this.connectionEpoch,
-      key = `load:${r.key}:${epoch}`;
-    if (!this.budget.reserve(key, 10 * 1024 * 1024)) {
-      r.error = "session_limit";
-      this.emit();
-      return;
-    }
-    r.loading = true;
-    r.error = null;
-    this.emit();
-    const pending = (async () => {
-      try {
-        const session = await AuthenticSession.open(
-          this.bridge,
-          r.date!,
-          r.buffer,
-          undefined,
-          {
-            budget: this.budget,
-            current: () => !this.disposed && this.resources.get(r.key) === r,
-            loadCurrent: () => this.current(r, epoch, connection),
-          },
-        );
-        if (!this.current(r, epoch, connection)) {
-          session.dispose();
-          return;
-        }
-        r.session = session;
-        r.buffer.setEditable(this.writable);
-        let previous = session.view().queue.state;
-        session.subscribe((view) => {
-          r.dirty = view.queue.generation > view.queue.saved;
-          r.buffer.setEditable(
-            this.online &&
-              this.writable &&
-              !view.creating &&
-              !view.createError &&
-              !view.loadError &&
-              !view.queue.paused,
-          );
-          if (previous !== view.queue.state) {
-            previous = view.queue.state;
-            this.events.notice(
-              `${r.date}: ${view.queue.state === "clean" ? "Saved" : view.queue.state === "saving" ? "Saving…" : view.queue.state === "dirty" ? "Unsaved changes" : view.queue.state === "external_conflict" ? "Changed on disk" : "Save failed"}.`,
-            );
-            if (view.queue.state === "clean") this.events.savedDatesChanged();
-          }
-          this.emit();
-        });
-      } catch (e) {
-        if (this.current(r, epoch, connection)) r.error = code(e);
-      } finally {
-        this.budget.release(key);
-        if (r.epoch === epoch) {
-          r.loading = false;
-          r.pending = undefined;
-          this.emit();
-        }
-      }
-    })();
-    r.pending = pending;
-    await pending;
+  private loadAuthentic(r: EditorResource) {
+    return this.loading.loadAuthentic(r);
   }
   async connect(online: boolean, writable: boolean) {
     this.online = online;
@@ -468,75 +420,8 @@ export class ResourceCoordinator {
     if (changed) this.emit();
   }
   /** Illustrated bodies have no save session. Stable date identity survives publication changes. */
-  async openIllustrated(
-    date: string,
-    activate = true,
-    refresh = false,
-  ): Promise<boolean> {
-    if (this.active?.buffer.composing || !this.bridge.readIllustrated)
-      return false;
-    const r = this.record(
-      `illustrated:${date}`,
-      `${date} · Illustrated`,
-      "illustrated",
-      date,
-    );
-    if (!r) return false;
-    if (activate) this.activate(r);
-    if (!this.online) return !!r.illustrated;
-    const connection = this.connectionEpoch;
-    if (r.pending) {
-      const loadingEpoch = r.epoch;
-      await r.pending;
-      if (!this.current(r, loadingEpoch, connection)) return false;
-      if (!refresh) return !!r.illustrated;
-    }
-    if (r.illustrated && !r.stale && !refresh) return true;
-    const epoch = ++r.epoch;
-    const key = `illustrated-load:${r.instance}:${epoch}`;
-    if (!this.budget.reserve(key, 5 * 1024 * 1024)) {
-      r.error = "session_limit";
-      this.emit();
-      return false;
-    }
-    r.loading = true;
-    this.emit();
-    const pending = (async () => {
-      try {
-        const entry = await this.bridge.readIllustrated!(date);
-        if (!this.current(r, epoch, connection)) return;
-        if (entry.date !== date)
-          throw new AuthenticError("invalid_response", false);
-        if (
-          !this.budget.reserve(`illustrated:${r.instance}`, payloadBytes(entry))
-        )
-          throw new AuthenticError("session_limit", false);
-        r.buffer.setEditable(false);
-        if (r.buffer.setIllustrated) {
-          if (r.illustrated?.version !== entry.version || r.stale)
-            r.buffer.setIllustrated(entry, true);
-        } else r.buffer.setText(entry.markdown);
-        r.illustrated = entry;
-        r.stale = false;
-        r.error = null;
-      } catch (error) {
-        if (this.current(r, epoch, connection)) {
-          r.error = code(error);
-          r.stale = true;
-          if (r.illustrated) r.buffer.setIllustrated?.(r.illustrated, false);
-        }
-      } finally {
-        this.budget.release(key);
-        if (r.epoch === epoch) {
-          r.loading = false;
-          r.pending = undefined;
-          this.emit();
-        }
-      }
-    })();
-    r.pending = pending;
-    await pending;
-    return this.resources.get(r.key) === r && !r.error && !!r.illustrated;
+  openIllustrated(date: string, activate = true, refresh = false) {
+    return this.loading.openIllustrated(date, activate, refresh);
   }
   async openCandidate(key: string) {
     return this.switchTab(key);
@@ -552,207 +437,16 @@ export class ResourceCoordinator {
     await this.loadAuthentic(r);
     return true;
   }
-  async openSource(source: Source): Promise<boolean> {
-    if (this.active?.buffer.composing) {
-      this.events.notice("Finish text composition before switching tabs.");
-      return false;
-    }
-    if (!this.online || !source.capabilities.read) {
-      this.events.notice("Re-import this source before opening its body.");
-      return false;
-    }
-    const r = this.record(
-      `source:${source.id}`,
-      source.relative_key,
-      "source",
-      this.selectedDate ?? undefined,
-    );
-    if (!r) return false;
-    if (r.detached) {
-      this.events.notice(
-        "Close the detached copy before opening a replacement source from a fresh import.",
-      );
-      this.activate(r);
-      return false;
-    }
-    if (r.source) {
-      if (
-        r.source.snapshot_id !== source.import_id &&
-        source.digest !== r.baseDigest
-      )
-        r.stale = true;
-      this.activate(r);
-      return true;
-    }
-    if (r.pending) {
-      this.activate(r);
-      await r.pending;
-      return true;
-    }
-    const epoch = ++r.epoch,
-      connection = this.connectionEpoch,
-      key = `load:${r.key}:${epoch}`;
-    if (!this.budget.reserve(key, 10 * 1024 * 1024)) {
-      r.error = "session_limit";
-      this.emit();
-      return false;
-    }
-    r.loading = true;
-    this.activate(r);
-    const pending = (async () => {
-      try {
-        const body = await this.bridge.readSource(source.id, source.import_id);
-        if (!this.current(r, epoch, connection)) return;
-        if (
-          body.source.id !== source.id ||
-          body.source.digest !== source.digest ||
-          body.snapshot_id !== source.import_id
-        )
-          throw new AuthenticError("source_stale", false);
-        const metadata = {
-          source: body.source,
-          snapshot_id: body.snapshot_id,
-          capabilities: body.capabilities,
-        };
-        if (
-          !this.budget.reserve(
-            `source-metadata:${r.key}`,
-            payloadBytes(metadata),
-          )
-        )
-          throw new AuthenticError("session_limit", false);
-        try {
-          r.buffer.setText(body.body);
-        } catch (error) {
-          this.budget.release(`source-metadata:${r.key}`);
-          throw error;
-        }
-        r.source = metadata;
-        r.baseDigest = body.source.digest;
-        r.buffer.setEditable(
-          this.online &&
-            this.writable &&
-            !!body.capabilities.save &&
-            !r.detached,
-        );
-        r.stale = false;
-        r.error = null;
-      } catch (e) {
-        if (this.current(r, epoch, connection)) r.error = code(e);
-      } finally {
-        this.budget.release(key);
-        if (r.epoch === epoch) {
-          r.loading = false;
-          r.pending = undefined;
-          this.emit();
-        }
-      }
-    })();
-    r.pending = pending;
-    await pending;
-    return r.error === null;
+  openSource(source: Source): Promise<boolean> {
+    return this.loading.openSource(source);
   }
   /** A replacement snapshot never changes an open buffer or its base observation. */
   reconcileImport(date: string, context: ImportContextView) {
-    let changed = false;
-    for (const resource of this.resources.values()) {
-      if (
-        resource.kind !== "source" ||
-        resource.date !== date ||
-        !resource.source ||
-        resource.stale
-      )
-        continue;
-      if (
-        context.stale ||
-        (context.page && context.page.import_id !== resource.source.snapshot_id)
-      ) {
-        resource.stale = true;
-        changed = true;
-      }
-    }
-    if (changed) this.emit();
+    this.loading.reconcileImport(date, context);
   }
   /** Replace a source only after explicit dirty-buffer consent and a fresh snapshot read. */
-  async refreshSource(source: Source): Promise<boolean> {
-    return this.transition(async () => {
-      const r = this.resources.get(`source:${source.id}`);
-      if (!r?.source || !this.online || !source.capabilities.read || r.pending)
-        return false;
-      if (r.detached || this.sourceReserved(source.id)) return false;
-      if (!(await this.settle(r))) return false;
-      if (
-        r.detached ||
-        this.sourceReserved(source.id) ||
-        this.resources.get(r.key) !== r
-      )
-        return false;
-      const epoch = ++r.epoch,
-        connection = this.connectionEpoch,
-        key = `load:${r.key}:${epoch}`;
-      if (!this.budget.reserve(key, 10 * 1024 * 1024)) {
-        r.error = "session_limit";
-        this.emit();
-        return false;
-      }
-      r.loading = true;
-      this.emit();
-      try {
-        const body = await this.bridge.readSource(source.id, source.import_id);
-        if (!this.current(r, epoch, connection)) return false;
-        if (
-          body.source.id !== source.id ||
-          body.source.digest !== source.digest ||
-          body.snapshot_id !== source.import_id
-        )
-          throw new AuthenticError("source_stale", false);
-        const metadata = {
-          source: body.source,
-          snapshot_id: body.snapshot_id,
-          capabilities: body.capabilities,
-        };
-        const previousBytes = payloadBytes(r.source);
-        if (
-          !this.budget.reserve(
-            `source-metadata:${r.key}`,
-            payloadBytes(metadata),
-          )
-        )
-          throw new AuthenticError("session_limit", false);
-        try {
-          r.buffer.setText(body.body);
-        } catch (error) {
-          this.budget.reserve(`source-metadata:${r.key}`, previousBytes);
-          throw error;
-        }
-        r.source = metadata;
-        r.baseDigest = body.source.digest;
-        r.buffer.setEditable(
-          this.online &&
-            this.writable &&
-            !!body.capabilities.save &&
-            !r.detached,
-        );
-        r.saveOp = undefined;
-        r.saveError = null;
-        r.dirty = false;
-        r.stale = false;
-        r.error = null;
-        return true;
-      } catch (error) {
-        if (this.current(r, epoch, connection)) {
-          r.error = code(error);
-          r.stale = true;
-        }
-        return false;
-      } finally {
-        this.budget.release(key);
-        if (r.epoch === epoch) {
-          r.loading = false;
-          this.emit();
-        }
-      }
-    });
+  refreshSource(source: Source): Promise<boolean> {
+    return this.loading.refreshSource(source);
   }
   async switchTab(key: string) {
     const r = this.resources.get(key);
