@@ -68,7 +68,7 @@ to inspect. See [Illustrated records](architecture/logging.md#illustrated-genera
 Before opening a pull request, run the full checks below from the repository root, except for the owner-approved docs-only P1-M1/P1-M2 exemption. See [development-process.md](development-process.md#definition-of-done) for that exemption and the required documentation review.
 
 ```sh
-cargo fmt --manifest-path src-tauri/Cargo.toml --check
+cargo fmt --manifest-path src-tauri/Cargo.toml --all --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 npx prettier --check .
@@ -133,7 +133,7 @@ npm run tauri dev                                                               
 npm run tauri build                                                                                              # build the app bundle
 cargo test --manifest-path src-tauri/Cargo.toml                                                                  # run Rust tests
 npx vitest run                                                                                                   # run UI tests
-cargo fmt --manifest-path src-tauri/Cargo.toml && npx prettier --write .                                         # format
+cargo fmt --manifest-path src-tauri/Cargo.toml --all && npx prettier --write .                                   # format
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && npx eslint . --max-warnings 0  # lint
 scripts/gate.sh                                                                                                  # full gate + tsc typecheck: parallel lanes, quiet, PASS/FAIL per command
 ```

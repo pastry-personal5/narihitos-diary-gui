@@ -16,7 +16,7 @@ run() { # name, command...
 
 # Rust lane is sequential: clippy and test share cargo's build-directory lock anyway.
 (
-  run G01 cargo fmt --manifest-path $M --check
+  run G01 cargo fmt --manifest-path $M --all --check
   run G02 cargo clippy --manifest-path $M --all-targets --quiet -- -D warnings
   run G03 cargo test --manifest-path $M --quiet
 ) &

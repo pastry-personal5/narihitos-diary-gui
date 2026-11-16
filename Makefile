@@ -41,11 +41,11 @@ release-server: versions ## Build the ordinary release standalone server
 release: release-server package ## Build the release server and .app (no publishing)
 
 fmt: ## Format Rust and the rest (writes files)
-	cargo fmt --manifest-path $(M)
+	cargo fmt --manifest-path $(M) --all
 	npx prettier --write .
 
 fmt-check: ## Check formatting (G01, G04)
-	cargo fmt --manifest-path $(M) --check
+	cargo fmt --manifest-path $(M) --all --check
 	npx prettier --check .
 
 clippy: ## Rust lint (G02)
