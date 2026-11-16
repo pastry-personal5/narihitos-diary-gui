@@ -51,7 +51,7 @@ pub struct WireJob {
     id: String,
     sequence: u64,
     state: JobState,
-    #[serde(default, deserialize_with = "super::job_error")]
+    #[serde(default, deserialize_with = "super::types::job_error")]
     error_code: Option<String>,
     progress: Option<AiProgress>,
 }
