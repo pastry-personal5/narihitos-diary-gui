@@ -558,6 +558,34 @@ mod tests {
         assert!(s.coordinator.lock().unwrap().event_cursor() > cursor);
     }
 
+    /// M37 characterization: a finished Illustrated job is returned unchanged and not signalled.
+    #[tokio::test]
+    async fn terminal_cancel_returns_current_without_signal() {
+        let s = state();
+        running(&s);
+        s.illustrated_jobs
+            .lock()
+            .unwrap()
+            .get_mut(JOB)
+            .unwrap()
+            .terminal = true;
+        let done = s
+            .coordinator
+            .lock()
+            .unwrap()
+            .transition(SESSION, s.now(), JOB, JobState::Succeeded)
+            .unwrap();
+        let mut req = request("POST", &format!("/api/v1/jobs/{JOB}/cancel"));
+        req.headers_mut()
+            .insert("x-diary-session", SESSION.parse().unwrap());
+        let r = router(s.clone()).oneshot(req).await.unwrap();
+        assert_eq!(r.status(), StatusCode::OK);
+        let v: Value =
+            serde_json::from_slice(&to_bytes(r.into_body(), 16384).await.unwrap()).unwrap();
+        assert_eq!((v["state"].as_str(), v["sequence"].as_u64()), (Some("succeeded"), Some(done.sequence)));
+        assert!(!s.illustrated_jobs.lock().unwrap()[JOB].run.token().is_cancelled());
+    }
+
     #[tokio::test]
     async fn close_signals_illustrated_worker_before_waiting_for_acknowledgement() {
         let s = state();

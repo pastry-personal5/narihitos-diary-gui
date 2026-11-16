@@ -870,3 +870,16 @@ async fn generation_captures_one_prompt_revision_for_every_candidate() {
     assert_eq!(seen.last().unwrap().0.as_str(), "b".repeat(64));
     assert_eq!(seen.last().unwrap().1, "fixture:b");
 }
+/// M37 characterization: cancelling a finished generation returns it unchanged with progress.
+#[tokio::test]
+async fn terminal_generation_cancel_returns_current_job_with_progress() {
+    let f = setup(AgentKind::Codex, false, false, false);
+    let id = start(&f, "r", 1).await;
+    let done = terminal(&f, &id).await;
+    let (st, v) = call(&f.s, "POST", &format!("/api/v1/jobs/{id}/cancel"), None).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(v["state"], done["job"]["state"]);
+    assert_eq!(v["sequence"], done["job"]["sequence"]);
+    assert!(v["progress"].is_object(), "{v}");
+    assert_ne!(v["cancellation_requested"], true);
+}

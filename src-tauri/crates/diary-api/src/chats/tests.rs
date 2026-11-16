@@ -489,3 +489,35 @@ async fn chat_retains_current_turn_definition_and_resolves_again_for_next_turn()
     );
     assert!(second.get("prompt").is_none());
 }
+
+/// M37 characterization: chat cancel answers with the bare job (no progress); a terminal chat
+/// job falls through to the generic path and is returned unchanged.
+#[tokio::test]
+async fn chat_cancel_returns_bare_job_and_terminal_cancel_is_unchanged() {
+    let s = setup(Mode_::Block);
+    let chat = open(&s).await;
+    let (_, started) = send(&s, &chat, "r1", "hello").await;
+    let job = started["job"]["id"].as_str().unwrap();
+    let (st, v) = call(&s, "POST", &format!("/api/v1/jobs/{job}/cancel"), None).await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(v.get("progress").is_none(), "{v}");
+    until(&s, &chat, "cancelled").await;
+
+    let s = setup(Mode_::Reply);
+    let chat = open(&s).await;
+    let (_, started) = send(&s, &chat, "r1", "hello").await;
+    let job = started["job"]["id"].as_str().unwrap();
+    let mut done = Value::Null;
+    for _ in 0..400 {
+        done = call(&s, "GET", &format!("/api/v1/jobs/{job}"), None).await.1;
+        if done["state"] == "succeeded" {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(done["state"], "succeeded");
+    let (st, v) = call(&s, "POST", &format!("/api/v1/jobs/{job}/cancel"), None).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!((&v["state"], &v["sequence"]), (&done["state"], &done["sequence"]));
+    assert!(v.get("progress").is_none(), "{v}");
+}
