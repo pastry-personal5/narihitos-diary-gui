@@ -310,6 +310,14 @@ async fn state_changes_publish_one_job_change_each_and_exports_cannot_be_cancell
     );
     sync(&s, SESSION, &e);
     assert_eq!(job(&s).state, JobState::Succeeded);
+    assert_eq!(
+        (job(&s).kind, job(&s).origin),
+        (
+            diary_application::JobKind::IcloudExport,
+            diary_application::JobOrigin::Operation(OP.into())
+        ),
+        "the export kind follows its target"
+    );
     let (status, body) = call(
         &s,
         req("POST", &format!("/api/v1/jobs/{OP}/cancel"), None, true),

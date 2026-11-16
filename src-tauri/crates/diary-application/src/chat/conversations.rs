@@ -9,6 +9,14 @@ pub enum Purpose {
     ParagraphReview,
 }
 impl Purpose {
+    /// The purpose a conversation ID was minted for (see `conversation_id`).
+    pub fn of(conversation_id: &str) -> Self {
+        if conversation_id.starts_with("paragraph-") {
+            Self::ParagraphReview
+        } else {
+            Self::Chat
+        }
+    }
     pub fn conversation_id(self, unique: &str) -> String {
         match self {
             Self::Chat => unique.to_owned(),
@@ -29,11 +37,7 @@ impl Conversations {
         }
     }
     pub fn for_id(&self, id: &str) -> &Mutex<Option<Chat>> {
-        self.slot(if id.starts_with("paragraph-") {
-            Purpose::ParagraphReview
-        } else {
-            Purpose::Chat
-        })
+        self.slot(Purpose::of(id))
     }
     /// Visits held conversations under their slot lock; callbacks must not reenter this registry.
     pub fn each(&self, mut action: impl FnMut(&Chat)) {

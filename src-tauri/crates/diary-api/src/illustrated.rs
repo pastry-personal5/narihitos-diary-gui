@@ -302,7 +302,18 @@ pub async fn create(
         Err(_) => return error(Error::Unavailable),
     };
     let id = Uuid::new_v4().to_string();
-    let job = match c.admit_agent(&session, s.now(), &b.request_id, &digest, &id, 4096) {
+    let job = match c.admit(
+        &session,
+        s.now(),
+        diary_application::Admission::new(
+            &b.request_id,
+            &digest,
+            &id,
+            4096,
+            diary_application::JobKind::Illustrated,
+        )
+        .origin(diary_application::JobOrigin::Date(d)),
+    ) {
         Ok(v) => v,
         Err(e) => return app_error(e),
     };
@@ -420,6 +431,38 @@ pub async fn create(
     response
 }
 
+/// Cancels a running Illustrated job; `None` when no worker state exists (generic path).
+pub(crate) fn cancel(
+    s: &ServerState,
+    c: &mut Coordinator,
+    id: &str,
+    current: &Job,
+) -> Option<Response> {
+    let mut changed = false;
+    let known = {
+        let jobs = s.illustrated_jobs.lock().unwrap();
+        jobs.get(&current.id).is_some_and(|j| {
+            if j.session != id {
+                return false;
+            }
+            if !j.terminal && !current.state.is_terminal() {
+                changed = j.run.request_cancel();
+            }
+            true
+        })
+    };
+    if !known {
+        return None;
+    }
+    if changed && let Ok(j) = c.touch(id, s.now(), &current.id) {
+        imports::publish(s, c, id, &j);
+    }
+    Some(match c.get(id, s.now(), &current.id) {
+        Ok(job) => Json(job_value(s, id, job)).into_response(),
+        Err(e) => app_error(e),
+    })
+}
+
 pub fn valid_photo_query(path: &str, query: &str) -> bool {
     let Some(rest) = path.strip_prefix("/api/v1/illustrated/") else {
         return false;
@@ -448,8 +491,18 @@ mod tests {
     fn running(s: &ServerState) {
         let mut c = s.coordinator.lock().unwrap();
         c.open(SESSION, s.now()).unwrap();
-        c.admit_agent(SESSION, s.now(), "create", &"a".repeat(64), JOB, 4096)
-            .unwrap();
+        c.admit(
+            SESSION,
+            s.now(),
+            diary_application::Admission::new(
+                "create",
+                &"a".repeat(64),
+                JOB,
+                4096,
+                diary_application::JobKind::Illustrated,
+            ),
+        )
+        .unwrap();
         c.transition(SESSION, s.now(), JOB, JobState::Running)
             .unwrap();
         s.illustrated_jobs.lock().unwrap().insert(
@@ -582,8 +635,16 @@ mod tests {
         assert_eq!(r.status(), StatusCode::OK);
         let v: Value =
             serde_json::from_slice(&to_bytes(r.into_body(), 16384).await.unwrap()).unwrap();
-        assert_eq!((v["state"].as_str(), v["sequence"].as_u64()), (Some("succeeded"), Some(done.sequence)));
-        assert!(!s.illustrated_jobs.lock().unwrap()[JOB].run.token().is_cancelled());
+        assert_eq!(
+            (v["state"].as_str(), v["sequence"].as_u64()),
+            (Some("succeeded"), Some(done.sequence))
+        );
+        assert!(
+            !s.illustrated_jobs.lock().unwrap()[JOB]
+                .run
+                .token()
+                .is_cancelled()
+        );
     }
 
     #[tokio::test]

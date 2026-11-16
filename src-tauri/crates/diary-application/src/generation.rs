@@ -380,13 +380,17 @@ impl Store {
         if reservation < frozen.bytes() * 2 + MAX_TEXT_BYTES * 2 {
             return Err(Error::DiscardRequired);
         }
-        let job = coordinator.admit_agent(
+        let job = coordinator.admit(
             a.session,
             a.now,
-            a.request_id,
-            a.digest,
-            a.job_id,
-            reservation,
+            crate::Admission::new(
+                a.request_id,
+                a.digest,
+                a.job_id,
+                reservation,
+                crate::JobKind::Generation,
+            )
+            .origin(crate::JobOrigin::Date(frozen.date())),
         )?;
         let g = Arc::new(Mutex::new(Generation {
             job_id: job.id.clone(),

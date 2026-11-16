@@ -11,10 +11,13 @@ async fn insertion_behind_job_page_cursor_is_discovered_by_first_watermark_repla
             c.admit(
                 SESSION,
                 0,
-                &format!("request-{i}"),
-                &"a".repeat(64),
-                &id,
-                100,
+                diary_application::Admission::new(
+                    &format!("request-{i}"),
+                    &"a".repeat(64),
+                    &id,
+                    100,
+                    diary_application::JobKind::Import,
+                ),
             )
             .unwrap();
             c.cancel(SESSION, 0, &id).unwrap();
@@ -32,8 +35,18 @@ async fn insertion_behind_job_page_cursor_is_discovered_by_first_watermark_repla
     let cursor = first["next_cursor"].as_str().unwrap();
     {
         let mut c = s.coordinator.lock().unwrap();
-        c.admit(SESSION, 0, "late-request", &"a".repeat(64), "job-000a", 100)
-            .unwrap();
+        c.admit(
+            SESSION,
+            0,
+            diary_application::Admission::new(
+                "late-request",
+                &"a".repeat(64),
+                "job-000a",
+                100,
+                diary_application::JobKind::Import,
+            ),
+        )
+        .unwrap();
         c.publish(SESSION, 0, "job-000a", 400).unwrap();
     }
     let response = app

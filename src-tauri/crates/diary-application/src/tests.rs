@@ -16,7 +16,12 @@ fn setup() -> Coordinator {
     c
 }
 fn admit(c: &mut Coordinator) -> Job {
-    c.admit("client", 0, "request", DIGEST, "job", 100).unwrap()
+    c.admit(
+        "client",
+        0,
+        crate::Admission::new("request", DIGEST, "job", 100, crate::JobKind::Import),
+    )
+    .unwrap()
 }
 
 #[test]
@@ -38,15 +43,39 @@ fn retry_recovers_lost_admission_reply_even_at_capacity() {
     let mut c = setup();
     let job = admit(&mut c);
     assert_eq!(
-        c.admit("client", 1, "second", DIGEST, "second-job", 100),
+        c.admit(
+            "client",
+            1,
+            crate::Admission::new("second", DIGEST, "second-job", 100, crate::JobKind::Import)
+        ),
         Err(Error::Limit)
     );
     assert_eq!(
-        c.admit("client", 1, "request", DIGEST, "unused-new-id", usize::MAX),
+        c.admit(
+            "client",
+            1,
+            crate::Admission::new(
+                "request",
+                DIGEST,
+                "unused-new-id",
+                usize::MAX,
+                crate::JobKind::Import
+            )
+        ),
         Ok(job)
     );
     assert_eq!(
-        c.admit("client", 1, "request", &"b".repeat(64), "unused", 0),
+        c.admit(
+            "client",
+            1,
+            crate::Admission::new(
+                "request",
+                &"b".repeat(64),
+                "unused",
+                0,
+                crate::JobKind::Import
+            )
+        ),
         Err(Error::RequestMismatch)
     );
     assert_eq!(c.list("client", 1, None, 200).unwrap().len(), 1);
@@ -65,8 +94,12 @@ fn cancellation_remains_available_under_saturation_and_is_idempotent() {
         Err(Error::InvalidTransition)
     );
     c.heartbeat("client", 5_000).unwrap();
-    c.admit("client", 5_000, "next", DIGEST, "next-job", 0)
-        .unwrap();
+    c.admit(
+        "client",
+        5_000,
+        crate::Admission::new("next", DIGEST, "next-job", 0, crate::JobKind::Import),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -133,19 +166,31 @@ fn terminal_metadata_and_reserved_results_remain_bounded() {
     admit(&mut c);
     c.cancel("client", 0, "job").unwrap();
     assert_eq!(
-        c.admit("client", 0, "next", DIGEST, "next-job", 0),
+        c.admit(
+            "client",
+            0,
+            crate::Admission::new("next", DIGEST, "next-job", 0, crate::JobKind::Import)
+        ),
         Err(Error::Limit)
     );
     assert_eq!(
-        c.admit("client", 0, "request", DIGEST, "ignored", 0)
-            .unwrap()
-            .state,
+        c.admit(
+            "client",
+            0,
+            crate::Admission::new("request", DIGEST, "ignored", 0, crate::JobKind::Import)
+        )
+        .unwrap()
+        .state,
         JobState::Cancelled
     );
     c.close("client", 0).unwrap();
     c.open("client-new", 0).unwrap();
-    c.admit("client-new", 0, "next", DIGEST, "next-job", 0)
-        .unwrap();
+    c.admit(
+        "client-new",
+        0,
+        crate::Admission::new("next", DIGEST, "next-job", 0, crate::JobKind::Import),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -156,15 +201,22 @@ fn optional_admission_preserves_save_reserve_and_control_access() {
         c.admit(
             "client",
             0,
-            &format!("request-{n}"),
-            DIGEST,
-            &format!("job-{n}"),
-            0,
+            crate::Admission::new(
+                &format!("request-{n}"),
+                DIGEST,
+                &format!("job-{n}"),
+                0,
+                crate::JobKind::Import,
+            ),
         )
         .unwrap();
     }
     assert_eq!(
-        c.admit("client", 0, "overflow", DIGEST, "overflow", 0),
+        c.admit(
+            "client",
+            0,
+            crate::Admission::new("overflow", DIGEST, "overflow", 0, crate::JobKind::Import)
+        ),
         Err(Error::Limit)
     );
     c.heartbeat("client", HEARTBEAT_INTERVAL_MS).unwrap();
@@ -192,4 +244,59 @@ fn notification_retry_does_not_fabricate_new_job_sequences_or_events() {
         c.replay("client", 0, "instance", 0),
         Ok(Replay::Events(vec![first, cancelled]))
     );
+}
+
+#[test]
+fn agent_kinds_share_one_run_and_other_kinds_record_kind_and_origin() {
+    for (kind, agent) in [
+        (JobKind::Chat, true),
+        (JobKind::ParagraphReview, true),
+        (JobKind::Generation, true),
+        (JobKind::Illustrated, true),
+        (JobKind::IcloudExport, false),
+        (JobKind::NotionExport, false),
+        (JobKind::Import, false),
+        (JobKind::Harness, false),
+    ] {
+        let mut c = Coordinator::new("instance".into(), Limits::default());
+        c.open("client", 0).unwrap();
+        c.admit(
+            "client",
+            0,
+            Admission::new("r1", DIGEST, "j1", 0, JobKind::Generation),
+        )
+        .unwrap();
+        let origin = JobOrigin::Operation("op".into());
+        let second = c.admit(
+            "client",
+            0,
+            Admission::new("r2", DIGEST, "j2", 0, kind).origin(origin.clone()),
+        );
+        if agent {
+            assert_eq!(second, Err(Error::Busy), "{kind:?}");
+        } else {
+            let job = second.unwrap();
+            assert_eq!((job.kind, job.origin), (kind, origin), "{kind:?}");
+            assert_eq!(c.get("client", 0, "j2").unwrap().kind, kind);
+        }
+    }
+}
+
+#[test]
+fn fail_keeps_its_code_on_the_job() {
+    let mut c = setup();
+    admit(&mut c);
+    c.transition("client", 0, "job", JobState::Running).unwrap();
+    let failed = c.fail("client", 0, "job", "limit").unwrap();
+    assert_eq!(
+        (failed.state, failed.error_code),
+        (JobState::Failed, Some("limit"))
+    );
+    assert_eq!(c.get("client", 0, "job").unwrap().error_code, Some("limit"));
+    assert_eq!(
+        c.fail("client", 0, "job", "other").unwrap().error_code,
+        Some("limit"),
+        "a failed job keeps its first code"
+    );
+    assert_eq!(c.get("client", 0, "job").unwrap().error_code, Some("limit"));
 }

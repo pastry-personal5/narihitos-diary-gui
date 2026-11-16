@@ -4,10 +4,13 @@ pub fn admit(coordinator: &mut Coordinator, session: &str, now: u64) -> Result<(
     let job = coordinator.admit(
         session,
         now,
-        "scaffold-fake-request",
-        &"a".repeat(64),
-        "scaffold-fake-job",
-        0,
+        diary_application::Admission::new(
+            "scaffold-fake-request",
+            &"a".repeat(64),
+            "scaffold-fake-job",
+            0,
+            diary_application::JobKind::Harness,
+        ),
     )?;
     // Reopening the same lease returns the admitted job, including a terminal state.
     if job.state != JobState::Queued {

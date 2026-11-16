@@ -824,11 +824,11 @@ fn main() {
                 return;
             }
             #[cfg(feature = "scaffold-smoke")]
-            if matches!(event, tauri::WindowEvent::Focused(true)) {
-                if let Some(webview) = window.app_handle().get_webview_window("main") {
-                    let _ = tauri::Webview::set_focus(webview.as_ref());
-                    let _ = webview.eval("document.querySelector('.cm-content')?.focus()");
-                }
+            if matches!(event, tauri::WindowEvent::Focused(true))
+                && let Some(webview) = window.app_handle().get_webview_window("main")
+            {
+                let _ = tauri::Webview::set_focus(webview.as_ref());
+                let _ = webview.eval("document.querySelector('.cm-content')?.focus()");
             }
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 #[cfg(feature = "scaffold-smoke")]

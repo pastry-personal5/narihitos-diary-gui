@@ -509,7 +509,9 @@ async fn chat_cancel_returns_bare_job_and_terminal_cancel_is_unchanged() {
     let job = started["job"]["id"].as_str().unwrap();
     let mut done = Value::Null;
     for _ in 0..400 {
-        done = call(&s, "GET", &format!("/api/v1/jobs/{job}"), None).await.1;
+        done = call(&s, "GET", &format!("/api/v1/jobs/{job}"), None)
+            .await
+            .1;
         if done["state"] == "succeeded" {
             break;
         }
@@ -518,6 +520,51 @@ async fn chat_cancel_returns_bare_job_and_terminal_cancel_is_unchanged() {
     assert_eq!(done["state"], "succeeded");
     let (st, v) = call(&s, "POST", &format!("/api/v1/jobs/{job}/cancel"), None).await;
     assert_eq!(st, StatusCode::OK);
-    assert_eq!((&v["state"], &v["sequence"]), (&done["state"], &done["sequence"]));
+    assert_eq!(
+        (&v["state"], &v["sequence"]),
+        (&done["state"], &done["sequence"])
+    );
     assert!(v.get("progress").is_none(), "{v}");
+}
+
+/// M37: chat and paragraph-review turns are admitted with their own kinds and conversation origin.
+#[tokio::test]
+async fn chat_and_paragraph_turns_have_their_own_kinds() {
+    let s = setup(Mode_::Block);
+    let user = open(&s).await;
+    let (_, started) = send(&s, &user, "r1", "hello").await;
+    let job = started["job"]["id"].as_str().unwrap().to_owned();
+    let admitted = s
+        .coordinator
+        .lock()
+        .unwrap()
+        .get(SESSION, s.now(), &job)
+        .unwrap();
+    assert_eq!(
+        (admitted.kind, admitted.origin),
+        (
+            diary_application::JobKind::Chat,
+            diary_application::JobOrigin::Chat(user.clone())
+        )
+    );
+    call(&s, "POST", &format!("/api/v1/jobs/{job}/cancel"), None).await;
+    until(&s, &user, "cancelled").await;
+    let (_, opened) = call(
+        &s,
+        "POST",
+        "/api/v1/chats",
+        Some(json!({"profile":"main","locale":"en-US","purpose":"paragraph_review"})),
+    )
+    .await;
+    let paragraph = opened["chat_id"].as_str().unwrap();
+    let (_, started) = send(&s, paragraph, "r2", "review").await;
+    let job = started["job"]["id"].as_str().unwrap();
+    let admitted = s
+        .coordinator
+        .lock()
+        .unwrap()
+        .get(SESSION, s.now(), job)
+        .unwrap();
+    assert_eq!(admitted.kind, diary_application::JobKind::ParagraphReview);
+    call(&s, "POST", &format!("/api/v1/jobs/{job}/cancel"), None).await;
 }

@@ -40,6 +40,38 @@ fn error(e: generation::Error) -> Response {
         ReviewActive => failure(StatusCode::CONFLICT, "review_active"),
     }
 }
+/// Cancels a generation; `None` when the store no longer holds it (generic path).
+pub(super) fn cancel(
+    s: &ServerState,
+    c: &mut Coordinator,
+    id: &str,
+    current: &Job,
+) -> Option<Response> {
+    let g = s
+        .generations
+        .lock()
+        .expect("generations poisoned")
+        .get(id, &current.id)?;
+    let changed = {
+        let g = g.lock().expect("generation poisoned");
+        if !current.state.is_terminal() && g.cancel() {
+            let mut snap = g.shared.lock().expect("snapshot poisoned");
+            snap.phase = Some(Phase::Stopping);
+            snap.text = String::new();
+            snap.revision += 1;
+            true
+        } else {
+            false
+        }
+    };
+    if changed && let Ok(j) = c.touch(id, s.now(), &current.id) {
+        imports::publish(s, c, id, &j);
+    }
+    Some(match c.get(id, s.now(), &current.id) {
+        Ok(j) => Json(job_value(s, id, j)).into_response(),
+        Err(e) => app_error(e),
+    })
+}
 pub(super) fn progress(s: &ServerState, session: &str, job: &Job) -> Option<Value> {
     let g = s
         .generations

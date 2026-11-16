@@ -147,8 +147,18 @@ fn seeded() -> Arc<ServerState> {
     ));
     let c = inner.coordinator.get_mut().unwrap();
     c.open(SESSION, 0).unwrap();
-    c.admit(SESSION, 0, "request", &"a".repeat(64), "job", 100)
-        .unwrap();
+    c.admit(
+        SESSION,
+        0,
+        diary_application::Admission::new(
+            "request",
+            &"a".repeat(64),
+            "job",
+            100,
+            diary_application::JobKind::Import,
+        ),
+    )
+    .unwrap();
     s
 }
 fn owned_request(method: &str, path: &str) -> HttpRequest<Body> {

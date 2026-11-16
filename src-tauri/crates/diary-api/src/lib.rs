@@ -35,7 +35,7 @@ use axum::{
 use diary_application::diagnostics::{
     Diagnostics, ErrorTag, EventCode, Level, NullDiagnostics, OpaqueId, Record, TraceId,
 };
-use diary_application::{Coordinator, Error, Job, JobState, Limits, Replay};
+use diary_application::{Coordinator, Error, Job, JobKind, JobState, Limits, Replay};
 use guard::*;
 use jobs::*;
 use serde::{Deserialize, Serialize};
@@ -88,7 +88,6 @@ pub struct ServerState {
     review_hasher: Option<Arc<dyn diary_domain::review::Hasher>>,
     lease_ended: Option<Arc<dyn Fn() + Send + Sync>>,
     source_slots: Arc<tokio::sync::Semaphore>,
-    import_errors: Mutex<(String, std::collections::BTreeMap<String, &'static str>)>,
     sse_slots: Arc<tokio::sync::Semaphore>,
     clock: Arc<dyn Fn() -> u64 + Send + Sync>,
     stopping: std::sync::atomic::AtomicBool,
@@ -136,7 +135,6 @@ impl ServerState {
             review_hasher: None,
             lease_ended: None,
             source_slots: Arc::new(tokio::sync::Semaphore::new(2)),
-            import_errors: Mutex::new((String::new(), std::collections::BTreeMap::new())),
             authentic_epoch: std::sync::atomic::AtomicU64::new(0),
             sse_slots: Arc::new(tokio::sync::Semaphore::new(4)),
             clock: Arc::new(|| {

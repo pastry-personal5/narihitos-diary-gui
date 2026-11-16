@@ -23,9 +23,12 @@ impl From<Job> for JobDto {
     }
 }
 pub(crate) fn job_value(s: &ServerState, session: &str, job: Job) -> Value {
-    let progress = generations::progress(s, session, &job)
-        .or_else(|| chats::progress(s, session, &job))
-        .or_else(|| illustrated::progress(s, session, &job.id));
+    let progress = match job.kind {
+        JobKind::Generation => generations::progress(s, session, &job),
+        JobKind::Chat | JobKind::ParagraphReview => chats::progress(s, session, &job),
+        JobKind::Illustrated => illustrated::progress(s, session, &job.id),
+        JobKind::IcloudExport | JobKind::NotionExport | JobKind::Import | JobKind::Harness => None,
+    };
     let mut value = serde_json::to_value(JobDto::from(job)).expect("fixed DTO");
     if let Some(Value::Object(p)) = progress {
         value["progress"] = Value::Object(p.clone());
@@ -77,12 +80,7 @@ pub(crate) async fn get_job(
         .get(id, s.now(), &job)
     {
         Ok(job) => {
-            let errors = s.import_errors.lock().expect("import errors poisoned");
-            let code = if errors.0 == id {
-                errors.1.get(&job.id).copied()
-            } else {
-                None
-            };
+            let code = job.error_code;
             let mut value = job_value(&s, id, job);
             if let Some(code) = code {
                 value["error_code"] = json!(code);
@@ -102,83 +100,52 @@ pub(crate) async fn cancel_job(
         Ok(id) => id,
         Err(e) => return app_error(e),
     };
-    if exports::is_export_job(&s, &job) {
-        return exports::cancel(&s, id, &job).await;
-    }
-    let mut c = s.coordinator.lock().expect("coordinator poisoned");
-    // Validate lease/job ownership before signalling a worker.
-    let current = match c.get(id, s.now(), &job) {
-        Ok(j) => j,
-        Err(e) => return app_error(e),
+    // Export cancellation awaits the export service, so the coordinator guard is released first.
+    let handled = {
+        let mut c = s.coordinator.lock().expect("coordinator poisoned");
+        // Validate lease/job ownership before signalling a worker.
+        match c.get(id, s.now(), &job) {
+            // An export operation the coordinator could not admit is still cancellable.
+            Err(e) if !exports::is_export_job(&s, &job) => return app_error(e),
+            Err(_) => None,
+            Ok(current)
+                if matches!(current.kind, JobKind::IcloudExport | JobKind::NotionExport) =>
+            {
+                None
+            }
+            // Feature arms return `None` when their worker state is gone: generic path.
+            Ok(current) => Some(
+                match current.kind {
+                    JobKind::Illustrated => illustrated::cancel(&s, &mut c, id, &current),
+                    JobKind::Generation => generations::cancel(&s, &mut c, id, &current),
+                    JobKind::Chat | JobKind::ParagraphReview => {
+                        chats::cancel(&s, &mut c, id, &current)
+                    }
+                    JobKind::IcloudExport
+                    | JobKind::NotionExport
+                    | JobKind::Import
+                    | JobKind::Harness => None,
+                }
+                .unwrap_or_else(|| cancel_generic(&s, &mut c, id, &current, &trace)),
+            ),
+        }
     };
-    let mut illustrated_changed = false;
-    let illustrated_job = {
-        let jobs = s.illustrated_jobs.lock().unwrap();
-        jobs.get(&job).is_some_and(|j| {
-            if j.session != id {
-                return false;
-            }
-            if !j.terminal && !current.state.is_terminal() {
-                illustrated_changed = j.run.request_cancel();
-            }
-            true
-        })
-    };
-    if illustrated_job {
-        if illustrated_changed && let Ok(j) = c.touch(id, s.now(), &job) {
-            imports::publish(&s, &mut c, id, &j);
-        }
-        return match c.get(id, s.now(), &job) {
-            Ok(job) => Json(job_value(&s, id, job)).into_response(),
-            Err(e) => app_error(e),
-        };
+    match handled {
+        Some(response) => response,
+        None => exports::cancel(&s, id, &job).await,
     }
-    let was_terminal = c
-        .get(id, s.now(), &job)
-        .is_ok_and(|j| j.state.is_terminal());
-    let generation = s
-        .generations
-        .lock()
-        .expect("generations poisoned")
-        .get(id, &job);
-    if let Some(g) = generation {
-        let changed = {
-            let g = g.lock().expect("generation poisoned");
-            if !was_terminal && g.cancel() {
-                let mut snap = g.shared.lock().expect("snapshot poisoned");
-                snap.phase = Some(diary_application::agent::Phase::Stopping);
-                snap.text = String::new();
-                snap.revision += 1;
-                true
-            } else {
-                false
-            }
-        };
-        if changed && let Ok(j) = c.touch(id, s.now(), &job) {
-            imports::publish(&s, &mut c, id, &j);
-        }
-        return match c.get(id, s.now(), &job) {
-            Ok(j) => Json(job_value(&s, id, j)).into_response(),
-            Err(e) => app_error(e),
-        };
-    }
-    let mut chat_job = false;
-    s.conversations.each(|chat| {
-        chat_job |= chat.turn().is_some_and(|t| t.job_id == job);
-    });
-    if chat_job && !was_terminal {
-        s.conversations.each(|chat| {
-            chat.cancel_job(&job);
-        });
-        if let Ok(j) = c.touch(id, s.now(), &job) {
-            imports::publish(&s, &mut c, id, &j);
-        }
-        return match c.get(id, s.now(), &job) {
-            Ok(j) => Json(JobDto::from(j)).into_response(),
-            Err(e) => app_error(e),
-        };
-    }
-    match c.cancel(id, s.now(), &job) {
+}
+/// Generic cancellation: the coordinator state is the whole job (also the fallback for feature
+/// jobs whose worker state is gone).
+fn cancel_generic(
+    s: &ServerState,
+    c: &mut Coordinator,
+    id: &str,
+    current: &Job,
+    trace: &TraceId,
+) -> Response {
+    let was_terminal = current.state.is_terminal();
+    match c.cancel(id, s.now(), &current.id) {
         Ok(job) => {
             s.conversations.each(|chat| {
                 chat.cancel_job(&job.id);
@@ -188,8 +155,7 @@ pub(crate) async fn cancel_job(
             let bytes = serde_json::to_vec(&json!({"instance_id":s.instance_id,"session_id":id,"event_id":u64::MAX,"job_id":job.id,"job_sequence":job.sequence,"kind":"job_changed","payload":dto})).expect("fixed DTO").len();
             let _ = c.publish(id, s.now(), &job.id, bytes);
             if job.state.is_terminal() && !was_terminal {
-                let mut record =
-                    in_session(traced(EventCode::JobFinished, Level::Info, &trace), id);
+                let mut record = in_session(traced(EventCode::JobFinished, Level::Info, trace), id);
                 // Fixture job IDs are not opaque IDs; real (UUID) job IDs are recorded.
                 record.job = OpaqueId::parse(&job.id);
                 s.log(record);

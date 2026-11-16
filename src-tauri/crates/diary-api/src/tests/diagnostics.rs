@@ -124,8 +124,18 @@ async fn repeated_cancel_emits_job_finished_only_once() {
     inner.clock = Arc::new(|| 0);
     let c = inner.coordinator.get_mut().unwrap();
     c.open(SESSION, 0).unwrap();
-    c.admit(SESSION, 0, "request", &"a".repeat(64), JOB, 100)
-        .unwrap();
+    c.admit(
+        SESSION,
+        0,
+        diary_application::Admission::new(
+            "request",
+            &"a".repeat(64),
+            JOB,
+            100,
+            diary_application::JobKind::Import,
+        ),
+    )
+    .unwrap();
     let (s, rec) = recorded(s);
     let app = router(s);
     for _ in 0..3 {
@@ -151,8 +161,18 @@ async fn cancel_emits_job_finished_with_the_job_id() {
     inner.clock = Arc::new(|| 0);
     let c = inner.coordinator.get_mut().unwrap();
     c.open(SESSION, 0).unwrap();
-    c.admit(SESSION, 0, "request", &"a".repeat(64), JOB, 100)
-        .unwrap();
+    c.admit(
+        SESSION,
+        0,
+        diary_application::Admission::new(
+            "request",
+            &"a".repeat(64),
+            JOB,
+            100,
+            diary_application::JobKind::Import,
+        ),
+    )
+    .unwrap();
     let (s, rec) = recorded(s);
     let response = router(s)
         .oneshot(owned_request("POST", &format!("/api/v1/jobs/{JOB}/cancel")))

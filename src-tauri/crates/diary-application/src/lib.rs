@@ -53,11 +53,47 @@ impl JobState {
     }
 }
 
+/// What a job is. Server-internal: dispatch and the single AI-run slot follow it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JobKind {
+    Chat,
+    ParagraphReview,
+    Generation,
+    Illustrated,
+    IcloudExport,
+    NotionExport,
+    Import,
+    /// Synthetic native-harness job (`scaffold-smoke` builds only).
+    Harness,
+}
+impl JobKind {
+    /// Chat, paragraph review, generation and Illustrated share one agent run per client.
+    pub fn uses_agent_slot(self) -> bool {
+        matches!(
+            self,
+            Self::Chat | Self::ParagraphReview | Self::Generation | Self::Illustrated
+        )
+    }
+}
+
+/// What a job works on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JobOrigin {
+    None,
+    Date(diary_domain::authentic::DiaryDate),
+    Chat(String),
+    Operation(String),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Job {
     pub id: String,
     pub sequence: u64,
     pub state: JobState,
+    pub kind: JobKind,
+    pub origin: JobOrigin,
+    /// Stable failure code set with the `Failed` transition.
+    pub error_code: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,12 +176,37 @@ pub struct Coordinator {
     event_id: u64,
 }
 
-/// The per-request values shared by both admission entry points.
-struct Admission<'a> {
-    request_id: &'a str,
-    digest: &'a str,
-    job_id: &'a str,
-    reserved_bytes: usize,
+/// One admission request. `reserved_bytes` accounts for the maximum result/metadata owned by the run.
+#[derive(Debug, Clone)]
+pub struct Admission<'a> {
+    pub request_id: &'a str,
+    pub digest: &'a str,
+    pub job_id: &'a str,
+    pub reserved_bytes: usize,
+    pub kind: JobKind,
+    pub origin: JobOrigin,
+}
+impl<'a> Admission<'a> {
+    pub fn new(
+        request_id: &'a str,
+        digest: &'a str,
+        job_id: &'a str,
+        reserved_bytes: usize,
+        kind: JobKind,
+    ) -> Self {
+        Self {
+            request_id,
+            digest,
+            job_id,
+            reserved_bytes,
+            kind,
+            origin: JobOrigin::None,
+        }
+    }
+    pub fn origin(mut self, origin: JobOrigin) -> Self {
+        self.origin = origin;
+        self
+    }
 }
 
 impl Coordinator {
@@ -234,67 +295,19 @@ impl Coordinator {
         Ok(())
     }
 
-    /// Application port for admission; it is deliberately not an HTTP endpoint.
-    /// `reserved_bytes` accounts for the maximum result/metadata owned by the run.
-    pub fn admit(
-        &mut self,
-        id: &str,
-        now: u64,
-        request_id: &str,
-        digest: &str,
-        job_id: &str,
-        reserved_bytes: usize,
-    ) -> Result<Job, Error> {
-        self.admit_inner(
-            id,
-            now,
-            Admission {
-                request_id,
-                digest,
-                job_id,
-                reserved_bytes,
-            },
-            false,
-        )
-    }
-
-    /// Admits an agent run: after the idempotent lookup, a second active agent job is `Busy`
-    /// whatever its request ID, so a retry with a new ID cannot bypass the gate.
-    pub fn admit_agent(
-        &mut self,
-        id: &str,
-        now: u64,
-        request_id: &str,
-        digest: &str,
-        job_id: &str,
-        reserved_bytes: usize,
-    ) -> Result<Job, Error> {
-        self.admit_inner(
-            id,
-            now,
-            Admission {
-                request_id,
-                digest,
-                job_id,
-                reserved_bytes,
-            },
-            true,
-        )
-    }
-
-    fn admit_inner(
-        &mut self,
-        id: &str,
-        now: u64,
-        admission: Admission<'_>,
-        agent: bool,
-    ) -> Result<Job, Error> {
+    /// Application port for admission; it is deliberately not an HTTP endpoint. For an agent
+    /// kind, after the idempotent lookup a second active agent job is `Busy` whatever its
+    /// request ID, so a retry with a new ID cannot bypass the gate.
+    pub fn admit(&mut self, id: &str, now: u64, admission: Admission<'_>) -> Result<Job, Error> {
         let Admission {
             request_id,
             digest,
             job_id,
             reserved_bytes,
+            kind,
+            origin,
         } = admission;
+        let agent = kind.uses_agent_slot();
         validate_id(request_id)?;
         validate_id(job_id)?;
         if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -352,6 +365,9 @@ impl Coordinator {
             id: job_id.into(),
             sequence: 1,
             state: JobState::Queued,
+            kind,
+            origin,
+            error_code: None,
         };
         session.retained_bytes = total;
         session.result_bytes.insert(job_id.into(), reserved_bytes);
@@ -477,6 +493,32 @@ impl Coordinator {
         job.sequence = job.sequence.checked_add(1).ok_or(Error::Limit)?;
         job.state = state;
         Ok(job.clone())
+    }
+
+    /// Fails a job with a stable code, kept on the job for `get`. Like `transition`, failing an
+    /// already failed job is idempotent and keeps its first code.
+    pub fn fail(
+        &mut self,
+        id: &str,
+        now: u64,
+        job_id: &str,
+        code: &'static str,
+    ) -> Result<Job, Error> {
+        let before = self.get(id, now, job_id)?;
+        if before.state == JobState::Failed {
+            return Ok(before);
+        }
+        let job = self.transition(id, now, job_id, JobState::Failed)?;
+        let stored = self
+            .authorized(id, now)?
+            .jobs
+            .get_mut(job_id)
+            .ok_or(Error::NotFound)?;
+        stored.error_code = Some(code);
+        Ok(Job {
+            error_code: Some(code),
+            ..job
+        })
     }
 
     /// Records observable progress (stage or provisional text) so a new event can be published.

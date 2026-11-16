@@ -93,14 +93,6 @@ pub(super) fn error(e: ImportError) -> Response {
         code(e),
     )
 }
-fn remember_error(s: &ServerState, session: &str, job: &str, code: &'static str) {
-    let mut errors = s.import_errors.lock().expect("import errors poisoned");
-    if errors.0 != session {
-        *errors = (session.to_owned(), Default::default());
-    }
-    // Per-job coordinator admission accounts for this bounded metadata.
-    errors.1.insert(job.to_owned(), code);
-}
 pub(super) fn body<T>(b: Result<Json<T>, JsonRejection>) -> Result<T, Response> {
     b.map(|Json(v)| v).map_err(|e| {
         failure(
@@ -162,10 +154,14 @@ pub(super) async fn create(
     let job = match c.admit(
         &session,
         s.now(),
-        &b.request_id,
-        &key,
-        &Uuid::new_v4().to_string(),
-        4096,
+        diary_application::Admission::new(
+            &b.request_id,
+            &key,
+            &Uuid::new_v4().to_string(),
+            4096,
+            diary_application::JobKind::Import,
+        )
+        .origin(diary_application::JobOrigin::Date(date)),
     ) {
         Ok(j) => j,
         Err(e) => return app_error(e),
@@ -177,8 +173,7 @@ pub(super) async fn create(
     let permit = match s.source_slots.clone().try_acquire_owned() {
         Ok(p) => p,
         Err(_) => {
-            remember_error(&s, &session, &job.id, "limit");
-            if let Ok(failed) = c.transition(&session, s.now(), &job.id, JobState::Failed) {
+            if let Ok(failed) = c.fail(&session, s.now(), &job.id, "limit") {
                 publish(&s, &mut c, &session, &failed);
             }
             return failure(StatusCode::TOO_MANY_REQUESTS, "limit");
@@ -204,15 +199,15 @@ pub(super) async fn create(
         if c.get(&session, s.now(), &job.id).is_err() {
             return;
         }
-        let terminal = match result {
-            Ok(_) => JobState::Succeeded,
-            Err(ImportError::Cancelled) => JobState::Cancelled,
-            Err(e) => {
-                remember_error(&s, &session, &job.id, code(e));
-                JobState::Failed
+        // Per-job coordinator admission accounts for the bounded failure code.
+        let finished = match result {
+            Ok(_) => c.transition(&session, s.now(), &job.id, JobState::Succeeded),
+            Err(ImportError::Cancelled) => {
+                c.transition(&session, s.now(), &job.id, JobState::Cancelled)
             }
+            Err(e) => c.fail(&session, s.now(), &job.id, code(e)),
         };
-        if let Ok(job) = c.transition(&session, s.now(), &job.id, terminal) {
+        if let Ok(job) = finished {
             publish(&s, &mut c, &session, &job);
         }
     });

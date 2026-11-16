@@ -149,37 +149,82 @@ fn coordinator() -> Coordinator {
 #[test]
 fn second_run_is_busy() {
     let mut c = coordinator();
-    c.admit_agent("client", 0, "r1", DIGEST, "j1", 10).unwrap();
+    c.admit(
+        "client",
+        0,
+        crate::Admission::new("r1", DIGEST, "j1", 10, crate::JobKind::Chat),
+    )
+    .unwrap();
     assert_eq!(
-        c.admit_agent("client", 0, "r2", OTHER, "j2", 10),
+        c.admit(
+            "client",
+            0,
+            crate::Admission::new("r2", OTHER, "j2", 10, crate::JobKind::Chat)
+        ),
         Err(Error::Busy)
     );
     // An import-style job is not an agent run and is not blocked.
-    c.admit("client", 0, "r3", OTHER, "j3", 10).unwrap();
+    c.admit(
+        "client",
+        0,
+        crate::Admission::new("r3", OTHER, "j3", 10, crate::JobKind::Import),
+    )
+    .unwrap();
     c.transition("client", 0, "j1", JobState::Running).unwrap();
     assert_eq!(
-        c.admit_agent("client", 0, "r4", OTHER, "j4", 10),
+        c.admit(
+            "client",
+            0,
+            crate::Admission::new("r4", OTHER, "j4", 10, crate::JobKind::Chat)
+        ),
         Err(Error::Busy)
     );
     c.transition("client", 0, "j1", JobState::Succeeded)
         .unwrap();
-    c.admit_agent("client", 0, "r5", OTHER, "j5", 10).unwrap();
+    c.admit(
+        "client",
+        0,
+        crate::Admission::new("r5", OTHER, "j5", 10, crate::JobKind::Chat),
+    )
+    .unwrap();
 }
 
 #[test]
 fn retry_returns_same_job() {
     let mut c = coordinator();
-    let a = c.admit_agent("client", 0, "r1", DIGEST, "j1", 10).unwrap();
+    let a = c
+        .admit(
+            "client",
+            0,
+            crate::Admission::new("r1", DIGEST, "j1", 10, crate::JobKind::Chat),
+        )
+        .unwrap();
     // The busy check never hides a lost reply.
-    assert_eq!(c.admit_agent("client", 0, "r1", DIGEST, "j9", 10), Ok(a));
+    assert_eq!(
+        c.admit(
+            "client",
+            0,
+            crate::Admission::new("r1", DIGEST, "j9", 10, crate::JobKind::Chat)
+        ),
+        Ok(a)
+    );
 }
 
 #[test]
 fn changed_payload_is_mismatch() {
     let mut c = coordinator();
-    c.admit_agent("client", 0, "r1", DIGEST, "j1", 10).unwrap();
+    c.admit(
+        "client",
+        0,
+        crate::Admission::new("r1", DIGEST, "j1", 10, crate::JobKind::Chat),
+    )
+    .unwrap();
     assert_eq!(
-        c.admit_agent("client", 0, "r1", OTHER, "j2", 10),
+        c.admit(
+            "client",
+            0,
+            crate::Admission::new("r1", OTHER, "j2", 10, crate::JobKind::Chat)
+        ),
         Err(Error::RequestMismatch)
     );
 }
@@ -187,7 +232,12 @@ fn changed_payload_is_mismatch() {
 #[test]
 fn touch_bumps_sequence_until_terminal() {
     let mut c = coordinator();
-    c.admit_agent("client", 0, "r1", DIGEST, "j1", 10).unwrap();
+    c.admit(
+        "client",
+        0,
+        crate::Admission::new("r1", DIGEST, "j1", 10, crate::JobKind::Chat),
+    )
+    .unwrap();
     assert_eq!(c.touch("client", 0, "j1").unwrap().sequence, 2);
     c.cancel("client", 0, "j1").unwrap();
     assert_eq!(c.touch("client", 0, "j1"), Err(Error::InvalidTransition));

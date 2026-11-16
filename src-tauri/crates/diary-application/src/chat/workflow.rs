@@ -143,13 +143,22 @@ impl PreparedTurn {
         job_id: &str,
     ) -> Result<Job, Error> {
         coordinator
-            .admit_agent(
+            .admit(
                 session,
                 now,
-                &self.input.request_id,
-                &self.digest,
-                job_id,
-                self.reserved,
+                crate::Admission::new(
+                    &self.input.request_id,
+                    &self.digest,
+                    job_id,
+                    self.reserved,
+                    match super::conversations::Purpose::of(&self.input.chat_id) {
+                        super::conversations::Purpose::Chat => crate::JobKind::Chat,
+                        super::conversations::Purpose::ParagraphReview => {
+                            crate::JobKind::ParagraphReview
+                        }
+                    },
+                )
+                .origin(crate::JobOrigin::Chat(self.input.chat_id.clone())),
             )
             .map_err(Error::Coordination)
     }
@@ -332,13 +341,16 @@ mod tests {
             "job"
         );
         assert_eq!(
-            c.admit_agent(
+            c.admit(
                 "session",
                 0,
-                "other-request",
-                &"b".repeat(64),
-                "other-job",
-                0
+                crate::Admission::new(
+                    "other-request",
+                    &"b".repeat(64),
+                    "other-job",
+                    0,
+                    crate::JobKind::Chat
+                )
             ),
             Err(crate::Error::Busy)
         );

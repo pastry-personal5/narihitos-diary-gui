@@ -229,7 +229,11 @@ fn busy_between_candidates_and_cancel_between_candidates() {
         let snap = g.shared.lock().unwrap();
         if snap.phase == Some(Phase::BetweenCandidates) {
             assert_eq!(
-                c.admit_agent("s", 0, "other", DIGEST, "other", 0),
+                c.admit(
+                    "s",
+                    0,
+                    crate::Admission::new("other", DIGEST, "other", 0, crate::JobKind::Chat)
+                ),
                 Err(crate::Error::Busy)
             );
             assert!(snap.text.is_empty());
@@ -645,7 +649,17 @@ fn shared_transient_cap_charges_generation_and_preserves_metadata() {
     store.discard(&mut c, "s", 0, "j").unwrap();
     // Admission metadata stays charged even after content is discarded.
     assert_eq!(
-        c.admit("s", 0, "x", DIGEST, "x", crate::MAX_TRANSIENT_BYTES),
+        c.admit(
+            "s",
+            0,
+            crate::Admission::new(
+                "x",
+                DIGEST,
+                "x",
+                crate::MAX_TRANSIENT_BYTES,
+                crate::JobKind::Import
+            )
+        ),
         Err(crate::Error::Limit)
     );
 }

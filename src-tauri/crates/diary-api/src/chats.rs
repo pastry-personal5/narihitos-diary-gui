@@ -12,6 +12,7 @@ use axum::{
 use diary_application::JobState;
 use diary_application::agent::{AgentErrorCode, ChatDocument, DocumentKind, Locale, Phase, Role};
 use diary_application::chat::{Outcome, workflow};
+use diary_application::{Coordinator, Job};
 use diary_domain::authentic::DiaryDate;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -370,6 +371,32 @@ pub(super) async fn close(
 mod tests;
 
 /// Discovery never includes transcript, document, prompt or provisional output.
+/// Cancels the active turn that owns this job; `None` otherwise (generic path, as for a
+/// finished turn).
+pub(super) fn cancel(
+    s: &ServerState,
+    c: &mut Coordinator,
+    id: &str,
+    current: &Job,
+) -> Option<Response> {
+    let mut owned = false;
+    s.conversations.each(|chat| {
+        owned |= chat.turn().is_some_and(|t| t.job_id == current.id);
+    });
+    if !owned || current.state.is_terminal() {
+        return None;
+    }
+    s.conversations.each(|chat| {
+        chat.cancel_job(&current.id);
+    });
+    if let Ok(j) = c.touch(id, s.now(), &current.id) {
+        imports::publish(s, c, id, &j);
+    }
+    Some(match c.get(id, s.now(), &current.id) {
+        Ok(j) => Json(JobDto::from(j)).into_response(),
+        Err(e) => app_error(e),
+    })
+}
 pub(super) fn progress(
     s: &ServerState,
     session: &str,

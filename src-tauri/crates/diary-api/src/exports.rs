@@ -201,7 +201,25 @@ pub(super) fn sync(s: &ServerState, session: &str, r: &ExportResult) {
     let now = s.now();
     let current = match c.get(session, now, id) {
         Ok(job) => job,
-        Err(Error::NotFound) => match c.admit(session, now, id, &r.input_hash, id, 4096) {
+        Err(Error::NotFound) => match c.admit(
+            session,
+            now,
+            diary_application::Admission::new(
+                id,
+                &r.input_hash,
+                id,
+                4096,
+                match r.target {
+                    diary_application::export::Target::Icloud => {
+                        diary_application::JobKind::IcloudExport
+                    }
+                    diary_application::export::Target::Notion => {
+                        diary_application::JobKind::NotionExport
+                    }
+                },
+            )
+            .origin(diary_application::JobOrigin::Operation(id.to_owned())),
+        ) {
             Ok(job) => job,
             Err(_) => return,
         },
