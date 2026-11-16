@@ -7,11 +7,8 @@ src-tauri/gen/
 .DS_Store
 
 tmp/
-tmp/initial-owner-ideas.md
 
-config/
-config/global_config.yaml
-config/.global_config.yaml.swp
+config/*
 !config/global_config_example.yaml
 
 
