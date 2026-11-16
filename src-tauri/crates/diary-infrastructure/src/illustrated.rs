@@ -26,6 +26,12 @@ pub struct Store {
 fn io<T>(r: std::io::Result<T>) -> Result<T, Error> {
     r.map_err(|_| Error::Storage)
 }
+/// Finder writes `.DS_Store` (and `._*` on non-APFS volumes) into folders the user opens.
+fn hidden(item: &std::fs::DirEntry) -> bool {
+    let name = item.file_name();
+    let name = name.as_encoded_bytes();
+    name == b".DS_Store" || name.starts_with(b"._")
+}
 impl Store {
     /// Caller must retain the workspace OS lock for this store's lifetime.
     pub fn open(root: PathBuf) -> Result<Self, Error> {
@@ -62,6 +68,9 @@ impl Store {
     fn recover(&self) -> Result<(), Error> {
         for item in io(std::fs::read_dir(self.pending()))? {
             let item = io(item)?;
+            if hidden(&item) {
+                continue;
+            }
             let id = item.file_name().to_string_lossy().into_owned();
             if !valid_uuid(&id) || !io(item.file_type())?.is_dir() {
                 return Err(Error::Storage);
@@ -120,6 +129,9 @@ impl Store {
             let mut count = 0;
             for item in io(std::fs::read_dir(&p))? {
                 let item = io(item)?;
+                if hidden(&item) {
+                    continue;
+                }
                 if !io(item.file_type())?.is_file() {
                     return Err(Error::Storage);
                 }
@@ -208,11 +220,17 @@ impl Port for Store {
         let root = self.root.join("assets/diary/illustrated");
         for y in io(std::fs::read_dir(root))? {
             let y = io(y)?;
+            if hidden(&y) {
+                continue;
+            }
             if !io(y.file_type())?.is_dir() {
                 return Err(Error::Storage);
             }
             for m in io(std::fs::read_dir(y.path()))? {
                 let m = io(m)?;
+                if hidden(&m) {
+                    continue;
+                }
                 if !io(m.file_type())?.is_dir() {
                     return Err(Error::Storage);
                 }
@@ -433,6 +451,39 @@ mod tests {
             assert_eq!(s.photo(e.date, NEW, 1).unwrap(), b"new");
             assert_eq!(std::fs::read_dir(s.pending()).unwrap().count(), 0);
         }
+    }
+    #[test]
+    fn finder_metadata_does_not_block_list_replace_delete_or_recovery() {
+        let t = tempfile::tempdir().unwrap();
+        let s = Store::open(t.path().into()).unwrap();
+        let e = entry(OLD);
+        let image = t.path().join("input.png");
+        std::fs::write(&image, b"old").unwrap();
+        s.publish(&e, std::slice::from_ref(&image), &CancelToken::default())
+            .unwrap();
+        let parent = s.parent(e.date).unwrap();
+        for dir in [
+            t.path().join("assets/diary/illustrated"),
+            parent.parent().unwrap().to_path_buf(),
+            parent.join(e.date.to_string()),
+            s.pending(),
+        ] {
+            fs::create_new(&dir.join(".DS_Store"), b"finder").unwrap();
+        }
+        fs::create_new(&parent.join(format!("{}/._01.png", e.date)), b"appledouble").unwrap();
+        drop(s);
+        let s = Store::open(t.path().into()).unwrap();
+        assert_eq!(s.list().unwrap(), vec![e.date]);
+        s.publish(
+            &entry(NEW),
+            std::slice::from_ref(&image),
+            &CancelToken::default(),
+        )
+        .unwrap();
+        fs::create_new(&parent.join(format!("{}/.DS_Store", e.date)), b"finder").unwrap();
+        s.delete(e.date, NEW, true).unwrap();
+        assert!(s.read(e.date).unwrap().is_none());
+        assert_eq!(s.list().unwrap(), vec![]);
     }
     #[test]
     fn refuses_photo_directory_symlink_and_cleans_only_owned_staging() {
