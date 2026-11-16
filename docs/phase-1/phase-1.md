@@ -258,6 +258,25 @@ Goal: Upload the selected date's Illustrated diary text and resized JPEG photos 
 Plan: [overview/checklist](../archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-overview.md), [work plan](../archive/milestones/p1-m36/milestone-36-illustrated-notion-upload-architecture.md).
 Notes: Completed 2026-11-13 with hosted-byte drift protection, fake/server/native/live proof, full gate and refreshed ordinary release artifacts. Evidence is in the work plan; M32 remains Active.
 
+### P1-M37: Job registry refactoring
+
+Status: Planned
+Goal: Give every job a kind and origin inside the server, dispatch progress/cancel by kind and split four near-limit files, with no contract or behavior change.
+Plan: [overview/checklist](milestone-37-job-registry-overview.md), [work plan](milestone-37-job-registry-architecture.md).
+Notes: Order M37, M39, M38, all before M32 closes (owner, 2026-11-16).
+
+### P1-M39: Job contract additions
+
+Status: Planned
+Goal: Add job kind, origin and export progress to the job contract and let the client use them; runs before P1-M38.
+Plan: [overview/checklist](milestone-39-job-additions-overview.md), [work plan](milestone-39-job-additions-architecture.md).
+
+### P1-M38: Job lanes and Illustrated photo candidates
+
+Status: Planned
+Goal: Queue jobs in separate agent/image/export lanes instead of refusing them, and render several Illustrated photo candidates per slot for the user to pick, re-roll and publish later.
+Plan: [overview/checklist](milestone-38-job-lanes-overview.md), [work plan](milestone-38-job-lanes-architecture.md).
+
 ### P1-M32: Personal release qualification
 
 Status: Active
