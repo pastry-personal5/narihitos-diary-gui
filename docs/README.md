@@ -20,7 +20,7 @@ Status: Active
 - [P1-M32 caret paragraph review](phase-1/milestone-32-paragraph-review-overview.md) ([work plan](phase-1/milestone-32-paragraph-review-architecture.md)): focused Draft paragraph AI suggestion, guarded Accept/Reject and isolated chat lifecycle.
 
 - [P1-M32 Draft candidate table](phase-1/milestone-32-draft-candidate-table-overview.md) ([work plan](phase-1/milestone-32-draft-candidate-table-architecture.md)): four-column table matching the Snippet tab, with Style label, bitmap Info/Style description and bitmap Open in Tabbed Editor actions; implemented with the full gate passing; narrow-Explorer visual evidence pending.
-- [P1-M37 job registry refactoring](phase-1/milestone-37-job-registry-overview.md) ([work plan](phase-1/milestone-37-job-registry-architecture.md)): Planned: job kind/origin inside the server, one dispatch and four file splits; no contract change.
+- [P1-M37 job registry refactoring](phase-1/milestone-37-job-registry-overview.md) ([work plan](phase-1/milestone-37-job-registry-architecture.md)): Done: job kind/origin inside the server, one dispatch and four file splits; no contract change.
 - [P1-M39 job contract additions](phase-1/milestone-39-job-additions-overview.md) ([work plan](phase-1/milestone-39-job-additions-architecture.md)): Planned: job kind, origin and export progress in the contract and client; before M38.
 - [P1-M38 job lanes and Illustrated photo candidates](phase-1/milestone-38-job-lanes-overview.md) ([work plan](phase-1/milestone-38-job-lanes-architecture.md)): Planned: agent/image/export queues and per-slot photo candidates with pick and re-roll.
 - [Phase 2 ideas](phase-2-ideas.md): initial non-binding ideas for Diary v2.0.0; scheduling and milestones are deferred.

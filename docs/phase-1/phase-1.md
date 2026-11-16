@@ -260,10 +260,10 @@ Notes: Completed 2026-11-13 with hosted-byte drift protection, fake/server/nativ
 
 ### P1-M37: Job registry refactoring
 
-Status: Planned
+Status: Done
 Goal: Give every job a kind and origin inside the server, dispatch progress/cancel by kind and split four near-limit files, with no contract or behavior change.
 Plan: [overview/checklist](milestone-37-job-registry-overview.md), [work plan](milestone-37-job-registry-architecture.md).
-Notes: Order M37, M39, M38, all before M32 closes (owner, 2026-11-16).
+Notes: Completed 2026-11-16 with characterization tests, test-name parity, synthetic smokes, `scaffold-smoke` lint/tests and the full gate. Order M37, M39, M38, all before M32 closes (owner, 2026-11-16).
 
 ### P1-M39: Job contract additions
 

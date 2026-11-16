@@ -1,6 +1,6 @@
 # P1-M37: Job registry refactoring work plan
 
-Status: Planned
+Status: Done (2026-11-16)
 
 Approach, module boundaries and sequencing for the [P1-M37 overview](milestone-37-job-registry-overview.md). Pure refactoring: every step compiles and passes its crate tests before the next starts, and no HTTP, SSE, bridge or UI output changes.
 
@@ -94,3 +94,16 @@ Target: no resulting file over 600 lines; public paths unchanged via re-exports;
 - An export job observed before `exports::sync` admits it has no kind. Mitigation: kind is set at that same admission, so no job exists without one; a test asserts every admission path sets kind.
 - Wrong chat kind for paragraph review. Mitigation: kind comes from the same `paragraph-` conversation-ID rule `Conversations::for_id` uses; a test admits one of each purpose.
 - Large moves hide accidental logic edits. Mitigation: move-only commits, as in M28.
+
+## Implementation record (2026-11-16)
+
+Departures from the plan above, each kept behavior-neutral:
+
+- **`is_export_job` stays as a fallback.** `cancel_job` dispatches on kind, but an export whose coordinator admission failed (for example at the session job limit) exists only in `export_jobs`; today it is still cancellable through `POST /jobs/{id}/cancel`. The lookup is kept for that case only.
+- **One loader module.** `resources.ts` needed the Authentic load moved as well to get under 600 lines, so Authentic, Illustrated and source loads (plus import reconcile) went into one `navigation/resource-loading.ts` (`ResourceLoading`) instead of two files. `resources.ts` 861 → 555 lines; `resource-loading.ts` 388.
+- **Window commands stay in `main.rs`.** `watch_close`/`finish_close` share the close gate with `main()`, so `main.rs` keeps them; 57 wrappers moved into `commands/{session,ai,sources,illustrated,authentic,events}.rs` (69–154 lines each). `main.rs` 858 → 196 lines. `tests/architecture.test.js` now reads the command files and the last path segment of each handler entry; it checks the same permission set.
+- **`bridge.rs`** 803 → 464 lines; `bridge/types.rs` 158, `bridge/stream.rs` 191. `job_error` became `pub(super)` for `bridge/progress.rs`.
+- **`generation/tests/`**: `mod.rs` holds fixtures and the shared source/Authentic fakes (315 lines), `run.rs` 228, `capture.rs` 133, `workflow.rs` 292.
+- **Failure code.** `Coordinator::fail` records the code with the `Failed` transition and is idempotent, keeping the first code. Before, an import error code was stored even when a cancel had already won the race, so a cancelled job could show an `error_code`; it no longer does.
+- **`Purpose::of`** names the existing `paragraph-` conversation-ID rule so admission and `Conversations::for_id` share it.
+- **Pre-existing lint.** The `scaffold-smoke`-only focus handler in `main.rs` had a collapsible `if` that clippy rejects; the gate never built that feature. Collapsed.
