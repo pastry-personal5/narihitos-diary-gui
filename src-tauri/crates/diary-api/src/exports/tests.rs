@@ -327,6 +327,22 @@ async fn state_changes_publish_one_job_change_each_and_exports_cannot_be_cancell
     assert_eq!(status, StatusCode::OK, "{body}");
 }
 
+// A session that does not hold the lease cannot cancel an export or take over its events.
+#[tokio::test]
+async fn export_cancel_requires_the_live_lease() {
+    let (s, stub) = setup(None, false);
+    call(&s, req("POST", "/api/v1/exports", Some(start_body()), true)).await;
+    let mut r = request("POST", &format!("/api/v1/jobs/{OP}/cancel"));
+    r.headers_mut().insert(
+        "x-diary-session",
+        "00000000-0000-4000-8000-0000000000ff".parse().unwrap(),
+    );
+    let (status, body) = call(&s, r).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "{body}");
+    assert_ne!(stub.now.lock().unwrap().1, ExportState::Cancelled);
+    assert_eq!(s.export_jobs.lock().unwrap()[OP].0, SESSION);
+}
+
 #[tokio::test]
 async fn typed_lookup_and_unfinished_listing() {
     let (s, _) = setup(None, false);

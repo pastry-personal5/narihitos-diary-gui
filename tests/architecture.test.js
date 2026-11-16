@@ -145,9 +145,9 @@ describe("explicit command permission boundary", () => {
   // Command wrappers live in src-tauri/src/commands/; main.rs keeps window commands and the handler.
   const commands = [
     main,
-    ...readdirSync("src-tauri/src/commands").map((f) =>
-      readFileSync(`src-tauri/src/commands/${f}`, "utf8"),
-    ),
+    ...readdirSync("src-tauri/src/commands")
+      .filter((f) => f.endsWith(".rs") && !f.startsWith("._"))
+      .map((f) => readFileSync(`src-tauri/src/commands/${f}`, "utf8")),
   ].join("\n");
   const build = readFileSync("src-tauri/build.rs", "utf8");
   const config = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));

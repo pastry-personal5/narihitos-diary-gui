@@ -25,9 +25,14 @@ impl From<Job> for JobDto {
 pub(crate) fn job_value(s: &ServerState, session: &str, job: Job) -> Value {
     let progress = match job.kind {
         JobKind::Generation => generations::progress(s, session, &job),
-        JobKind::Chat | JobKind::ParagraphReview => chats::progress(s, session, &job),
+        JobKind::Chat => chats::progress(s, session, &job),
         JobKind::Illustrated => illustrated::progress(s, session, &job.id),
-        JobKind::IcloudExport | JobKind::NotionExport | JobKind::Import | JobKind::Harness => None,
+        // Paragraph review exposes its state through its own polling adapter.
+        JobKind::ParagraphReview
+        | JobKind::IcloudExport
+        | JobKind::NotionExport
+        | JobKind::Import
+        | JobKind::Harness => None,
     };
     let mut value = serde_json::to_value(JobDto::from(job)).expect("fixed DTO");
     if let Some(Value::Object(p)) = progress {
@@ -105,9 +110,10 @@ pub(crate) async fn cancel_job(
         let mut c = s.coordinator.lock().expect("coordinator poisoned");
         // Validate lease/job ownership before signalling a worker.
         match c.get(id, s.now(), &job) {
-            // An export operation the coordinator could not admit is still cancellable.
-            Err(e) if !exports::is_export_job(&s, &job) => return app_error(e),
-            Err(_) => None,
+            // An export the coordinator could not admit is still cancellable, but only by a
+            // live lease: `exports::sync` rebinds the export's events to the caller's session.
+            Err(Error::NotFound) if exports::is_export_job(&s, &job) => None,
+            Err(e) => return app_error(e),
             Ok(current)
                 if matches!(current.kind, JobKind::IcloudExport | JobKind::NotionExport) =>
             {

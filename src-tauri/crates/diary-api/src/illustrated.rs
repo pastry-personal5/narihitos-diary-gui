@@ -611,7 +611,7 @@ mod tests {
         assert!(s.coordinator.lock().unwrap().event_cursor() > cursor);
     }
 
-    /// M37 characterization: a finished Illustrated job is returned unchanged and not signalled.
+    /// Characterization: a finished Illustrated job is returned unchanged and not signalled.
     #[tokio::test]
     async fn terminal_cancel_returns_current_without_signal() {
         let s = state();

@@ -490,7 +490,7 @@ async fn chat_retains_current_turn_definition_and_resolves_again_for_next_turn()
     assert!(second.get("prompt").is_none());
 }
 
-/// M37 characterization: chat cancel answers with the bare job (no progress); a terminal chat
+/// Characterization: chat cancel answers with the bare job (no progress); a terminal chat
 /// job falls through to the generic path and is returned unchanged.
 #[tokio::test]
 async fn chat_cancel_returns_bare_job_and_terminal_cancel_is_unchanged() {
@@ -527,7 +527,7 @@ async fn chat_cancel_returns_bare_job_and_terminal_cancel_is_unchanged() {
     assert!(v.get("progress").is_none(), "{v}");
 }
 
-/// M37: chat and paragraph-review turns are admitted with their own kinds and conversation origin.
+/// Chat and paragraph-review turns are admitted with their own kinds and conversation origin.
 #[tokio::test]
 async fn chat_and_paragraph_turns_have_their_own_kinds() {
     let s = setup(Mode_::Block);

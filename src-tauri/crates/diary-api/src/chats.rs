@@ -370,7 +370,6 @@ pub(super) async fn close(
 #[cfg(test)]
 mod tests;
 
-/// Discovery never includes transcript, document, prompt or provisional output.
 /// Cancels the active turn that owns this job; `None` otherwise (generic path, as for a
 /// finished turn).
 pub(super) fn cancel(
@@ -397,6 +396,7 @@ pub(super) fn cancel(
         Err(e) => app_error(e),
     })
 }
+/// Discovery never includes transcript, document, prompt or provisional output.
 pub(super) fn progress(
     s: &ServerState,
     session: &str,
