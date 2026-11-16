@@ -65,11 +65,21 @@ tag_enum!(EventCode {
     BridgeDiscoveryRead => "bridge.discovery_read",
     BridgeStatusProbe => "bridge.status_probe",
     BridgeConnected => "bridge.connected",
+    IllustratedAdmitted => "illustrated.admitted",
+    IllustratedTextReady => "illustrated.text_ready",
+    IllustratedPhoto => "illustrated.photo",
+    IllustratedFinished => "illustrated.finished",
     ExportRoute => "export.route",
     ExportAdapterCall => "export.adapter",
     NotionHttp => "notion.http",
 });
 tag_enum!(ErrorTag {
+    AgentFailed => "agent_failed",
+    RenderFailed => "render_failed",
+    StorageFailed => "storage_failed",
+    NoAuthentic => "no_authentic",
+    EngineUnavailable => "engine_unavailable",
+    SourceBusy => "source_busy",
     StaleRevision => "stale_revision",
     ExternalChange => "external_change",
     Invalid => "invalid",
@@ -197,6 +207,46 @@ impl From<ProfileStatus> for StatusTag {
     }
 }
 
+tag_enum!(ValidationRule {
+    ResultTooLarge => "result_too_large",
+    JsonSyntax => "json_syntax",
+    JsonSchema => "json_schema",
+    ThemeCount => "theme_count",
+    GroupCount => "group_count",
+    ThemeLabel => "theme_label",
+    GroupThemesEmpty => "group_themes_empty",
+    TextEmpty => "text_empty",
+    TextControl => "text_control",
+    TextImage => "text_image",
+    TextHtml => "text_html",
+    AltEmpty => "alt_empty",
+    AltTooLarge => "alt_too_large",
+    AltCharacters => "alt_characters",
+    PromptEmpty => "prompt_empty",
+    PromptTooLarge => "prompt_too_large",
+    PromptControl => "prompt_control",
+    ThemeIndex => "theme_index",
+    ThemeDuplicate => "theme_duplicate",
+    ThemeMissing => "theme_missing",
+    TextTooLarge => "text_too_large",
+});
+
+/// Correlation metadata is never included in provider input.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DiagnosticContext {
+    pub trace: Option<TraceId>,
+    pub session: Option<OpaqueId>,
+    pub job: Option<OpaqueId>,
+}
+impl DiagnosticContext {
+    pub fn attach(&self, mut record: Record) -> Record {
+        record.trace = self.trace.clone();
+        record.session = self.session.clone();
+        record.job = self.job.clone();
+        record
+    }
+}
+
 /// Agent diagnostics: every field is a closed tag or a number, never text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentDetail {
@@ -216,6 +266,8 @@ pub struct AgentDetail {
     pub input_bytes: Option<u32>,
     pub output_bytes: Option<u32>,
     pub exit_number: Option<i32>,
+    pub validation: Option<ValidationRule>,
+    pub group_index: Option<u32>,
     pub candidate_index: Option<u32>,
     pub style: Option<Style>,
     pub requested: Option<u32>,
@@ -241,6 +293,8 @@ impl AgentDetail {
             input_bytes: None,
             output_bytes: None,
             exit_number: None,
+            validation: None,
+            group_index: None,
             candidate_index: None,
             style: None,
             requested: None,

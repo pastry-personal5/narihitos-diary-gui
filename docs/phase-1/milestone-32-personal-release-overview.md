@@ -2,6 +2,27 @@
 
 Status: Active
 
+## Illustrated generation diagnostics follow-up (2026-11-14)
+
+- [x] Report a closed validation rule and optional one-based group index without logging generated content or parser exception text.
+- [x] Correlate Illustrated admission, agent validation, photo progress and terminal outcome by request trace, session and job through the existing trace reader.
+- [x] Cover validation reasons, strict log codec/redaction and job/trace selection in delegated regressions; pass the repository gate and update debugging guidance.
+
+Evidence: delegated detailed validator and strict codec tests passed, including
+rule/group attribution and untrusted-tag rejection. The real log-store/provider
+test passed with seeded input/output/prompt redaction and job/trace selection.
+Its previous bare `401` substring assertion was narrowed to the actual raw error
+prefix, since timestamps, durations and opaque IDs may contain those digits.
+The isolated synthetic Illustrated smoke passed success, malformed output and
+render failure with complete correlated timelines and no duplicate admission;
+evidence is in temporary directory `diary-illustrated-tz5n4ejx`. The first sandbox
+loopback denial was superseded by the passing run with loopback access. All
+seven repository gate lanes passed in `run.nxinmX`; focused log-store validation
+also passed after the redaction-assertion correction. The ordinary debug server
+was rebuilt by the synthetic smoke. No live AI/GPU generation, production server
+restart or release qualification is claimed. Restart the running server before
+reproducing to use the new diagnostics.
+
 ## Krea factory image size follow-up (2026-11-13)
 
 Apply the owner's requested half-width, half-height factory default through the

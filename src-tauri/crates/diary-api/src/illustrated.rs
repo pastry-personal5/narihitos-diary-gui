@@ -3,6 +3,7 @@ use super::*;
 use axum::extract::rejection::JsonRejection;
 use diary_application::{
     agent::*,
+    diagnostics::DiagnosticContext,
     illustrated::{self, Error},
 };
 use diary_domain::authentic::DiaryDate;
@@ -218,6 +219,7 @@ pub fn progress(s: &ServerState, session: &str, id: &str) -> Option<Value> {
     )
 }
 pub async fn create(
+    Extension(trace): Extension<TraceId>,
     State(s): State<Arc<ServerState>>,
     Path(d): Path<String>,
     headers: HeaderMap,
@@ -302,6 +304,12 @@ pub async fn create(
     s.illustrated_jobs.lock().unwrap().insert(id.clone(), p);
     imports::publish(&s, &mut c, &session, &job);
     drop(c);
+    let context = DiagnosticContext {
+        trace: Some(trace),
+        session: OpaqueId::parse(&session),
+        job: OpaqueId::parse(&id),
+    };
+    s.log(context.attach(Record::new(EventCode::IllustratedAdmitted, Level::Info)));
     let response = (StatusCode::ACCEPTED, Json(json!({"job":JobDto::from(job)}))).into_response();
     tokio::task::spawn_blocking(move || {
         let creation = illustrated::Creation {
@@ -319,12 +327,31 @@ pub async fn create(
             created_at: instant(),
             cancel: cancel.clone(),
         };
-        let result = creation.execute(
+        let result = creation.execute_traced(
             &mut || {
                 let u = Uuid::new_v4();
                 u32::from_le_bytes(u.as_bytes()[..4].try_into().unwrap())
             },
             &mut |photo, total| {
+                if total > 0 {
+                    s.log(
+                        context.attach(
+                            Record::new(
+                                if photo == 0 {
+                                    EventCode::IllustratedTextReady
+                                } else {
+                                    EventCode::IllustratedPhoto
+                                },
+                                Level::Info,
+                            )
+                            .count(if photo == 0 {
+                                total as u32
+                            } else {
+                                photo as u32
+                            }),
+                        ),
+                    );
+                }
                 let mut c = s.coordinator.lock().unwrap();
                 if let Some(p) = s.illustrated_jobs.lock().unwrap().get_mut(&id) {
                     p.photo = photo;
@@ -334,7 +361,33 @@ pub async fn create(
                     imports::publish(&s, &mut c, &session, &j);
                 }
             },
+            context.clone(),
         );
+        let mut terminal = Record::new(
+            EventCode::IllustratedFinished,
+            match result {
+                Ok(()) | Err(Error::Cancelled) => Level::Info,
+                Err(_) => Level::Warn,
+            },
+        );
+        if let Err(e) = result {
+            terminal = terminal.error(match e {
+                Error::Agent => ErrorTag::AgentFailed,
+                Error::Render => ErrorTag::RenderFailed,
+                Error::Storage => ErrorTag::StorageFailed,
+                Error::NotFound => ErrorTag::NoAuthentic,
+                Error::ProfileUnavailable => ErrorTag::ProfileNotReady,
+                Error::EngineUnavailable => ErrorTag::EngineUnavailable,
+                Error::SourceBusy => ErrorTag::SourceBusy,
+                Error::Cancelled => ErrorTag::Cancelled,
+                Error::Invalid => ErrorTag::Invalid,
+                Error::Stale => ErrorTag::StaleRevision,
+                Error::Busy => ErrorTag::Busy,
+                Error::ConfirmationRequired => ErrorTag::Denied,
+                Error::Unavailable => ErrorTag::Unavailable,
+            });
+        }
+        s.log(context.attach(terminal));
         let mut c = s.coordinator.lock().unwrap();
         if let Some(p) = s.illustrated_jobs.lock().unwrap().get_mut(&id) {
             p.terminal = true;

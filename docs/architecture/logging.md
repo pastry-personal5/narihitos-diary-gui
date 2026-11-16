@@ -101,3 +101,35 @@ Synthetic fixtures with an injected clock must show: daily rollover at local mid
 P1-M22 extends the typed agent detail with optional candidate index, closed style ID, requested/ready/failed/cancelled/not-started counts. Adapter lifecycle records identify the candidate index and style; the API emits one terminal generation summary with the opaque job/session IDs and counts. These fields are numbers or closed enums; source bodies, candidate text, prompts, paths and raw diagnostics cannot be attached. The log codec round-trips the additional fields and continues rejecting unknown fields/tags.
 
 Generation preparation emits client debug events `ui.generation_preparing`, `ui.generation_dirty`, `ui.generation_saving`, `ui.generation_flushing`, `ui.generation_submitting` and `ui.generation_admitted`. The last stage reached identifies where an attempt stopped; counts describe selected or dirty snippets only. `ui.generation_failed` is a warning with a closed error tag (unknown exceptions become `unavailable`). Server `generation.capture` warnings identify profile/context/source capture failures with session ID and a closed error tag, before a job exists. These use the existing diagnostic command, rate limits and debug opt-in; no selected IDs, labels, dates, paths or exception strings are sent by the WebView. Diagnostic rejection or failure never changes generation behavior.
+
+## Illustrated generation records
+
+Illustrated creation emits `illustrated.admitted`, `illustrated.text_ready`,
+`illustrated.photo` and `illustrated.finished` server records. Each carries the
+creation request's trace ID, session and job ID; the worker's `agent.run` or
+`agent.blocked` record carries the same IDs. These diagnostic IDs are never
+included in provider input. Stage records are `info` so the default server log
+retains the timeline. Terminal failures are `warn`; success and cancellation are
+`info`. For `text_ready`, `n` is the total planned photos; for `photo`, `n` is the
+one-based photo being started. The terminal `err` distinguishes agent, render,
+storage, source and prerequisite failures. A finished record without `err` means
+success. Duplicate admission retries reuse the job without a second timeline.
+
+Illustrated output rejection adds `agent.validation`, a closed rule tag, and
+`agent.group_index` when the rule concerns a specific one-based group. Rules
+identify result size, JSON syntax/schema, theme/group counts, invalid theme
+labels, empty/forbidden/oversize text, alt or prompt fields, invalid/duplicate
+indices and missing theme coverage. Only the first failed rule is reported.
+`json_schema` includes missing, duplicate, unknown or incorrectly typed fields;
+parser messages and field values are never recorded. Validation and acceptance
+rules are unchanged. Provider output and temporary response files remain
+unretained; no content-level debug mode is introduced.
+
+Use `trace --select recent:20` to find an `illustrated.finished` failure, then
+`trace --select job:<job-id>` for the full worker timeline, or
+`trace --select trace:<trace-id>` to correlate the creation request. The strict
+codec revalidates the added tags, rejects unknown values and continues reading
+older records without them. Failed validation appears before any photo record;
+render failure follows the corresponding photo record, and storage failure can
+follow the last photo. These records describe attempted stages, not durable
+recovery state.

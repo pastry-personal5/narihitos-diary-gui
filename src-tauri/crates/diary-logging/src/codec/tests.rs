@@ -302,3 +302,31 @@ fn export_detail_round_trips_and_rejects_free_text() {
     let bad = line.replace("object_not_found", "Not Allowed");
     assert!(parse_line(&bad).is_none());
 }
+
+#[test]
+fn illustrated_validation_rules_round_trip_and_reject_untrusted_tags() {
+    for rule in ValidationRule::ALL {
+        let mut detail = AgentDetail::new(AgentKind::Codex);
+        detail.validation = Some(*rule);
+        detail.group_index = Some(2);
+        let record = Record::new(EventCode::AgentRun, Level::Warn).agent(detail);
+        let line = render_line(
+            &Header {
+                ts: TS,
+                role: Role::Server,
+                instance: None,
+            },
+            &record,
+        )
+        .unwrap();
+        assert_eq!(parse_line(&line).unwrap().record, record);
+        assert!(parse_line(&line.replace(rule.as_str(), "private_generated_content")).is_none());
+        assert!(
+            parse_line(&line.replace(
+                "\"group_index\":2",
+                "\"group_index\":\"private_generated_content\""
+            ))
+            .is_none()
+        );
+    }
+}

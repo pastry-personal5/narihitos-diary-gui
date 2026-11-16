@@ -86,8 +86,9 @@ Path(os.environ['DIARY_IMAGE_OUT']).write_bytes(png)
     assert record, 'isolated server readiness timed out'
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     session = None
+    request_trace = uuid.uuid4().hex
     def call(path, method='GET', body=None, authorized=True):
-        headers = {'Authorization': 'Bearer ' + record['token'], 'Content-Type': 'application/json'}
+        headers = {'Authorization': 'Bearer ' + record['token'], 'Content-Type': 'application/json', 'X-Diary-Trace-Id': request_trace}
         if authorized and session:
             headers['X-Diary-Session'] = session
         request = urllib.request.Request(record['origin'] + '/api/v1' + path, method=method, headers=headers, data=None if body is None else json.dumps(body).encode())
@@ -123,9 +124,30 @@ Path(os.environ['DIARY_IMAGE_OUT']).write_bytes(png)
             assert call('/sessions/' + session + '/heartbeat', 'POST')[0] == 204
             time.sleep(1)
         raise AssertionError('illustrated job timed out')
+    def trace_job(job, codes, error=None, validation=None):
+        deadline = time.monotonic() + 5
+        while True:
+            output = subprocess.run([str(binary), 'trace', '--config', str(config), '--select', 'job:' + job], check=True, capture_output=True, text=True)
+            lines = [json.loads(line) for line in output.stdout.splitlines()]
+            events = [line for line in lines if 'code' in line]
+            if events and events[-1]['code'] == 'illustrated.finished':
+                break
+            assert time.monotonic() < deadline, 'terminal diagnostic not persisted'
+            time.sleep(0.05)
+        assert [line['code'] for line in events] == codes, events
+        assert all(line['trace'] == request_trace and line['sess'] == session for line in events)
+        assert events[-1].get('err') == error, events[-1]
+        if validation:
+            assert events[1]['agent']['validation'] == validation, events[1]
+        assert lines[-1]['summary']['invalid'] == 0
+        assert 'I had tea' not in output.stdout and 'morning tea' not in output.stdout
+        traced = subprocess.run([str(binary), 'trace', '--config', str(config), '--select', 'trace:' + request_trace], check=True, capture_output=True, text=True)
+        assert job in traced.stdout
     started = time.monotonic()
     job = start()
     wait(job, 'succeeded')
+    if not args.live:
+        trace_job(job, ['illustrated.admitted', 'agent.run', 'illustrated.text_ready', 'illustrated.photo', 'illustrated.photo', 'illustrated.finished'])
     status, entry = call('/illustrated/' + date)
     assert status == 200 and entry['theme_count'] >= len(entry['photos']) >= 1, entry
     version = entry['version']
@@ -135,6 +157,11 @@ Path(os.environ['DIARY_IMAGE_OUT']).write_bytes(png)
     assert authentic_path.read_bytes() == original
     assert call('/authentic')[1]['items'][0]['date'] == date
     if not args.live:
+        (home / 'scenario').write_text('malformed')
+        job = start()
+        wait(job, 'failed')
+        trace_job(job, ['illustrated.admitted', 'agent.run', 'illustrated.finished'], 'agent_failed', 'json_syntax')
+        assert call('/illustrated/' + date)[1]['version'] == version
         # Cancel while the real supervised fake agent is blocked, before any renderer starts.
         (home / 'scenario').write_text('silent-exec')
         (home / 'stdin').unlink(missing_ok=True)
@@ -149,7 +176,9 @@ Path(os.environ['DIARY_IMAGE_OUT']).write_bytes(png)
         assert call('/illustrated/' + date)[1]['version'] == version
         (home / 'scenario').write_text('illustrated')
         (base / 'control').write_text('fail')
-        wait(start(), 'failed')
+        job = start()
+        wait(job, 'failed')
+        trace_job(job, ['illustrated.admitted', 'agent.run', 'illustrated.text_ready', 'illustrated.photo', 'illustrated.finished'], 'render_failed')
         assert call('/illustrated/' + date)[1]['version'] == version
         (base / 'control').write_text('slow')
         job = start()

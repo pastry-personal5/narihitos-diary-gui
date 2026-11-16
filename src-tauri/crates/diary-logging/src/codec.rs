@@ -6,7 +6,7 @@ use diary_application::agent::{AgentErrorCode, AgentKind, Reason, Style};
 use diary_application::diagnostics::{
     ActionTag, AgentDetail, Component, ErrorTag, EventCode, ExitTag, ExportDetail, Fault, Level,
     OpaqueId, PathClass, PhaseTag, Record, ResourceDetail, ResourceKind, Role, StateTag, StatusTag,
-    StopTag, Token, TraceId,
+    StopTag, Token, TraceId, ValidationRule,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -124,6 +124,11 @@ pub fn render_line(h: &Header, r: &Record) -> Option<String> {
         tag(&mut s, "exit", a.exit.map(ExitTag::as_str));
         tag(&mut s, "reason", a.reason.map(Reason::as_str));
         tag(&mut s, "status", a.status.map(StatusTag::as_str));
+        tag(
+            &mut s,
+            "validation",
+            a.validation.map(ValidationRule::as_str),
+        );
         tag(&mut s, "style", a.style.map(Style::id));
         if let Some(v) = a.changed {
             let _ = write!(s, r#","changed":{v}"#);
@@ -133,6 +138,7 @@ pub fn render_line(h: &Header, r: &Record) -> Option<String> {
             ("ev", a.events),
             ("in", a.input_bytes),
             ("out", a.output_bytes),
+            ("group_index", a.group_index),
             ("candidate_index", a.candidate_index),
             ("requested", a.requested),
             ("ready", a.ready),
@@ -213,6 +219,8 @@ struct WireExport {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WireAgent {
+    validation: Option<String>,
+    group_index: Option<u32>,
     kind: String,
     action: Option<String>,
     phase: Option<String>,
@@ -305,6 +313,8 @@ fn convert(w: WireLine) -> Result<ParsedLine, ()> {
             input_bytes: a.input,
             output_bytes: a.out,
             exit_number: a.xn,
+            validation: opt(&a.validation, ValidationRule::parse)?,
+            group_index: a.group_index,
             candidate_index: a.candidate_index,
             style: opt(&a.style, |s| Style::ALL.into_iter().find(|v| v.id() == s))?,
             requested: a.requested,

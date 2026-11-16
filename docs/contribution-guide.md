@@ -53,6 +53,16 @@ The trace command is read-only, bounded to 200 records (`--limit` up to 500) and
 
 For Generate failures, launch the client with `DIARY_LOG=debug` (`make gui` already sets it), reproduce once, then use `diary-server trace --config PATH --select debug:50` for preparation stages or `--select recent:20` for failure warnings. Client `ui.generation_*` stages distinguish a dirty-source choice, Entry settling and submission; server `generation.capture` warnings explain rejected profile/source capture. See the [logging contract](architecture/logging.md#generation-records).
 
+For Illustrated generation failures, no debug opt-in is needed. Run
+`diary-server trace --config PATH --select recent:20`, find the failed
+`illustrated.finished` record, then use `--select job:<job-id>` to follow admission,
+agent validation, planned photo count, each photo start and completion. The
+`agent.validation` rule and optional one-based `agent.group_index` identify output
+rejections without exposing generated text. `--select trace:<trace-id>` follows
+the originating creation request. Rebuild and restart the server before
+reproducing to load these diagnostics; older failures have no retained response
+to inspect. See [Illustrated records](architecture/logging.md#illustrated-generation-records).
+
 ## Required validation
 
 Before opening a pull request, run the full checks below from the repository root, except for the owner-approved docs-only P1-M1/P1-M2 exemption. See [development-process.md](development-process.md#definition-of-done) for that exemption and the required documentation review.

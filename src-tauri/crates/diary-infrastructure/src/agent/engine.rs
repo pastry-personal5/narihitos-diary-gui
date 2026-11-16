@@ -165,6 +165,7 @@ impl EventSink for Watch<'_> {
 /// What the run record needs besides the sink's counts.
 #[derive(Default)]
 struct Diag {
+    validation: Option<diary_application::illustrated::ValidationFailure>,
     reason: Option<Reason>,
     stop: Option<StopTag>,
     exit: Option<(ExitTag, Option<i32>)>,
@@ -418,8 +419,14 @@ impl<P: Protocol> Adapter<P> {
             .collect(&inv)
             .map_err(|e| diag.fail(Reason::ResultMissing, e.0))?;
         match request.mode() {
-            Mode::Illustrated(p) => super::output::validate_illustrated(&out.bytes, p.max_photos)
-                .map(AgentOutput::Illustrated),
+            Mode::Illustrated(p) => {
+                super::output::validate_illustrated_detailed(&out.bytes, p.max_photos)
+                    .map(AgentOutput::Illustrated)
+                    .map_err(|failure| {
+                        diag.validation = Some(failure);
+                        C::InvalidOutput.into()
+                    })
+            }
             Mode::Candidate { packet, .. } => {
                 if out.structured == Some(false) {
                     return Err(C::InvalidOutput.into());
@@ -569,6 +576,8 @@ impl<P: Protocol> Adapter<P> {
         d.exit = diag.exit.map(|(t, _)| t);
         d.exit_number = diag.exit.and_then(|(_, n)| n);
         d.reason = diag.reason;
+        d.validation = diag.validation.map(|v| v.rule);
+        d.group_index = diag.validation.and_then(|v| v.group_index);
         d.escaped = Some(diag.escaped);
         d.events = Some(watch.events);
         d.input_bytes = Some(diag.input);
@@ -599,7 +608,7 @@ impl<P: Protocol> Adapter<P> {
         if let Err(e) = &result {
             rec = rec.error(super::host::code_tag(e.0));
         }
-        self.host.emit(rec);
+        self.host.emit(request.diagnostics().attach(rec));
         result
     }
 }

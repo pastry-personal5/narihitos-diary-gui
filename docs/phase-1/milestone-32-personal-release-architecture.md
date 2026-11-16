@@ -4,6 +4,21 @@ Status: Active
 
 Execute the [release checklist](milestone-32-personal-release-overview.md) against the final ordinary packaged app and standalone server. Reuse existing verification tools and application boundaries; fix demonstrated defects with code, regression coverage and docs together. Planning does not certify a capability or authorize new dependencies.
 
+## Illustrated generation diagnostics follow-up (2026-11-14)
+
+Extend the existing typed logging and read-only trace paths for the observed
+Illustrated output rejection. Preserve accepted output, provider prompts and
+content-retention rules. The application validator returns a closed first-failure
+rule with an optional one-based group index; infrastructure maps it to the same
+public `invalid_output` error and attaches only typed diagnostic metadata. The
+API supplies validated request trace/session/job IDs through `AgentRequest`,
+kept separate from provider packet encoding, and emits admission, text-ready,
+photo-start and terminal records. The codec must accept old records, round-trip
+new fields and reject untrusted tags. Synthetic provider/log-store tests and the
+isolated Illustrated API smoke verify failure reasons, redaction and job/trace
+selection before the seven-lane gate. No live generation or production restart is
+needed for acceptance of this diagnostic-only follow-up.
+
 ## Acceptance boundary
 
 Apply the [owner's updated acceptance policy](milestone-32-personal-release-overview.md#acceptance-policy-owner-update-2026-11-09):

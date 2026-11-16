@@ -162,10 +162,24 @@ mod tests {
 }
 
 /// Strict illustrated response; no prose/fence extraction or partial acceptance.
+#[cfg(test)]
 pub fn validate_illustrated(
     bytes: &[u8],
     cap: usize,
 ) -> Result<diary_application::illustrated::Plan, AgentError> {
+    validate_illustrated_detailed(bytes, cap).map_err(|_| bad())
+}
+
+pub fn validate_illustrated_detailed(
+    bytes: &[u8],
+    cap: usize,
+) -> Result<diary_application::illustrated::Plan, diary_application::illustrated::ValidationFailure>
+{
+    use diary_application::{diagnostics::ValidationRule, illustrated::ValidationFailure};
+    let fail = |rule| ValidationFailure {
+        rule,
+        group_index: None,
+    };
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     struct Raw {
@@ -181,9 +195,14 @@ pub fn validate_illustrated(
         prompt: String,
     }
     if bytes.len() > MAX_RESULT_BYTES {
-        return Err(bad());
+        return Err(fail(ValidationRule::ResultTooLarge));
     }
-    let raw: Raw = serde_json::from_slice(bytes).map_err(|_| bad())?;
+    let raw: Raw = serde_json::from_slice(bytes).map_err(|e| {
+        fail(match e.classify() {
+            serde_json::error::Category::Data => ValidationRule::JsonSchema,
+            _ => ValidationRule::JsonSyntax,
+        })
+    })?;
     let plan = diary_application::illustrated::Plan {
         themes: raw.themes,
         groups: raw
@@ -197,7 +216,7 @@ pub fn validate_illustrated(
             })
             .collect(),
     };
-    plan.validate(cap).map_err(|_| bad())?;
+    plan.validate_detailed(cap)?;
     Ok(plan)
 }
 
@@ -217,5 +236,73 @@ mod illustrated_tests {
             assert!(validate_illustrated(bad.as_bytes(), 4).is_err());
         }
         assert!(validate_illustrated(good, 0).is_err());
+    }
+}
+
+#[cfg(test)]
+mod illustrated_diagnostic_tests {
+    use super::*;
+    use diary_application::diagnostics::ValidationRule::*;
+    use serde_json::json;
+
+    #[test]
+    fn rejection_rules_identify_the_failed_constraint_without_content() {
+        let good = json!({"themes":["private theme"],"groups":[{"themes":[1],"text":"private diary", "alt":"private alt", "prompt":"private prompt"}]});
+        let check = |v: serde_json::Value, cap, rule, group_index| {
+            let failure =
+                validate_illustrated_detailed(&serde_json::to_vec(&v).unwrap(), cap).unwrap_err();
+            assert_eq!(failure.rule, rule);
+            assert_eq!(failure.group_index, group_index);
+            assert!(!format!("{failure:?}").contains("private"));
+        };
+        for (field, value, rule) in [
+            ("themes", json!([]), GroupThemesEmpty),
+            ("text", json!(" "), TextEmpty),
+            ("text", json!("private\rdiary"), TextControl),
+            ("text", json!("![private](image)"), TextImage),
+            ("text", json!("<private>"), TextHtml),
+            ("alt", json!(""), AltEmpty),
+            ("alt", json!("x".repeat(1025)), AltTooLarge),
+            ("alt", json!("[private]"), AltCharacters),
+            ("prompt", json!(" "), PromptEmpty),
+            ("prompt", json!("x".repeat(32769)), PromptTooLarge),
+            ("prompt", json!("private\0prompt"), PromptControl),
+            ("themes", json!([0]), ThemeIndex),
+            ("themes", json!([2]), ThemeIndex),
+            ("themes", json!([1, 1]), ThemeDuplicate),
+        ] {
+            let mut v = good.clone();
+            v["groups"][0][field] = value;
+            check(v, 1, rule, Some(1));
+        }
+        for (field, value, rule) in [
+            ("themes", json!([]), ThemeCount),
+            ("themes", json!([""]), ThemeLabel),
+            ("themes", json!(["private", "missing"]), ThemeMissing),
+            ("groups", json!([]), GroupCount),
+        ] {
+            let mut v = good.clone();
+            v[field] = value;
+            check(v, 1, rule, None);
+        }
+        check(good.clone(), 0, GroupCount, None);
+        let mut v = good.clone();
+        v["groups"][0]["text"] = json!("x".repeat(1024 * 1024 + 1));
+        check(v, 1, TextTooLarge, None);
+        let mut v = good;
+        v["private_unknown_field"] = json!("private data");
+        check(v, 1, JsonSchema, None);
+        assert_eq!(
+            validate_illustrated_detailed(b"```private```", 1)
+                .unwrap_err()
+                .rule,
+            JsonSyntax
+        );
+        assert_eq!(
+            validate_illustrated_detailed(&vec![b' '; MAX_RESULT_BYTES + 1], 1)
+                .unwrap_err()
+                .rule,
+            ResultTooLarge
+        );
     }
 }

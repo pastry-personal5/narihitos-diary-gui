@@ -95,48 +95,78 @@ pub struct Plan {
     pub themes: Vec<String>,
     pub groups: Vec<Group>,
 }
+/// A closed rejection reason with a one-based group index when applicable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ValidationFailure {
+    pub rule: crate::diagnostics::ValidationRule,
+    pub group_index: Option<u32>,
+}
 impl Plan {
     pub fn validate(&self, cap: usize) -> Result<(), Error> {
-        if self.themes.is_empty()
-            || self.themes.len() > 1024
-            || self.groups.is_empty()
-            || self.groups.len() > cap
-            || self.groups.len() > 99
-        {
-            return Err(Error::Invalid);
+        self.validate_detailed(cap).map_err(|_| Error::Invalid)
+    }
+    pub fn validate_detailed(&self, cap: usize) -> Result<(), ValidationFailure> {
+        use crate::diagnostics::ValidationRule::*;
+        let fail = |rule, group_index| ValidationFailure { rule, group_index };
+        if self.themes.is_empty() || self.themes.len() > 1024 {
+            return Err(fail(ThemeCount, None));
+        }
+        if self.groups.is_empty() || self.groups.len() > cap || self.groups.len() > 99 {
+            return Err(fail(GroupCount, None));
         }
         let mut seen = vec![false; self.themes.len()];
         for theme in &self.themes {
             if theme.trim().is_empty() || theme.len() > 4096 {
-                return Err(Error::Invalid);
+                return Err(fail(ThemeLabel, None));
             }
         }
         let mut bytes = 0;
-        for g in &self.groups {
+        for (index, g) in self.groups.iter().enumerate() {
+            let group = Some((index + 1) as u32);
             bytes += g.text.len();
-            if g.themes.is_empty()
-                || g.text.trim().is_empty()
-                || g.text.contains(['\0', '\r'])
-                || g.text.contains("![")
-                || g.text.contains('<')
-                || g.alt.is_empty()
-                || g.alt.len() > 1024
-                || g.alt.contains(['[', ']', '\n', '\r', '\\', '\0'])
-                || g.prompt.trim().is_empty()
-                || g.prompt.len() > 32768
-                || g.prompt.contains('\0')
-            {
-                return Err(Error::Invalid);
+            let rule = if g.themes.is_empty() {
+                Some(GroupThemesEmpty)
+            } else if g.text.trim().is_empty() {
+                Some(TextEmpty)
+            } else if g.text.contains(['\0', '\r']) {
+                Some(TextControl)
+            } else if g.text.contains("![") {
+                Some(TextImage)
+            } else if g.text.contains('<') {
+                Some(TextHtml)
+            } else if g.alt.is_empty() {
+                Some(AltEmpty)
+            } else if g.alt.len() > 1024 {
+                Some(AltTooLarge)
+            } else if g.alt.contains(['[', ']', '\n', '\r', '\\', '\0']) {
+                Some(AltCharacters)
+            } else if g.prompt.trim().is_empty() {
+                Some(PromptEmpty)
+            } else if g.prompt.len() > 32768 {
+                Some(PromptTooLarge)
+            } else if g.prompt.contains('\0') {
+                Some(PromptControl)
+            } else {
+                None
+            };
+            if let Some(rule) = rule {
+                return Err(fail(rule, group));
             }
             for &i in &g.themes {
-                if i == 0 || i > seen.len() || seen[i - 1] {
-                    return Err(Error::Invalid);
+                if i == 0 || i > seen.len() {
+                    return Err(fail(ThemeIndex, group));
+                }
+                if seen[i - 1] {
+                    return Err(fail(ThemeDuplicate, group));
                 }
                 seen[i - 1] = true;
             }
         }
-        if seen.contains(&false) || bytes > 1024 * 1024 {
-            return Err(Error::Invalid);
+        if seen.contains(&false) {
+            return Err(fail(ThemeMissing, None));
+        }
+        if bytes > 1024 * 1024 {
+            return Err(fail(TextTooLarge, None));
         }
         Ok(())
     }
@@ -165,6 +195,14 @@ impl Creation<'_> {
         self,
         seed: &mut dyn FnMut() -> u32,
         progress: &mut dyn FnMut(usize, usize),
+    ) -> Result<(), Error> {
+        self.execute_traced(seed, progress, Default::default())
+    }
+    pub fn execute_traced(
+        self,
+        seed: &mut dyn FnMut() -> u32,
+        progress: &mut dyn FnMut(usize, usize),
+        context: crate::diagnostics::DiagnosticContext,
     ) -> Result<(), Error> {
         if self.cancel.is_cancelled() {
             return Err(Error::Cancelled);
@@ -203,7 +241,8 @@ impl Creation<'_> {
         let output = self
             .runner
             .run(
-                AgentRequest::new(self.profile.clone(), self.locale, Mode::Illustrated(packet)),
+                AgentRequest::new(self.profile.clone(), self.locale, Mode::Illustrated(packet))
+                    .with_diagnostics(context),
                 &mut Quiet,
                 &self.cancel,
             )
@@ -254,6 +293,7 @@ impl Creation<'_> {
         entry.render().map_err(|_| Error::Invalid)?;
         let mut rendered = Vec::new();
         let total = entry.photos.len();
+        progress(0, total);
         for (i, photo) in entry.photos.iter_mut().enumerate() {
             if self.cancel.is_cancelled() {
                 return Err(Error::Cancelled);

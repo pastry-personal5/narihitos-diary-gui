@@ -174,6 +174,7 @@ pub enum Mode {
 /// Immutable after construction (private fields).
 #[derive(Clone, PartialEq, Eq)]
 pub struct AgentRequest {
+    diagnostics: crate::diagnostics::DiagnosticContext,
     profile: ProfileHandle,
     locale: Locale,
     mode: Mode,
@@ -181,10 +182,18 @@ pub struct AgentRequest {
 impl AgentRequest {
     pub fn new(profile: ProfileHandle, locale: Locale, mode: Mode) -> Self {
         Self {
+            diagnostics: Default::default(),
             profile,
             locale,
             mode,
         }
+    }
+    pub fn with_diagnostics(mut self, context: crate::diagnostics::DiagnosticContext) -> Self {
+        self.diagnostics = context;
+        self
+    }
+    pub fn diagnostics(&self) -> &crate::diagnostics::DiagnosticContext {
+        &self.diagnostics
     }
     pub fn schema_version(&self) -> u32 {
         SCHEMA_VERSION

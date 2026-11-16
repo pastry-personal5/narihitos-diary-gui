@@ -121,6 +121,37 @@ fn real_log_files_hold_typed_agent_lines_and_no_content() {
         set(k, "");
         let _ = agents.run(request(k), &mut Sink, &CancelToken::default()); // succeeds
     }
+    // Illustrated validation failures retain correlation after the worker exits.
+    use diary_application::diagnostics::{DiagnosticContext, OpaqueId, TraceId, ValidationRule};
+    let context = DiagnosticContext {
+        trace: TraceId::parse(&"a".repeat(32)),
+        session: OpaqueId::parse(&"b".repeat(32)),
+        job: OpaqueId::parse(&"c".repeat(32)),
+    };
+    for (scenario, cap) in [("malformed", 4), ("illustrated", 1)] {
+        set(AgentKind::Codex, scenario);
+        let request = AgentRequest::new(
+            ProfileHandle {
+                alias: "codex".into(),
+                kind: AgentKind::Codex,
+            },
+            Locale::parse("en").unwrap(),
+            Mode::Illustrated(diary_application::illustrated::Packet {
+                body: SECRET.into(),
+                date: diary_domain::authentic::DiaryDate::from_ymd(2026, 11, 14).unwrap(),
+                settings: Default::default(),
+                max_photos: cap,
+            }),
+        )
+        .with_diagnostics(context.clone());
+        assert_eq!(
+            agents
+                .run(request, &mut Sink, &CancelToken::default())
+                .unwrap_err()
+                .0,
+            AgentErrorCode::InvalidOutput
+        );
+    }
     // A refused run: an alias that is not configured.
     let _ = agents.run(
         AgentRequest::new(
@@ -148,7 +179,10 @@ fn real_log_files_hold_typed_agent_lines_and_no_content() {
     for needle in [
         SECRET,
         "Tea was nice",
-        "401",
+        "I had tea",
+        "morning tea",
+        // Numbers also occur legitimately in timestamps, durations and opaque IDs.
+        "unexpected status 401",
         "Unauthorized",
         work_str.as_str(),
         "fake_cli",
@@ -188,6 +222,26 @@ fn real_log_files_hold_typed_agent_lines_and_no_content() {
     // The trace reader shows the refused and failed runs under `recent` (warn and above) and the
     // cancelled runs by their stop tag, re-rendered from typed values.
     let report = collect(&ws, &Selector::Recent(50), 200);
+    for selector in [
+        Selector::Job(context.job.clone().unwrap()),
+        Selector::Trace(context.trace.clone().unwrap()),
+    ] {
+        let traced = collect(&ws, &selector, 200);
+        assert_eq!(traced.invalid, 0);
+        assert_eq!(traced.lines.len(), 2);
+        for (line, expected) in traced
+            .lines
+            .iter()
+            .zip([ValidationRule::JsonSyntax, ValidationRule::GroupCount])
+        {
+            let record = parse_line(line).unwrap().record;
+            assert_eq!(record.trace, context.trace);
+            assert_eq!(record.session, context.session);
+            assert_eq!(record.job, context.job);
+            assert_eq!(record.agent.unwrap().validation, Some(expected));
+        }
+        assert!(!traced.lines.concat().contains(SECRET));
+    }
     assert_eq!(report.invalid, 0);
     let text = report.lines.concat();
     assert!(text.contains(r#""code":"agent.blocked""#), "{text}");
