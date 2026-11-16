@@ -214,8 +214,19 @@ pub fn progress(s: &ServerState, session: &str, id: &str) -> Option<Value> {
     if j.session != session {
         return None;
     }
+    let phase = if j.terminal {
+        "finished"
+    } else if j.run.token().is_cancelled() {
+        "stopping"
+    } else if j.photo == 0 {
+        "text"
+    } else {
+        "photo"
+    };
+    // Clients reject a `text` phase with a count; the planned total is announced by the first photo.
+    let count = if phase == "text" { 0 } else { j.total };
     Some(
-        json!({"kind":"illustrated","job_id":id,"instance_id":s.instance_id,"session_id":session,"origin_date":j.date.to_string(),"phase":if j.terminal{"finished"}else if j.run.token().is_cancelled(){"stopping"}else if j.photo==0{"text"}else{"photo"},"photo_index":j.photo,"photo_count":j.total,"error_code":j.error.map(|e|match e{Error::Cancelled=>"cancelled",Error::Agent=>"agent_failed",Error::Render=>"render_failed",Error::NotFound=>"no_authentic",Error::ProfileUnavailable=>"profile_unavailable",Error::EngineUnavailable=>"engine_unavailable",Error::SourceBusy=>"source_busy",Error::Invalid=>"invalid_illustrated",_=>"unavailable"})}),
+        json!({"kind":"illustrated","job_id":id,"instance_id":s.instance_id,"session_id":session,"origin_date":j.date.to_string(),"phase":phase,"photo_index":j.photo,"photo_count":count,"error_code":j.error.map(|e|match e{Error::Cancelled=>"cancelled",Error::Agent=>"agent_failed",Error::Render=>"render_failed",Error::NotFound=>"no_authentic",Error::ProfileUnavailable=>"profile_unavailable",Error::EngineUnavailable=>"engine_unavailable",Error::SourceBusy=>"source_busy",Error::Invalid=>"invalid_illustrated",_=>"unavailable"})}),
     )
 }
 pub async fn create(
@@ -444,6 +455,35 @@ mod tests {
         s.illustrated_jobs.lock().unwrap().insert(
             JOB.into(),
             illustrated::JobProgress::new(SESSION.into(), DiaryDate::parse("2026-11-13").unwrap()),
+        );
+    }
+
+    #[test]
+    fn text_ready_progress_keeps_the_text_phase_contract() {
+        let s = state();
+        running(&s);
+        // The worker records the planned total before the first photo starts.
+        s.illustrated_jobs
+            .lock()
+            .unwrap()
+            .get_mut(JOB)
+            .unwrap()
+            .total = 3;
+        let p = progress(&s, SESSION, JOB).unwrap();
+        assert_eq!(
+            (p["phase"].as_str(), p["photo_count"].as_u64()),
+            (Some("text"), Some(0))
+        );
+        s.illustrated_jobs
+            .lock()
+            .unwrap()
+            .get_mut(JOB)
+            .unwrap()
+            .photo = 1;
+        let p = progress(&s, SESSION, JOB).unwrap();
+        assert_eq!(
+            (p["phase"].as_str(), p["photo_count"].as_u64()),
+            (Some("photo"), Some(3))
         );
     }
 
