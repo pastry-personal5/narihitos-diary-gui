@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const metadata = JSON.parse(
@@ -142,6 +142,13 @@ describe("explicit command permission boundary", () => {
     "finish_close",
   ].sort();
   const main = readFileSync("src-tauri/src/main.rs", "utf8");
+  // Command wrappers live in src-tauri/src/commands/; main.rs keeps window commands and the handler.
+  const commands = [
+    main,
+    ...readdirSync("src-tauri/src/commands").map((f) =>
+      readFileSync(`src-tauri/src/commands/${f}`, "utf8"),
+    ),
+  ].join("\n");
   const build = readFileSync("src-tauri/build.rs", "utf8");
   const config = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
   const capability = JSON.parse(
@@ -154,7 +161,7 @@ describe("explicit command permission boundary", () => {
     const handler = main
       .match(/generate_handler!\[([^\]]+)\]/u)[1]
       .split(",")
-      .map((v) => v.trim())
+      .map((v) => v.trim().split("::").at(-1))
       .filter(Boolean)
       .sort();
     expect(manifest).toEqual(expected);
@@ -165,7 +172,11 @@ describe("explicit command permission boundary", () => {
         .sort(),
     ).toEqual(expected);
     expect(
-      [...main.matchAll(/#\[tauri::command\]\s*(?:async )?fn ([a-z_]+)/gu)]
+      [
+        ...commands.matchAll(
+          /#\[tauri::command\]\s*(?:pub )?(?:async )?fn ([a-z_]+)/gu,
+        ),
+      ]
         .map((m) => m[1])
         .sort(),
     ).toEqual(expected);
