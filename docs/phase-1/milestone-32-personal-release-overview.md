@@ -2,6 +2,34 @@
 
 Status: Active
 
+## Repository review follow-up (2026-11-16)
+
+Owner-requested whole-repository review. Demonstrated defects only; no behavior,
+acceptance or dependency change beyond each item.
+
+- [x] Illustrated progress keeps the published `text` phase contract (`photo_index`
+      and `photo_count` 0). The 2026-11-14 diagnostics change added a text-ready
+      callback that published `text` with the planned count, which the WebView
+      and native bridge validators reject; its smoke did not exercise them.
+- [x] The Illustrated store ignores Finder `.DS_Store` and AppleDouble `._*`
+      entries, so list, replace, delete and startup recovery no longer fail after
+      the user opens an Illustrated folder in Finder.
+- [x] `.gitignore` uses `config/*`, so the `!config/global_config_example.yaml`
+      re-include works if an example is placed there (the tracked example is
+      `docs/global_config_example.yaml`); private configuration stays ignored.
+- [x] `make fmt`, `make fmt-check`, gate lane G01 and the contribution guide use
+      `cargo fmt --all`, matching the architecture test that already checks every
+      workspace member; plain `cargo fmt` skipped `diary-api`.
+- [x] Focused regressions and the seven-lane repository gate pass.
+
+Evidence: new regressions `text_ready_progress_keeps_the_text_phase_contract`
+(diary-api) and `finder_metadata_does_not_block_list_replace_delete_or_recovery`
+(diary-infrastructure) pass with the focused Illustrated suites (30 tests). The
+first gate attempt failed only G06's workspace-wide `cargo fmt --all --check`,
+which exposed the formatting-command gap; after the fix all seven lanes passed in
+`run.lJ0J1z`. No live AI/GPU generation, packaged app or release qualification is
+claimed.
+
 ## Illustrated generation diagnostics follow-up (2026-11-14)
 
 - [x] Report a closed validation rule and optional one-based group index without logging generated content or parser exception text.
@@ -21,7 +49,9 @@ seven repository gate lanes passed in `run.nxinmX`; focused log-store validation
 also passed after the redaction-assertion correction. The ordinary debug server
 was rebuilt by the synthetic smoke. No live AI/GPU generation, production server
 restart or release qualification is claimed. Restart the running server before
-reproducing to use the new diagnostics.
+reproducing to use the new diagnostics. The 2026-11-16
+[review follow-up](#repository-review-follow-up-2026-11-16) corrects the `text`
+progress shape this change introduced.
 
 ## Krea factory image size follow-up (2026-11-13)
 

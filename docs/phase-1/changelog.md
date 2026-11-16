@@ -36,6 +36,8 @@ This log records Phase 1 decisions and material plan changes. Research recommend
 
 ## Entries
 
+- 2026-11-16 — Owner — Requested a whole-repository review with fixes. Fixed demonstrated defects only: the Illustrated `text` progress contract, Finder metadata in Illustrated storage, workspace-wide `cargo fmt --all` in the format commands and an ineffective `.gitignore` re-include. See the [checklist](milestone-32-personal-release-overview.md#repository-review-follow-up-2026-11-16).
+
 - 2026-11-14 — Owner — Requested specific debug logs and tracing for failed Illustrated generation. Add a diagnostic-only M32 follow-up with closed validation reasons and correlated request/session/job stages; preserve existing acceptance, prompt and content-retention rules. See the [checklist](milestone-32-personal-release-overview.md#illustrated-generation-diagnostics-follow-up-2026-11-14) and [logging contract](../architecture/logging.md#illustrated-generation-records).
 
 - 2026-11-13 — Owner, Krea factory size — Halve the default width and height to 624 × 832 pixels, preserving 3:4 portrait and no upscaling; tracked in the [M32 follow-up](milestone-32-personal-release-overview.md#krea-factory-image-size-follow-up-2026-11-13).
